@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My variables — Epireum's Data Engineering Lab</title>
+  <style>
+    :root{
+      --bg:#0b1020; --panel:#141b2e; --panel2:#1b2438; --line:#2a3550;
+      --ink:#e8edf7; --muted:#9aa8c7; --accent:#6d8bff; --accent2:#39d0c4; --danger:#ff6b6b; --gold:#e2b93b;
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    html,body{min-height:100%}
+    body{margin:0; color:var(--ink);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+      background:radial-gradient(1200px 600px at 80% -10%, rgba(109,139,255,.18), transparent 60%),
+                 radial-gradient(900px 500px at -10% 10%, rgba(57,208,196,.12), transparent 55%), var(--bg)}
+    a{color:inherit; text-decoration:none}
+    button{font:inherit; cursor:pointer; border-radius:9px; padding:7px 13px; border:1px solid var(--line); background:var(--panel2); color:var(--ink)}
+    button:hover{border-color:var(--accent)}
+    button:disabled{opacity:.45; cursor:not-allowed}
+    button.primary{border:0; font-weight:700; color:#0b1020; background:linear-gradient(135deg,var(--accent),var(--accent2))}
+    button.small{padding:3px 9px; font-size:.82rem}
+    button.danger{border-color:rgba(255,107,107,.55); color:#ffb3b0}
+    button.danger:hover{background:rgba(255,107,107,.12)}
+    input[type=text], input[type=password]{font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line);
+      border-radius:8px; padding:7px 10px; outline:none; width:100%}
+    input:focus{border-color:var(--accent)}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--accent2)}
+    .pagebar{padding:10px 28px; border-bottom:1px solid var(--line); background:rgba(20,27,46,.45)}
+    .pagebar h1{margin:0; font-size:1.1rem; font-weight:800} .pagebar h1 .dot{color:var(--accent)}
+    main{max-width:980px; margin:0 auto; padding:18px 22px; display:flex; flex-direction:column; gap:14px}
+    .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px}
+    .card h3{margin:0 0 10px; font-size:.95rem; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em}
+    .sub{color:var(--muted); font-size:.88rem; margin:0 0 10px}
+    .form{display:grid; grid-template-columns:1fr 2fr auto auto; gap:10px; align-items:center}
+    .form label.chk{display:flex; align-items:center; gap:6px; color:var(--muted); font-size:.9rem; white-space:nowrap}
+    table{width:100%; border-collapse:collapse}
+    td,th{padding:8px 10px; border-bottom:1px solid var(--line); text-align:left; font-size:.92rem; vertical-align:middle}
+    th{color:var(--muted); font-size:.75rem; text-transform:uppercase; letter-spacing:.05em}
+    tr:last-child td{border-bottom:0}
+    td.name{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-weight:600}
+    td.val{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--muted); max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+    td.r{text-align:right; white-space:nowrap}
+    .tag{font-size:.68rem; padding:1px 7px; border-radius:999px; border:1px solid rgba(226,185,59,.55); color:#f3d98b}
+    .empty{color:var(--muted); padding:14px 4px}
+    pre{margin:0; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; overflow:auto; font-size:.86rem}
+    .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--line);
+           padding:10px 16px; border-radius:10px; box-shadow:var(--shadow); display:none; z-index:10}
+    .toast.err{border-color:var(--danger); color:#ffb3b0}
+    @media (max-width:720px){ .pagebar{padding:10px 16px} main{padding:14px 16px} .form{grid-template-columns:1fr} td.val{max-width:140px} }
+  </style>
+</head>
+<body>
+  <header id="lab-top"></header>
+  <script src="/lab-header.js?v=4"></script>
+  <div class="pagebar"><h1>🔑 My variables <span class="dot">·</span> environment for your notebooks</h1></div>
+  <main>
+    <div class="card">
+      <h3 id="form-title">Add a variable</h3>
+      <p class="sub">Only you can see these. Mark keys and passwords as <b>secret</b>: they are never shown again
+        (you can replace them). Names the lab sets itself — <code>AWS_*</code>, <code>LAKE_*</code>, <code>SPARK_*</code>,
+        <code>GIT_*</code>, <code>PATH</code>… — are not allowed.</p>
+      <div class="form">
+        <input type="text" id="name" placeholder="NAME  e.g. RFS_ACCESS_KEY" autocomplete="off" spellcheck="false">
+        <input type="password" id="value" placeholder="value" autocomplete="new-password" spellcheck="false">
+        <label class="chk"><input type="checkbox" id="secret" checked> secret</label>
+        <div style="display:flex; gap:8px">
+          <button class="primary" id="save">Save</button>
+          <button id="cancel" hidden>Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Your variables</h3>
+      <table>
+        <thead><tr><th>Name</th><th>Value</th><th>Updated (UTC)</th><th></th></tr></thead>
+        <tbody id="rows"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Use them in a notebook</h3>
+      <p class="sub">Every notebook loads them into <code>os.environ</code> when its kernel starts. Changed something
+        here? Run <code>lab_env()</code> — no restart needed.</p>
+      <pre>import os
+lab_env()                               # reload after a change on this page
+key = os.environ["RFS_ACCESS_KEY"]
+secret = os.environ.get("RFS_SECRET_KEY")</pre>
+    </div>
+  </main>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // Everything goes through /api/env (home-api, behind the Keycloak login). The variables live in
+    // YOUR bucket (.lab/env.json); the server always uses the logged-in member's bucket.
+    var $ = function (id) { return document.getElementById(id); };
+    var editing = null;          // name being edited, or null when adding
+    function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+    function toast(m, err) { var t = $('toast'); t.textContent = m; t.className = 'toast' + (err ? ' err' : ''); t.style.display = 'block';
+      clearTimeout(t._h); t._h = setTimeout(function () { t.style.display = 'none'; }, 3500); }
+    function api(method, query, body) {
+      var opts = {method: method, credentials: 'same-origin', headers: {'X-Lab-Request': '1'}};
+      if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+      return fetch('/api/env' + (query ? '?' + new URLSearchParams(query) : ''), opts)
+        .then(function (r) { return r.json().then(function (j) { return {ok: r.ok, body: j}; }); });
+    }
+
+    function load() {
+      api('GET').then(function (r) {
+        var tb = $('rows'); tb.innerHTML = '';
+        if (!r.ok) { tb.innerHTML = ''; var td = el('td', 'empty', r.body.error || 'could not load'); td.colSpan = 4;
+          var tr = el('tr'); tr.appendChild(td); tb.appendChild(tr); return; }
+        if (!r.body.vars.length) { var td2 = el('td', 'empty', 'No variables yet — add one above.'); td2.colSpan = 4;
+          var tr2 = el('tr'); tr2.appendChild(td2); tb.appendChild(tr2); return; }
+        r.body.vars.forEach(function (v) {
+          var tr = el('tr');
+          tr.appendChild(el('td', 'name', v.name));
+          var val = el('td', 'val');
+          if (v.secret) { val.textContent = '••••••••  '; val.appendChild(el('span', 'tag', 'secret')); }
+          else { val.textContent = v.value; val.title = v.value; }
+          tr.appendChild(val);
+          tr.appendChild(el('td', null, v.updated || ''));
+          var act = el('td', 'r');
+          var ed = el('button', 'small', 'Edit'); ed.onclick = function () { edit(v); };
+          var del = el('button', 'small danger', 'Delete'); del.style.marginLeft = '6px';
+          del.onclick = function () { remove(v.name, del); };
+          act.appendChild(ed); act.appendChild(del); tr.appendChild(act);
+          tb.appendChild(tr);
+        });
+      });
+    }
+
+    function edit(v) {
+      editing = v.name;
+      $('form-title').textContent = 'Change ' + v.name;
+      $('name').value = v.name; $('name').disabled = true;
+      $('secret').checked = v.secret;
+      $('value').type = v.secret ? 'password' : 'text';
+      $('value').value = v.secret ? '' : v.value;
+      $('value').placeholder = v.secret ? 'leave empty to keep the current value' : 'value';
+      $('cancel').hidden = false; $('value').focus();
+    }
+    function reset() {
+      editing = null;
+      $('form-title').textContent = 'Add a variable';
+      $('name').value = ''; $('name').disabled = false; $('value').value = '';
+      $('value').placeholder = 'value'; $('secret').checked = true; $('value').type = 'password';
+      $('cancel').hidden = true;
+    }
+    function save() {
+      var name = $('name').value.trim(), value = $('value').value;
+      if (!name) return toast('Give the variable a name.', true);
+      var body = {name: name, secret: $('secret').checked};
+      // editing with an empty box keeps the stored value (secrets are never sent back to retype)
+      if (!(editing && value === '')) body.value = value;
+      $('save').disabled = true;
+      api('POST', null, body).then(function (r) {
+        $('save').disabled = false;
+        if (!r.ok) return toast(r.body.error || 'not saved', true);
+        toast(name + ' saved — run lab_env() in an open notebook to use it.');
+        reset(); load();
+      }).catch(function () { $('save').disabled = false; toast('not saved', true); });
+    }
+    function remove(name, btn) {
+      if (btn.dataset.sure !== '1') {                 // second click confirms (no browser dialog)
+        btn.dataset.sure = '1'; btn.textContent = 'Sure?';
+        setTimeout(function () { btn.dataset.sure = ''; btn.textContent = 'Delete'; }, 3000);
+        return;
+      }
+      api('DELETE', {name: name}).then(function (r) {
+        if (!r.ok) return toast(r.body.error || 'not deleted', true);
+        toast(name + ' deleted'); if (editing === name) reset(); load();
+      });
+    }
+
+    $('secret').onchange = function () { $('value').type = $('secret').checked ? 'password' : 'text'; };
+    $('save').onclick = save;
+    $('cancel').onclick = reset;
+    $('value').onkeydown = $('name').onkeydown = function (e) { if (e.key === 'Enter') save(); };
+    load();
+  </script>
+</body>
+</html>

@@ -32,12 +32,23 @@ the logged-in user; nothing from the browser can point at another bucket.
   GET    /api/admin/jobs?id=…                            → {"state": running|done|error, "result"|"error"}
   GET    /api/admin/settings · POST {"registration": bool}  self-registration on the sign-in page
 
+"My variables" — the learner's own environment variables (e.g. keys for an outside S3), kept
+in their OWN bucket as .lab/env.json. Every notebook kernel loads them into os.environ at start
+(00-spark.py); lab_env() reloads them without a restart. Secret values are never sent back.
+Changes need the X-Lab-Request header (a plain cross-site form can't send it).
+  GET    /api/env                                        names (+ values of non-secrets)
+  POST   /api/env  {"name", "value"?, "secret"}          add / change (no value = keep it)
+  DELETE /api/env?name=…                                 remove
+
 Only reachable through oauth2-proxy (it is not published), so the identity headers can
 be trusted. Standard library only.
 """
+import io
 import json
 import os
+import re
 import threading
+import time
 import urllib.error
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -68,6 +79,36 @@ _lock = threading.Lock()
 _jobs = {}                # manager actions: id → {"state", "result" | "error", …}
 _ACTIONS = {"create": labadmin.create, "password": labadmin.set_password,
             "reset": labadmin.reset_lakehouse, "wipe": labadmin.wipe, "delete": labadmin.delete}
+
+# "My variables": stored in the learner's own bucket. Names the lab itself sets (keys, Spark,
+# lakehouse login, git, Python/system paths) are refused — overriding them breaks the notebook.
+ENV_KEY = ".lab/env.json"
+ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
+ENV_RESERVED_PREFIX = ("AWS_", "LAKE_", "SPARK_", "PYSPARK_", "GIT_", "JUPYTER", "JPY_", "MV_",
+                       "LD_", "PYTHON", "KUBERNETES_", "POLARIS_")
+ENV_RESERVED = {"PATH", "HOME", "USER", "SHELL", "LANG", "TZ", "PWD", "HOSTNAME", "TERM",
+                "SHARED_CATALOG"}
+ENV_MAX_VARS, ENV_MAX_VALUE = 50, 4096
+
+
+def env_reserved(name):
+    up = name.upper()
+    return up in ENV_RESERVED or up.startswith(ENV_RESERVED_PREFIX)
+
+
+def _env_read(bucket):
+    try:
+        with lh.get_object(bucket, ENV_KEY) as r:
+            return json.loads(r.read() or b"{}")
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return {}
+        raise
+
+
+def _env_write(bucket, data):
+    body = json.dumps(data, indent=1, sort_keys=True).encode()
+    lh.put_object(bucket, ENV_KEY, io.BytesIO(body), len(body), "application/json")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -118,6 +159,8 @@ class Handler(BaseHTTPRequestHandler):
             if method == "GET" and path == "/api/files":
                 prefix = (q.get("prefix") or "").lstrip("/")
                 folders, files = lh.list_dir(bucket, prefix)
+                if not prefix:                       # "My variables" file: managed on its own page
+                    folders = [f for f in folders if f != ".lab/"]
                 kids = {f[len(prefix):] for f in folders}
                 return self._json(200, {
                     "bucket": bucket, "prefix": prefix,
@@ -216,6 +259,67 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             return self._json(500, {"error": str(e)})
 
+    def _env(self, method):
+        """All /api/env calls — the logged-in learner's own variables, in their own bucket."""
+        path, q = self._route()
+        user = self._user()
+        if not user:
+            return self._json(401, {"error": "not logged in"})
+        name = lake_name(user)
+        bucket = bucket_name(name)
+        try:
+            self._ensure(name)
+            if path != "/api/env":
+                return self._json(404, {"error": "not found"})
+            if method == "GET":
+                data = _env_read(bucket)
+                return self._json(200, {"vars": [
+                    {"name": k, "secret": bool(v.get("secret")), "updated": v.get("updated"),
+                     **({} if v.get("secret") else {"value": v.get("value", "")})}
+                    for k, v in sorted(data.items())]})
+            if self.headers.get("X-Lab-Request") != "1":
+                return self._json(403, {"error": "missing X-Lab-Request header"})
+            with _lock:                                  # one change at a time (read-modify-write)
+                data = _env_read(bucket)
+                if method == "DELETE":
+                    key = q.get("name", "")
+                    if data.pop(key, None) is None:
+                        return self._json(404, {"error": f"no variable {key}"})
+                    _env_write(bucket, data)
+                    return self._json(200, {"deleted": key})
+                if method != "POST":
+                    return self._json(404, {"error": "not found"})
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(length) or b"{}") if length else {}
+                key = (body.get("name") or "").strip()
+                value = body.get("value")
+                if not ENV_NAME.match(key):
+                    raise ValueError("name: letters, digits and _ only, not starting with a digit (max 64)")
+                if env_reserved(key):
+                    raise ValueError(f"{key} is set by the lab itself — choose another name")
+                if value is None:
+                    if key not in data:
+                        raise ValueError("value is required")
+                    value = data[key]["value"]           # edit without retyping a secret
+                if not isinstance(value, str) or len(value) > ENV_MAX_VALUE:
+                    raise ValueError(f"value: text up to {ENV_MAX_VALUE} characters")
+                if key not in data and len(data) >= ENV_MAX_VARS:
+                    raise ValueError(f"at most {ENV_MAX_VARS} variables")
+                data[key] = {"value": value, "secret": bool(body.get("secret")),
+                             "updated": time.strftime("%Y-%m-%d %H:%M", time.gmtime())}
+                _env_write(bucket, data)
+            print(f"[home-api] {user}: variable {key} saved", flush=True)   # never the value
+            return self._json(200, {"saved": key})
+        except ValueError as e:
+            return self._json(400, {"error": str(e)})
+        except urllib.error.HTTPError as e:
+            msg = e.read().lower()
+            if b"quota" in msg:
+                return self._json(503, {"error": "Your bucket is full or still being prepared — try again shortly."})
+            return self._json(502, {"error": f"storage: HTTP {e.code}"})
+        except Exception as e:
+            return self._json(500, {"error": str(e)})
+
     def _admin(self, method):
         """All /api/admin* calls — managers only. Changes need the X-Lab-Admin header (a plain
         cross-site form can't send it) and act on other accounts, never your own."""
@@ -273,6 +377,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin(method)
         if self.path.startswith("/api/catalogs"):
             return self._catalogs(method)
+        if self.path.startswith("/api/env"):
+            return self._env(method)
         return self._files(method)
 
     def do_PUT(self):
@@ -293,6 +399,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._catalogs("GET")
         if self.path.startswith("/api/admin"):
             return self._admin("GET")
+        if self.path.startswith("/api/env"):
+            return self._env("GET")
         if self.path != "/api/me":
             return self._json(404, {"error": "not found"})
         user = self._user()

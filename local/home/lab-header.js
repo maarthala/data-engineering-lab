@@ -1,4 +1,4 @@
-// The lab's top bar — the same on every page (home, My files, My catalogs).
+// The lab's top bar — the same on every page (home, My files, My catalogs, My variables).
 // A page puts <header id="lab-top"></header> where the bar goes and loads this script; it draws
 // the brand, who's signed in + their lakehouse, the page links (current one highlighted; managers
 // also get Manage members) and Log out. /api/me (home-api, behind the Keycloak login) also creates the learner's lakehouse
@@ -38,7 +38,7 @@
     '<div><div class="name">Epireum\'s Data Engineering Lab</div>' +
     '<div class="tag">Your gateway to a Data Engineering career</div></div></a>' +
     '<div class="me" id="me" hidden><span>Hi <b id="me-name"></b></span><span class="lake" id="me-lake"></span>' +
-    link('/', '🏠 Home') + link('/files.html', '📁 My files') + link('/catalogs.html', '🗂️ My catalogs') +
+    link('/', '🏠 Home') + link('/files.html', '📁 My files') + link('/catalogs.html', '🗂️ My catalogs') + link('/variables.html', '🔑 My variables') +
     '<span id="me-admin" hidden>' + link('/manage.html', '👥 Manage members') + '</span>' +
     '<a class="btn" id="me-out" href="#">Log out</a></div>';
 

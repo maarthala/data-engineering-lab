@@ -23,6 +23,8 @@ data:
 {{ .Files.Get "files/home/catalogs.html" | indent 4 }}
   manage.html: |
 {{ .Files.Get "files/home/manage.html" | indent 4 }}
+  variables.html: |
+{{ .Files.Get "files/home/variables.html" | indent 4 }}
   lab-header.js: |
 {{ .Files.Get "files/home/lab-header.js" | indent 4 }}
   default.conf: |
@@ -54,6 +56,7 @@ spec:
             - { name: html, mountPath: /usr/share/nginx/html/files.html, subPath: files.html }
             - { name: html, mountPath: /usr/share/nginx/html/catalogs.html, subPath: catalogs.html }
             - { name: html, mountPath: /usr/share/nginx/html/manage.html, subPath: manage.html }
+            - { name: html, mountPath: /usr/share/nginx/html/variables.html, subPath: variables.html }
             - { name: html, mountPath: /usr/share/nginx/html/lab-header.js, subPath: lab-header.js }
             - { name: html, mountPath: /usr/share/nginx/html/img/epireum-logo.png, subPath: epireum-logo.png }
             # bigger header limit: oauth2-proxy forwards the session + sign-in cookies

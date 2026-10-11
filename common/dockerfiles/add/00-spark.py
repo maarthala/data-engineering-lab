@@ -34,6 +34,56 @@ except Exception as _e:  # noqa: BLE001
     print("  Start it once spark-connect is up: spark = SparkSession.builder.getOrCreate()")
 
 
+# --- My variables: the learner's own env vars from the lab's "My variables" page -------
+# Kept in their own bucket (.lab/env.json); loaded into os.environ at every kernel start.
+# Names the lab sets itself (AWS_*, LAKE_*, SPARK_*, …) are never overridden.
+_ENV_RESERVED_PREFIX = ("AWS_", "LAKE_", "SPARK_", "PYSPARK_", "GIT_", "JUPYTER", "JPY_", "MV_",
+                        "LD_", "PYTHON", "KUBERNETES_", "POLARIS_")
+_ENV_RESERVED = {"PATH", "HOME", "USER", "SHELL", "LANG", "TZ", "PWD", "HOSTNAME", "TERM",
+                 "SHARED_CATALOG"}
+
+
+def lab_env(quiet=False):
+    """Load your variables from the lab's "My variables" page into os.environ (again).
+    Run it after adding or changing a variable — no kernel restart needed:
+        lab_env()
+        os.environ["MY_KEY"]
+    Returns the names loaded (values are never printed)."""
+    import json, os
+    bucket = os.environ.get("LAKE_BUCKET")
+    if not bucket:
+        return []
+    import s3fs
+    fs = s3fs.S3FileSystem(
+        key=os.environ.get("LAKE_S3_KEY") or os.environ.get("AWS_ACCESS_KEY_ID"),
+        secret=os.environ.get("LAKE_S3_SECRET") or os.environ.get("AWS_SECRET_ACCESS_KEY"),
+        client_kwargs={"endpoint_url": os.environ.get("AWS_S3_ENDPOINT", "http://storage:9000")})
+    path = f"{bucket}/.lab/env.json"
+    if not fs.exists(path):
+        return []
+    with fs.open(path, "rb") as f:
+        data = json.load(f)
+    names = []
+    for k, v in sorted(data.items()):
+        up = k.upper()
+        if up in _ENV_RESERVED or up.startswith(_ENV_RESERVED_PREFIX):
+            continue
+        os.environ[k] = str(v.get("value", ""))
+        names.append(k)
+    if not quiet:
+        print(f"✓ {len(names)} variable(s) from My variables: {', '.join(names) or '—'}")
+    return names
+
+
+if _os_env.get("LAKE_BUCKET"):
+    try:
+        _names = lab_env(quiet=True)
+        if _names:
+            print(f"✓ {len(_names)} variable(s) from My variables in os.environ — lab_env() reloads them")
+    except Exception as _e:  # noqa: BLE001
+        print(f"⚠ My variables not loaded ({_e})")
+
+
 # --- More catalogs: your own extra catalogs + ones other learners shared with you ------
 def use_catalog(catalog, alias=None, quiet=False):
     """Make another Polaris catalog usable in Spark, with YOUR login (same server and
