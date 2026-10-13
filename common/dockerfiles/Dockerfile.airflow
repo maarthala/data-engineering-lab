@@ -69,6 +69,17 @@ ENV SPARK_HOME=/opt/spark
 ENV PATH=$SPARK_HOME/bin:$JAVA_HOME/bin:$PATH
 
 
+# dbt for learner DAGs (lab_dbt() in lab_spark.py): its own venv, same versions as Jupyter, with
+# its own pyspark-client (the image's packages are per-user, which a venv can't see). The wrapper
+# hides dbt-spark's harmless "catalogImplementation" warning, as in Jupyter.
+RUN PIP_USER=false python -m venv /opt/dbt \
+ && PIP_USER=false /opt/dbt/bin/pip install --no-cache-dir dbt-core==1.12.5 dbt-spark==1.11.0 pyspark-client==4.1.3 \
+ && printf '%s\n' '#!/bin/sh' \
+      '# dbt-spark always asks for Hive support, which Spark Connect ignores: hide that one warning' \
+      'export PYTHONWARNINGS="ignore:Failed to set spark.sql.catalogImplementation:UserWarning${PYTHONWARNINGS:+,$PYTHONWARNINGS}"' \
+      'exec /opt/dbt/bin/dbt "$@"' > /usr/local/bin/dbt \
+ && chmod +x /usr/local/bin/dbt
+
 USER airflow
 ADD ./add/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

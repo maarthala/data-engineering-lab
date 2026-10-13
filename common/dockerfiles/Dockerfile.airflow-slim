@@ -25,6 +25,19 @@ RUN curl -fsSL -o /tmp/constraints.txt \
       ipykernel \
  && python -m ipykernel install --user --name python3 --display-name "Python 3"
 
+USER root
+# dbt for learner DAGs (lab_dbt() in lab_spark.py): its own venv, same versions as Jupyter, with
+# its own pyspark-client (the image's packages are per-user, which a venv can't see). The wrapper
+# hides dbt-spark's harmless "catalogImplementation" warning, as in Jupyter.
+RUN PIP_USER=false python -m venv /opt/dbt \
+ && PIP_USER=false /opt/dbt/bin/pip install --no-cache-dir dbt-core==1.12.5 dbt-spark==1.11.0 pyspark-client==4.1.3 \
+ && printf '%s\n' '#!/bin/sh' \
+      '# dbt-spark always asks for Hive support, which Spark Connect ignores: hide that one warning' \
+      'export PYTHONWARNINGS="ignore:Failed to set spark.sql.catalogImplementation:UserWarning${PYTHONWARNINGS:+,$PYTHONWARNINGS}"' \
+      'exec /opt/dbt/bin/dbt "$@"' > /usr/local/bin/dbt \
+ && chmod +x /usr/local/bin/dbt
+USER airflow
+
 # Lab-account login (FAB OAuth → Keycloak), the learners' DAG bundle (every <user>-lake/dags/)
 # and the dag-id prefix policy — same files the local stack mounts.
 COPY add/airflow_webserver_config.py /opt/airflow/webserver_config.py

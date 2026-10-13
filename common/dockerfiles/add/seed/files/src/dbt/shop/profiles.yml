@@ -10,5 +10,6 @@ shop:
       schema: silver           # default schema for models without +schema
       server_side_parameters:
         spark.sql.defaultCatalog: iceberg
+        spark.sql.catalog.iceberg.default-namespace: silver   # for dbt's helper views (snapshots)
         spark.sql.catalog.iceberg.warehouse: "{{ env_var('LAKE_WAREHOUSE') }}"
         spark.sql.catalog.iceberg.credential: "{{ env_var('LAKE_CREDENTIAL') }}"

@@ -86,6 +86,7 @@ shop:
       schema: silver           # default schema for models without +schema
       server_side_parameters:
         spark.sql.defaultCatalog: iceberg
+        spark.sql.catalog.iceberg.default-namespace: silver   # for dbt's helper views (snapshots)
         spark.sql.catalog.iceberg.warehouse: "{{ env_var('LAKE_WAREHOUSE') }}"
         spark.sql.catalog.iceberg.credential: "{{ env_var('LAKE_CREDENTIAL') }}"
 ```
@@ -97,6 +98,8 @@ shop:
   means Spark Connect, exactly like your notebooks.
 - **`server_side_parameters`**: Spark settings for dbt's session. `iceberg` becomes the default
   catalog, so `silver.stg_orders` means `iceberg.silver.stg_orders`, in **your** lakehouse.
+  **`default-namespace: silver`** is the schema for anything dbt creates without naming one
+  (a few helper views, like the snapshots' in a later lesson).
 - **`{{ env_var('LAKE_WAREHOUSE') }}`**: `{{ … }}` is **Jinja**, the same template syntax as
   Airflow's `{{ ds }}` ([Airflow basics](../unit5/basics.md)): dbt fills in the value before
   using the file. **`env_var(name)`** reads an **environment variable** of your server:

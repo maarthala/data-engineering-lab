@@ -1,4 +1,4 @@
-"""lab_spark() — a Spark session for a learner's DAG, signed in AS THAT LEARNER.
+"""lab_spark() — a Spark session for a learner's DAG, signed in AS THAT LEARNER (lab_dbt(): their dbt project).
 
 Learner DAGs (synced from <user>-lake/dags/ by the "learners" bundle) run in the shared
 Airflow, which has no learner credentials. This helper gives a task the same Spark a notebook
@@ -147,3 +147,57 @@ def run_notebook(notebook, user=None):
         if result.result is not None:
             print(result.result)
         print(f"run_notebook: cell {i}/{len(cells)} ok")
+
+
+DBT = os.environ.get("LAB_DBT", "/usr/local/bin/dbt")
+DBT_GENERATED = ("target/", "logs/", "dbt_packages/")
+
+
+def lab_dbt(command="build", project="shop", user=None):
+    """Run a dbt command on the learner's dbt project from a DAG task, signed in AS THEM.
+
+        @task
+        def build():
+            from lab_spark import lab_dbt
+            lab_dbt("build")                       # = `dbt build` in ~/work/dbt/shop
+
+    The project is their bucket's files/src/dbt/<project>/ (Jupyter's dbt/<project>/ folder,
+    mirrored on save), copied to a fresh folder for this run. Their own profiles.yml is used:
+    it reads LAKE_WAREHOUSE / LAKE_CREDENTIAL, set here to <user>_lake and the <user>_jobs login
+    (same as lab_spark). packages.yml → `dbt deps` first. The task fails if dbt fails.
+    """
+    import shlex
+    import subprocess
+    import tempfile
+
+    who = user or _current_user()
+    name = lh.lake_name(who)
+    if not re.fullmatch(r"[a-z0-9_]+", name) or not re.fullmatch(r"[A-Za-z0-9_-]+", project):
+        raise ValueError(f"bad learner or project name {name!r} / {project!r}")
+    bucket, prefix = lh.bucket_name(name), f"{lh.SRC}dbt/{project}/"
+    with tempfile.TemporaryDirectory(prefix=f"dbt-{name}-") as tmp:
+        n = 0
+        for key in lh.list_all(bucket, prefix):
+            rel = key[len(prefix):]
+            if not rel or rel.endswith("/") or rel.startswith(DBT_GENERATED):
+                continue
+            path = os.path.join(tmp, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with lh.get_object(bucket, key) as r, open(path, "wb") as f:
+                f.write(r.read())
+            n += 1
+        if not os.path.exists(os.path.join(tmp, "dbt_project.yml")):
+            raise RuntimeError(f"no dbt project in {bucket}/{prefix} (save it in Jupyter's dbt/{project}/ folder)")
+        print(f"lab_dbt: you are {name} · project dbt/{project} ({n} files) · iceberg = {name}_lake")
+        env = {**os.environ, "SPARK_REMOTE": SPARK_REMOTE, "LAKE_WAREHOUSE": f"{name}_lake",
+               "LAKE_CREDENTIAL": _jobs_credential(name), "DBT_PROFILES_DIR": tmp,
+               "DBT_SEND_ANONYMOUS_USAGE_STATS": "false", "DBT_USE_COLORS": "false"}
+        steps = ([["deps"]] if os.path.exists(os.path.join(tmp, "packages.yml")) else []) + [shlex.split(command)]
+        for args in steps:
+            print(f"lab_dbt: $ dbt {' '.join(args)}", flush=True)
+            proc = subprocess.Popen([DBT, *args], cwd=tmp, env=env, text=True,
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            for line in proc.stdout:
+                print(line.rstrip(), flush=True)
+            if proc.wait():
+                raise RuntimeError(f"dbt {' '.join(args)} failed (exit {proc.returncode}) — see the log above")

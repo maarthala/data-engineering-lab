@@ -138,6 +138,13 @@ nav:
       - "Your first dbt project": dbt/first-project.md
       - "Sources and staging models": dbt/sources-staging.md
       - "Models, ref() and materializations": dbt/models-ref.md
+      - "Tests and seeds": dbt/tests.md
+      - "Incremental models": dbt/incremental.md
+      - "Jinja and macros": dbt/jinja-macros.md
+      - "Snapshots: keep history": dbt/snapshots.md
+      - "Docs and lineage": dbt/docs-lineage.md
+      - "Run dbt from Airflow": dbt/airflow.md
+      - "Challenge: a tested Gold mart in dbt": dbt/challenge.md
   - "Data governance (Polaris)":
       - "Governed Iceberg with Apache Polaris": unit6/polaris.md
       - "Create users & assign access (UI)": unit6/polaris-admin.md

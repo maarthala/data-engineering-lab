@@ -17,7 +17,7 @@ How a model is built is its **materialization**:
 | **`view`** | a view: only the SQL is stored; it runs each time someone queries it | staging: cheap, always current |
 | **`table`** | a table: the result is computed once and stored | marts that dashboards read: fast to query |
 | **`ephemeral`** | nothing: its SQL is pasted into the models that use it, as a CTE | small helper steps you don't need to query |
-| **`incremental`** | a table that only adds or updates new rows on each run | big tables ([later in the unit](#coming-up)) |
+| **`incremental`** | a table that only adds or updates new rows on each run | big tables ([Incremental models](incremental.md)) |
 
 Your `dbt_project.yml` already sets the defaults: `staging/` → view, `marts/` → table.
 
@@ -205,11 +205,6 @@ manages what's in the project now. Drop it yourself in a notebook:
 %%sql
 DROP TABLE iceberg.gold.cancelled_per_day
 ```
-
-## Coming up
-Next in the unit: **tests** that check the data on every build, **incremental** models,
-**macros** and Jinja, **snapshots** for history, the **docs site** with the lineage graph, and
-running the project from **Airflow**.
 
 ## 🎯 This runs unchanged on Azure, Databricks, Snowflake & Fabric
 `ref()`, `config()`, selectors and the four materializations are core dbt and work the same on
