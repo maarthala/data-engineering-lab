@@ -12,7 +12,7 @@ your data platform, here's how to reach us at **Epireum**.
 
     Ask questions, share what you built, and help others — on our Discord.
 
-    [Join the Discord →](https://discord.gg/2B5mTgGjM)
+    [Join the Discord →](https://discord.gg/sByPdSRFjf)
 
 -   🎓 **Learn Data Engineering**
 
@@ -40,7 +40,7 @@ The fastest way to get unstuck is our **Discord** — join to:
 - get **help with setup or a problem** you've hit, and
 - help others learning alongside you.
 
-[**Join the Discord → discord.gg/2B5mTgGjM**](https://discord.gg/2B5mTgGjM){ .md-button .md-button--primary }
+[**Join the Discord → discord.gg/sByPdSRFjf**](https://discord.gg/sByPdSRFjf){ .md-button .md-button--primary }
 
 We also help **set up this stack or fix problems** if you get stuck — ask in the
 community and we'll jump in.
@@ -79,6 +79,6 @@ Our team's expertise spans the full modern data stack:
 
 | If you want to… | Contact |
 |---|---|
-| Join the community / get help with the stack | [Discord](https://discord.gg/2B5mTgGjM) |
+| Join the community / get help with the stack | [Discord](https://discord.gg/sByPdSRFjf) |
 | Ask about training or courses | [learning@epireum.com](mailto:learning@epireum.com) |
 | Hire the team / find DE resources | [contact@epireum.com](mailto:contact@epireum.com) |

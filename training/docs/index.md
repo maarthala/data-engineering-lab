@@ -10,7 +10,7 @@ your own workspace, shared company data, and everything behind one login.
 [⬇ Get the lab (GitHub)](https://github.com/maarthala/databrick-local-simulator){ .md-button .md-button--primary }
 [▶ Start the course](setup/prerequisites.md){ .md-button }
 [📚 Course overview](course.md){ .md-button }
-[💬 Join the Discord](https://discord.gg/2B5mTgGjM){ .md-button }
+[💬 Join the Discord](https://discord.gg/sByPdSRFjf){ .md-button }
 
 ## Highlights — learn it here, use it on Fabric, Databricks & Snowflake
 
@@ -188,4 +188,4 @@ Join our **Discord** to get help with setup or a lesson, share what you built, a
 learners and data engineers. When you ask, include which lesson or tool, what you ran, and the
 error — it gets you an answer faster.
 
-[💬 Join the Discord → discord.gg/2B5mTgGjM](https://discord.gg/2B5mTgGjM){ .md-button .md-button--primary }
+[💬 Join the Discord → discord.gg/sByPdSRFjf](https://discord.gg/sByPdSRFjf){ .md-button .md-button--primary }

@@ -10,7 +10,7 @@ platform already knowing *why* things work — not just which buttons to press.
 
 [▶ Start with Unit 0](setup/prerequisites.md){ .md-button .md-button--primary }
 [👀 Take the tour](index.md){ .md-button }
-[💬 Join the Discord](https://discord.gg/2B5mTgGjM){ .md-button }
+[💬 Join the Discord](https://discord.gg/sByPdSRFjf){ .md-button }
 
 ## Course units
 
@@ -116,7 +116,7 @@ platform already knowing *why* things work — not just which buttons to press.
 
     Ask questions, get unstuck, share what you built and help others.
 
-    [Join the community →](https://discord.gg/2B5mTgGjM)
+    [Join the community →](https://discord.gg/sByPdSRFjf)
 
 -   🎓 **Learn with us**
 

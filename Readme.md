@@ -19,7 +19,7 @@ The stack's landing page links straight to this course, so it's always the curre
 Join our **Discord** to discuss the stack, get help with setup or problems, and connect
 with other learners:
 
-**→ [discord.gg/2B5mTgGjM](https://discord.gg/2B5mTgGjM)**
+**→ [discord.gg/sByPdSRFjf](https://discord.gg/sByPdSRFjf)**
 
 - Instructor-led **DE training** for students & career-changers — **learning@epireum.com**
 - **Companies** looking for DE talent or delivery — **contact@epireum.com**
