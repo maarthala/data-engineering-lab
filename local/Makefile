@@ -47,7 +47,7 @@ docs-serve: ## Live-preview the course while authoring (hot-reload) at http://lo
 	@echo "Serving course at http://localhost:8010 (Ctrl-C to stop) ..."
 	docker run --rm -it -p 8010:8000 -v "$(CURDIR)/../training":/docs squidfunk/mkdocs-material:9 serve -a 0.0.0.0:8000
 
-polaris-seed: ## Provision the governed Polaris catalog + personas/RBAC (Unit 6, the live governance)
+polaris-seed: ## Provision the governed Polaris catalog + personas/RBAC (the governance unit, live)
 	bash ../common/polaris/seed-polaris.sh
 
 config: ## Validate the merged compose configuration

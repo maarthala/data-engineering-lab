@@ -64,6 +64,14 @@ platform already knowing *why* things work — not just which buttons to press.
 
     [{count:unit5/basics.md} lessons →](unit5/basics.md)
 
+-   🧱 **Unit {unit:dbt/why-dbt.md} · Transform with dbt**
+
+    ---
+
+    Build Silver and Gold as SQL models — dependencies, materializations, tests and docs.
+
+    [{count:dbt/why-dbt.md} lessons →](dbt/why-dbt.md)
+
 -   🛡️ **Unit {unit:unit6/polaris.md} · Data governance**
 
     ---

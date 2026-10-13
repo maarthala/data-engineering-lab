@@ -1,0 +1,14 @@
+# How dbt connects: through Spark Connect, as YOU (your lakehouse + your login, read from
+# your notebook environment — there's no password in this file).
+shop:
+  target: dev
+  outputs:
+    dev:
+      type: spark
+      method: session          # use the Spark session of this server (Spark Connect)
+      host: na                 # not used by the session method, but required
+      schema: silver           # default schema for models without +schema
+      server_side_parameters:
+        spark.sql.defaultCatalog: iceberg
+        spark.sql.catalog.iceberg.warehouse: "{{ env_var('LAKE_WAREHOUSE') }}"
+        spark.sql.catalog.iceberg.credential: "{{ env_var('LAKE_CREDENTIAL') }}"

@@ -1,6 +1,6 @@
 """ShopFlow Bronze ingest — land raw Postgres tables as Iceberg tables.
 
-Run by Airflow (Unit 5) or by hand:
+Run by Airflow (orchestration unit) or by hand:
   spark-submit --master spark://spark-master:7077 \
     --conf spark.sql.catalogImplementation=in-memory \
     ingest_bronze.py --catalog iceberg

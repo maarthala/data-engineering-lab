@@ -183,7 +183,7 @@ _README = {
                        "e.g. dag_id=\"ravi_daily_sales\".\n",
     "files/src/dbt/": "Your dbt projects — the dbt/ folder in Jupyter, kept in sync (dbt's target/, logs/\n"
                       "and dbt_packages/ are rebuilt on every run and stay in Jupyter only).\n",
-    "files/source/": "Raw files to ingest (CSV, Parquet, JSON …) — lesson 4.2 exports ShopFlow here.\n",
+    "files/source/": "Raw files to ingest (CSV, Parquet, JSON …) — the 'Read the lake' lesson exports ShopFlow here.\n",
     "tables/": "Table storage for your catalogs (tables/<catalog>/<namespace>/<table>/). Managed by\n"
                "the catalog — create and drop tables with SQL / Spark, don't edit files here.\n",
 }
@@ -212,6 +212,7 @@ def make_folders(bucket):
 #   seed/files/source/shopflow/*.csv        practice data
 #   seed/files/src/notebooks/*.ipynb        starter notebooks (Jupyter's notebooks/ folder)
 #   seed/files/src/dags/*.py                starter DAGs (Jupyter's dags/ folder → Airflow)
+#   seed/files/src/dbt/shop/                starter dbt project (Jupyter's dbt/ folder)
 # Copied once — a learner's own edits or deletions are left alone. In notebooks and DAGs,
 # __BUCKET__ / __LAKE__ / __USER__ become the learner's bucket / lakehouse / name, so their code
 # shows real names (a DAG's dag_id must start with <user>_).
@@ -239,8 +240,9 @@ def seed_files(bucket):
             if n.endswith((".ipynb", ".py")):
                 body = (body.replace(b"__BUCKET__", bucket.encode()).replace(b"__LAKE__", lake.encode())
                         .replace(b"__USER__", lake[:-len("_lake")].encode()))
-            ctype = {"csv": "text/csv", "ipynb": "application/x-ipynb+json", "py": "text/x-python"}.get(n.rsplit(".", 1)[-1],
-                                                                               "application/octet-stream")
+            ctype = {"csv": "text/csv", "ipynb": "application/x-ipynb+json", "py": "text/x-python",
+                     "yml": "text/yaml", "sql": "text/plain", "md": "text/markdown"}.get(n.rsplit(".", 1)[-1],
+                                                                                         "application/octet-stream")
             try:
                 put_object(bucket, key, io.BytesIO(body), len(body), ctype)
             except urllib.error.HTTPError:                # new bucket not scanned yet — next call

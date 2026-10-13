@@ -133,6 +133,11 @@ nav:
       - "Build the medallion DAG": unit5/medallion-dag.md
       - "Schedule ingestion & Spark jobs": unit5/schedule.md
       - "The development workflow (notebook → job → DAG)": unit5/dev-workflow.md
+  - "Transform with dbt":
+      - "Why dbt": dbt/why-dbt.md
+      - "Your first dbt project": dbt/first-project.md
+      - "Sources and staging models": dbt/sources-staging.md
+      - "Models, ref() and materializations": dbt/models-ref.md
   - "Data governance (Polaris)":
       - "Governed Iceberg with Apache Polaris": unit6/polaris.md
       - "Create users & assign access (UI)": unit6/polaris-admin.md

@@ -8,8 +8,8 @@ from Polaris by home-api) then decide what each learner may read — their own l
 was shared with them, the shared lake.
 
 Two Trino connections, one engine, two data tiers:
-  - "shopflow"          -> the raw OLTP source        (Unit 2 SQL Lab)
-  - "ShopFlow Lakehouse"-> the governed Gold lakehouse (Unit 7 dashboards)
+  - "shopflow"          -> the raw OLTP source        (SQL lessons, SQL Lab)
+  - "ShopFlow Lakehouse"-> the governed Gold lakehouse (dashboards lesson)
 """
 import json
 

@@ -1,0 +1,14 @@
+# Your dbt project. Lessons in Unit "Transform with dbt" add the models step by step.
+name: shop
+version: "1.0"
+profile: shop                  # which connection in profiles.yml to use
+
+models:
+  shop:
+    +file_format: iceberg      # every model is an Iceberg table/view in your lakehouse
+    staging:                   # models/staging/ → views in the silver schema
+      +materialized: view
+      +schema: silver
+    marts:                     # models/marts/ → tables in the gold schema
+      +materialized: table
+      +schema: gold

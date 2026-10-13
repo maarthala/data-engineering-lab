@@ -1,7 +1,7 @@
 """Advance the ShopFlow business by one day: insert a day's new orders into Postgres.
 
 Stands in for reality — in production this "new data" would arrive on its own. Runs first in the
-daily DAG (Unit 5.3):
+daily DAG ("Schedule ingestion & Spark jobs" lesson):
   python simulate_day.py --date 2026-09-01 --orders 200
 """
 import argparse

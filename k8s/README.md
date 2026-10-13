@@ -82,7 +82,7 @@ The other admin logins work the same way — swap the key:
 | Lab manager (landing page, Manage members, every tool) | `manager` | `manager-password` |
 | Keycloak admin console (`http://auth.de.lan/admin`) | `admin` | `keycloak-admin-password` |
 | Polaris Console admin (`/login?local=1`) | `root` | `polaris-root-secret` |
-| Polaris personas (Unit 6 lessons) | `analyst` / `engineer` / `lead` | `polaris-persona-secret` |
+| Polaris personas (governance lessons) | `analyst` / `engineer` / `lead` | `polaris-persona-secret` |
 | Storage (RustFS console) root | `admin` | `storage-root-password` |
 | SQLPad admin (password login) | `admin@de.local` | `sqlpad-admin-password` |
 | Superset admin (`/login/?local=1`) | `admin` | `superset-admin-password` |

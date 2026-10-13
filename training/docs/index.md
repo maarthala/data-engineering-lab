@@ -163,6 +163,7 @@ table — read or write — with a teammate. Polaris enforces it on every query
 | Catalog & governance | **Apache Polaris** (Iceberg REST) | your lakehouse, grants, sharing, credential vending |
 | Notebooks & compute | **Jupyter** + **Spark** (Spark Connect) | Python, pandas and Spark — Bronze → Silver → Gold |
 | SQL | **Trino** · **SQLPad** | distributed SQL over the lake and the source databases |
+| Transformation | **dbt** (on Spark) | SQL models for Silver and Gold, in dependency order |
 | Orchestration | **Apache Airflow** | schedule your pipelines — DAGs straight from your bucket |
 | BI | **Apache Superset** | dashboards over your Gold tables |
 | Sources | **PostgreSQL** | ShopFlow (the course's online shop) and AdventureWorks |

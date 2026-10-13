@@ -41,7 +41,11 @@ RUN pip install --no-cache-dir \
 # through Spark Connect as the learner. NOT the dbt-spark[session] extra: that pulls a full pyspark.
 RUN python -m venv --system-site-packages /opt/dbt \
  && /opt/dbt/bin/pip install --no-cache-dir dbt-core==1.12.5 dbt-spark==1.11.0 \
- && ln -s /opt/dbt/bin/dbt /usr/local/bin/dbt
+ && printf '%s\n' '#!/bin/sh' \
+      '# dbt-spark always asks for Hive support, which Spark Connect ignores: hide that one warning' \
+      'export PYTHONWARNINGS="ignore:Failed to set spark.sql.catalogImplementation:UserWarning${PYTHONWARNINGS:+,$PYTHONWARNINGS}"' \
+      'exec /opt/dbt/bin/dbt "$@"' > /usr/local/bin/dbt \
+ && chmod +x /usr/local/bin/dbt
 
 # Non-root notebook user (uid 1000, "jovyan" to match convention).
 RUN useradd -m -u 1000 -s /bin/bash jovyan
