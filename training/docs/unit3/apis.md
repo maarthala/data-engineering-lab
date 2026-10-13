@@ -143,8 +143,10 @@ headers = {"Authorization": "Bearer <token>", "Accept": "application/json"}
 !!! warning "Never hard-code secrets"
     A token in your code gets committed to git and shared with everyone who reads the notebook.
     Read it from an **environment variable** or a secrets store instead —
-    `os.environ["API_TOKEN"]` — and keep the actual value out of the repo. On the cloud platforms
-    this is Key Vault / Databricks secrets / Snowflake secrets.
+    `os.environ["API_TOKEN"]` — and keep the actual value out of the repo. In the lab, save it
+    on **🔑 My variables** (as a *secret*) and every notebook has it in `os.environ`; see
+    [My variables](../setup/workspace.md#my-variables-keys-and-settings-for-your-notebooks). On the
+    cloud platforms this is Key Vault / Databricks secrets / Snowflake secrets.
 
 ### Load the response into pandas
 API JSON → DataFrame is the everyday move — now it's tabular and joinable:

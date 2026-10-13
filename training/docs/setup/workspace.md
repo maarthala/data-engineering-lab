@@ -45,7 +45,7 @@ open — Superset, Airflow, SQLPad — keeps its own session until you log out t
 | 🧰 SQLPad user | `<you>` | your saved queries |
 
 The top bar of the landing page shows it: **"your lakehouse: `<you>_lake` ✓ · bucket:
-`<you>-lake`"**, plus **📁 My files**, **🗂️ My catalogs** and **Log out**. Below it, the
+`<you>-lake`"**, plus **📁 My files**, **🗂️ My catalogs**, **🔑 My variables** and **Log out**. Below it, the
 tools are grouped in four columns — *Build & explore* (Notebook, Compute, SQL workbench),
 *Pipelines* (Airflow), *Visualize* (Superset) and *Lakehouse* (My files, My catalogs, Storage).
 
@@ -148,6 +148,53 @@ tells you whose is whose.
   it, add namespaces and tables. (The Console's own **Catalogs** list shows `0` for members:
   listing *all* catalogs is admin-only, so open yours from here.)
 
+## My variables — keys and settings for your notebooks
+
+Some code needs a value you must **not** write into a notebook: an API token, a password, the key
+for an outside S3 bucket. Put those on **🔑 My variables** (top bar). Every notebook then finds them
+in `os.environ`, the dictionary of environment variables Python gives every program.
+
+1. Type a **name** (letters, digits and `_`, e.g. `API_TOKEN`) and a **value**.
+2. Leave **secret** ticked for keys and passwords: the value is never shown again, only replaced.
+   Untick it for plain settings (e.g. `REGION = eu-west`), and the page shows the value.
+3. **Save.** The variables live in your own bucket (`.lab/env.json`), and only you can read them.
+
+A notebook loads them when its kernel starts. The startup lines then include:
+
+```text
+✓ 2 variable(s) from My variables in os.environ — lab_env() reloads them
+```
+
+Read them with `os.environ`:
+
+```python
+import os
+token = os.environ["API_TOKEN"]          # KeyError if the variable doesn't exist
+region = os.environ.get("REGION", "eu-west")   # .get(name, default) — no error, default instead
+```
+
+- **`os.environ["API_TOKEN"]`** — the value as a string. It fails with `KeyError` when the name is
+  missing, which is what you want for a key the code can't work without.
+- **`os.environ.get("REGION", "eu-west")`** — returns the default when the variable isn't set.
+
+Added or changed a variable while a notebook is open? Run **`lab_env()`** to reload, with no
+kernel restart:
+
+```python
+lab_env()
+```
+```text
+✓ 2 variable(s) from My variables: API_TOKEN, REGION
+```
+
+It prints the **names** only, never the values. Names the lab sets itself (`AWS_*`, `LAKE_*`,
+`SPARK_*`, `GIT_*`, `PATH` …) are refused, e.g. *"AWS_REGION is set by the lab itself — choose
+another name"*, so you can't break your own login by accident.
+
+!!! note "On the cloud platforms"
+    The same idea is **Databricks secrets** (`dbutils.secrets.get`), **Azure Key Vault**, and
+    **Snowflake secrets**: the value lives in a store, and code asks for it by name.
+
 ## Starting over
 
 Broke your lakehouse, or want a clean slate for the next unit? Ask your **platform manager**
@@ -167,4 +214,5 @@ switch **self-registration** on or off (on while a new batch signs up, off other
 - Tell your own lakehouse (`iceberg` in Jupyter) from the shared lake (`shared` in Jupyter, `iceberg` in Trino)
 - Keep notebooks and DAGs in `notebooks/` and `dags/`, and name DAGs `<you>_…`
 - Create a catalog and share a namespace or table with another member
+- Keep keys and settings on My variables and read them with `os.environ`
 - Know when to ask a manager for a lakehouse reset or a full wipe
