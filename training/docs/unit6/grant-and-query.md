@@ -1,4 +1,4 @@
-# 6.4 Grant table access to a user & query it
+# Grant table access to a user & query it
 
 You have personas ([6.2](polaris-admin.md)) and tables ([6.3](create-catalog-table.md)).
 Now the everyday governance task: **give a user read access to a specific table**, then

@@ -1,4 +1,4 @@
-# 1.5 Dimensional modeling: facts & dimensions
+# Dimensional modeling: facts & dimensions
 
 ## Why this unit exists
 Picture a Monday-morning request from your head of sales:

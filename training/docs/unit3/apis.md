@@ -1,4 +1,4 @@
-# 3.5 Consuming APIs with `requests`
+# Consuming APIs with `requests`
 
 ## Concept
 Not all data lives in your database. **APIs** (web services you call over HTTP) are a major

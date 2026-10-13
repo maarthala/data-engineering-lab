@@ -1,4 +1,4 @@
-# 6.1 Polaris: governed Iceberg for *every* engine
+# Polaris: governed Iceberg for *every* engine
 
 ## Concept
 The lakehouse stores tables; a **catalog** governs them — who can see and touch what.

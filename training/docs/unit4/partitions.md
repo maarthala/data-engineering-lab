@@ -1,4 +1,4 @@
-# 4.11 Partitions: `coalesce` & `repartition`
+# Partitions: `coalesce` & `repartition`
 
 ## Concept
 Spark never handles a DataFrame as one big block. It cuts the rows into **partitions** —

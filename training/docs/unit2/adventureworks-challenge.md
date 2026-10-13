@@ -1,4 +1,4 @@
-# 2.11 Challenge: AdventureWorks
+# Challenge: AdventureWorks
 
 ## Concept
 So far you've queried **ShopFlow**, a small teaching dataset. **AdventureWorks** is a much

@@ -1,4 +1,4 @@
-# 4.4 Spark SQL & aggregates (Gold)
+# Spark SQL & aggregates (Gold)
 
 ## Concept
 **Gold** holds business-ready aggregates — the tables a dashboard or analyst queries directly.
@@ -19,17 +19,17 @@ You'll build three marts from `silver.orders`:
 - **`gold.top_products`** — best-selling products by revenue.
 - **`gold.customer_ltv`** — lifetime value per customer.
 
-### Tie back to Unit 1.4 — what "Gold" means
+### Tie back to Unit {lesson:unit1/medallion.md} — what "Gold" means
 In [Unit 1.4](../unit1/medallion.md) you learned the medallion layers: **Bronze** is raw, **Silver**
 is cleaned and conformed, and **Gold** is **aggregated, business-ready marts**. Gold is where raw
 line items become the handful of numbers a dashboard actually shows — revenue per day, best-selling
 products, lifetime value per customer. This lesson does exactly that: it reads the clean
 `silver.orders` from [4.3](transform-silver.md) and rolls it up into three persistent Gold tables.
 
-!!! info "The one idea to carry from Unit 2"
+!!! info "The one idea to carry from Unit {unit:unit2/intro.md}"
     The `GROUP BY … SUM/COUNT/AVG` you wrote by hand in [Unit 2.2](../unit2/joins-aggregations.md) is
     **the same SQL** you'll run here — only now it runs inside Spark and its result is **saved as a
-    table**, not just printed. Unit 2 answered a question once; Gold *persists* the answer so a BI
+    table**, not just printed. Unit {unit:unit2/intro.md} answered a question once; Gold *persists* the answer so a BI
     tool can query it a thousand times without recomputing.
 
 ### DataFrame API vs `spark.sql()`
@@ -37,7 +37,7 @@ Spark gives you two ways to express the same logic: the **DataFrame API** (chain
 like `df.groupBy("order_date").agg(F.sum("line_amount"))`) and **`spark.sql("…")`** (a plain SQL
 string). Both compile to the *same* optimized plan — Spark doesn't care which door you walked
 through — so pick whichever reads clearer. For aggregation-heavy Gold logic, SQL is usually the most
-readable, so we lean on `spark.sql()` and reuse Unit 2's skills verbatim.
+readable, so we lean on `spark.sql()` and reuse Unit {unit:unit2/intro.md}'s skills verbatim.
 
 !!! note "`spark.sql()` — run SQL over the lakehouse from Python"
     `spark.sql("SELECT …")` hands a SQL string to Spark, which resolves table names against the
@@ -94,7 +94,7 @@ def write_gold(df, table, partition=None):
     get the same Gold tables — no duplicate rows, no leftover state. That's the behaviour you want
     for a batch that rebuilds marts on a schedule.
 
-### gold.daily_sales — the same GROUP BY from Unit 2
+### gold.daily_sales — the same GROUP BY from Unit {unit:unit2/intro.md}
 
 Our first mart answers "how much did we sell each day?" Its **grain is one row per day** — collapse
 every delivered line item into a single summary row per `order_date`.
@@ -123,9 +123,9 @@ write_gold(daily, "daily_sales", partition=partitioning.months("order_date"))
 - **`GROUP BY order_date`** — bucket the surviving rows by day. This is what sets the grain: **one
   output row per date**.
 - **`sum(line_amount) AS revenue`** — add up the money for that day. `sum` is the classic aggregate
-  from Unit 2 — it's the day's total revenue, a **business metric**.
+  from Unit {unit:unit2/intro.md} — it's the day's total revenue, a **business metric**.
 - **`sum(quantity) AS units`** — total items sold that day.
-- **`count(DISTINCT order_id) AS orders`** — count the **unique** orders. As in Unit 2, `DISTINCT`
+- **`count(DISTINCT order_id) AS orders`** — count the **unique** orders. As in Unit {unit:unit2/intro.md}, `DISTINCT`
   matters: a single order can span several line-item rows, so plain `count(order_id)` would over-count.
 - **`ORDER BY order_date`** — sort the mart chronologically.
 - **`write_gold(daily, "daily_sales", partition=partitioning.months("order_date"))`** — save it as
@@ -166,7 +166,7 @@ write_gold(top, "top_products")
 - **`WITH product_rev AS (…)`** — a **CTE** (common table expression): a named sub-query you can
   reference by name in the main query. It just makes the two-step logic readable — first aggregate,
   then rank.
-- **Inside the CTE** — the familiar Unit 2 pattern: `GROUP BY product_id, product_name, category`
+- **Inside the CTE** — the familiar Unit {unit:unit2/intro.md} pattern: `GROUP BY product_id, product_name, category`
   gives **one row per product**, with `sum(line_amount)` as its total revenue and `sum(quantity)` as
   its units.
 - **`rank() OVER (ORDER BY revenue DESC) AS revenue_rank`** — a **window function** (from
@@ -237,7 +237,7 @@ spark.sql("SELECT * FROM iceberg.gold.customer_ltv ORDER BY lifetime_value DESC 
   `.show()` is what actually displays it.)
 
 Because it's the shared `iceberg` catalog, the **same** `gold.*` tables are now readable from
-**Trino** (Unit 2) as `iceberg.gold.*` — one write, two query engines.
+**Trino** (Unit {unit:unit2/intro.md}) as `iceberg.gold.*` — one write, two query engines.
 
 ## Challenge
 Build **`gold.monthly_country_sales`**: revenue and distinct-customer count **per month per
@@ -294,6 +294,6 @@ country**, for delivered orders only, sorted by month then revenue. Use `spark.s
 | **Shared catalog** | Spark writes `iceberg.gold.*`; Trino reads the same tables |
 
 ## You can now…
-- Reuse Unit 2 SQL inside Spark via `spark.sql()` over the lakehouse catalog
+- Reuse Unit {unit:unit2/intro.md} SQL inside Spark via `spark.sql()` over the lakehouse catalog
 - Aggregate `silver.orders` into `daily_sales`, `top_products`, `customer_ltv`
 - Partition Gold tables with Iceberg transforms for efficient, pruned queries

@@ -1,4 +1,4 @@
-# 4.7 Table maintenance: OPTIMIZE, Z-order, VACUUM
+# Table maintenance: OPTIMIZE, Z-order, VACUUM
 
 ## Concept
 Lakehouse tables are **files plus a log of versions**. Every write adds new files and a new

@@ -16,93 +16,93 @@ platform already knowing *why* things work — not just which buttons to press.
 
 <div class="grid cards unit-cards" markdown>
 
--   🚀 **Unit 0 · Getting started**
+-   🚀 **Unit {unit:setup/prerequisites.md} · Getting started**
 
     ---
 
     Set up the stack, meet ShopFlow, and see how it all fits together.
 
-    [8 lessons →](setup/prerequisites.md)
+    [{count:setup/prerequisites.md} lessons →](setup/prerequisites.md)
 
--   🧭 **Unit 1 · Foundations**
+-   🧭 **Unit {unit:unit1/what-is-de.md} · Foundations**
 
     ---
 
     What Data Engineering is, the lakehouse, medallion and data modelling.
 
-    [5 lessons →](unit1/what-is-de.md)
+    [{count:unit1/what-is-de.md} lessons →](unit1/what-is-de.md)
 
--   🔎 **Unit 2 · SQL on big data**
+-   🔎 **Unit {unit:unit2/intro.md} · SQL on big data**
 
     ---
 
     Query the lake — joins, window functions, CTEs, views, functions, MERGE and JSON.
 
-    [11 lessons →](unit2/intro.md)
+    [{count:unit2/intro.md} lessons →](unit2/intro.md)
 
--   🐍 **Unit 3 · Python in notebooks**
+-   🐍 **Unit {unit:unit3/python-essentials.md} · Python in notebooks**
 
     ---
 
     Python for data work — dataframes, files, APIs and databases.
 
-    [9 lessons →](unit3/python-essentials.md)
+    [{count:unit3/python-essentials.md} lessons →](unit3/python-essentials.md)
 
--   ⚡ **Unit 4 · Spark**
+-   ⚡ **Unit {unit:unit4/fundamentals.md} · Spark**
 
     ---
 
     Distributed processing — build Bronze → Silver → Gold, materialized views, table maintenance, and tuning.
 
-    [10 lessons →](unit4/fundamentals.md)
+    [{count:unit4/fundamentals.md} lessons →](unit4/fundamentals.md)
 
--   ⏱️ **Unit 5 · Orchestration**
+-   ⏱️ **Unit {unit:unit5/basics.md} · Orchestration**
 
     ---
 
     Turn jobs into scheduled, dependable pipelines.
 
-    [4 lessons →](unit5/basics.md)
+    [{count:unit5/basics.md} lessons →](unit5/basics.md)
 
--   🛡️ **Unit 6 · Data governance**
+-   🛡️ **Unit {unit:unit6/polaris.md} · Data governance**
 
     ---
 
     Catalogs, users, roles and who can see which data.
 
-    [4 lessons →](unit6/polaris.md)
+    [{count:unit6/polaris.md} lessons →](unit6/polaris.md)
 
--   📊 **Unit 7 · Business intelligence**
+-   📊 **Unit {unit:unit7/dashboards.md} · Business intelligence**
 
     ---
 
     Turn the Gold layer into dashboards people use.
 
-    [1 lesson →](unit7/dashboards.md)
+    [{count:unit7/dashboards.md} lesson →](unit7/dashboards.md)
 
--   🧰 **Unit 8 · Real-world recipes**
+-   🧰 **Unit {unit:recipes/excel.md} · Real-world recipes**
 
     ---
 
     Event triggers, SCD2, data quality and reverse-ETL.
 
-    [5 lessons →](recipes/excel.md)
+    [{count:recipes/excel.md} lessons →](recipes/excel.md)
 
--   🏁 **Unit 9 · Capstones**
+-   🏁 **Unit {unit:capstones/capstone-1.md} · Capstones**
 
     ---
 
     Prove it end to end — two projects, easy and medium.
 
-    [2 projects →](capstones/capstone-1.md)
+    [{count:capstones/capstone-1.md} projects →](capstones/capstone-1.md)
 
--   🌉 **Unit 10 · Bridge to the platforms**
+-   🌉 **Unit {unit:platforms/rosetta.md} · Bridge to the platforms**
 
     ---
 
     Map every skill to Databricks, Snowflake, Fabric and Azure.
 
-    [2 lessons →](platforms/rosetta.md)
+    [{count:platforms/rosetta.md} lessons →](platforms/rosetta.md)
 
 </div>
 

@@ -1,11 +1,11 @@
-# 0.3.1 Personas & roles (governance demos)
+# Personas & roles (governance demos)
 
 Day to day you work as **yourself** — your [lab account](workspace.md), with your own lakehouse.
 For the governance lessons the stack also has three fixed **personas**. Each persona is a real
 **Polaris principal** (a login with a client ID + secret) mapped to a real set of **grants** on the
 course's **shared lake** — so when you sign in as one, you see exactly what that role is allowed to
 see. That's the point: you *experience* governance from inside a role, the way a real teammate
-would. (Creating your *own* users is Unit 6.2.)
+would. (Creating your *own* users is Unit {lesson:unit6/polaris-admin.md}.)
 
 !!! tip "Username = role, on purpose"
     In a real company people have names and get permissions through their *role*. Here we make the

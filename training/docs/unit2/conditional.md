@@ -1,4 +1,4 @@
-# 2.6 Conditional logic, NULLs & filtering
+# Conditional logic, NULLs & filtering
 
 ## Concept
 Raw data is messy: missing values, codes that need labels, categories you want as columns.

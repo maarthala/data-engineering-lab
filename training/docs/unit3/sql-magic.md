@@ -1,4 +1,4 @@
-# 3.8 Query tables with `%%sql`
+# Query tables with `%%sql`
 
 ## Concept
 Notebooks on this stack ship a **`%%sql` cell magic** — put it on the first line of a cell and write
@@ -38,7 +38,7 @@ SHOW SCHEMAS IN iceberg
     reads the sources and writes these tables). Following the course in order, they exist as
     namespaces but hold **no tables yet** — so `SELECT * FROM iceberg.gold.…` would say *table not
     found*. No problem: below you'll **create your own schema and data** to practise on, then meet
-    the pipeline's tables in Unit 4. (Want real data right now? The ready-made tables are in the
+    the pipeline's tables in Unit {unit:unit4/fundamentals.md}. (Want real data right now? The ready-made tables are in the
     shared lake: `SELECT * FROM shared.gold.daily_sales LIMIT 10`.)
 
 ### 2 · Create your own schema, table & data
@@ -109,7 +109,7 @@ Console. Tidy up when you're done experimenting:
 DROP TABLE iceberg.sandbox.my_customers
 ```
 
-### 4 · The same `%%sql`, on the pipeline's tables (after Unit 4)
+### 4 · The same `%%sql`, on the pipeline's tables (after Unit {unit:unit4/fundamentals.md})
 Once [Unit 4](../unit4/fundamentals.md) has built Bronze → Silver → Gold, the **identical** `%%sql`
 queries them — no new skills, just real tables. A Gold lookup:
 
@@ -151,14 +151,14 @@ back), switch to `spark.sql(...)`:
 df = spark.sql("SELECT * FROM shared.gold.daily_sales WHERE revenue > 80000")
 df.count()                              # keep working with the DataFrame in Python
 ```
-(After Unit 4 the same pattern captures your own Gold table:
+(After Unit {unit:unit4/fundamentals.md} the same pattern captures your own Gold table:
 `spark.sql("SELECT * FROM iceberg.gold.daily_sales")`.)
 
 !!! tip "Raw files need a view first"
     `%%sql` works on **catalog tables** with no setup. To `%%sql` a raw file in object storage,
     register it as a temp view once (see [3.9](upload-register.md)):
     ```python
-    # your own files — e.g. the history you export in 4.2
+    # your own files — e.g. the history you export in {lesson:unit4/read-bronze.md}
     spark.read.parquet("s3a://demouser-lake/files/source/shopflow/history/orders") \
          .createOrReplaceTempView("orders_hist")
     ```

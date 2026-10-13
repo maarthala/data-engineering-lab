@@ -1,4 +1,4 @@
-# 2.2 Joins & aggregations
+# Joins & aggregations
 
 ## Concept
 Real questions rarely fit in one table. ShopFlow's revenue lives across four tables (the
@@ -41,7 +41,7 @@ Two ideas to hold onto before we start:
   counting the same order many times.
 
 ## Lab
-These labs run on the raw ShopFlow source via the `shopflow` catalog. (After Unit 4, the
+These labs run on the raw ShopFlow source via the `shopflow` catalog. (After Unit {unit:unit4/fundamentals.md}, the
 same SQL works on `iceberg.silver.*` — just change the schema.)
 
 > Run these in **SQLPad** on the **Lakehouse (Trino) — &lt;your username&gt;** connection (not *ShopFlow — OLTP*) or **Superset SQL Lab** (see [2.1](intro.md)). In Superset,

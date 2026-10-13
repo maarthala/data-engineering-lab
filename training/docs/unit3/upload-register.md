@@ -1,4 +1,4 @@
-# 3.9 Upload a file & register it as a table
+# Upload a file & register it as a table
 
 ## Concept
 A very common real task: someone hands you a file, you drop it in the **data lake** (RustFS), then

@@ -1,4 +1,4 @@
-# 1.1 What is Data Engineering?
+# What is Data Engineering?
 
 ## Concept
 **Data engineering** is the practice of building the systems that move and shape data

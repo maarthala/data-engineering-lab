@@ -1,4 +1,4 @@
-# 3.1 Python & notebooks for data engineering
+# Python & notebooks for data engineering
 
 ## Concept
 SQL ([Unit 2](../unit2/intro.md)) answers questions once the data is in tables. But a data
@@ -182,7 +182,7 @@ print(big, bands)
 !!! tip "Why comprehensions matter for data engineering"
     *Filter* and *map* are the two operations you do constantly to data — a comprehension is the
     quickest way to express them on small collections. The very same "filter, then transform"
-    thinking is exactly what SQL's `WHERE` + `SELECT` (Unit 2) and pandas/Spark do at scale next.
+    thinking is exactly what SQL's `WHERE` + `SELECT` (Unit {unit:unit2/intro.md}) and pandas/Spark do at scale next.
 
 **Handling errors** — real pipelines hit bad data; catch it instead of crashing:
 
@@ -195,7 +195,7 @@ def to_float(x):
     try:
         return float(x)
     except (ValueError, TypeError):
-        return None          # a "TRY_CAST" in Python (like Unit 2.6)
+        return None          # a "TRY_CAST" in Python (like Unit {lesson:unit2/conditional.md})
 
 print(to_float("12.5"), to_float("oops"))       # 12.5 None
 ```
@@ -211,7 +211,7 @@ print(to_float("12.5"), to_float("oops"))       # 12.5 None
   raises a `ValueError`; passing something non-convertible (like `None`) raises a `TypeError`.
   Listing them in `( )` catches either one.
 - **`return None`** — when conversion fails, hand back **`None`** instead of blowing up. This is the
-  Python equivalent of SQL's `TRY_CAST` from Unit 2.6: bad values become "nothing" rather than
+  Python equivalent of SQL's `TRY_CAST` from Unit {lesson:unit2/conditional.md}: bad values become "nothing" rather than
   errors.
 - **`print(to_float("12.5"), to_float("oops"))`** — the good input returns `12.5`; the bad input is
   caught and returns `None`.

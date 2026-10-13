@@ -1,9 +1,9 @@
-# 9.1 Capstone 1 (easy)
+# Capstone 1 (easy)
 
 ## Concept
-You've now touched every layer of a real data platform: **Python** (Unit 3), **Spark** to build
-(Unit 4), **Airflow** to schedule (Unit 5), **Apache Polaris** to govern (Unit 6), and **Superset**
-to visualise (Unit 7). This capstone strings them together on your own — end to end — by shipping
+You've now touched every layer of a real data platform: **Python** (Unit {unit:unit3/python-essentials.md}), **Spark** to build
+(Unit {unit:unit4/fundamentals.md}), **Airflow** to schedule (Unit {unit:unit5/basics.md}), **Apache Polaris** to govern (Unit {unit:unit6/polaris.md}), and **Superset**
+to visualise (Unit {unit:unit7/dashboards.md}). This capstone strings them together on your own — end to end — by shipping
 **one new metric** for ShopFlow.
 
 The business question: **"What fraction of each day's orders were cancelled?"** Right now nobody

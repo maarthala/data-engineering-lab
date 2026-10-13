@@ -1,4 +1,4 @@
-# 8.4 Data quality checks and quarantine
+# Data quality checks and quarantine
 
 ## Concept
 Raw data lies. A feed will hand you a missing country, a negative amount, a duplicated key —
@@ -35,7 +35,7 @@ Both strategies lean on one Spark **action**: **`count()`**. Most DataFrame oper
 exactly what you need to *measure* quality and decide.
 
 ## Lab
-Assume the `spark` session (Spark Connect) and the `iceberg` catalog from Unit 4.
+Assume the `spark` session (Spark Connect) and the `iceberg` catalog from Unit {unit:unit4/fundamentals.md}.
 
 ### 1 · Encode the rules and split the batch
 We start with a tiny raw batch that has two deliberately bad rows — one with a missing `country`,

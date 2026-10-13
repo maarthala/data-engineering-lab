@@ -49,6 +49,10 @@ markdown_extensions:
   - tables
   - toc: { permalink: true }
 
+# Unit + lesson numbers come from the nav order (hooks/numbering.py) — never type them.
+hooks:
+  - hooks/numbering.py
+
 plugins:
   - search
   - redirects:
@@ -73,78 +77,78 @@ nav:
   - Home: index.md
   - "Course overview": course.md
   - "Help & community": help.md
-  - "0 · Getting started":
-      - "0.1 Prerequisites & setup": setup/prerequisites.md
-      - "0.2 Bring up the stack": setup/deploy.md
-      - "0.3 Your lab account & workspace": setup/workspace.md
-      - "0.3.1 Personas & roles (governance demos)": setup/personas.md
-      - "0.4 The ShopFlow scenario": scenario.md
-      - "0.5 Technical architecture": unit0/architecture.md
-      - "0.6 Database schema": unit0/schema.md
-      - "0.7 Stack architecture": unit0/stack.md
-      - "0.8 Data in the stack — what's where": unit0/data-inventory.md
-  - "1 · Foundations":
-      - "1.1 What is Data Engineering": unit1/what-is-de.md
-      - "1.2 Lake vs Warehouse vs Lakehouse": unit1/lakehouse.md
-      - "1.3 File & table formats": unit1/formats.md
-      - "1.4 Medallion architecture": unit1/medallion.md
-      - "1.5 Dimensional modeling (facts & dimensions)": unit1/dimensional-modeling.md
-  - "2 · SQL on big data":
-      - "2.1 Query the lake with Trino": unit2/intro.md
-      - "2.2 Joins & aggregations": unit2/joins-aggregations.md
-      - "2.3 Window functions": unit2/window-functions.md
-      - "2.4 CTEs & complex analytics": unit2/ctes.md
-      - "2.5 Views": unit2/views.md
-      - "2.6 Conditional logic, NULLs & filtering": unit2/conditional.md
-      - "2.7 Functions (built-in, lambdas & your own)": unit2/functions.md
-      - "2.8 MERGE & upserts": unit2/merge.md
-      - "2.9 Semi-structured data (JSON)": unit2/json.md
-      - "2.10 Challenge: cohort report": unit2/challenge.md
-      - "2.11 Challenge: AdventureWorks": unit2/adventureworks-challenge.md
-  - "3 · Python — Notebook":
-      - "3.1 Python & notebooks for DE": unit3/python-essentials.md
-      - "3.2 pandas": unit3/pandas.md
-      - "3.3 NumPy": unit3/numpy.md
-      - "3.4 PyArrow & Parquet": unit3/pyarrow.md
-      - "3.5 Consuming APIs (requests)": unit3/apis.md
-      - "3.6 SQL from Python (Postgres & lakehouse)": unit3/databases.md
-      - "3.7 Spark from a notebook": unit3/spark.md
-      - "3.8 Query tables with %%sql": unit3/sql-magic.md
-      - "3.9 Upload a file & register it as a table": unit3/upload-register.md
-  - "4 · Spark":
-      - "4.1 Spark fundamentals": unit4/fundamentals.md
-      - "4.2 Read the lake (Bronze)": unit4/read-bronze.md
-      - "4.2.1 Data cleaning (messy Bronze → clean Silver)": unit4/data-cleaning.md
-      - "4.3 Transform to Silver": unit4/transform-silver.md
-      - "4.4 Spark SQL & aggregates (Gold)": unit4/spark-sql-gold.md
-      - "4.5 Materialized views": unit4/materialized-views.md
-      - "4.6 Challenge: build a Gold mart": unit4/challenge.md
-      - "4.7 Table maintenance (OPTIMIZE, Z-order, VACUUM)": unit4/table-maintenance.md
-      - "4.8 Spark performance & tuning": unit4/performance.md
-      - "4.9 How Spark runs (architecture & query lifecycle)": unit4/spark-architecture.md
-      - "4.10 Data skew & salting": unit4/skew.md
-      - "4.11 Partitions: coalesce & repartition": unit4/partitions.md
-  - "5 · Orchestration (Airflow)":
-      - "5.1 Airflow basics": unit5/basics.md
-      - "5.2 Build the medallion DAG": unit5/medallion-dag.md
-      - "5.3 Schedule ingestion & Spark jobs": unit5/schedule.md
-      - "5.4 The development workflow (notebook → job → DAG)": unit5/dev-workflow.md
-  - "6 · Data governance (Polaris)":
-      - "6.1 Governed Iceberg with Apache Polaris": unit6/polaris.md
-      - "6.2 Create users & assign access (UI)": unit6/polaris-admin.md
-      - "6.3 Create your own catalog, namespace & table": unit6/create-catalog-table.md
-      - "6.4 Grant table access & query it": unit6/grant-and-query.md
-  - "7 · Business intelligence (Superset)":
-      - "7.1 Dashboards from the Gold layer": unit7/dashboards.md
-  - "8 · Real-world recipes":
-      - "8.1 Ingest Excel from object storage": recipes/excel.md
-      - "8.2 Run on file arrival (event trigger)": recipes/file-trigger.md
-      - "8.3 Slowly changing dimensions (SCD2)": recipes/scd2.md
-      - "8.4 Data quality checks & quarantine": recipes/data-quality.md
-      - "8.5 Reverse-ETL: publish Gold out": recipes/reverse-etl.md
-  - "9 · Capstones":
-      - "9.1 Capstone 1 (easy)": capstones/capstone-1.md
-      - "9.2 Capstone 2 (medium)": capstones/capstone-2.md
-  - "10 · Bridge to the platforms":
-      - "10.1 OSS ⇄ Databricks / Snowflake / Fabric / Azure": platforms/rosetta.md
-      - "10.2 Glossary": platforms/glossary.md
+  - "Getting started":
+      - "Prerequisites & setup": setup/prerequisites.md
+      - "Bring up the stack": setup/deploy.md
+      - "Your lab account & workspace": setup/workspace.md
+      - "+ Personas & roles (governance demos)": setup/personas.md
+      - "The ShopFlow scenario": scenario.md
+      - "Technical architecture": unit0/architecture.md
+      - "Database schema": unit0/schema.md
+      - "Stack architecture": unit0/stack.md
+      - "Data in the stack — what's where": unit0/data-inventory.md
+  - "Foundations":
+      - "What is Data Engineering": unit1/what-is-de.md
+      - "Lake vs Warehouse vs Lakehouse": unit1/lakehouse.md
+      - "File & table formats": unit1/formats.md
+      - "Medallion architecture": unit1/medallion.md
+      - "Dimensional modeling (facts & dimensions)": unit1/dimensional-modeling.md
+  - "SQL on big data":
+      - "Query the lake with Trino": unit2/intro.md
+      - "Joins & aggregations": unit2/joins-aggregations.md
+      - "Window functions": unit2/window-functions.md
+      - "CTEs & complex analytics": unit2/ctes.md
+      - "Views": unit2/views.md
+      - "Conditional logic, NULLs & filtering": unit2/conditional.md
+      - "Functions (built-in, lambdas & your own)": unit2/functions.md
+      - "MERGE & upserts": unit2/merge.md
+      - "Semi-structured data (JSON)": unit2/json.md
+      - "Challenge: cohort report": unit2/challenge.md
+      - "Challenge: AdventureWorks": unit2/adventureworks-challenge.md
+  - "Python — Notebook":
+      - "Python & notebooks for DE": unit3/python-essentials.md
+      - "pandas": unit3/pandas.md
+      - "NumPy": unit3/numpy.md
+      - "PyArrow & Parquet": unit3/pyarrow.md
+      - "Consuming APIs (requests)": unit3/apis.md
+      - "SQL from Python (Postgres & lakehouse)": unit3/databases.md
+      - "Spark from a notebook": unit3/spark.md
+      - "Query tables with %%sql": unit3/sql-magic.md
+      - "Upload a file & register it as a table": unit3/upload-register.md
+  - "Spark":
+      - "Spark fundamentals": unit4/fundamentals.md
+      - "Read the lake (Bronze)": unit4/read-bronze.md
+      - "+ Data cleaning (messy Bronze → clean Silver)": unit4/data-cleaning.md
+      - "Transform to Silver": unit4/transform-silver.md
+      - "Spark SQL & aggregates (Gold)": unit4/spark-sql-gold.md
+      - "Materialized views": unit4/materialized-views.md
+      - "Challenge: build a Gold mart": unit4/challenge.md
+      - "Table maintenance (OPTIMIZE, Z-order, VACUUM)": unit4/table-maintenance.md
+      - "Spark performance & tuning": unit4/performance.md
+      - "How Spark runs (architecture & query lifecycle)": unit4/spark-architecture.md
+      - "Data skew & salting": unit4/skew.md
+      - "Partitions: coalesce & repartition": unit4/partitions.md
+  - "Orchestration (Airflow)":
+      - "Airflow basics": unit5/basics.md
+      - "Build the medallion DAG": unit5/medallion-dag.md
+      - "Schedule ingestion & Spark jobs": unit5/schedule.md
+      - "The development workflow (notebook → job → DAG)": unit5/dev-workflow.md
+  - "Data governance (Polaris)":
+      - "Governed Iceberg with Apache Polaris": unit6/polaris.md
+      - "Create users & assign access (UI)": unit6/polaris-admin.md
+      - "Create your own catalog, namespace & table": unit6/create-catalog-table.md
+      - "Grant table access & query it": unit6/grant-and-query.md
+  - "Business intelligence (Superset)":
+      - "Dashboards from the Gold layer": unit7/dashboards.md
+  - "Real-world recipes":
+      - "Ingest Excel from object storage": recipes/excel.md
+      - "Run on file arrival (event trigger)": recipes/file-trigger.md
+      - "Slowly changing dimensions (SCD2)": recipes/scd2.md
+      - "Data quality checks & quarantine": recipes/data-quality.md
+      - "Reverse-ETL: publish Gold out": recipes/reverse-etl.md
+  - "Capstones":
+      - "Capstone 1 (easy)": capstones/capstone-1.md
+      - "Capstone 2 (medium)": capstones/capstone-2.md
+  - "Bridge to the platforms":
+      - "OSS ⇄ Databricks / Snowflake / Fabric / Azure": platforms/rosetta.md
+      - "Glossary": platforms/glossary.md

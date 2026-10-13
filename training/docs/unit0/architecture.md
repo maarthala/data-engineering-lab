@@ -1,4 +1,4 @@
-# 0.5 Technical architecture
+# Technical architecture
 
 You've met the **business** ([the ShopFlow scenario](../scenario.md)) and the questions
 it needs answered. This page is the **machine that answers them** — the tools in the

@@ -1,4 +1,4 @@
-# 5.4 The development workflow: notebook → job → DAG
+# The development workflow: notebook → job → DAG
 
 ## Concept
 How a data engineer actually **builds and ships** a pipeline. A pipeline is **two artifacts**, and

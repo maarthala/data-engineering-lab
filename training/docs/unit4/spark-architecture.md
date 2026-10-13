@@ -1,4 +1,4 @@
-# 4.9 How Spark runs under the hood (architecture & the query lifecycle)
+# How Spark runs under the hood (architecture & the query lifecycle)
 
 ## Concept
 Every data flow / Spark job is really **one driver coordinating many executors**. Understanding

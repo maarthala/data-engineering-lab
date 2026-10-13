@@ -1,4 +1,4 @@
-# 2.7 Functions: built-in, lambdas, and your own
+# Functions: built-in, lambdas, and your own
 
 ## Concept
 A **function** takes values in and gives a value back: `upper('uk')` → `'UK'`. You've already used

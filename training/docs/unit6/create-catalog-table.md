@@ -1,4 +1,4 @@
-# 6.3 Create your own catalog, namespace & table
+# Create your own catalog, namespace & table
 
 You've *used* the governed catalog; now build the whole hierarchy yourself and see
 exactly where each piece lives. The structure is three levels:

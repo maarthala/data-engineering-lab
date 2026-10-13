@@ -1,4 +1,4 @@
-# 4.8 Spark performance & tuning
+# Spark performance & tuning
 
 ## Concept
 Spark is fast because it works in **parallel** — but *how* it splits, shuffles, and joins data
@@ -15,7 +15,7 @@ the cluster's cores. Partitions are *the* reason Spark scales.
 ```python
 from pyspark.sql.functions import spark_partition_id
 
-RAW = "s3a://demouser-lake/files/source/shopflow"    # exported in 4.2 (your bucket)
+RAW = "s3a://demouser-lake/files/source/shopflow"    # exported in {lesson:unit4/read-bronze.md} (your bucket)
 df = spark.read.parquet(f"{RAW}/history/orders")
 # how many chunks this DataFrame is split into
 print(df.select(spark_partition_id()).distinct().count())

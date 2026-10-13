@@ -1,4 +1,4 @@
-# 4.1 Spark fundamentals
+# Spark fundamentals
 
 ## Concept
 You already met **Spark** in [3.7](../unit3/spark.md) — the pre-created `spark` session,
@@ -58,7 +58,7 @@ Connect to Spark from **Jupyter** at [http://localhost:8008](http://localhost:80
 your lab account). The notebook is a lightweight **Spark Connect** client: it's pre-wired to the
 cluster's Connect server (`sc://spark-connect:15002`), and the **`iceberg`** lakehouse catalog is
 already configured — pointing at **your own** lakehouse (`demouser_lake`), so the tables you build in
-this unit are yours alone. So the whole connection is a single line — the equivalent of Unit 2's
+this unit are yours alone. So the whole connection is a single line — the equivalent of Unit {unit:unit2/intro.md}'s
 `USE …`:
 
 ```python
@@ -91,10 +91,10 @@ print(spark.version)
     cluster so data far bigger than one machine's RAM still fits.
 
 !!! note "Where's all the config?"
-    In Unit 2 you saw catalogs are **admin-configured**, not created by you. Same here: the
+    In Unit {unit:unit2/intro.md} you saw catalogs are **admin-configured**, not created by you. Same here: the
     cluster's Connect server already knows the **`iceberg`** catalog (object storage + Iceberg
     REST) and the S3 credentials, so your notebook doesn't repeat any of it. You'll build the
-    lakehouse under `iceberg.bronze/silver/gold` — the *same* catalog Trino reads in Unit 2.
+    lakehouse under `iceberg.bronze/silver/gold` — the *same* catalog Trino reads in Unit {unit:unit2/intro.md}.
 
 Build a first DataFrame from a small in-memory sample and *feel* lazy evaluation. (This is a
 tiny synthetic sample, using ShopFlow's real `status` values — real revenue comes from
@@ -151,7 +151,7 @@ delivered.explain()
 !!! info "Why lazy? Because Spark optimizes the *whole* plan"
     Because transformations only build a plan, Spark sees the entire chain before running a
     single row. That lets it push the `filter` down, drop columns you didn't `select`, and skip
-    reading data it doesn't need — the same warehouse-grade optimization Trino did in Unit 2,
+    reading data it doesn't need — the same warehouse-grade optimization Trino did in Unit {unit:unit2/intro.md},
     now applied to your Python. The rule to memorize: **transformations are lazy; an action
     (`show`, `count`, `collect`, `write`) triggers execution.**
 

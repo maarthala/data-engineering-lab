@@ -1,4 +1,4 @@
-# 0.3 Your lab account & workspace
+# Your lab account & workspace
 
 You sign in **once** — with your **lab account** — and every tool knows who you are. On your first
 sign-in the lab also builds you a private **workspace**: your own lakehouse, your own storage
@@ -67,7 +67,7 @@ SELECT * FROM shared.gold.daily_sales LIMIT 10   -- the course's ready-made Gold
 (*Table not found*? The shared lake hasn't been filled yet — whoever runs the stack starts the
 `shopflow_medallion` DAG once, see [0.2](deploy.md#fill-the-shared-lake-once).)
 
-So in Jupyter, the Unit 4 lessons build `iceberg.bronze/silver/gold` **in your own lakehouse** —
+So in Jupyter, the Unit {unit:unit4/fundamentals.md} lessons build `iceberg.bronze/silver/gold` **in your own lakehouse** —
 nobody else's tables get in your way, and you can't break theirs.
 
 !!! tip "Another catalog in Spark"
@@ -86,7 +86,7 @@ Your bucket is organised like an Azure / Fabric lakehouse — **Files** and **Ta
 │   │   ├── notebooks/            = Jupyter's notebooks/ folder (kept in sync)
 │   │   ├── dags/                 = Jupyter's dags/ folder (kept in sync) → Airflow
 │   │   └── dbt/                  = Jupyter's dbt/ folder (kept in sync)
-│   └── source/                   raw files to ingest — lesson 4.2 exports ShopFlow here
+│   └── source/                   raw files to ingest — lesson {lesson:unit4/read-bronze.md} exports ShopFlow here
 └── tables/                       table storage of your catalogs — tables/<catalog>/<namespace>/<table>/
 ```
 

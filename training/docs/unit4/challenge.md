@@ -1,8 +1,8 @@
-# 4.6 Challenge: build a Gold mart
+# Challenge: build a Gold mart
 
 ## Concept
-You've walked the full medallion with Spark: read the lake into **Bronze** (4.2),
-cleaned and joined into **Silver** (4.3), and aggregated into **Gold** (4.4). Now you
+You've walked the full medallion with Spark: read the lake into **Bronze** ({lesson:unit4/read-bronze.md}),
+cleaned and joined into **Silver** ({lesson:unit4/transform-silver.md}), and aggregated into **Gold** ({lesson:unit4/spark-sql-gold.md}). Now you
 own the pattern end to end. This unit's challenge asks you to design and ship a **new
 Gold mart** yourself — the kind of ticket a data engineer picks up on any real team.
 
@@ -38,7 +38,7 @@ A good Gold mart is: built **only** from Silver (never re-reading raw sources),
 ### The brief
 Build **`gold.category_daily_revenue`**: for each **product category** and **day**,
 report revenue, units sold, and number of distinct orders — delivered orders only. Then add
-one analytical column that requires a **window function** (Unit 2 skill): each row's
+one analytical column that requires a **window function** (Unit {unit:unit2/intro.md} skill): each row's
 **share of that day's total revenue**, so the business can see which categories
 dominate on any given day.
 
@@ -58,7 +58,7 @@ spark.sql("CREATE SCHEMA IF NOT EXISTS iceberg.gold")
 # TODO: aggregate, add pct_of_day via a window, write the Iceberg table.
 ```
 
-Think first: which Unit 2 tools apply? A `GROUP BY` for the grain, and a
+Think first: which Unit {unit:unit2/intro.md} tools apply? A `GROUP BY` for the grain, and a
 `sum(...) OVER (PARTITION BY order_date)` window to get the daily total without a
 second pass.
 
@@ -121,7 +121,7 @@ building it, confirm the **same** table is readable from Trino (it should be —
     aggregate → write pipeline, expressed as a single `spark.sql` query plus one `writeTo`.
 
     - **Read (the `FROM`).** `FROM iceberg.silver.orders` reads *only* from Silver — the clean,
-      governed detail table from lesson 4.3. We never touch the raw lake here; requirement 1 is
+      governed detail table from lesson {lesson:unit4/transform-silver.md}. We never touch the raw lake here; requirement 1 is
       "source from Silver alone", and honouring it is what keeps Gold consistent (everyone
       aggregates the same trusted rows). `iceberg.silver.orders` is already one row per order
       line, with `line_amount`, `quantity`, `order_date`, `category`, and `status` columns ready

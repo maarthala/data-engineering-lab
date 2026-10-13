@@ -1,4 +1,4 @@
-# 3.7 Spark from a notebook
+# Spark from a notebook
 
 ## Concept
 pandas ([3.2](pandas.md)) is perfect until the data outgrows one machine's memory. Then you reach
@@ -55,7 +55,7 @@ The **`spark`** object (a **`SparkSession`**) is your handle to the cluster — 
 `spark.sql(...)`, every read and write goes through it. It's a **Spark Connect** client: a thin
 local object that ships your code to the remote cluster's Connect server (pre-wired to
 `sc://spark-connect:15002`), and two lakehouse catalogs are ready: **`iceberg`** — *your own*
-lakehouse (`demouser_lake`, empty until you build it in Unit 4) — and **`shared`** — the course's
+lakehouse (`demouser_lake`, empty until you build it in Unit {unit:unit4/fundamentals.md}) — and **`shared`** — the course's
 shared lake with the ready-made ShopFlow tables (read-only; see [0.3](../setup/workspace.md)).
 
 !!! info "How `spark` gets there"
@@ -228,11 +228,11 @@ these jobs for you. The *code* is identical — only how it's launched changes.
     A production job's final step is usually **`df.write…`** — the **action** that saves a
     DataFrame's result back to the lakehouse as a table (rather than `show()`-ing it to a human).
     Like every action, `write` is what actually triggers all the upstream lazy transformations to
-    run. Unit 4 uses `write` to build the real Silver and Gold tables.
+    run. Unit {unit:unit4/fundamentals.md} uses `write` to build the real Silver and Gold tables.
 
 ## Challenge
 From the notebook, use Spark to compute **delivered revenue per country** from
-`iceberg.silver.orders` (built in Unit 4), then bring the small result back to pandas and print it
+`iceberg.silver.orders` (built in Unit {unit:unit4/fundamentals.md}), then bring the small result back to pandas and print it
 sorted by revenue.
 
 ??? note "Solution"
@@ -263,7 +263,7 @@ sorted by revenue.
     - **Snowflake** — **Snowpark** gives a Spark-like DataFrame API; `.to_pandas()` bridges the same way.
     - **Azure Data Factory** — Mapping Data Flows run on managed Spark under the hood.
 
-    You've now met all the tools; Unit 4 uses Spark to build the real lakehouse.
+    You've now met all the tools; Unit {unit:unit4/fundamentals.md} uses Spark to build the real lakehouse.
 
 ## Key terms, at a glance
 | Term | Plain meaning |
@@ -286,4 +286,4 @@ sorted by revenue.
 - See how Spark's verbs mirror pandas — at cluster scale
 - Move data between pandas and Spark (and know when *not* to `toPandas()`)
 - Write a Python **UDF** / **pandas UDF**, and use it from SQL
-- Understand what "submitting a Spark job" means — the bridge into Unit 4
+- Understand what "submitting a Spark job" means — the bridge into Unit {unit:unit4/fundamentals.md}

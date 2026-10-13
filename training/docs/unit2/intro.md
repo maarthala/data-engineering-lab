@@ -1,4 +1,4 @@
-# 2.1 Query the lake with Trino
+# Query the lake with Trino
 
 ## Concept
 A **distributed SQL engine** lets you run ordinary SQL over data wherever it lives —
@@ -13,8 +13,8 @@ its own schemas and tables. `SHOW CATALOGS` lists them. On our stack:
 
 | Catalog | Connects to… | Where the bytes physically live | What's inside | You use it |
 |---|---|---|---|---|
-| **`shopflow`** | the live ShopFlow app database (Postgres) | the Postgres server | the **raw source** tables — `customers`, `products`, `orders`, `order_items` | **now, Unit 2** |
-| **`iceberg`** | the lakehouse (via the **Apache Polaris** Iceberg REST catalog) | Parquet files on **RustFS** object storage | the **Bronze / Silver / Gold** tables *you'll build* | from Unit 4 |
+| **`shopflow`** | the live ShopFlow app database (Postgres) | the Postgres server | the **raw source** tables — `customers`, `products`, `orders`, `order_items` | **now, Unit {unit:unit2/intro.md}** |
+| **`iceberg`** | the lakehouse (via the **Apache Polaris** Iceberg REST catalog) | Parquet files on **RustFS** object storage | the **Bronze / Silver / Gold** tables *you'll build* | from Unit {unit:unit4/fundamentals.md} |
 | **`system`** | Trino itself | in memory | engine info (nodes, running queries) | rarely |
 
 !!! question "Why is the lakehouse catalog called `iceberg` and not `shopflow`?"
@@ -25,7 +25,7 @@ its own schemas and tables. `SHOW CATALOGS` lists them. On our stack:
       (Apache Iceberg — see [1.3](../unit1/formats.md)).
 
     So your ShopFlow data lives in **two homes at different stages of its life**: raw in the
-    `shopflow` catalog (Postgres, right now), and — after you build the pipeline in Unit 4 —
+    `shopflow` catalog (Postgres, right now), and — after you build the pipeline in Unit {unit:unit4/fundamentals.md} —
     refined in the `iceberg` catalog (the lakehouse on RustFS). Same business, two places.
 
 !!! info "Do I ever *create* a catalog?"
@@ -47,13 +47,13 @@ inside any catalog, use `SHOW SCHEMAS FROM <catalog>` and `SHOW TABLES FROM <cat
 ```mermaid
 flowchart TB
   U[You: one SQL query] --> T[Trino coordinator]
-  T --> PG[(shopflow catalog<br/>live Postgres — Unit 2)]
-  T --> LK[(iceberg catalog<br/>lakehouse on RustFS — Unit 4+)]
+  T --> PG[(shopflow catalog<br/>live Postgres — Unit {unit:unit2/intro.md})]
+  T --> LK[(iceberg catalog<br/>lakehouse on RustFS — Unit {unit:unit4/fundamentals.md}+)]
 ```
 
 !!! note "Same SQL, two homes"
     Everything you write this unit against `shopflow.public.*` will run **unchanged** on
-    your `iceberg.silver.*` / `iceberg.gold.*` tables once you build them in Unit 4 — just
+    your `iceberg.silver.*` / `iceberg.gold.*` tables once you build them in Unit {unit:unit4/fundamentals.md} — just
     swap the three-part name. SQL is portable across sources; that's the whole point of a
     query engine.
 
@@ -171,14 +171,14 @@ LIMIT 20;
 
 !!! tip "ShopFlow order statuses"
     An order's `status` is one of `placed` · `shipped` · `delivered` · `cancelled`.
-    Throughout Unit 2 we treat **`delivered`** as a *completed sale* (revenue you can
+    Throughout Unit {unit:unit2/intro.md} we treat **`delivered`** as a *completed sale* (revenue you can
     count). Get used to filtering on it.
 
-Once you've built the ShopFlow Gold tables (Unit 4), the *exact same* SQL works against the
+Once you've built the ShopFlow Gold tables (Unit {unit:unit4/fundamentals.md}), the *exact same* SQL works against the
 lakehouse — just change the three-part name:
 
 ```sql
--- From Unit 4 onward — the governed lakehouse via the iceberg catalog
+-- From Unit {unit:unit4/fundamentals.md} onward — the governed lakehouse via the iceberg catalog
 SHOW SCHEMAS FROM iceberg;          -- expect: bronze, silver, gold
 SELECT * FROM iceberg.gold.daily_sales ORDER BY order_date DESC LIMIT 14;
 ```
@@ -285,4 +285,4 @@ Using only the `orders` table: list the **5 most recent cancelled orders placed 
 - Explain what a distributed SQL engine does, and connect to Trino via CLI or the UI
 - Discover data with `SHOW CATALOGS/SCHEMAS/TABLES` and `DESCRIBE`
 - Write filtered, sorted `SELECT`s using `catalog.schema.table` names
-- Explain why the same SQL will run on the lakehouse catalog in Unit 4
+- Explain why the same SQL will run on the lakehouse catalog in Unit {unit:unit4/fundamentals.md}

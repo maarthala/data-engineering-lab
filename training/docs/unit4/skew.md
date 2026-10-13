@@ -1,4 +1,4 @@
-# 4.10 Data skew & salting
+# Data skew & salting
 
 ## Concept
 A shuffle spreads rows across partitions **by a key**. If one key has far more rows than the

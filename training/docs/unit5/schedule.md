@@ -1,4 +1,4 @@
-# 5.3 Schedule ingestion & Spark jobs
+# Schedule ingestion & Spark jobs
 
 ## Concept
 ShopFlow is a *living* business: every day brings new orders. A real pipeline doesn't reload all

@@ -1,4 +1,4 @@
-# 5.1 Airflow basics
+# Airflow basics
 
 ## Concept
 So far you've run each ShopFlow Spark job by hand: ingest Bronze, build Silver, build Gold

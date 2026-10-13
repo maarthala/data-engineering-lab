@@ -1,4 +1,4 @@
-# 0.8 · Data in the stack — what's where
+# · Data in the stack — what's where
 
 Before you start querying, know **what data exists and where it lives**. The stack holds data in
 three places, each with a different job:
@@ -77,7 +77,7 @@ Tables are registered in the **Apache Polaris** catalog service. You work with t
 | `gold` | business marts (aggregated) | `daily_sales`, `top_products`, `customer_ltv` |
 
 The course lake has all of these from day one; your lakehouse gets them as you work through
-Units 4–5. List what's there any time:
+Units {unit:unit4/fundamentals.md}–5. List what's there any time:
 
 ```sql
 %%sql

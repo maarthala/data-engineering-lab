@@ -1,4 +1,4 @@
-# 8.5 Reverse-ETL: publish the Gold layer out
+# Reverse-ETL: publish the Gold layer out
 
 ## Concept
 Everything so far pulled data **into** the lakehouse — Bronze ingest, Silver cleaning, Gold marts.

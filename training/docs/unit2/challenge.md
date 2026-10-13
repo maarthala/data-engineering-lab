@@ -1,4 +1,4 @@
-# 2.10 Challenge: cohort report
+# Challenge: cohort report
 
 ## Concept
 A **cohort analysis** groups customers by *when they first became active* — their
@@ -32,7 +32,7 @@ A few plain-language definitions before you start:
   calendar date lets you compare a January cohort's "3 months later" directly against a June
   cohort's "3 months later".
 
-This challenge combines everything from Unit 2: joins, aggregations, window functions, and
+This challenge combines everything from Unit {unit:unit2/intro.md}: joins, aggregations, window functions, and
 chained CTEs. Build it step by step.
 
 ```mermaid

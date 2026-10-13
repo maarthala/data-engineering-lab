@@ -1,4 +1,4 @@
-# 2.4 CTEs & complex analytics
+# CTEs & complex analytics
 
 ## Concept
 As analytics get real, a single query grows into a tangle of nested subqueries. A
@@ -18,7 +18,7 @@ nobody can debug, you write:
 understandable and testable.
 
 In this page we build a **repeat-purchase / basket analysis** entirely from chained CTEs —
-the same structure you'll reuse when writing the Gold `customer_ltv` table in Unit 4.
+the same structure you'll reuse when writing the Gold `customer_ltv` table in Unit {unit:unit4/fundamentals.md}.
 
 ```mermaid
 flowchart LR

@@ -1,4 +1,4 @@
-# 2.5 Views: saved queries in the lakehouse
+# Views: saved queries in the lakehouse
 
 ## Concept
 In [2.4](ctes.md) you named a step of a query with a **CTE**, but that name disappears when the
@@ -144,7 +144,7 @@ DROP VIEW demouser_lake.my_lab.v_order_summary;
 Drop the top view first: `v_delivered_revenue` reads from `v_order_summary`.
 
 ## Where views can live (and who can read them)
-| | Trino | Spark (Unit 3+) |
+| | Trino | Spark (Unit {unit:unit3/python-essentials.md}+) |
 |---|---|---|
 | Create a view in the lakehouse (`iceberg.…`) | ✓ | ✓ |
 | Create a view in `shopflow` (Postgres) | ✗ the connector doesn't allow it | n/a |

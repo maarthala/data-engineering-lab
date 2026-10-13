@@ -1,4 +1,4 @@
-# 4.3 Transform to Silver
+# Transform to Silver
 
 ## Concept
 **Silver** is the trusted, business-ready model: types are correct, duplicates are gone, nulls
@@ -267,7 +267,7 @@ WHEN NOT MATCHED THEN INSERT *
 
 `WHEN MATCHED … UPDATE SET *` applies the price change to an existing line;
 `WHEN NOT MATCHED … INSERT *` adds a late-arriving order line — one transactional statement, no
-duplicates. (This is the incremental pattern; in Unit 5 Airflow runs it on a schedule.)
+duplicates. (This is the incremental pattern; in Unit {unit:unit5/basics.md} Airflow runs it on a schedule.)
 
 ## Challenge
 Add a **data-quality flag** to Silver: mark any order line where `quantity <= 0` or

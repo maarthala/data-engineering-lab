@@ -1,4 +1,4 @@
-# 10.2 Glossary
+# Glossary
 
 Terms used throughout the course — deliberately the same words the cloud platforms use, so
 they're already familiar when you get there.

@@ -1,4 +1,4 @@
-# 4.2 Read the lake (Bronze)
+# Read the lake (Bronze)
 
 ## Concept
 **Bronze** is the raw landing zone: faithful copies of the sources, minimally touched, append-
@@ -7,7 +7,7 @@ ShopFlow has two kinds of source, and Spark reads both:
 
 - **Postgres OLTP** (`shopflow` db) — the live tables `customers`, `products`, `orders`,
   `order_items` (the [schema](../unit0/schema.md)) — read over **JDBC**. The same data you
-  queried directly in Unit 2, now *ingested* into the lake.
+  queried directly in Unit {unit:unit2/intro.md}, now *ingested* into the lake.
 - **Object-storage history** — older orders archived as date-partitioned **Parquet** — read as
   files.
 
@@ -18,7 +18,7 @@ flowchart LR
   B["🥉 iceberg.bronze.*<br/>raw Iceberg tables"]
 ```
 
-The rule for Bronze: **land, don't transform.** Cleaning happens in Silver (4.3).
+The rule for Bronze: **land, don't transform.** Cleaning happens in Silver ({lesson:unit4/transform-silver.md}).
 
 !!! info "Why Bronze keeps everything as-is"
     Back in [1.4](../unit1/medallion.md) you learned the medallion layers. **Bronze** is the
@@ -110,7 +110,7 @@ customers.show(5)
   (`org.postgresql.Driver`) Spark loads to speak Postgres.
 - **`.load()`** — the *action* that runs the read and returns a **DataFrame**.
 - The four calls build four DataFrames — `customers`, `products`, `orders`, `items` — each mirroring
-  its Postgres table one-for-one. This is the *same* data you queried in Unit 2, now inside Spark.
+  its Postgres table one-for-one. This is the *same* data you queried in Unit {unit:unit2/intro.md}, now inside Spark.
 - **`customers.show(5)`** — print the first 5 rows so you can eyeball what came back.
 
 *Produces:* four DataFrames, one per source table. Grain (what one row means): one customer, one
@@ -208,7 +208,7 @@ hist.writeTo("iceberg.bronze.orders_history").using("iceberg").createOrReplace()
 and `orders_history` — each a faithful, uncleaned copy of its source. Nothing was renamed, deduped,
 or filtered: that's Bronze doing its job.
 
-Verify — this is exactly the SQL from Unit 2, now over the lakehouse via Spark:
+Verify — this is exactly the SQL from Unit {unit:unit2/intro.md}, now over the lakehouse via Spark:
 
 ```python
 spark.sql("SHOW TABLES IN iceberg.bronze").show()
@@ -318,7 +318,7 @@ from Postgres and appends them.
       rows to the existing Bronze table, leaving what's already there untouched.
 
     Using a `(SELECT … WHERE …)` subquery as `dbtable` pushes the filter into Postgres, so Spark
-    transfers only the new rows (**predicate pushdown**, like Trino in Unit 2).
+    transfers only the new rows (**predicate pushdown**, like Trino in Unit {unit:unit2/intro.md}).
 
 !!! tip "🎯 This runs unchanged on Azure, Databricks, Snowflake & Fabric"
     **What you just did:** ingested raw sources into Bronze — Postgres over JDBC and Parquet from

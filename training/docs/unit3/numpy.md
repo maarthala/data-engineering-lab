@@ -1,4 +1,4 @@
-# 3.3 NumPy — fast numeric arrays
+# NumPy — fast numeric arrays
 
 ## Concept
 **NumPy** is the numerical foundation Python data work is built on — **pandas itself stores its

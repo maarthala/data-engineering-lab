@@ -1,4 +1,4 @@
-# 3.4 PyArrow — Parquet & the columnar bridge
+# PyArrow — Parquet & the columnar bridge
 
 ## Concept
 **Apache Arrow** is a language-agnostic **columnar in-memory format**, and **PyArrow** is its
@@ -14,7 +14,7 @@ engineering — and worth understanding because it does two jobs no other tool d
 
 Think of it this way: **Parquet is Arrow written to disk; Arrow is Parquet loaded into memory.**
 
-### Tying back to 1.3: row vs column, disk vs memory
+### Tying back to {lesson:unit1/formats.md}: row vs column, disk vs memory
 In [1.3 (file formats)](../unit1/formats.md) you met **Parquet** as a *columnar file on disk* —
 values of one column stored together, which is what makes "read only the `amount` column" cheap.
 Arrow is the same **columnar** idea, but for data held *in memory* while a program is running.
@@ -127,7 +127,7 @@ pd.read_parquet("/tmp/orders2.parquet")
 
 ### Column projection — the columnar win
 Because Parquet stores each column separately, you can read **only the columns you need** — far
-less I/O than reading the whole file (the same idea as Trino's projection pushdown in Unit 2):
+less I/O than reading the whole file (the same idea as Trino's projection pushdown in Unit {unit:unit2/intro.md}):
 
 ```python
 pq.read_table("/tmp/orders.parquet", columns=["order_id", "amount"]).to_pandas()
@@ -145,7 +145,7 @@ pq.read_table("/tmp/orders.parquet", columns=["order_id", "amount"]).to_pandas()
     Reading a subset of columns is called **projection**. On a 3-column toy file the saving is
     tiny, but on a real table with 200 columns and millions of rows, asking for 2 columns instead
     of 200 is the difference between seconds and minutes. It's the exact same idea as Trino's
-    *projection pushdown* from Unit 2 — the engine pushes "I only need these columns" down to the
+    *projection pushdown* from Unit {unit:unit2/intro.md} — the engine pushes "I only need these columns" down to the
     storage layer.
 
 ### Inspect Parquet without loading it
@@ -174,7 +174,7 @@ print(pq.read_schema("/tmp/orders.parquet"))
     file and how big is it?" instantly — and how they later decide which row groups they can skip.
 
 ### Partitioned datasets + predicate pushdown
-Real lakehouse data is **partitioned** into folders (like the `dt=…` history in Unit 4). PyArrow's
+Real lakehouse data is **partitioned** into folders (like the `dt=…` history in Unit {unit:unit4/fundamentals.md}). PyArrow's
 `dataset` API reads a whole partitioned tree and pushes filters down so it skips folders it
 doesn't need:
 
@@ -218,7 +218,7 @@ dataset.to_table(filter=ds.field("country") == "US",
     PyArrow here, Spark, or Trino.
 
 !!! tip "Why this matters for the lakehouse"
-    Every Parquet file in `iceberg.bronze/silver/gold` (Unit 4) is Arrow-on-disk. When Spark does
+    Every Parquet file in `iceberg.bronze/silver/gold` (Unit {unit:unit4/fundamentals.md}) is Arrow-on-disk. When Spark does
     `.toPandas()` or Trino returns rows to the Python client, Arrow is the wire format. Learning
     it explains *why* columnar + partition pruning make the whole lakehouse fast.
 

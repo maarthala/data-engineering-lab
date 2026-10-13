@@ -1,4 +1,4 @@
-# 1.3 File & table formats
+# File & table formats
 
 ## Concept
 In [1.2](lakehouse.md) you learned a lakehouse = **object storage + a table format + a

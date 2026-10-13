@@ -1,4 +1,4 @@
-# 0.2 Bring up the stack
+# Bring up the stack
 
 This page is for **whoever runs the platform** — you on your laptop (Docker Compose) or an operator
 on a cluster (Kubernetes). If someone already runs the stack for you and gave you URLs, you don't
@@ -37,7 +37,7 @@ learning.
 
     !!! warning "`make polaris-seed` is needed for everything in `iceberg`, and again after a reset"
         It creates the `iceberg` lakehouse catalog. Until it runs, every `iceberg.…` query
-        (Units 2–6) fails with **`Unable to find warehouse polaris_lake`**.
+        (Units {unit:unit2/intro.md}–{unit:unit6/polaris.md}) fails with **`Unable to find warehouse polaris_lake`**.
         Postgres keeps no data volume, so the catalog is lost whenever the Postgres container is
         recreated: after `make down`, `make restart`, or a `make up` that rebuilds it. **Run
         `make polaris-seed` again** after any of those, or whenever you see that error. It's safe

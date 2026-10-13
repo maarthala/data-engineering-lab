@@ -1,9 +1,9 @@
-# 7.1 Dashboards from the Gold layer
+# Dashboards from the Gold layer
 
 ## Concept
 Everyone above you in the org — a category manager, a CFO, the CEO — doesn't open Jupyter or run
 a DAG. They open a **dashboard**. This lesson is the last mile of the whole pipeline: you turn the
-Gold marts **you** built in [Units 4–5](../unit4/spark-sql-gold.md) — in your own lakehouse,
+Gold marts **you** built in [Units {unit:unit4/fundamentals.md}–{unit:unit5/basics.md}](../unit4/spark-sql-gold.md) — in your own lakehouse,
 `demouser_lake` — into charts a human reads in five seconds.
 
 !!! info "What is BI, a dashboard, and a chart?"
@@ -41,7 +41,7 @@ flowchart LR
 ```
 
 **Superset never touches the lake files directly.** It speaks **SQL over Trino** — the same query
-engine you used in Unit 2. Trino exposes your lakehouse as the catalog **`demouser_lake`**, so your
+engine you used in Unit {unit:unit2/intro.md}. Trino exposes your lakehouse as the catalog **`demouser_lake`**, so your
 Gold table `daily_sales` is addressed as `demouser_lake.gold.daily_sales`. (The course's shared lake
 is the catalog `iceberg`.) When you drag a chart around
 in Superset, under the hood Superset is sending `SELECT …` statements to Trino and drawing the
@@ -87,7 +87,7 @@ them under **Settings → Database Connections**:
   shared `iceberg` (the URI only sets the default); you pick the catalog when you query or create
   a dataset.
 - **shopflow** → `trino://trino@trino:8080/shopflow/public` — the raw source you queried back in
-  Unit 2 SQL Lab. You won't chart from this one — BI reads Gold only.
+  Unit {unit:unit2/intro.md} SQL Lab. You won't chart from this one — BI reads Gold only.
 
 Because both are pre-configured, you can skip straight to building. But so you can do it on any
 platform, here's the general recipe to add a connection yourself: **+ Database → Other**, paste

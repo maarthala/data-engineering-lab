@@ -1,4 +1,4 @@
-# 2.8 Changing data: MERGE & upserts
+# Changing data: MERGE & upserts
 
 ## Concept
 Everything so far only **read** data. But data engineering is mostly about **changing** a

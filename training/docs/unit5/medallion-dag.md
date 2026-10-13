@@ -1,4 +1,4 @@
-# 5.2 Build the medallion DAG
+# Build the medallion DAG
 
 ## Concept
 In [Unit 4](../unit4/fundamentals.md) you wrote three Spark jobs for ShopFlow: one that ingests
@@ -7,7 +7,7 @@ aggregates it into **Gold**. Run out of order they produce garbage — Gold read
 reads Bronze. **The order *is* the pipeline.**
 
 Now you'll capture that order as a single Airflow DAG: three tasks, one arrow between each,
-doing the same work as your Unit 4 notebooks — except Airflow enforces the sequence, retries
+doing the same work as your Unit {unit:unit4/fundamentals.md} notebooks — except Airflow enforces the sequence, retries
 failures, and records every run.
 
 ```mermaid
@@ -17,10 +17,10 @@ flowchart LR
 
 Recall the two ideas this lesson fuses together:
 
-- From **Unit 1.4**, the **medallion architecture** — data flows through three layers, each one
+- From **Unit {lesson:unit1/medallion.md}**, the **medallion architecture** — data flows through three layers, each one
   cleaner than the last. **Bronze** is the raw copy, **Silver** is cleaned and conformed, **Gold**
   is the aggregated business tables. Each layer *reads the one before it*.
-- From **5.1**, a **DAG** (Directed Acyclic Graph) is how Airflow describes a pipeline: a set of
+- From **{lesson:unit5/basics.md}**, a **DAG** (Directed Acyclic Graph) is how Airflow describes a pipeline: a set of
   **tasks** (the units of work) plus the **dependencies** (arrows) that say which task must finish
   before the next one starts.
 
@@ -43,7 +43,7 @@ The plan for this lesson is one **task per layer** and one arrow between them �
     the lab's **Spark cluster**, not inside Airflow. Each task calls **`lab_spark()`**, which opens
     a Spark session on the cluster **signed in as you**: exactly like your notebook, `iceberg` is
     **your own lakehouse** (`demouser_lake`) and `shared` is the course lake. So the tables this
-    DAG writes are the same ones you built by hand in Unit 4.
+    DAG writes are the same ones you built by hand in Unit {unit:unit4/fundamentals.md}.
 
 ## Lab
 
@@ -62,7 +62,7 @@ PG = {"url": "jdbc:postgresql://postgres:5432/shopflow", "user": "learner",
 @dag(
     dag_id="demouser_medallion",          # own account? use your username instead of demouser
     description="Bronze → Silver → Gold for ShopFlow",
-    schedule=None,                        # manual for now; 5.3 adds a schedule
+    schedule=None,                        # manual for now; {lesson:unit5/schedule.md} adds a schedule
     start_date=pendulum.datetime(2026, 1, 1, tz="UTC"),
     catchup=False,
     tags=["unit5", "medallion"],
@@ -242,6 +242,6 @@ per product), as its own task that runs **in parallel** with `gold` after `silve
 | **Import errors** | Where the UI shows a DAG that failed to parse |
 
 ## You can now…
-- Turn your Unit 4 medallion into an Airflow DAG with `bronze() >> silver() >> gold()`
+- Turn your Unit {unit:unit4/fundamentals.md} medallion into an Airflow DAG with `bronze() >> silver() >> gold()`
 - Write tasks with `@task` that do Spark work as you via `lab_spark()`, and read their logs in the UI
 - Express parallel branches with lists (`>> [a, b]`) for fan-out / fan-in

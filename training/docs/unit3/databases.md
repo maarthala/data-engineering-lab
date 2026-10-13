@@ -1,4 +1,4 @@
-# 3.6 SQL from Python — Postgres & the lakehouse
+# SQL from Python — Postgres & the lakehouse
 
 ## Concept
 You've run SQL in SQLPad and Superset ([Unit 2](../unit2/intro.md)). But the everyday
@@ -7,7 +7,7 @@ DataFrame — so you can then transform it, call an API, or load it somewhere el
 matter, both on our stack:
 
 - **Postgres** — the raw ShopFlow OLTP source (`customers`, `products`, `orders`, `order_items`).
-- **The lakehouse** (via Spark) — the Bronze/Silver/Gold tables (once built in Unit 4).
+- **The lakehouse** (via Spark) — the Bronze/Silver/Gold tables (once built in Unit {unit:unit4/fundamentals.md}).
 
 ### How Python talks to a database
 Python can't speak a database's private language on its own — it needs a translator. Three
@@ -25,7 +25,7 @@ layers do the work, and every cell below sits on top of them:
   write elsewhere.
 
 So the everyday move is: **send SQL → get rows → land them in a DataFrame.** This echoes the
-Unit 2 idea of *"same SQL, two homes"* — here it becomes *same Python, two homes*: identical
+Unit {unit:unit2/intro.md} idea of *"same SQL, two homes"* — here it becomes *same Python, two homes*: identical
 code reads Postgres or the lakehouse, and only the connection URL changes.
 
 ```python
@@ -182,7 +182,7 @@ not through a database driver. Your notebook already has a `spark` session, and 
 the result into the same kind of DataFrame you got from Postgres:
 
 ```python
-# the course's shared lake: a ready-made Gold mart (you build your own in Unit 4)
+# the course's shared lake: a ready-made Gold mart (you build your own in Unit {unit:unit4/fundamentals.md})
 daily = spark.sql(
     "SELECT * FROM shared.gold.daily_sales ORDER BY order_date DESC LIMIT 14"
 ).toPandas()

@@ -1,4 +1,4 @@
-# 10.1 OSS ⇄ Databricks / Snowflake / Fabric / Azure
+# OSS ⇄ Databricks / Snowflake / Fabric / Azure
 
 This course teaches Data Engineering on an **open-source** stack — deliberately, so you learn the
 *concepts* without a cloud bill. Every concept maps directly to the commercial platforms you'll

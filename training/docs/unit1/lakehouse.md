@@ -1,4 +1,4 @@
-# 1.2 Lake vs Warehouse vs Lakehouse
+# Lake vs Warehouse vs Lakehouse
 
 ## Concept
 In [1.1](what-is-de.md) you saw that analytics data must live in a **separate OLAP

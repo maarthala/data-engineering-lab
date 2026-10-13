@@ -1,4 +1,4 @@
-# 4.5 Materialized views
+# Materialized views
 
 ## Concept
 In [4.4](spark-sql-gold.md) you built Gold marts by running a query and **saving the result as a
@@ -139,7 +139,7 @@ DROP MATERIALIZED VIEW iceberg.gold.mv_country_monthly
 That way a typo can't wipe out `gold.daily_sales`.
 
 ## MV or a Gold job?
-| Choose a **materialized view** when… | Choose a **Gold job** (4.4 style) when… |
+| Choose a **materialized view** when… | Choose a **Gold job** ({lesson:unit4/spark-sql-gold.md} style) when… |
 |---|---|
 | the logic is **one SQL query** | you need several steps, Python, or `MERGE` |
 | a full recompute is affordable | the table is huge and needs incremental loads |

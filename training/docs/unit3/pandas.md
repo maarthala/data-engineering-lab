@@ -1,4 +1,4 @@
-# 3.2 pandas — the data engineer's Swiss army knife
+# pandas — the data engineer's Swiss army knife
 
 ## Concept
 **pandas** is Python's in-memory table library. Its **DataFrame** is a spreadsheet-in-code:

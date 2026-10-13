@@ -1,4 +1,4 @@
-# 9.2 Capstone 2 (medium)
+# Capstone 2 (medium)
 
 ## Concept
 Capstone 1 was a clean, rebuild-every-run metric. Real pipelines are messier: orders get
@@ -21,8 +21,8 @@ flowchart LR
 ## Lab
 Recall the grain: `iceberg.silver.orders` is **one row per order line** — key `(order_id,
 product_id)` — already enriched with `product_name`, `category`, `quantity`, `unit_price`,
-`line_amount`, `order_date` (Unit 4). A corrected or re-sent line shares that key, which is exactly
-what `MERGE` keys on. Confirm the grain is clean — in a notebook (your Silver from Unit 4 or the
+`line_amount`, `order_date` (Unit {unit:unit4/fundamentals.md}). A corrected or re-sent line shares that key, which is exactly
+what `MERGE` keys on. Confirm the grain is clean — in a notebook (your Silver from Unit {unit:unit4/fundamentals.md} or the
 [5.2 medallion DAG](../unit5/medallion-dag.md)):
 
 ```sql
@@ -79,7 +79,7 @@ governed by least-privilege grants, scheduled idempotently, and surfaced in Supe
 
         # a cleaned batch of order lines (same schema as silver.orders), keyed (order_id, product_id)
         # .localCheckpoint() snapshots the batch first — Spark 4.1 can't plan a MERGE whose
-        # source still points back at tables (same as lesson 4.3)
+        # source still points back at tables (same as lesson {lesson:unit4/transform-silver.md})
         batch.localCheckpoint().createOrReplaceTempView("incoming")
         spark.sql("""
           MERGE INTO iceberg.silver.orders t

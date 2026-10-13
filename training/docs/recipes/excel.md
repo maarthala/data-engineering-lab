@@ -1,4 +1,4 @@
-# 8.1 Ingest an Excel file from object storage
+# Ingest an Excel file from object storage
 
 ## Concept
 Not every source is a database or a Parquet file. The real world runs on **spreadsheets** —
@@ -19,7 +19,7 @@ flowchart LR
 
 **pandas** *can* read Excel — via the **openpyxl** engine — so you read the file into a **pandas
 DataFrame**, convert that to a **Spark DataFrame**, then land it in Bronze with the exact write
-pattern from Unit 4. Excel files are small (they open in a spreadsheet, after all), so pulling one
+pattern from Unit {unit:unit4/fundamentals.md}. Excel files are small (they open in a spreadsheet, after all), so pulling one
 through pandas on the driver is perfectly fine — you're not streaming a billion rows.
 
 !!! info "Why the pandas detour is the right call here"
@@ -123,7 +123,7 @@ spark.sql("SELECT count(*) FROM iceberg.bronze.customers_excel").show()
 - **`spark.createDataFrame(pdf)`** — convert the pandas DataFrame into a **Spark DataFrame**
   (`sdf`). This is the bridge from the single-machine world to the cluster: Spark infers the schema
   from pandas' columns and dtypes and takes ownership of the data.
-- **`sdf.writeTo("iceberg.bronze.customers_excel").using("iceberg").createOrReplace()`** — the Unit 4
+- **`sdf.writeTo("iceberg.bronze.customers_excel").using("iceberg").createOrReplace()`** — the Unit {unit:unit4/fundamentals.md}
   write pattern: target the three-part name `iceberg.bronze.customers_excel` (`iceberg` catalog →
   `bronze` schema → table), store it as an **Iceberg** table, and **create-or-fully-replace** it.
   Trino can read it immediately — as `demouser_lake.bronze.customers_excel`.

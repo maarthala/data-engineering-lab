@@ -1,4 +1,4 @@
-# 2.3 Window functions
+# Window functions
 
 ## Concept
 `GROUP BY` collapses rows. **Window functions** do something more powerful: they compute

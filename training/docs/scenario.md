@@ -1,4 +1,4 @@
-# 0.4 The ShopFlow scenario
+# The ShopFlow scenario
 
 Everything in this course is built around one fictional company, **ShopFlow**.
 Before we touch a single tool, you need to understand the *business* — because in

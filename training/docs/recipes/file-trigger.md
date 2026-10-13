@@ -1,4 +1,4 @@
-# 8.2 Run a pipeline when a file arrives (event trigger)
+# Run a pipeline when a file arrives (event trigger)
 
 ## Concept
 In [Unit 5](../unit5/basics.md) you learned to run a pipeline **on a schedule** — "every day at
@@ -88,7 +88,7 @@ with DAG(dag_id="demouser_ingest_on_file_arrival",     # own account? your usern
   is there** → return `True` and the sensor is satisfied; `0` means "not yet" → return `False` and it
   pokes again.
 - **`with DAG(dag_id="demouser_ingest_on_file_arrival", schedule="*/5 * * * *", …)`** — same DAG definition as
-  Unit 5. The cron `*/5 * * * *` starts a fresh **DAG run** every 5 minutes; each run's sensor then
+  Unit {unit:unit5/basics.md}. The cron `*/5 * * * *` starts a fresh **DAG run** every 5 minutes; each run's sensor then
   waits (up to its `timeout`) for the file. `start_date` and `catchup=False` behave exactly as in
   [5.1](../unit5/basics.md) — don't backfill history, just go forward.
 - **`wait = PythonSensor(task_id="wait_for_file", python_callable=file_has_landed, …)`** — creates

@@ -1,4 +1,4 @@
-# 1.4 Medallion architecture
+# Medallion architecture
 
 ## Concept
 You now have a lakehouse ([1.2](lakehouse.md)) built on reliable table formats

@@ -1,4 +1,4 @@
-# 0.1 Prerequisites & setup
+# Prerequisites & setup
 
 This course is **hands-on**: you drive a running data platform from **your own machine** — a
 browser and a couple of command-line tools. You never open a shell *inside* a container; you use
@@ -174,7 +174,7 @@ To run it on your **own** laptop, you need Docker and the repo.
     images. On Docker Desktop check **Settings → Resources → Disk usage limit**.
 
 !!! info "Why `ruby`?"
-    `make init` uses it to prepare the **AdventureWorks** sample database (lesson 2.11). Without
+    `make init` uses it to prepare the **AdventureWorks** sample database (lesson {lesson:unit2/adventureworks-challenge.md}). Without
     ruby that step is skipped with a warning, and everything else still works.
 
 With Docker and Git installed, follow **[Bring up the stack](deploy.md)** for the exact `make`
@@ -184,7 +184,7 @@ commands (Docker Compose) or the Ansible steps (Kubernetes).
 
 ## Verify your setup
 
-Run through this checklist once — if all three pass, you're ready for Unit 1.
+Run through this checklist once — if all three pass, you're ready for Unit {unit:unit1/what-is-de.md}.
 
 1. **Sign in to the landing page** — open [http://localhost:8000](http://localhost:8000). You're sent
    to the **DE Learning Lab** login page: sign in as **`demouser` / `demouser`** (the default account
@@ -214,7 +214,7 @@ Everything in the stack, its URL, and how to sign in. (On Kubernetes swap `local
 
 | Service | Local URL | Login |
 |---|---|---|
-| Landing page | [http://localhost:8000](http://localhost:8000) | **`demouser` / `demouser`** (default — the examples use it), `learner2` / `learner2` (a second user, for sharing in 6.1), your own (**Register**), or `manager` / `manager` |
+| Landing page | [http://localhost:8000](http://localhost:8000) | **`demouser` / `demouser`** (default — the examples use it), `learner2` / `learner2` (a second user, for sharing in {lesson:unit6/polaris.md}), your own (**Register**), or `manager` / `manager` |
 | Keycloak (logins) | http://localhost:8180/admin | admin console: `admin` / `admin` (realm **de-lab**) |
 | Training course | https://maarthala.github.io/databrick-local-simulator/ | — (linked from the landing page) |
 | Jupyter (notebooks) | http://localhost:8008 | your lab account — your **own** Jupyter, and `iceberg` = your own lakehouse |

@@ -1,4 +1,4 @@
-# 4.2.1 Data cleaning — from messy Bronze to clean Silver
+# Data cleaning — from messy Bronze to clean Silver
 
 ## Concept
 Files and feeds almost never arrive clean. Before anyone can trust a number, a data engineer
