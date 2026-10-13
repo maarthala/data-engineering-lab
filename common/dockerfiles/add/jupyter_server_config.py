@@ -103,7 +103,7 @@ c.JupyterFs.resources = [
         },
     }
 ]
-# JupyterHub learners: ~/work/notebooks and ~/work/dags live in the normal file browser
+# JupyterHub learners: ~/work/notebooks, ~/work/dags and ~/work/dbt live in the normal file browser
 # and are mirrored to their own bucket (dags/ → Airflow). See lab_sync.py.
 import sys  # noqa: E402
 sys.path.insert(0, "/etc/jupyter")

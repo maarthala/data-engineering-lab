@@ -1,7 +1,8 @@
 """Learner code ↔ their own bucket.
 
-~/work/notebooks and ~/work/dags (JupyterLab's normal file browser) are mirrored to
-s3://<user>-lake/files/src/notebooks/ and files/src/dags/ — Airflow's "learners" bundle reads the dags.
+~/work/notebooks, ~/work/dags and ~/work/dbt (JupyterLab's normal file browser) are mirrored to
+s3://<user>-lake/files/src/notebooks/, files/src/dags/ and files/src/dbt/ — Airflow's "learners"
+bundle reads the dags. dbt's generated folders (target/, logs/, dbt_packages/) stay local.
 
   server start   two-way: the newer copy of each file wins, nothing is deleted
                  (picks up files uploaded via My files / the RustFS console)
@@ -19,7 +20,9 @@ import s3fs
 from jupyter_server.services.contents.largefilemanager import LargeFileManager
 from tornado import web
 
-FOLDERS = ("notebooks", "dags")
+FOLDERS = ("notebooks", "dags", "dbt")
+# dbt rebuilds these on every run — mirroring them would only fill the 100 MB bucket
+DBT_GENERATED = {"target", "logs", "dbt_packages"}
 PREFIX = "files/src/"                          # their place in the bucket: files/src/notebooks, …
 ROOT = "/home/jovyan/work"                     # the learner's persistent volume
 BUCKET = os.environ.get("LAKE_BUCKET", "")
@@ -41,6 +44,8 @@ def fs():
 def synced(path):
     """Path relative to ROOT, like 'dags/etl/a.py' → is it inside a synced folder?"""
     parts = (path or "").strip("/").split("/")
+    if parts[0] == "dbt" and DBT_GENERATED.intersection(parts[1:-1]):
+        return False
     return ENABLED and len(parts) > 1 and parts[0] in FOLDERS and not any(p.startswith(".") for p in parts)
 
 
@@ -112,7 +117,7 @@ def initial_sync(root):
 
 
 class SyncedFileManager(LargeFileManager):
-    """The normal file manager + mirroring of notebooks/ and dags/ to the learner's bucket.
+    """The normal file manager + mirroring of notebooks/, dags/ and dbt/ to the learner's bucket.
     Works on real file paths (relative to ROOT), whatever the server's root_dir is."""
 
     def _rel(self, path):

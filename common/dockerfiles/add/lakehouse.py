@@ -48,10 +48,10 @@ TRINO_LOGIN = os.environ.get("TRINO_POLARIS_LOGIN", "trino_lab:trino-lab-secret"
 # label — RustFS takes any; on AWS it's the IAM role Polaris assumes.
 VEND_ROLE = os.environ.get("STORAGE_VENDING_ROLE", "arn:aws:iam::000000000000:role/lab-vending")
 # Bucket layout (like a Fabric / Azure lakehouse): files/ = files you work with, tables/ = catalog
-# storage. files/src/{notebooks,dags} mirror Jupyter's notebooks/ + dags/ (dags → Airflow);
+# storage. files/src/{notebooks,dags,dbt} mirror Jupyter's notebooks/ + dags/ + dbt/ (dags → Airflow);
 # files/source/ = raw files to ingest; tables/<catalog>/… = Iceberg (and Delta) table data.
 SRC = "files/src/"
-FOLDERS = ("files/src/notebooks/", "files/src/dags/", "files/source/", "tables/")
+FOLDERS = ("files/src/notebooks/", "files/src/dags/", "files/src/dbt/", "files/source/", "tables/")
 
 
 
@@ -181,6 +181,8 @@ _README = {
     "files/src/dags/": "Airflow DAGs — the dags/ folder in Jupyter, kept in sync. Any .py here shows up\n"
                        "in Airflow within ~30 seconds. The dag_id must start with your username + '_',\n"
                        "e.g. dag_id=\"ravi_daily_sales\".\n",
+    "files/src/dbt/": "Your dbt projects — the dbt/ folder in Jupyter, kept in sync (dbt's target/, logs/\n"
+                      "and dbt_packages/ are rebuilt on every run and stay in Jupyter only).\n",
     "files/source/": "Raw files to ingest (CSV, Parquet, JSON …) — lesson 4.2 exports ShopFlow here.\n",
     "tables/": "Table storage for your catalogs (tables/<catalog>/<namespace>/<table>/). Managed by\n"
                "the catalog — create and drop tables with SQL / Spark, don't edit files here.\n",

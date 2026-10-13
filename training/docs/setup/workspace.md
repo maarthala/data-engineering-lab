@@ -84,7 +84,8 @@ Your bucket is organised like an Azure / Fabric lakehouse — **Files** and **Ta
 ├── files/                        files you work with
 │   ├── src/
 │   │   ├── notebooks/            = Jupyter's notebooks/ folder (kept in sync)
-│   │   └── dags/                 = Jupyter's dags/ folder (kept in sync) → Airflow
+│   │   ├── dags/                 = Jupyter's dags/ folder (kept in sync) → Airflow
+│   │   └── dbt/                  = Jupyter's dbt/ folder (kept in sync)
 │   └── source/                   raw files to ingest — lesson 4.2 exports ShopFlow here
 └── tables/                       table storage of your catalogs — tables/<catalog>/<namespace>/<table>/
 ```
@@ -92,16 +93,17 @@ Your bucket is organised like an Azure / Fabric lakehouse — **Files** and **Ta
 **Tables** is managed by the catalog: create and drop tables with SQL / Spark, don't edit files
 there. **Files** is yours to use freely.
 
-In Jupyter's **file browser** you start with two folders, **mirrored to `files/src/`**: every
+In Jupyter's **file browser** you start with three folders, **mirrored to `files/src/`**: every
 save, rename and delete in them is copied to your bucket straight away.
 
 | Jupyter folder | In your bucket | For |
 |---|---|---|
 | `notebooks/` | `files/src/notebooks/` | your notebooks (`.ipynb`) |
 | `dags/` | `files/src/dags/` | your Airflow DAGs (`.py`) — **Airflow picks them up in ~30 s** |
+| `dbt/` | `files/src/dbt/` | your dbt projects — dbt's generated `target/`, `logs/` and `dbt_packages/` stay in Jupyter only |
 
 Files you upload elsewhere (My files, the RustFS console) appear in Jupyter the next time your
-server starts (**File → Hub Control Panel → Stop My Server → Start**). Anything outside these two
+server starts (**File → Hub Control Panel → Stop My Server → Start**). Anything outside these three
 folders stays in your Jupyter workspace only.
 
 **📁 My files** (landing page) is a file manager for your bucket — browse, upload, download, new
