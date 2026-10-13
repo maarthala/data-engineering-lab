@@ -118,16 +118,16 @@ airflow:
   # Slim image (no baked-in Spark); Spark jobs run in separate pods via
   # KubernetesPodOperator. Much smaller/faster to schedule than the fat image.
   repo: airflow-slim
-  tag: "20261002-7"        # dated: re-importing :latest can leave the old image
+  tag: "20261013-1"        # dated: re-importing :latest can leave the old image
   adminUser: airflow         # password: secret key airflow-admin-password
 jupyter:
   enabled: true
   # JupyterHub: Keycloak login, one Jupyter pod per learner (KubeSpawner) with their own
-  # lakehouse + a work volume; notebooks/ and dags/ mirror to their bucket.
+  # lakehouse + a work volume; notebooks/, dags/ and dbt/ mirror to their bucket.
   repo: jupyter              # the single-user image (one pod per learner)
   # A dated tag, not :latest — re-importing :latest on the node left the OLD image behind the
   # tag (learner pods started without jupyter-entrypoint.sh). Bump it with every new build.
-  tag: "20261002-7"
+  tag: "20261013-1"
   hubImage: ghcr.io/maarthala/de-stack/jupyterhub:20261002-7
   userStorage: 1Gi           # per-learner work volume (PVC claim-<user>)
   userMemory: 1G
