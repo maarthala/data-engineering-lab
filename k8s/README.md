@@ -97,7 +97,7 @@ use `microk8s kubectl`.
 |---|---|---|
 | Landing page | `http://de.lan` | **lab account** (Register; the admin account `manager` uses secret `manager-password`) — one login for every tool |
 | Keycloak (accounts) | `http://auth.de.lan/admin` | `admin` / secret `keycloak-admin-password` (realm `de-lab`) |
-| Training course | https://maarthala.github.io/databrick-local-simulator/ | — (linked from the landing page) |
+| Training course | https://maarthala.github.io/data-engineering-lab/ | — (linked from the landing page) |
 | RustFS console | `http://storage.de.lan/rustfs/console/` | lab account (own bucket) · root `admin` / secret `storage-root-password` |
 | Polaris Console | `http://polaris-console.de.lan` | lab account · `/login?local=1`: personas `analyst`/`engineer`/`lead` (secret `polaris-persona-secret`), admin `root` (secret `polaris-root-secret`) |
 | Polaris API | `http://polaris.de.lan` | OAuth2 client credentials (realm `POLARIS`) |

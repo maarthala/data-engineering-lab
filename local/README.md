@@ -28,7 +28,7 @@ make ps     # status      make logs S=polaris     make down   # stop + remove vo
 Ports 5432 / 8001 taken by something else? Set `POSTGRES_HOST_PORT` / `AIRFLOW_HOST_PORT` in `.env`.
 
 The **hands-on Data Engineering course** ([`../training`](../training)) is published to
-**[GitHub Pages](https://maarthala.github.io/databrick-local-simulator/)** (auto-deployed on
+**[GitHub Pages](https://maarthala.github.io/data-engineering-lab/)** (auto-deployed on
 every push to `main`), and the stack's landing page links straight there — one always-current
 source. When editing lessons under `training/docs/`: `make docs-serve` live-previews at
 **http://localhost:8010**, and `make docs` validates with `mkdocs build --strict` (the same
@@ -38,7 +38,7 @@ gate the Pages CI uses) before you push.
 | Service | URL | Login |
 |---|---|---|
 | Landing page | http://localhost:8000 | your **lab account** — Register, or `manager` / `manager`; one login for every tool below |
-| Training course | https://maarthala.github.io/databrick-local-simulator/ | — (linked from the landing page) |
+| Training course | https://maarthala.github.io/data-engineering-lab/ | — (linked from the landing page) |
 | Keycloak (accounts) | http://localhost:8180/admin | admin / admin (realm `de-lab`) |
 | RustFS console (S3) | http://localhost:9001/rustfs/console/ | lab account (own bucket) · root admin / admin123 |
 | Polaris Console | http://localhost:8189 | lab account · `/login?local=1`: personas analyst/engineer/lead (id = secret = name), admin root/s3cr3t |

@@ -5,7 +5,7 @@
 # default index — so this image is just a plain nginx.
 #
 # The training COURSE is NOT baked in. It's published to GitHub Pages
-# (https://maarthala.github.io/databrick-local-simulator/) by
+# (https://maarthala.github.io/data-engineering-lab/) by
 # .github/workflows/docs.yml on every push to main, and the landing page links
 # straight there — a single always-fresh source, so the course can never go
 # stale inside this image.

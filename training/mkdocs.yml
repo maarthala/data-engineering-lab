@@ -1,10 +1,10 @@
 site_name: Epireum's Data Engineering Lab
 site_description: Learn Data Engineering by building a real Bronze→Silver→Gold pipeline for the ShopFlow e-commerce company, then map every skill to Databricks, Snowflake, Fabric, and Azure.
-site_url: https://maarthala.github.io/databrick-local-simulator/
-repo_url: https://github.com/maarthala/databrick-local-simulator
-repo_name: maarthala/databrick-local-simulator
+site_url: https://maarthala.github.io/data-engineering-lab/
+repo_url: https://github.com/maarthala/data-engineering-lab
+repo_name: maarthala/data-engineering-lab
 copyright: >
-  <a href="https://github.com/maarthala/databrick-local-simulator" target="_blank" rel="noopener">⭐ View this project on GitHub</a>
+  <a href="https://github.com/maarthala/data-engineering-lab" target="_blank" rel="noopener">⭐ View this project on GitHub</a>
   &nbsp;·&nbsp; reach <a href="mailto:contact@epireum.com">contact@epireum.com</a> for more information
 docs_dir: docs
 site_dir: site
@@ -70,7 +70,7 @@ extra:
     property: G-YJG2RDY33C
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/maarthala/databrick-local-simulator
+      link: https://github.com/maarthala/data-engineering-lab
       name: Project on GitHub
 
 nav:

@@ -7,7 +7,7 @@ governed lakehouse, Spark, SQL, orchestration and BI — that runs on your own m
 command. Clone it, sign in, and you're working the way a data engineer works at a real company:
 your own workspace, shared company data, and everything behind one login.
 
-[⬇ Get the lab (GitHub)](https://github.com/maarthala/databrick-local-simulator){ .md-button .md-button--primary }
+[⬇ Get the lab (GitHub)](https://github.com/maarthala/data-engineering-lab){ .md-button .md-button--primary }
 [▶ Start the course](setup/prerequisites.md){ .md-button }
 [📚 Course overview](course.md){ .md-button }
 [💬 Join the Discord](https://discord.gg/sByPdSRFjf){ .md-button }
@@ -173,8 +173,8 @@ table — read or write — with a teammate. Polaris enforces it on every query
 You need Docker with **8 GB** of memory (12–16 GB is comfortable) and about **25 GB** of disk.
 
 ```bash
-git clone https://github.com/maarthala/databrick-local-simulator.git
-cd databrick-local-simulator/local
+git clone https://github.com/maarthala/data-engineering-lab.git
+cd data-engineering-lab/local
 cp .env.example .env
 make init      # first run only: downloads Spark/Iceberg jars
 make up        # builds and starts the whole lab

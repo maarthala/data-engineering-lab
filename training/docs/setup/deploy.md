@@ -19,8 +19,8 @@ learning.
     ### Steps
     ```bash
     # 1. get the repo
-    git clone https://github.com/maarthala/databrick-local-simulator.git
-    cd databrick-local-simulator/local      # every command below runs from local/
+    git clone https://github.com/maarthala/data-engineering-lab.git
+    cd data-engineering-lab/local      # every command below runs from local/
 
     # 2. first run only
     cp .env.example .env   # REQUIRED: .env tells Docker Compose which services make up the stack
@@ -101,8 +101,8 @@ learning.
 === "Kubernetes"
 
     Deploying to a cluster is an **operator** task (more moving parts than Compose). The canonical
-    guide is [`k8s/README.md`](https://github.com/maarthala/databrick-local-simulator/blob/main/k8s/README.md)
-    and [`k8s/ansible/README.md`](https://github.com/maarthala/databrick-local-simulator/blob/main/k8s/ansible/README.md);
+    guide is [`k8s/README.md`](https://github.com/maarthala/data-engineering-lab/blob/main/k8s/README.md)
+    and [`k8s/ansible/README.md`](https://github.com/maarthala/data-engineering-lab/blob/main/k8s/ansible/README.md);
     the essentials are below.
 
     ### Prerequisites
@@ -142,7 +142,7 @@ learning.
     work). Read the manager's with
     `kubectl -n de-stack get secret de-stack-secrets -o jsonpath='{.data.manager-password}' | base64 -d`
     and sign in as **`manager`**; the other admin logins and their keys are listed in
-    [`k8s/README.md` → First sign-in after deploying](https://github.com/maarthala/databrick-local-simulator/blob/main/k8s/README.md#first-sign-in-after-deploying).
+    [`k8s/README.md` → First sign-in after deploying](https://github.com/maarthala/data-engineering-lab/blob/main/k8s/README.md#first-sign-in-after-deploying).
 
     **Fill the shared lake once:** in Airflow (`http://airflow.de.lan`, as `manager`) switch
     **`shopflow_medallion`** on and trigger it — Bronze → Silver → Gold in under a minute. (Same
@@ -160,7 +160,7 @@ learning.
 - For the governance lessons, sign in to the Polaris Console as one of the
   [personas](personas.md) (`analyst` / `engineer` / `lead`).
 - The training course is published on **GitHub Pages**
-  (<https://maarthala.github.io/databrick-local-simulator/>), auto-deployed on every push to
+  (<https://maarthala.github.io/data-engineering-lab/>), auto-deployed on every push to
   `main` — and the stack's landing page links straight to it, so it's always the current version.
 
 ## You can now…

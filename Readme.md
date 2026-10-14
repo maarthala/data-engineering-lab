@@ -1,4 +1,4 @@
-# Databrick Local Simulator
+# Data Engineering Lab
 
 A hands-on Data Engineering learning environment — a **governed lakehouse**
 (RustFS object storage, Apache Polaris governed Iceberg catalog, Spark, Trino, Superset, Airflow,
@@ -9,7 +9,7 @@ Jupyter) that you can run two ways with the **same stack**:
 Read the hands-on **Data Engineering course** online — build the ShopFlow
 Bronze→Silver→Gold lakehouse and map every skill to Databricks, Snowflake & Fabric:
 
-**→ [maarthala.github.io/databrick-local-simulator](https://maarthala.github.io/databrick-local-simulator/)**
+**→ [maarthala.github.io/data-engineering-lab](https://maarthala.github.io/data-engineering-lab/)**
 
 Start with **Prerequisites & setup** and **Bring up the stack**, then work through the units.
 The stack's landing page links straight to this course, so it's always the current version.

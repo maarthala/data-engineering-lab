@@ -216,7 +216,7 @@ Everything in the stack, its URL, and how to sign in. (On Kubernetes swap `local
 |---|---|---|
 | Landing page | [http://localhost:8000](http://localhost:8000) | **`demouser` / `demouser`** (default — the examples use it), `learner2` / `learner2` (a second user, for sharing in {lesson:unit6/polaris.md}), your own (**Register**), or `manager` / `manager` |
 | Keycloak (logins) | http://localhost:8180/admin | admin console: `admin` / `admin` (realm **de-lab**) |
-| Training course | https://maarthala.github.io/databrick-local-simulator/ | — (linked from the landing page) |
+| Training course | https://maarthala.github.io/data-engineering-lab/ | — (linked from the landing page) |
 | Jupyter (notebooks) | http://localhost:8008 | your lab account — your **own** Jupyter, and `iceberg` = your own lakehouse |
 | Spark master UI | http://localhost:8002 | — |
 | Trino | through SQLPad / Superset (laptop stack: UI http://localhost:8007/ui/, CLI `:8007`) | lab account (via SQLPad / Superset) |
