@@ -108,6 +108,11 @@ services:
       # port, so it broke other tools too ("400 Request Header Or Cookie Too Large").
       OAUTH2_PROXY_SESSION_STORE_TYPE: redis
       OAUTH2_PROXY_REDIS_CONNECTION_URL: redis://redis:6379/1
+      # Follow the Keycloak session: every minute (on the next request) the session is refreshed
+      # with Keycloak, which refuses once its session has ended (2 h idle / 12 h at most, or Log
+      # out in another tool) → straight back to the login page. 12 h = Keycloak's longest session.
+      OAUTH2_PROXY_COOKIE_REFRESH: 1m
+      OAUTH2_PROXY_COOKIE_EXPIRE: 12h
       # where "Log out" lands after oauth2-proxy clears its cookie (Keycloak ends the SSO session)
       OAUTH2_PROXY_WHITELIST_DOMAINS: localhost:8180
     depends_on:

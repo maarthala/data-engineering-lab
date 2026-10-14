@@ -220,6 +220,9 @@ spec:
             # session (tokens) in Redis: the cookie holds only a ticket, so request headers stay small
             - { name: OAUTH2_PROXY_SESSION_STORE_TYPE, value: redis }
             - { name: OAUTH2_PROXY_REDIS_CONNECTION_URL, value: "redis://redis:6379/1" }
+            # follow the Keycloak session: refreshed every minute, Keycloak refuses once it ended → login page
+            - { name: OAUTH2_PROXY_COOKIE_REFRESH, value: 1m }
+            - { name: OAUTH2_PROXY_COOKIE_EXPIRE, value: 12h }
             # one CSRF/PKCE cookie per login attempt (second tab / stale login page → 500 otherwise)
             - { name: OAUTH2_PROXY_COOKIE_CSRF_PER_REQUEST, value: "true" }
             - { name: OAUTH2_PROXY_COOKIE_CSRF_EXPIRE, value: 15m }
