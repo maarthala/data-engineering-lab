@@ -215,8 +215,8 @@ straight in **your folder** `secret/<you>/`: one entry per secret, the same ones
   returns `abc123`. With several keys (`user`, `password`) it returns them as JSON:
   `{"password": "b", "user": "a"}`.
 - Only your folder: another member's folder, or the list of all folders, shows nothing (just a
-  *View secret* box), because the vault refuses. Your own folder shows *404 Not Found* until it
-  holds a secret.
+  *View secret* box), because the vault refuses. The UI can't show an empty folder, so while yours
+  is empty the link opens **Create secret** with `<you>/` filled in: type the name after the `/`.
 
 !!! note "Coming from My variables?"
     The lab used to load these into `os.environ` ("My variables"). Your values moved into the
