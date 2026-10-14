@@ -63,19 +63,38 @@ def _vault(method, key="", body=None):
         raise RuntimeError(f"key vault: HTTP {e.code}") from None
 
 
-def key_vault(name):
-    """The value of one of your secrets from the lab's "My secrets" page (the key vault):
-        key = key_vault("WEATHER_API_KEY")
-    Never printed; a missing name raises KeyError."""
+def _fields(name):
+    """All fields of one of your secrets, without the page's own bookkeeping (secret, updated)."""
     body = _vault("GET", name)
     if body is None:
         raise KeyError(f"no secret {name!r} — add it on 🔑 My secrets (key_vault_list() lists yours)")
-    d = body["data"]["data"]
-    if "value" not in d:                 # made in the vault's own UI: any key name(s)
-        rest = {k: v for k, v in d.items() if k not in ("secret", "updated")}
-        import json
-        return next(iter(rest.values())) if len(rest) == 1 else json.dumps(rest)
-    return d["value"]
+    return {k: v for k, v in body["data"]["data"].items() if k not in ("secret", "updated")}
+
+
+def key_vault(name, field=None):
+    """One of your secrets from the lab's key vault ("🔑 My secrets"); never printed:
+        key = key_vault("WEATHER_API_KEY")       # a secret saved on the page → its value
+        pw  = key_vault("db", "password")        # one field of a secret with several
+    Without a field: the value (one field: that one; several: all of them as JSON text).
+    A missing name or field raises KeyError."""
+    d = _fields(name)
+    if field is not None:
+        if field not in d:
+            raise KeyError(f"secret {name!r} has no field {field!r} — its fields: {', '.join(sorted(d)) or '—'}")
+        return d[field]
+    if "value" in d:
+        return d["value"]
+    if len(d) == 1:
+        return next(iter(d.values()))
+    import json
+    return json.dumps(d)
+
+
+def key_vault_dict(name):
+    """Every field of one of your secrets as a dict, however many it has:
+        db = key_vault_dict("db")                # {"username": "...", "password": "..."}
+    A secret saved on the page has one field, value: {"value": "..."}."""
+    return _fields(name)
 
 
 def key_vault_list():

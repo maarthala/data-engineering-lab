@@ -213,9 +213,24 @@ straight in **your folder** `secret/<you>/`: one entry per secret, the same ones
 - Open a secret: its keys with the values hidden (`***********`), **Version 1**, and **Create new
   version** to change it (the vault keeps the old versions). One saved on the page has three keys:
   `value` (the secret itself) and the page's own `secret` and `updated`.
-- **Create Secret** adds one. Give it one key, e.g. `value` = `abc123`; `key_vault("NAME")` then
-  returns `abc123`. With several keys (`user`, `password`) it returns them as JSON:
-  `{"password": "b", "user": "a"}`.
+- **Create Secret** adds one. A secret in the vault is a set of named **fields** (the JSON toggle
+  is the same thing as JSON), so one secret can hold a whole login, e.g. `db` with `username` =
+  `demo` and `password` = `pw-42`. Read it by field, or all at once:
+
+    ```python
+    key_vault("db", "password")      # one field
+    key_vault_dict("db")             # every field, as a dict
+    ```
+    ```text
+    'pw-42'
+    {'password': 'pw-42', 'username': 'demo'}
+    ```
+
+    A field it doesn't have fails with
+    `KeyError: "secret 'db' has no field 'host' — its fields: password, username"`. A secret
+    saved on the page has one field, `value`: `key_vault("NAME")` is its value,
+    `key_vault_dict("NAME")` is `{'value': '...'}`. That's the usual vault practice: one secret
+    per login or connection, and code asks for the field it needs.
 - Only your folder: another member's folder, or the list of all folders, shows nothing (just a
   *View secret* box), because the vault refuses. The UI can't show an empty folder, so while yours
   is empty the link opens **Create secret** with `<you>/` filled in: type the name after the `/`.

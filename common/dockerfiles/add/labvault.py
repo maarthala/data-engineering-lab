@@ -7,7 +7,7 @@ holding {"value", "secret": "1"|"0", "updated"}. Policy member-<name> reaches on
 
 member_token(name)       a fresh token for the member's Jupyter (role member, one week); the
                          previous one is revoked, like the Polaris secret at every start
-names / get / put / delete   one member's secrets (home-api, Airflow)
+names / get / fields / put / delete   one member's secrets (home-api, Airflow)
 clear(name)              delete all their secrets (wipe) · forget(name): + policy, token,
                          vault sign-in record (delete)
 import_env_file(name)    move an old "My variables" file (.lab/env.json) into the vault, once
@@ -94,6 +94,15 @@ def get(name, key):
         rest = {k: v for k, v in d.items() if k not in ("secret", "updated")}
         d = {**d, "value": next(iter(rest.values())) if len(rest) == 1 else json.dumps(rest)}
     return {"value": d["value"], "secret": d.get("secret") != "0", "updated": d.get("updated")}
+
+
+def fields(name, key):
+    """Every field of the secret, without the page's own secret / updated; None if there's none."""
+    st, body = _call("GET", f"{MOUNT}/data/{_q(name, key)}")
+    if st == 404:
+        return None
+    _ok(st, f"read {key}")
+    return {k: v for k, v in body["data"]["data"].items() if k not in ("secret", "updated")}
 
 
 def put(name, key, value, secret=True, updated=None):
