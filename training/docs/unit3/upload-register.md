@@ -126,8 +126,55 @@ df.count()
 ```
 
 The same table is now visible in the **Polaris Console** (your lakehouse `<username>_lake`) and to
-every Spark session that signs in as you — one governed copy. (Trino and Superset read the course's
-*shared* lake, not your own — see [0.3](../setup/workspace.md).)
+every Spark session that signs in as you — one governed copy.
+
+#### From SQLPad (Trino)
+SQLPad reaches the same table, but under a **different name**. In Jupyter, `iceberg` is *your*
+lakehouse; in SQLPad (and Superset), `iceberg` is the course's **shared** lake, so your own lakehouse
+goes by its real name, **`<username>_lake`** ([0.3](../setup/workspace.md)):
+
+| Where | The table is |
+|---|---|
+| Jupyter (`%%sql`, `spark.table`) | `iceberg.bronze.customers_upload` |
+| SQLPad, Superset | `demouser_lake.bronze.customers_upload` |
+
+Open SQLPad, pick the connection **Lakehouse (Trino) — demouser** (your own username), and run:
+
+```sql
+SELECT * FROM demouser_lake.bronze.customers_upload ORDER BY id LIMIT 10;
+```
+```text
+ id | name  | country
+----+-------+---------
+  1 | Ada   | UK
+  2 | Linus | FI
+  3 | Grace | US
+```
+
+- **`ORDER BY id`** — sort by `id`, so the rows come back in the same order every time.
+- `iceberg.bronze.customers_upload` here fails with *Table 'iceberg.bronze.customers_upload' does not
+  exist*: that name looks in the shared lake.
+
+SQLPad also **changes** the table — it's your table, so `UPDATE`, `INSERT` and `DELETE` work:
+
+```sql
+UPDATE demouser_lake.bronze.customers_upload SET name = 'Surendra' WHERE id = 2;
+```
+```text
+UPDATE: 1 row
+```
+
+- **`UPDATE … SET name = 'Surendra'`** — set the column `name` to a new value…
+- **`WHERE id = 2`** — …only in the rows that match (leave out `WHERE` and every row changes).
+
+Run the `SELECT` again (in Jupyter too) and row 2 now says `Surendra` — one table, read and changed
+from both tools.
+
+!!! warning "Text values take 'single quotes'"
+    In SQL, `'Surendra'` is a text value, but `"Surendra"` (double quotes) is a **column name**.
+    `SET name = "Surendra"` fails with *Column 'surendra' cannot be resolved*: Trino looks for a
+    column called `surendra`. Double quotes are only for column or table names with spaces or
+    capitals, like `"Order Date"`.
 
 ### Just exploring? Use a temp view instead
 If you only need to poke at a file for this session (no permanent table), skip the catalog and
@@ -156,4 +203,4 @@ pattern; only the storage URL and catalog name change.
 - Read a CSV/Parquet from `s3a://…` in a notebook
 - **Register** it as a governed `iceberg` catalog table (`writeTo().createOrReplace()` or `CREATE TABLE AS`)
 - In SQL-only mode, get **column names right** with `CREATE TEMPORARY VIEW … USING csv OPTIONS (header 'true', …)` — or declare an explicit schema — instead of the header-losing `csv.<path>` shorthand
-- Query it from SQL and Spark — and know when a **temp view** is enough instead
+- Query it from SQL and Spark, and from **SQLPad** as `<username>_lake.bronze.…` (select *and* update) — and know when a **temp view** is enough instead
