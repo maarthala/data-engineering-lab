@@ -72,21 +72,24 @@ bao read sys/auth/oidc >/dev/null 2>&1 || bao auth enable -description="lab acco
 acc=$(bao read -field=accessor sys/auth/oidc)
 bao write auth/oidc/config oidc_discovery_url="$VAULT_OIDC_ISSUER" oidc_client_id=vault \
   oidc_client_secret="$VAULT_OIDC_CLIENT_SECRET" default_role=member >/dev/null
-# everyone: their own folder secret/<username>/… (the sign-in's username, filled in per token)
+# everyone: their own folder secret/<username>/… (the sign-in's username, filled in per token);
+# the UI also writes each secret's metadata (versions kept) and reads the store's settings
 bao write auth/oidc/role/member role_type=oidc user_claim=preferred_username groups_claim=groups \
   oidc_scopes=profile bound_audiences=vault allowed_redirect_uris="$VAULT_OIDC_REDIRECTS" \
   token_policies=lab-member token_ttl=8h token_max_ttl=8h >/dev/null
 me="{{identity.entity.aliases.$acc.name}}"
 bao policy write lab-member - >/dev/null <<EOF
 path "secret/data/$me/*"     { capabilities = ["create", "read", "update", "delete"] }
-path "secret/metadata/$me/*" { capabilities = ["read", "list", "delete"] }
+path "secret/metadata/$me/*" { capabilities = ["create", "read", "update", "list", "delete"] }
+path "secret/config"         { capabilities = ["read"] }
 path "secret/data/_lab/*"     { capabilities = ["deny"] }
 path "secret/metadata/_lab/*" { capabilities = ["deny"] }
 EOF
 # managers (Keycloak group managers): every member's folder, not the lab's own records
 bao policy write lab-manager - >/dev/null <<'EOF'
 path "secret/data/*"          { capabilities = ["create", "read", "update", "delete"] }
-path "secret/metadata/*"      { capabilities = ["read", "list", "delete"] }
+path "secret/metadata/*"      { capabilities = ["create", "read", "update", "list", "delete"] }
+path "secret/config"          { capabilities = ["read"] }
 path "secret/data/_lab/*"     { capabilities = ["deny"] }
 path "secret/metadata/_lab/*" { capabilities = ["deny"] }
 EOF
