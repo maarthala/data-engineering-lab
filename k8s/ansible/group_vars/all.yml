@@ -53,8 +53,9 @@ deploy_waves:
     templates: [configmaps.yaml, spark.yaml, spark-connect.yaml, trino.yaml]
   - name: "apps"
     # lab-code.yaml FIRST: the apps mount it with subPath, which never refreshes — a pod that
-    # starts before the ConfigMap is updated keeps the old code.
-    templates: [lab-code.yaml, airflow.yaml, jupyter.yaml, superset.yaml, home.yaml, sqlpad.yaml]
+    # starts before the ConfigMap is updated keeps the old code. vault.yaml next (it mounts
+    # lab-code too; the Hub, home-api and Airflow use it for "My secrets").
+    templates: [lab-code.yaml, vault.yaml, airflow.yaml, jupyter.yaml, superset.yaml, home.yaml, sqlpad.yaml]
 # NOTE: only ENABLED templates belong here — `helm template -s <t>` on a disabled
 # service renders nothing and `kubectl apply` then errors on empty input.
 

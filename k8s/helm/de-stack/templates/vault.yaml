@@ -1,0 +1,87 @@
+{{- if .Values.vault.enabled }}
+# The lab's key vault — OpenBao (open-source Vault), stock image. Every member's secrets
+# ("🔑 My secrets", lab_secret()) live here, encrypted, in the stack's Postgres (database vault);
+# no volume of its own. It unlocks itself at every start (static seal: secret key
+# vault-unseal-key) and vault-init.sh sets it up the first time (admin token = secret key
+# vault-admin-token, root token revoked). Same vault.hcl / vault-init.sh as the local stack.
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "de-stack.selector" (dict "app" "vault") | nindent 4 }}
+  ports:
+    - { name: http, port: 8200, targetPort: 8200 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {{- include "de-stack.selector" (dict "app" "vault") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "de-stack.selector" (dict "app" "vault") | nindent 8 }}
+      annotations: {{- include "de-stack.labChecksum" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      initContainers:
+        # the vault's database + login (Postgres' init scripts only run on an empty volume)
+        - name: vault-db
+          image: {{ .Values.postgres.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            - { name: PGHOST, value: postgres }
+            - { name: PGUSER, value: "{{ .Values.postgres.user }}" }
+            - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: postgres-password } } }
+            - { name: PG_VAULT_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: pg-vault-password } } }
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -q; do sleep 2; done
+              if psql -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'vault'" | grep -q 1; then
+                psql -qc "ALTER USER vault WITH PASSWORD '$PG_VAULT_PASSWORD'"
+              else
+                psql -qc "CREATE USER vault WITH PASSWORD '$PG_VAULT_PASSWORD'"
+              fi
+              psql -tAc "SELECT 1 FROM pg_database WHERE datname = 'vault'" | grep -q 1 || psql -qc "CREATE DATABASE vault OWNER vault"
+      containers:
+        - name: vault
+          image: {{ .Values.vault.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            - { name: PG_VAULT_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: pg-vault-password } } }
+            - { name: BAO_PG_CONNECTION_URL, value: "postgres://vault:$(PG_VAULT_PASSWORD)@postgres:5432/vault?sslmode=disable" }
+            - { name: BAO_UNSEAL_KEY, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: vault-unseal-key } } }
+            - { name: VAULT_ADMIN_TOKEN, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: vault-admin-token } } }
+            - { name: BAO_ADDR, value: http://127.0.0.1:8200 }
+          # the server, then the one-shot setup next to it (safe to re-run at every start)
+          command:
+            - sh
+            - -c
+            - |
+              bao server -config=/bao/config/lab.hcl & pid=$!
+              trap 'kill -TERM $pid' TERM INT
+              sh /vault-init.sh || echo "vault-init failed — see above"
+              wait $pid
+          ports:
+            - { name: http, containerPort: 8200 }
+          readinessProbe:
+            httpGet: { path: /v1/sys/health, port: 8200 }
+            periodSeconds: 10
+          resources:
+            requests: { memory: 64Mi, cpu: 20m }
+            limits: { memory: 256Mi }
+          volumeMounts:
+            - { name: lab-code, mountPath: /bao/config/lab.hcl, subPath: vault.hcl }
+            - { name: lab-code, mountPath: /vault-init.sh, subPath: vault-init.sh }
+      volumes:
+        - { name: lab-code, configMap: { name: lab-code } }
+{{- end }}

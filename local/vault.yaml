@@ -1,0 +1,74 @@
+# The lab's key vault — OpenBao (the open-source fork of HashiCorp Vault), stock image.
+# Every member's secrets ("🔑 My secrets", lab_secret() in notebooks and DAGs) live here,
+# encrypted, in the stack's Postgres (database vault) — no volume of its own. It unlocks
+# itself at every start with BAO_UNSEAL_KEY; vault-init.sh sets it up the first time.
+# UI: http://localhost:8200 (sign in with the token VAULT_ADMIN_TOKEN — the lab's own admin).
+x-vault-env: &vault-env
+  # lab only — on k8s both are random, in the de-stack-secrets Secret
+  VAULT_ADMIN_TOKEN: ${VAULT_ADMIN_TOKEN:-lab-vault-admin-local-token}
+
+services:
+  # One-shot: the vault's database + login in the stack's Postgres (its init scripts only
+  # run on an empty data volume, so a stack that already exists gets it here too).
+  vault-db:
+    image: postgres:18
+    container_name: vault-db
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    command:
+      - sh
+      - -c
+      - |
+        psql -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'vault'" | grep -q 1 || psql -c "CREATE USER vault WITH PASSWORD 'vault'"
+        psql -tAc "SELECT 1 FROM pg_database WHERE datname = 'vault'" | grep -q 1 || psql -c "CREATE DATABASE vault OWNER vault"
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - sparknet
+
+  vault:
+    image: openbao/openbao:2.6.4
+    container_name: vault
+    command: ["server", "-config=/bao/config/lab.hcl"]
+    ports:
+      - "8200:8200"
+    environment:
+      BAO_PG_CONNECTION_URL: postgres://vault:vault@postgres:5432/vault?sslmode=disable
+      # 64 hex characters; changing it later locks the vault (its data is encrypted with it)
+      BAO_UNSEAL_KEY: ${VAULT_UNSEAL_KEY:-ee1504ea56078de743046dac713556c78dbac00a81652a62e03c3fc5003c45b9}
+    volumes:
+      - ../common/dockerfiles/add/vault.hcl:/bao/config/lab.hcl:ro
+    healthcheck:
+      # 200 = unsealed and ready; sealed / not initialised yet → 503 / 501
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8200/v1/sys/health"]
+      interval: 10s
+      retries: 12
+      start_period: 10s
+    depends_on:
+      vault-db:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - sparknet
+
+  # One-shot after every start: first time initialise (admin token, root token revoked),
+  # then make sure the secret/ store and the member token role exist. Safe to re-run.
+  vault-init:
+    image: openbao/openbao:2.6.4
+    container_name: vault-init
+    entrypoint: ["sh", "/vault-init.sh"]
+    environment:
+      <<: *vault-env
+      BAO_ADDR: http://vault:8200
+    volumes:
+      - ../common/dockerfiles/add/vault-init.sh:/vault-init.sh:ro
+    restart: "no"
+    depends_on:
+      vault:
+        condition: service_started
+    networks:
+      - sparknet

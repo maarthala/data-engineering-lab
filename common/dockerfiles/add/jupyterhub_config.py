@@ -4,13 +4,15 @@ and every learner's `iceberg` catalog pointed at their OWN Polaris lakehouse.
 Spawn hook (every server start): make sure <name>_lake exists (lakehouse.provision),
 give principal <name> a fresh random client secret (lakehouse.reset_secret) and hand it
 ONLY to that learner's server as LAKE_* env; the IPython startup (00-spark.py)
-applies it to the Spark session. HUB_SPAWNER=docker (local) | kubernetes (k8s).
+applies it to the Spark session. Same for the key vault: a fresh token that reaches only their
+own secrets (VAULT_TOKEN, labvault.member_token) for lab_secret(). HUB_SPAWNER=docker (local) | kubernetes (k8s).
 
 Keycloak hostnames: the browser goes to the PUBLIC login URL, the Hub calls Keycloak's
 token/userinfo on the internal address (as oauth2-proxy does) — no hosts-file tricks.
 """
 import os
 
+import labvault
 from lakehouse import bucket_name, lake_name, provision, reset_secret, storage_key
 
 env = os.environ
@@ -137,6 +139,13 @@ async def pre_spawn(spawner):
         "GIT_AUTHOR_NAME": spawner.user.name,
         "GIT_AUTHOR_EMAIL": f"{spawner.user.name}@de.lan",
     })
+    if labvault.enabled():                     # "My secrets": their own vault folder only
+        try:
+            labvault.import_env_file(name)     # once: the old My variables file
+            spawner.environment.update({"VAULT_ADDR": labvault.VAULT,
+                                        "VAULT_TOKEN": labvault.member_token(name)})
+        except Exception as e:  # noqa: BLE001 — Jupyter still starts; lab_secret() says why
+            spawner.log.warning("vault token for %s: %s", name, e)
     spawner.log.info("lakehouse %s_lake ready for %s", name, spawner.user.name)
 
 

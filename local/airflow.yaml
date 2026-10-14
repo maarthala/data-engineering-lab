@@ -35,6 +35,9 @@ x-airflow-common:
     # Polaris login for the platform's own Spark jobs (shopflow_medallion → the shared lake);
     # the Spark cluster itself holds none.
     POLARIS_CREDENTIAL: root:s3cr3t
+    # lab_secret() in learner DAGs reads the DAG owner's secrets from the key vault
+    VAULT_ADDR: http://vault:8200
+    VAULT_ADMIN_TOKEN: ${VAULT_ADMIN_TOKEN:-lab-vault-admin-local-token}
     AIRFLOW_CONN_LEARNER_S3: >-
       {"conn_type": "aws", "login": "admin", "password": "admin123",
        "extra": {"endpoint_url": "http://storage:9000", "region_name": "us-east-1",
@@ -47,6 +50,7 @@ x-airflow-common:
     # lab_spark(): a Spark session for a learner's DAG, signed in as that learner (+ its deps)
     - ../common/dockerfiles/add/lab_spark.py:/opt/airflow/lab/lab_spark.py:ro
     - ../common/dockerfiles/add/lakehouse.py:/opt/airflow/lab/lakehouse.py:ro
+    - ../common/dockerfiles/add/labvault.py:/opt/airflow/lab/labvault.py:ro
     - ./configs/airflow.cfg:/opt/airflow/config/airflow.cfg
     - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
     - ./configs/spark/fairscheduler.xml:/opt/spark/conf/fairscheduler.xml

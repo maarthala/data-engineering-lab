@@ -34,54 +34,65 @@ except Exception as _e:  # noqa: BLE001
     print("  Start it once spark-connect is up: spark = SparkSession.builder.getOrCreate()")
 
 
-# --- My variables: the learner's own env vars from the lab's "My variables" page -------
-# Kept in their own bucket (.lab/env.json); loaded into os.environ at every kernel start.
-# Names the lab sets itself (AWS_*, LAKE_*, SPARK_*, …) are never overridden.
-_ENV_RESERVED_PREFIX = ("AWS_", "LAKE_", "SPARK_", "PYSPARK_", "GIT_", "JUPYTER", "JPY_", "MV_",
-                        "LD_", "PYTHON", "KUBERNETES_", "POLARIS_")
-_ENV_RESERVED = {"PATH", "HOME", "USER", "SHELL", "LANG", "TZ", "PWD", "HOSTNAME", "TERM",
-                 "SHARED_CATALOG"}
+# --- My secrets: the learner's own secrets, in the lab's key vault (OpenBao) -----------------
+# The Hub gives this server VAULT_ADDR + VAULT_TOKEN, a token that reaches only secret/<you>/….
+# Values are fetched when asked for, never loaded into os.environ or printed.
+def _vault(method, key="", body=None):
+    import json, os, urllib.error, urllib.parse, urllib.request
+    addr, token, me = os.environ.get("VAULT_ADDR"), os.environ.get("VAULT_TOKEN"), os.environ.get("LAKE_USER")
+    if not (addr and token and me):
+        raise RuntimeError("no key vault login on this server — restart it "
+                           "(File → Hub Control Panel → Stop My Server → Start)")
+    kind = "metadata" if method == "LIST" else "data"
+    url = f"{addr}/v1/secret/{kind}/{me}/{urllib.parse.quote(key, safe='')}"
+    if method == "LIST":
+        method, url = "GET", url + "?list=true"
+    data = json.dumps({"data": body}).encode() if body is not None else None
+    req = urllib.request.Request(url, data=data, method=method,
+                                 headers={"X-Vault-Token": token, "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            raw = r.read()
+            return json.loads(raw) if raw else None
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        if e.code == 403:
+            raise PermissionError("the key vault refused your token (it lasts a week) — restart your "
+                                  "server: File → Hub Control Panel → Stop My Server → Start") from None
+        raise RuntimeError(f"key vault: HTTP {e.code}") from None
+
+
+def lab_secret(name):
+    """The value of one of your secrets from the lab's "My secrets" page (the key vault):
+        key = lab_secret("WEATHER_API_KEY")
+    Never printed; a missing name raises KeyError."""
+    body = _vault("GET", name)
+    if body is None:
+        raise KeyError(f"no secret {name!r} — add it on 🔑 My secrets (lab_secrets() lists yours)")
+    return body["data"]["data"]["value"]
+
+
+def lab_secrets():
+    """The names of your secrets (never the values)."""
+    body = _vault("LIST")
+    return sorted(k for k in (body or {}).get("data", {}).get("keys", []) if not k.endswith("/"))
+
+
+def lab_secret_set(name, value, secret=True):
+    """Save a secret from code (same as 🔑 My secrets → Save). secret=False: the page shows it."""
+    import re, time
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", name):
+        raise ValueError("name: letters, digits and _ only, not starting with a digit (max 64)")
+    _vault("POST", name, {"value": str(value), "secret": "1" if secret else "0",
+                          "updated": time.strftime("%Y-%m-%d %H:%M", time.gmtime())})
+    print(f"✓ secret {name} saved")
 
 
 def lab_env(quiet=False):
-    """Load your variables from the lab's "My variables" page into os.environ (again).
-    Run it after adding or changing a variable — no kernel restart needed:
-        lab_env()
-        os.environ["MY_KEY"]
-    Returns the names loaded (values are never printed)."""
-    import json, os
-    bucket = os.environ.get("LAKE_BUCKET")
-    if not bucket:
-        return []
-    import s3fs
-    fs = s3fs.S3FileSystem(
-        key=os.environ.get("LAKE_S3_KEY") or os.environ.get("AWS_ACCESS_KEY_ID"),
-        secret=os.environ.get("LAKE_S3_SECRET") or os.environ.get("AWS_SECRET_ACCESS_KEY"),
-        client_kwargs={"endpoint_url": os.environ.get("AWS_S3_ENDPOINT", "http://storage:9000")})
-    path = f"{bucket}/.lab/env.json"
-    if not fs.exists(path):
-        return []
-    with fs.open(path, "rb") as f:
-        data = json.load(f)
-    names = []
-    for k, v in sorted(data.items()):
-        up = k.upper()
-        if up in _ENV_RESERVED or up.startswith(_ENV_RESERVED_PREFIX):
-            continue
-        os.environ[k] = str(v.get("value", ""))
-        names.append(k)
-    if not quiet:
-        print(f"✓ {len(names)} variable(s) from My variables: {', '.join(names) or '—'}")
-    return names
-
-
-if _os_env.get("LAKE_BUCKET"):
-    try:
-        _names = lab_env(quiet=True)
-        if _names:
-            print(f"✓ {len(_names)} variable(s) from My variables in os.environ — lab_env() reloads them")
-    except Exception as _e:  # noqa: BLE001
-        print(f"⚠ My variables not loaded ({_e})")
+    """Gone: "My variables" became 🔑 My secrets, read with lab_secret("NAME")."""
+    print('My variables moved to 🔑 My secrets: read a value with lab_secret("NAME") — '
+          f"yours: {', '.join(lab_secrets()) or '—'}")
 
 
 # --- More catalogs: your own extra catalogs + ones other learners shared with you ------

@@ -43,6 +43,7 @@ gate the Pages CI uses) before you push.
 | RustFS console (S3) | http://localhost:9001/rustfs/console/ | lab account (own bucket) · root admin / admin123 |
 | Polaris Console | http://localhost:8189 | lab account · `/login?local=1`: personas analyst/engineer/lead (id = secret = name), admin root/s3cr3t |
 | Polaris API | http://localhost:8185 | OAuth2 client credentials (realm `POLARIS`) |
+| Key vault (OpenBao) | http://localhost:8200 | token `lab-vault-admin-local-token` (the lab's admin; members use 🔑 My secrets) |
 | Trino | http://localhost:8007/ui/ | any username, no password |
 | Superset | http://localhost:8004 | lab account |
 | SQLPad (SQL workbench) | http://localhost:8003 | lab account (local admin admin@de.local / admin1234) |

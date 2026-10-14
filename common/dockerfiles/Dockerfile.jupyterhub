@@ -9,6 +9,7 @@ RUN python3 -m pip install --no-cache-dir \
 # mc: creates each learner's own object-store key (RustFS admin API needs mc's encryption)
 COPY --from=ghcr.io/maarthala/de-stack/mc:RELEASE.2025-08-13T08-35-41Z /usr/bin/mc /usr/local/bin/mc
 COPY add/lakehouse.py /srv/jupyterhub/lakehouse.py
+COPY add/labvault.py /srv/jupyterhub/labvault.py
 COPY add/seed /srv/jupyterhub/seed
 COPY add/jupyterhub_config.py /srv/jupyterhub/jupyterhub_config.py
 WORKDIR /srv/jupyterhub

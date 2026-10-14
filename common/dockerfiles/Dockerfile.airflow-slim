@@ -46,3 +46,4 @@ COPY add/airflow_local_settings.py /opt/airflow/lab/airflow_local_settings.py
 # lab_spark() / run_notebook() for learner DAG tasks (+ lakehouse.py, which it uses)
 COPY add/lab_spark.py /opt/airflow/lab/lab_spark.py
 COPY add/lakehouse.py /opt/airflow/lab/lakehouse.py
+COPY add/labvault.py /opt/airflow/lab/labvault.py

@@ -45,7 +45,7 @@ open — Superset, Airflow, SQLPad — keeps its own session until you log out t
 | 🧰 SQLPad user | `<you>` | your saved queries |
 
 The top bar of the landing page shows it: **"your lakehouse: `<you>_lake` ✓ · bucket:
-`<you>-lake`"**, plus **📁 My files**, **🗂️ My catalogs**, **🔑 My variables** and **Log out**. Below it, the
+`<you>-lake`"**, plus **📁 My files**, **🗂️ My catalogs**, **🔑 My secrets** and **Log out**. Below it, the
 tools are grouped in four columns — *Build & explore* (Notebook, Compute, SQL workbench),
 *Pipelines* (Airflow), *Visualize* (Superset) and *Lakehouse* (My files, My catalogs, Storage).
 
@@ -150,52 +150,67 @@ tells you whose is whose.
   it, add namespaces and tables. (The Console's own **Catalogs** list shows `0` for members:
   listing *all* catalogs is admin-only, so open yours from here.)
 
-## My variables — keys and settings for your notebooks
+## My secrets — keys and passwords in a key vault
 
 Some code needs a value you must **not** write into a notebook: an API token, a password, the key
-for an outside S3 bucket. Put those on **🔑 My variables** (top bar). Every notebook then finds them
-in `os.environ`, the dictionary of environment variables Python gives every program.
+for an outside S3 bucket. A notebook gets shared and committed to git; whoever reads it reads the
+key. Teams keep such values in a **key vault**: a service that stores them encrypted, gives each
+person access to their own, and hands a value to code that asks for it **by name**. The lab runs
+one (**OpenBao**, the open-source fork of HashiCorp Vault), and **🔑 My secrets** (top bar) is your
+folder in it.
 
 1. Type a **name** (letters, digits and `_`, e.g. `API_TOKEN`) and a **value**.
 2. Leave **secret** ticked for keys and passwords: the value is never shown again, only replaced.
    Untick it for plain settings (e.g. `REGION = eu-west`), and the page shows the value.
-3. **Save.** The variables live in your own bucket (`.lab/env.json`), and only you can read them.
+3. **Save.** Only you can read it: your Jupyter server gets a vault login that reaches your folder
+   and nothing else, and a new one at every start.
 
-A notebook loads them when its kernel starts. The startup lines then include:
-
-```text
-✓ 2 variable(s) from My variables in os.environ — lab_env() reloads them
-```
-
-Read them with `os.environ`:
+In a notebook, ask for a secret when you need it:
 
 ```python
-import os
-token = os.environ["API_TOKEN"]          # KeyError if the variable doesn't exist
-region = os.environ.get("REGION", "eu-west")   # .get(name, default) — no error, default instead
-```
-
-- **`os.environ["API_TOKEN"]`** — the value as a string. It fails with `KeyError` when the name is
-  missing, which is what you want for a key the code can't work without.
-- **`os.environ.get("REGION", "eu-west")`** — returns the default when the variable isn't set.
-
-Added or changed a variable while a notebook is open? Run **`lab_env()`** to reload, with no
-kernel restart:
-
-```python
-lab_env()
+token = lab_secret("API_TOKEN")          # the value, as a string
+lab_secrets()                            # the names of yours, never the values
 ```
 ```text
-✓ 2 variable(s) from My variables: API_TOKEN, REGION
+['API_TOKEN', 'REGION']
 ```
 
-It prints the **names** only, never the values. Names the lab sets itself (`AWS_*`, `LAKE_*`,
-`SPARK_*`, `GIT_*`, `PATH` …) are refused, e.g. *"AWS_REGION is set by the lab itself — choose
-another name"*, so you can't break your own login by accident.
+- **`lab_secret(name)`** — reads the value from the vault **now**: change it on the page and the
+  next call returns the new value, no restart. A name you don't have fails with
+  `KeyError: "no secret 'NOPE' — add it on 🔑 My secrets (lab_secrets() lists yours)"`, which is
+  what you want for a key the code can't work without.
+- The value is never printed, and it isn't in the notebook file: only the **name** is. Share the
+  notebook and nobody gets your key.
+
+You can also save one from code:
+
+```python
+lab_secret_set("DB_PASSWORD", "pw-42")
+```
+```text
+✓ secret DB_PASSWORD saved
+```
+
+In a **DAG** it's the same call, imported from the lab's helpers
+([Airflow basics](../unit5/basics.md)); it reads the secrets of the member whose DAG it is:
+
+```python
+@task
+def fetch():
+    from lab_spark import lab_secret
+    key = lab_secret("API_TOKEN")
+```
+
+!!! note "Coming from My variables?"
+    The lab used to load these into `os.environ` ("My variables"). Your values moved into the
+    vault on their own; read them with `lab_secret("NAME")` instead of `os.environ["NAME"]`. Why
+    the change: anything in `os.environ` is visible to every library in the notebook and shows up
+    in a `print(os.environ)`; a vault hands out a value only when asked.
 
 !!! note "On the cloud platforms"
-    The same idea is **Databricks secrets** (`dbutils.secrets.get`), **Azure Key Vault**, and
-    **Snowflake secrets**: the value lives in a store, and code asks for it by name.
+    Same idea, other names: **Azure Key Vault** (`SecretClient(...).get_secret("api-token").value`),
+    **Databricks secrets** (`dbutils.secrets.get("scope", "api_token")`), **AWS Secrets Manager**,
+    **Snowflake secrets**. The value lives in the vault; code asks for it by name.
 
 ## Starting over
 
@@ -206,7 +221,7 @@ Broke your lakehouse, or want a clean slate for the next unit? Ask your **platfo
 | | What goes | What stays |
 |---|---|---|
 | **Reset lakehouse** | every table and view in your catalogs (bronze / silver / gold and the sample table come back) | your files, notebooks, DAGs, catalogs and shares |
-| **Wipe** | everything: tables, extra catalogs, the shares you gave, your bucket, your Jupyter files | your account; you're back to a new member's setup (lakehouse, sample table, starter files) |
+| **Wipe** | everything: tables, extra catalogs, the shares you gave, your bucket, your Jupyter files, your secrets | your account; you're back to a new member's setup (lakehouse, sample table, starter files) |
 
 The same page lets managers create members, give someone a new password, delete an account, and
 switch **self-registration** on or off (on while a new batch signs up, off otherwise).
@@ -216,5 +231,5 @@ switch **self-registration** on or off (on while a new batch signs up, off other
 - Tell your own lakehouse (`iceberg` in Jupyter) from the shared lake (`shared` in Jupyter, `iceberg` in Trino)
 - Keep notebooks and DAGs in `notebooks/` and `dags/`, and name DAGs `<you>_…`
 - Create a catalog and share a namespace or table with another member
-- Keep keys and settings on My variables and read them with `os.environ`
+- Keep keys and passwords in **My secrets** (the key vault) and read them with `lab_secret()`
 - Know when to ask a manager for a lakehouse reset or a full wipe

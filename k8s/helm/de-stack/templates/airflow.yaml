@@ -117,6 +117,11 @@ spec:
             - { name: TRINO_LAB_SECRET, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: trino-lab-secret } } }
             - { name: AIRFLOW_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: airflow-admin-password } } }
             - { name: POLARIS_ADMIN, value: "root:$(POLARIS_ROOT_SECRET)" }      # lakehouse.py (lab_spark)
+            # lab_secret() in learner DAGs reads the DAG owner's secrets from the key vault
+            {{- if .Values.vault.enabled }}
+            - { name: VAULT_ADDR, value: http://vault:8200 }
+            - { name: VAULT_ADMIN_TOKEN, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: vault-admin-token } } }
+            {{- end }}
             - { name: TRINO_POLARIS_LOGIN, value: "trino_lab:$(TRINO_LAB_SECRET)" }
 {{- if .Values.keycloak.enabled }}
             # UI login with the lab account (Keycloak client airflow) — FAB auth manager +
@@ -194,6 +199,7 @@ spec:
             - { name: lab-code, mountPath: /opt/airflow/lab/airflow_local_settings.py, subPath: airflow_local_settings.py }
             - { name: lab-code, mountPath: /opt/airflow/lab/lab_spark.py, subPath: lab_spark.py }
             - { name: lab-code, mountPath: /opt/airflow/lab/lakehouse.py, subPath: lakehouse.py }
+            - { name: lab-code, mountPath: /opt/airflow/lab/labvault.py, subPath: labvault.py }
 {{- range $path, $_ := .Files.Glob "files/medallion-jobs/*.py" }}
             - name: medallion-jobs
               mountPath: /opt/airflow/jobs/{{ base $path }}

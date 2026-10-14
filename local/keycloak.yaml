@@ -56,12 +56,16 @@ services:
       KEYCLOAK_ADMIN: admin:admin
       HUB_ADMIN_TOKEN: lab-admin-local-hub-token
       AIRFLOW_ADMIN: airflow:airflow                  # delete also tidies the member's Airflow role / history
+      # "My secrets" — the key vault (vault.yaml); same lab-only token as there
+      VAULT_ADDR: http://vault:8200
+      VAULT_ADMIN_TOKEN: ${VAULT_ADMIN_TOKEN:-lab-vault-admin-local-token}
     volumes:
       - ./configs/trino/access:/trino-access
       # lab code mounted over the image's copies (as on Kubernetes) — edits need only a restart
       - ../common/dockerfiles/add/lakehouse.py:/app/lakehouse.py:ro
       - ../common/dockerfiles/add/home-api.py:/app/app.py:ro
       - ../common/dockerfiles/add/labadmin.py:/app/labadmin.py:ro
+      - ../common/dockerfiles/add/labvault.py:/app/labvault.py:ro
     depends_on:
       - polaris
     restart: unless-stopped

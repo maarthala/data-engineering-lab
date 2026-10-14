@@ -1,0 +1,1 @@
+../../../../../common/dockerfiles/add/vault-init.sh

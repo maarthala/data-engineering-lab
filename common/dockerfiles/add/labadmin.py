@@ -9,8 +9,8 @@ plus the Keycloak admin (KEYCLOAK_ADMIN=user:password) and a JupyterHub service 
   reset_lakehouse(user)      drop every table/view in their catalogs (bronze/silver/gold and the
                              sample table come back); files, catalogs and shares are kept
   wipe(user)                 back to a new member's setup: only <user>_lake (bronze/silver/gold +
-                             sample table), starter files, fresh Jupyter; extra catalogs deleted,
-                             the shares they gave revoked (account kept)
+                             sample table), starter files, fresh Jupyter, no secrets; extra
+                             catalogs deleted, the shares they gave revoked (account kept)
   delete(user)               remove the account and everything it owns
   registration() / set_registration(on)   self-registration on the sign-in page (Keycloak realm)
 """
@@ -24,6 +24,7 @@ import urllib.parse
 import urllib.request
 
 import lakehouse as lh
+import labvault
 
 KEYCLOAK = os.environ.get("KEYCLOAK_URL", "http://keycloak:8080")
 REALM = os.environ.get("KEYCLOAK_REALM", "de-lab")
@@ -122,6 +123,18 @@ def _airflow_forget(user, name):
     for role in {f"lab_{user}", f"lab_{name}"}:
         _http("DELETE", f"{AIRFLOW}/auth/fab/v1/roles/{urllib.parse.quote(role)}", headers=h)
     return True
+
+
+# ---- key vault: the member's secrets ("My secrets") ----------------------------------------
+def _vault(fn, name):
+    """Best effort: a vault that is down mustn't stop a wipe / delete. None = not reached."""
+    if not labvault.enabled():
+        return None
+    try:
+        return fn(name)
+    except Exception as e:
+        print(f"[labadmin] vault {name}: {e}", flush=True)
+        return None
 
 
 # ---- Polaris: tables of a catalog -------------------------------------------------------
@@ -315,10 +328,11 @@ def wipe(user):
     for r in shares:
         lh._call("DELETE", f"{lh._M}/catalogs/{lake}/catalog-roles/{r}", token=t)
     files = _empty_prefix(lh.bucket_name(name), "")
+    secrets_removed = _vault(labvault.clear, name)
     lh.provision(name)
     lh.publish_trino_rules()
     return {"user": user, "dropped": dropped, "catalogs_removed": extra, "shares_revoked": len(shares),
-            "files_removed": files, "jupyter_reset": jupyter}
+            "files_removed": files, "secrets_removed": secrets_removed, "jupyter_reset": jupyter}
 
 
 def delete(user):
@@ -329,6 +343,7 @@ def delete(user):
     ct = _content_token() if cats else None
     for cat in cats:                                     # tables, namespaces, roles, catalog
         _drop_catalog(cat, t, ct)
+    _vault(labvault.forget, name)                        # their secrets, vault token and policy
     for pr in (name, f"{name}_jobs"):                    # their login + their Airflow jobs' login
         lh._call("DELETE", f"{lh._M}/principals/{pr}", token=t)
     lh._call("DELETE", f"{lh._M}/principal-roles/{name}", token=t)

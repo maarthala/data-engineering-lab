@@ -14,6 +14,7 @@ value() {                       # no `| head` anywhere: it would trip pipefail
   case "$1" in
     airflow-fernet-key)   openssl rand -base64 32 | tr '+/' '-_' ;;   # Airflow Fernet key format
     jupyterhub-crypt-key) openssl rand -hex 32 ;;                     # 64 hex chars
+    vault-unseal-key)     openssl rand -hex 32 ;;                     # 64 hex chars (OpenBao static seal)
     *)                    openssl rand -hex 16 ;;                     # 32 chars (also an AES-256 key)
   esac
 }
@@ -22,7 +23,7 @@ KEYS="postgres-password pg-airflow-password pg-polaris-password pg-keycloak-pass
   keycloak-admin-password manager-password sqlpad-admin-password superset-admin-password airflow-admin-password
   oidc-home-secret oidc-jupyterhub-secret oidc-airflow-secret oidc-superset-secret oidc-sqlpad-secret
   oidc-storage-secret oidc-polaris-secret oauth2-cookie-secret airflow-fernet-key airflow-secret-key
-  superset-secret-key jupyterhub-crypt-key hub-admin-token"
+  superset-secret-key jupyterhub-crypt-key hub-admin-token pg-vault-password vault-unseal-key vault-admin-token"
 
 if existing=$($KUBECTL -n "$NAMESPACE" get secret "$NAME" -o jsonpath='{.data}' 2>/dev/null) && [ -n "$existing" ]; then
   added=0

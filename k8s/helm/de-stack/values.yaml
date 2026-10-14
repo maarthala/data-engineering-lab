@@ -80,6 +80,11 @@ storage:
 # UI is a local build. Images are imported to the node (kubelet pulls corrupt
 # containerd snapshots on this LXC):
 #   docker save apache/polaris:latest | ssh sysadmin@<node> microk8s images import /dev/stdin
+vault:
+  enabled: true
+  # The lab's key vault (OpenBao, stock image): "My secrets" + lab_secret(). Data in Postgres
+  # (database vault); keys pg-vault-password, vault-unseal-key, vault-admin-token in the Secret.
+  image: openbao/openbao:2.6.4
 polaris:
   enabled: true
   image: apache/polaris:1.8.0

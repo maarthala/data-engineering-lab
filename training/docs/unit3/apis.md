@@ -142,10 +142,10 @@ headers = {"Authorization": "Bearer <token>", "Accept": "application/json"}
 
 !!! warning "Never hard-code secrets"
     A token in your code gets committed to git and shared with everyone who reads the notebook.
-    Read it from an **environment variable** or a secrets store instead —
-    `os.environ["API_TOKEN"]` — and keep the actual value out of the repo. In the lab, save it
-    on **🔑 My variables** (as a *secret*) and every notebook has it in `os.environ`; see
-    [My variables](../setup/workspace.md#my-variables-keys-and-settings-for-your-notebooks). On the
+    Read it from a **key vault** (or an environment variable) instead, and keep the actual value
+    out of the repo. In the lab, save it on **🔑 My secrets** and read it with
+    `lab_secret("API_TOKEN")`; see
+    [My secrets](../setup/workspace.md#my-secrets-keys-and-passwords-in-a-key-vault). On the
     cloud platforms this is Key Vault / Databricks secrets / Snowflake secrets.
 
 ### Load the response into pandas

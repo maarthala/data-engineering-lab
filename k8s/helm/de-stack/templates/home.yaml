@@ -23,6 +23,8 @@ data:
 {{ .Files.Get "files/home/catalogs.html" | indent 4 }}
   manage.html: |
 {{ .Files.Get "files/home/manage.html" | indent 4 }}
+  secrets.html: |
+{{ .Files.Get "files/home/secrets.html" | indent 4 }}
   variables.html: |
 {{ .Files.Get "files/home/variables.html" | indent 4 }}
   lab-header.js: |
@@ -56,7 +58,8 @@ spec:
             - { name: html, mountPath: /usr/share/nginx/html/files.html, subPath: files.html }
             - { name: html, mountPath: /usr/share/nginx/html/catalogs.html, subPath: catalogs.html }
             - { name: html, mountPath: /usr/share/nginx/html/manage.html, subPath: manage.html }
-            - { name: html, mountPath: /usr/share/nginx/html/variables.html, subPath: variables.html }
+            - { name: html, mountPath: /usr/share/nginx/html/secrets.html, subPath: secrets.html }
+            - { name: html, mountPath: /usr/share/nginx/html/variables.html, subPath: variables.html }   # → secrets.html
             - { name: html, mountPath: /usr/share/nginx/html/lab-header.js, subPath: lab-header.js }
             - { name: html, mountPath: /usr/share/nginx/html/img/epireum-logo.png, subPath: epireum-logo.png }
             # bigger header limit: oauth2-proxy forwards the session + sign-in cookies
@@ -145,6 +148,11 @@ spec:
             - { name: HUB_ADMIN_TOKEN, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: hub-admin-token } } }
             - { name: AIRFLOW_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: airflow-admin-password } } }
             - { name: AIRFLOW_ADMIN, value: "{{ .Values.airflow.adminUser }}:$(AIRFLOW_ADMIN_PASSWORD)" }   # delete tidies the member's Airflow role / history
+            # "My secrets" — the key vault (vault.yaml)
+            {{- if .Values.vault.enabled }}
+            - { name: VAULT_ADDR, value: http://vault:8200 }
+            - { name: VAULT_ADMIN_TOKEN, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: vault-admin-token } } }
+            {{- end }}
           ports:
             - { name: http, containerPort: 8000 }
           readinessProbe:
@@ -153,6 +161,7 @@ spec:
             - { name: lab-code, mountPath: /app/lakehouse.py, subPath: lakehouse.py }
             - { name: lab-code, mountPath: /app/app.py, subPath: home-api.py }
             - { name: lab-code, mountPath: /app/labadmin.py, subPath: labadmin.py }
+            - { name: lab-code, mountPath: /app/labvault.py, subPath: labvault.py }
             - { name: lab-seed, mountPath: /app/seed }
       volumes:
         - { name: lab-code, configMap: { name: lab-code } }
