@@ -70,7 +70,12 @@ def lab_secret(name):
     body = _vault("GET", name)
     if body is None:
         raise KeyError(f"no secret {name!r} — add it on 🔑 My secrets (lab_secrets() lists yours)")
-    return body["data"]["data"]["value"]
+    d = body["data"]["data"]
+    if "value" not in d:                 # made in the vault's own UI: any key name(s)
+        rest = {k: v for k, v in d.items() if k not in ("secret", "updated")}
+        import json
+        return next(iter(rest.values())) if len(rest) == 1 else json.dumps(rest)
+    return d["value"]
 
 
 def lab_secrets():

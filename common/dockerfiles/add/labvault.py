@@ -8,7 +8,8 @@ holding {"value", "secret": "1"|"0", "updated"}. Policy member-<name> reaches on
 member_token(name)       a fresh token for the member's Jupyter (role member, one week); the
                          previous one is revoked, like the Polaris secret at every start
 names / get / put / delete   one member's secrets (home-api, Airflow)
-clear(name)              delete all their secrets (wipe) · forget(name): + policy, token (delete)
+clear(name)              delete all their secrets (wipe) · forget(name): + policy, token,
+                         vault sign-in record (delete)
 import_env_file(name)    move an old "My variables" file (.lab/env.json) into the vault, once
 Standard library only.
 """
@@ -89,7 +90,10 @@ def get(name, key):
         return None
     _ok(st, f"read {key}")
     d = body["data"]["data"]
-    return {"value": d.get("value", ""), "secret": d.get("secret") != "0", "updated": d.get("updated")}
+    if "value" not in d:                 # made in the vault's own UI: any key name(s)
+        rest = {k: v for k, v in d.items() if k not in ("secret", "updated")}
+        d = {**d, "value": next(iter(rest.values())) if len(rest) == 1 else json.dumps(rest)}
+    return {"value": d["value"], "secret": d.get("secret") != "0", "updated": d.get("updated")}
 
 
 def put(name, key, value, secret=True, updated=None):
@@ -121,6 +125,11 @@ def forget(name):
         _call("POST", "auth/token/revoke-accessor", {"accessor": old["data"]["data"]["accessor"]})
     _call("DELETE", f"{MOUNT}/metadata/{TOKENS}/{name}")
     _call("DELETE", f"sys/policies/acl/member-{name}")
+    st, auth = _call("GET", "sys/auth/oidc")                # their sign-in record (UI, Keycloak)
+    if st == 200:
+        st, ent = _call("POST", "identity/lookup/entity", {"alias_name": name, "alias_mount_accessor": auth["accessor"]})
+        if st == 200 and ent:
+            _call("DELETE", f"identity/entity/id/{ent['data']['id']}")
     return n
 
 

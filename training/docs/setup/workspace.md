@@ -201,6 +201,23 @@ def fetch():
     key = lab_secret("API_TOKEN")
 ```
 
+### In the key vault's own UI
+
+The bottom of **🔑 My secrets** has **Open the key vault ↗**: the vault's own web UI (OpenBao), at
+[http://localhost:8200](http://localhost:8200) locally, `http://vault.de.lan` on the lab cluster.
+Click **Sign in with OIDC Provider** and you're in with your lab account (the same Keycloak login),
+straight in **your folder** `secret/<you>/`: one entry per secret, the same ones the page shows.
+
+- Open a secret: its keys with the values hidden (`***********`), **Version 1**, and **Create new
+  version** to change it (the vault keeps the old versions). One saved on the page has three keys:
+  `value` (the secret itself) and the page's own `secret` and `updated`.
+- **Create Secret** adds one. Give it one key, e.g. `value` = `abc123`; `lab_secret("NAME")` then
+  returns `abc123`. With several keys (`user`, `password`) it returns them as JSON:
+  `{"password": "b", "user": "a"}`.
+- Only your folder: another member's folder, or the list of all folders, shows nothing (just a
+  *View secret* box), because the vault refuses. Your own folder shows *404 Not Found* until it
+  holds a secret.
+
 !!! note "Coming from My variables?"
     The lab used to load these into `os.environ` ("My variables"). Your values moved into the
     vault on their own; read them with `lab_secret("NAME")` instead of `os.environ["NAME"]`. Why

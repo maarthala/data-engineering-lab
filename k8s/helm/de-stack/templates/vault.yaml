@@ -4,6 +4,7 @@
 # no volume of its own. It unlocks itself at every start (static seal: secret key
 # vault-unseal-key) and vault-init.sh sets it up the first time (admin token = secret key
 # vault-admin-token, root token revoked). Same vault.hcl / vault-init.sh as the local stack.
+# UI: http://vault.<baseHost> — "Sign in with the lab account" (method OIDC, Keycloak).
 apiVersion: v1
 kind: Service
 metadata:
@@ -31,6 +32,14 @@ spec:
       annotations: {{- include "de-stack.labChecksum" . | nindent 8 }}
     spec:
       enableServiceLinks: false
+      # "Sign in with the lab account": the vault fetches Keycloak's discovery from the PUBLIC
+      # issuer (http://auth.<baseHost>) and checks it matches — inside this pod that name points
+      # at 127.0.0.1, where the container forwards port 80 to the keycloak Service
+      hostAliases:
+        - { ip: 127.0.0.1, hostnames: ["auth.{{ .Values.ingress.baseHost }}"] }
+      securityContext:
+        sysctls:
+          - { name: net.ipv4.ip_unprivileged_port_start, value: "80" }   # port 80 without root
       initContainers:
         # the vault's database + login (Postgres' init scripts only run on an empty volume)
         - name: vault-db
@@ -62,11 +71,16 @@ spec:
             - { name: BAO_UNSEAL_KEY, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: vault-unseal-key } } }
             - { name: VAULT_ADMIN_TOKEN, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: vault-admin-token } } }
             - { name: BAO_ADDR, value: http://127.0.0.1:8200 }
+            # UI sign-in with the lab account (Keycloak realm de-lab, client vault)
+            - { name: VAULT_OIDC_ISSUER, value: "http://auth.{{ .Values.ingress.baseHost }}/realms/de-lab" }
+            - { name: VAULT_OIDC_CLIENT_SECRET, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: oidc-vault-secret } } }
+            - { name: VAULT_OIDC_REDIRECTS, value: "http://vault.{{ .Values.ingress.baseHost }}/ui/vault/auth/oidc/oidc/callback,http://localhost:8250/oidc/callback" }
           # the server, then the one-shot setup next to it (safe to re-run at every start)
           command:
             - sh
             - -c
             - |
+              nc -lk -s 127.0.0.1 -p 80 -e nc keycloak 8080 &
               bao server -config=/bao/config/lab.hcl & pid=$!
               trap 'kill -TERM $pid' TERM INT
               sh /vault-init.sh || echo "vault-init failed — see above"
@@ -84,4 +98,23 @@ spec:
             - { name: lab-code, mountPath: /vault-init.sh, subPath: vault-init.sh }
       volumes:
         - { name: lab-code, configMap: { name: lab-code } }
+{{- if .Values.ingress.enabled }}
+---
+# the vault's UI: members "Sign in with the lab account" and see only their own folder
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vault
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: vault.{{ .Values.ingress.baseHost }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: vault, port: { number: 8200 } }
+{{- end }}
 {{- end }}

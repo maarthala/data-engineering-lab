@@ -107,6 +107,7 @@ use `microk8s kubectl`.
 | Airflow | `http://airflow.de.lan` | lab account |
 | Jupyter (JupyterHub) | `http://jupyter.de.lan` | lab account — own Jupyter pod + own lakehouse |
 | Spark master UI | `http://spark.de.lan` | — |
+| Key vault (OpenBao) | `http://vault.de.lan` | lab account (Sign in with OIDC Provider: own folder; managers all) · admin token = secret `vault-admin-token` |
 
 ## 5. First steps (what to actually do)
 1. **Register a lab account** at `http://de.lan` — first sign-in creates your lakehouse

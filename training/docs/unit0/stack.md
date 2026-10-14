@@ -123,6 +123,7 @@ single sign-on, register on the home portal) for every tool; see [0.3](../setup/
 | Airflow | http://localhost:8001 | `airflow.de.lan` | lab account (DAGs also from your bucket's `files/src/dags/`) |
 | RustFS console (object store) | http://localhost:9001/rustfs/console/ | `storage.de.lan/rustfs/console/` | lab account (your own bucket) · root `admin` / `admin123` |
 | Spark master UI | http://localhost:8002 | `spark.de.lan` | — |
+| Key vault (OpenBao) | http://localhost:8200 | `vault.de.lan` | lab account (**Sign in with OIDC Provider**; your own folder) |
 
 !!! warning "On a team stack these admin logins are private"
     The admin passwords above are the defaults of **your own laptop stack**, where you are the admin.
