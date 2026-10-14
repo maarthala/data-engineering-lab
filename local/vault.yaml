@@ -1,5 +1,5 @@
 # The lab's key vault — OpenBao (the open-source fork of HashiCorp Vault), stock image.
-# Every member's secrets ("🔑 My secrets", lab_secret() in notebooks and DAGs) live here,
+# Every member's secrets ("🔑 My secrets", key_vault() in notebooks and DAGs) live here,
 # encrypted, in the stack's Postgres (database vault) — no volume of its own. It unlocks
 # itself at every start with BAO_UNSEAL_KEY; vault-init.sh sets it up the first time.
 # UI: http://localhost:8200 — members "Sign in with the lab account" (method OIDC, Keycloak) and

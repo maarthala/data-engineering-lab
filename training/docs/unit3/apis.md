@@ -144,7 +144,7 @@ headers = {"Authorization": "Bearer <token>", "Accept": "application/json"}
     A token in your code gets committed to git and shared with everyone who reads the notebook.
     Read it from a **key vault** (or an environment variable) instead, and keep the actual value
     out of the repo. In the lab, save it on **🔑 My secrets** and read it with
-    `lab_secret("API_TOKEN")`; see
+    `key_vault("API_TOKEN")`; see
     [My secrets](../setup/workspace.md#my-secrets-keys-and-passwords-in-a-key-vault). On the
     cloud platforms this is Key Vault / Databricks secrets / Snowflake secrets.
 

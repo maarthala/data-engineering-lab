@@ -1,6 +1,6 @@
 """labvault — every member's secrets in the lab's key vault (OpenBao, the "vault" service).
 Shared by home-api (the "My secrets" page, Manage members), the JupyterHub spawn hook and
-Airflow (lab_secret() in member DAGs). Uses the admin token VAULT_ADMIN_TOKEN (vault-init.sh).
+Airflow (key_vault() in member DAGs). Uses the admin token VAULT_ADMIN_TOKEN (vault-init.sh).
 
 Layout: key/value store `secret/` (KV v2), one folder per member: secret/<name>/<key>, each
 holding {"value", "secret": "1"|"0", "updated"}. Policy member-<name> reaches only that folder.

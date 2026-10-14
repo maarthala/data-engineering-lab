@@ -35,7 +35,7 @@ x-airflow-common:
     # Polaris login for the platform's own Spark jobs (shopflow_medallion → the shared lake);
     # the Spark cluster itself holds none.
     POLARIS_CREDENTIAL: root:s3cr3t
-    # lab_secret() in learner DAGs reads the DAG owner's secrets from the key vault
+    # key_vault() in learner DAGs reads the DAG owner's secrets from the key vault
     VAULT_ADDR: http://vault:8200
     VAULT_ADMIN_TOKEN: ${VAULT_ADMIN_TOKEN:-lab-vault-admin-local-token}
     AIRFLOW_CONN_LEARNER_S3: >-

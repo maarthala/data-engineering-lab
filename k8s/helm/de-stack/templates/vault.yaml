@@ -1,6 +1,6 @@
 {{- if .Values.vault.enabled }}
 # The lab's key vault — OpenBao (open-source Vault), stock image. Every member's secrets
-# ("🔑 My secrets", lab_secret()) live here, encrypted, in the stack's Postgres (database vault);
+# ("🔑 My secrets", key_vault()) live here, encrypted, in the stack's Postgres (database vault);
 # no volume of its own. It unlocks itself at every start (static seal: secret key
 # vault-unseal-key) and vault-init.sh sets it up the first time (admin token = secret key
 # vault-admin-token, root token revoked). Same vault.hcl / vault-init.sh as the local stack.

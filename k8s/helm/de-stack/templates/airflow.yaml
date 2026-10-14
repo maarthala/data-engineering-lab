@@ -117,7 +117,7 @@ spec:
             - { name: TRINO_LAB_SECRET, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: trino-lab-secret } } }
             - { name: AIRFLOW_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: airflow-admin-password } } }
             - { name: POLARIS_ADMIN, value: "root:$(POLARIS_ROOT_SECRET)" }      # lakehouse.py (lab_spark)
-            # lab_secret() in learner DAGs reads the DAG owner's secrets from the key vault
+            # key_vault() in learner DAGs reads the DAG owner's secrets from the key vault
             {{- if .Values.vault.enabled }}
             - { name: VAULT_ADDR, value: http://vault:8200 }
             - { name: VAULT_ADMIN_TOKEN, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: vault-admin-token } } }

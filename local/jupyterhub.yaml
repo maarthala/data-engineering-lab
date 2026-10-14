@@ -25,7 +25,7 @@ services:
       JUPYTERHUB_CRYPT_KEY: ${JUPYTERHUB_CRYPT_KEY:-6874424c5eb55dec01d4ee3e6089a7b287602717fc11c0dfaa2524b2d7d88877}
       POLARIS_URL: http://polaris:8181
       HUB_ADMIN_TOKEN: lab-admin-local-hub-token   # home-api's "Manage members" (lab only; k8s: private secret)
-      # each member's server gets its own vault token (lab_secret) — minted with this one
+      # each member's server gets its own vault token (key_vault) — minted with this one
       VAULT_ADDR: http://vault:8200
       VAULT_ADMIN_TOKEN: ${VAULT_ADMIN_TOKEN:-lab-vault-admin-local-token}
       LEARNER_QUOTA_MB: "100"      # each learner's bucket <user>-lake (hard limit)

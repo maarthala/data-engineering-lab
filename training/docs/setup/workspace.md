@@ -168,24 +168,26 @@ folder in it.
 In a notebook, ask for a secret when you need it:
 
 ```python
-token = lab_secret("API_TOKEN")          # the value, as a string
-lab_secrets()                            # the names of yours, never the values
+token = key_vault("API_TOKEN")           # the value, as a string
+key_vault_list()                         # the names of yours, never the values
 ```
 ```text
 ['API_TOKEN', 'REGION']
 ```
 
-- **`lab_secret(name)`** — reads the value from the vault **now**: change it on the page and the
+- **`key_vault(name)`** — reads the value from the vault **now**: change it on the page and the
   next call returns the new value, no restart. A name you don't have fails with
-  `KeyError: "no secret 'NOPE' — add it on 🔑 My secrets (lab_secrets() lists yours)"`, which is
+  `KeyError: "no secret 'NOPE' — add it on 🔑 My secrets (key_vault_list() lists yours)"`, which is
   what you want for a key the code can't work without.
 - The value is never printed, and it isn't in the notebook file: only the **name** is. Share the
   notebook and nobody gets your key.
+- The first names of these helpers still work: `lab_secret`, `lab_secrets` and `lab_secret_set`
+  are the same functions.
 
 You can also save one from code:
 
 ```python
-lab_secret_set("DB_PASSWORD", "pw-42")
+key_vault_set("DB_PASSWORD", "pw-42")
 ```
 ```text
 ✓ secret DB_PASSWORD saved
@@ -197,8 +199,8 @@ In a **DAG** it's the same call, imported from the lab's helpers
 ```python
 @task
 def fetch():
-    from lab_spark import lab_secret
-    key = lab_secret("API_TOKEN")
+    from lab_spark import key_vault
+    key = key_vault("API_TOKEN")
 ```
 
 ### In the key vault's own UI
@@ -211,7 +213,7 @@ straight in **your folder** `secret/<you>/`: one entry per secret, the same ones
 - Open a secret: its keys with the values hidden (`***********`), **Version 1**, and **Create new
   version** to change it (the vault keeps the old versions). One saved on the page has three keys:
   `value` (the secret itself) and the page's own `secret` and `updated`.
-- **Create Secret** adds one. Give it one key, e.g. `value` = `abc123`; `lab_secret("NAME")` then
+- **Create Secret** adds one. Give it one key, e.g. `value` = `abc123`; `key_vault("NAME")` then
   returns `abc123`. With several keys (`user`, `password`) it returns them as JSON:
   `{"password": "b", "user": "a"}`.
 - Only your folder: another member's folder, or the list of all folders, shows nothing (just a
@@ -220,7 +222,7 @@ straight in **your folder** `secret/<you>/`: one entry per secret, the same ones
 
 !!! note "Coming from My variables?"
     The lab used to load these into `os.environ` ("My variables"). Your values moved into the
-    vault on their own; read them with `lab_secret("NAME")` instead of `os.environ["NAME"]`. Why
+    vault on their own; read them with `key_vault("NAME")` instead of `os.environ["NAME"]`. Why
     the change: anything in `os.environ` is visible to every library in the notebook and shows up
     in a `print(os.environ)`; a vault hands out a value only when asked.
 
@@ -248,5 +250,5 @@ switch **self-registration** on or off (on while a new batch signs up, off other
 - Tell your own lakehouse (`iceberg` in Jupyter) from the shared lake (`shared` in Jupyter, `iceberg` in Trino)
 - Keep notebooks and DAGs in `notebooks/` and `dags/`, and name DAGs `<you>_…`
 - Create a catalog and share a namespace or table with another member
-- Keep keys and passwords in **My secrets** (the key vault) and read them with `lab_secret()`
+- Keep keys and passwords in **My secrets** (the key vault) and read them with `key_vault()`
 - Know when to ask a manager for a lakehouse reset or a full wipe

@@ -63,13 +63,13 @@ def _vault(method, key="", body=None):
         raise RuntimeError(f"key vault: HTTP {e.code}") from None
 
 
-def lab_secret(name):
+def key_vault(name):
     """The value of one of your secrets from the lab's "My secrets" page (the key vault):
-        key = lab_secret("WEATHER_API_KEY")
+        key = key_vault("WEATHER_API_KEY")
     Never printed; a missing name raises KeyError."""
     body = _vault("GET", name)
     if body is None:
-        raise KeyError(f"no secret {name!r} — add it on 🔑 My secrets (lab_secrets() lists yours)")
+        raise KeyError(f"no secret {name!r} — add it on 🔑 My secrets (key_vault_list() lists yours)")
     d = body["data"]["data"]
     if "value" not in d:                 # made in the vault's own UI: any key name(s)
         rest = {k: v for k, v in d.items() if k not in ("secret", "updated")}
@@ -78,13 +78,13 @@ def lab_secret(name):
     return d["value"]
 
 
-def lab_secrets():
+def key_vault_list():
     """The names of your secrets (never the values)."""
     body = _vault("LIST")
     return sorted(k for k in (body or {}).get("data", {}).get("keys", []) if not k.endswith("/"))
 
 
-def lab_secret_set(name, value, secret=True):
+def key_vault_set(name, value, secret=True):
     """Save a secret from code (same as 🔑 My secrets → Save). secret=False: the page shows it."""
     import re, time
     if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", name):
@@ -94,10 +94,14 @@ def lab_secret_set(name, value, secret=True):
     print(f"✓ secret {name} saved")
 
 
+# the first names (notebooks written before the rename keep working)
+lab_secret, lab_secrets, lab_secret_set = key_vault, key_vault_list, key_vault_set
+
+
 def lab_env(quiet=False):
-    """Gone: "My variables" became 🔑 My secrets, read with lab_secret("NAME")."""
-    print('My variables moved to 🔑 My secrets: read a value with lab_secret("NAME") — '
-          f"yours: {', '.join(lab_secrets()) or '—'}")
+    """Gone: "My variables" became 🔑 My secrets, read with key_vault("NAME")."""
+    print('My variables moved to 🔑 My secrets: read a value with key_vault("NAME") — '
+          f"yours: {', '.join(key_vault_list()) or '—'}")
 
 
 # --- More catalogs: your own extra catalogs + ones other learners shared with you ------

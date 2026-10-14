@@ -1,5 +1,5 @@
 """lab_spark() — a Spark session for a learner's DAG, signed in AS THAT LEARNER (lab_dbt(): their dbt project;
-lab_secret(): one of their secrets).
+key_vault(): one of their secrets).
 
 Learner DAGs (synced from <user>-lake/dags/ by the "learners" bundle) run in the shared
 Airflow, which has no learner credentials. This helper gives a task the same Spark a notebook
@@ -204,14 +204,14 @@ def lab_dbt(command="build", project="shop", user=None):
                 raise RuntimeError(f"dbt {' '.join(args)} failed (exit {proc.returncode}) — see the log above")
 
 
-def lab_secret(name, user=None):
+def key_vault(name, user=None):
     """One of the learner's secrets ("My secrets", the key vault) in a DAG task — the same as
-    lab_secret() in a notebook:
+    key_vault() in a notebook:
 
         @task
         def fetch():
-            from lab_spark import lab_secret
-            key = lab_secret("WEATHER_API_KEY")
+            from lab_spark import key_vault
+            key = key_vault("WEATHER_API_KEY")
 
     Whose: the running DAG's owner (as lab_spark), read with Airflow's vault login. Never logged."""
     import labvault
@@ -222,3 +222,6 @@ def lab_secret(name, user=None):
     if s is None:
         raise KeyError(f"no secret {name!r} for {name_} — add it on 🔑 My secrets")
     return s["value"]
+
+
+lab_secret = key_vault          # the first name (DAGs written before the rename keep working)

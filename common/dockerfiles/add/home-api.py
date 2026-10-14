@@ -33,7 +33,7 @@ the logged-in user; nothing from the browser can point at another bucket.
   GET    /api/admin/settings · POST {"registration": bool}  self-registration on the sign-in page
 
 "My secrets" — the learner's own secrets (API keys, passwords…), kept in the lab's key vault
-(OpenBao, labvault.py) under secret/<name>/. Notebooks read them with lab_secret("NAME") with the
+(OpenBao, labvault.py) under secret/<name>/. Notebooks read them with key_vault("NAME") with the
 member's own vault token; DAGs the same, through Airflow. Secret values are never sent back.
 Changes need the X-Lab-Request header (a plain cross-site form can't send it).
   GET    /api/env                                        names (+ values of non-secrets)

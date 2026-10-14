@@ -98,7 +98,7 @@ spec:
             - { name: POLARIS_ROOT_SECRET, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: polaris-root-secret } } }
             - { name: TRINO_LAB_SECRET, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: trino-lab-secret } } }
             - { name: POLARIS_ADMIN, value: "root:$(POLARIS_ROOT_SECRET)" }
-            # each member's server gets its own vault token (lab_secret) — minted with this one
+            # each member's server gets its own vault token (key_vault) — minted with this one
             {{- if .Values.vault.enabled }}
             - { name: VAULT_ADDR, value: http://vault:8200 }
             - { name: VAULT_ADMIN_TOKEN, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: vault-admin-token } } }
