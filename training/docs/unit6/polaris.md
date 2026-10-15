@@ -22,7 +22,7 @@ Every lab account is a Polaris **principal** with two catalogs:
 
 | In your notebook | Polaris catalog | Stored in | You can |
 |---|---|---|---|
-| `iceberg` | **`demouser_lake`** — your lakehouse | `s3://demouser-lake/tables/demouser_lake` | everything — you're the **owner** |
+| `my` | **`demouser_lake`** — your lakehouse | `s3://demouser-lake/tables/demouser_lake` | everything — you're the **owner** |
 | `shared` | **`polaris_lake`** — the course's shared lake | `s3://demo-bucket/warehouse` | read `bronze` / `silver` / `gold` |
 
 ```
@@ -69,12 +69,12 @@ In a notebook, build one Gold and one Silver table from your sample table:
 
 ```python
 spark.sql("""
-CREATE OR REPLACE TABLE iceberg.gold.status_counts AS
-SELECT status, count(*) AS n FROM iceberg.bronze.sample_orders GROUP BY status
+CREATE OR REPLACE TABLE my.gold.status_counts AS
+SELECT status, count(*) AS n FROM my.bronze.sample_orders GROUP BY status
 """)
 spark.sql("""
-CREATE OR REPLACE TABLE iceberg.silver.orders_clean AS
-SELECT * FROM iceberg.bronze.sample_orders WHERE status <> 'cancelled'
+CREATE OR REPLACE TABLE my.silver.orders_clean AS
+SELECT * FROM my.bronze.sample_orders WHERE status <> 'cancelled'
 """)
 ```
 

@@ -13,13 +13,13 @@ Superset dashboard. This is the shape of a real production mart.
 ```mermaid
 flowchart LR
   SIM["corrected / late<br/>order lines"] --> M{{"MERGE upsert<br/>on (order_id, product_id)"}}
-  M --> S["iceberg.silver.orders"]
-  S --> W["iceberg.gold.product_weekly<br/>(overwrite affected weeks)"]
+  M --> S["my.silver.orders"]
+  S --> W["my.gold.product_weekly<br/>(overwrite affected weeks)"]
   W --> D["Superset dashboard"]
 ```
 
 ## Lab
-Recall the grain: `iceberg.silver.orders` is **one row per order line** — key `(order_id,
+Recall the grain: `my.silver.orders` is **one row per order line** — key `(order_id,
 product_id)` — already enriched with `product_name`, `category`, `quantity`, `unit_price`,
 `line_amount`, `order_date` (Unit {unit:unit4/fundamentals.md}). A corrected or re-sent line shares that key, which is exactly
 what `MERGE` keys on. Confirm the grain is clean — in a notebook (your Silver from Unit {unit:unit4/fundamentals.md} or the
@@ -28,7 +28,7 @@ what `MERGE` keys on. Confirm the grain is clean — in a notebook (your Silver 
 ```sql
 %%sql
 SELECT order_id, product_id, COUNT(*) AS n
-FROM iceberg.silver.orders
+FROM my.silver.orders
 GROUP BY order_id, product_id
 HAVING COUNT(*) > 1
 ```
@@ -43,9 +43,9 @@ governed by least-privilege grants, scheduled idempotently, and surfaced in Supe
 
 ### Requirements
 1. **Silver upsert (correctness).** Fold each incoming batch of order lines into
-   `iceberg.silver.orders` with a `MERGE` keyed on `(order_id, product_id)` — a corrected line
+   `my.silver.orders` with a `MERGE` keyed on `(order_id, product_id)` — a corrected line
    updates in place; a new one inserts. No duplicates, ever.
-2. **Gold weekly mart.** Build `iceberg.gold.product_weekly` at grain **(iso_week, product_name)**
+2. **Gold weekly mart.** Build `my.gold.product_weekly` at grain **(iso_week, product_name)**
    with columns `iso_week` (e.g. `2026-W36`), `product_name`, `category`, `revenue`, `units`.
 3. **Idempotency.** Recompute only the weeks touched by the batch and **overwrite just those
    partitions**, so a re-run is byte-identical and a late line corrects only its week.
@@ -57,7 +57,7 @@ governed by least-privilege grants, scheduled idempotently, and surfaced in Supe
    weekly revenue trend, top categories, and a week filter.
 
 ### Acceptance criteria
-- `iceberg.silver.orders` has **exactly one row per `(order_id, product_id)`** after any number of
+- `my.silver.orders` has **exactly one row per `(order_id, product_id)`** after any number of
   re-runs.
 - Injecting a **corrected line** and re-running updates that week's `revenue`/`units` in
   `gold.product_weekly` with **no duplicate `(iso_week, product_name)` rows**.
@@ -82,7 +82,7 @@ governed by least-privilege grants, scheduled idempotently, and surfaced in Supe
         # source still points back at tables (same as lesson {lesson:unit4/transform-silver.md})
         batch.localCheckpoint().createOrReplaceTempView("incoming")
         spark.sql("""
-          MERGE INTO iceberg.silver.orders t
+          MERGE INTO my.silver.orders t
           USING incoming s
           ON  t.order_id = s.order_id AND t.product_id = s.product_id
           WHEN MATCHED THEN UPDATE SET *      -- corrected/late line overwrites the row
@@ -97,7 +97,7 @@ governed by least-privilege grants, scheduled idempotently, and surfaced in Supe
         from pyspark.sql import functions as F
 
         weekly = (
-            spark.table("iceberg.silver.orders")
+            spark.table("my.silver.orders")
             .where(F.col("status") == "delivered")
             .withColumn("iso_week",
                 F.concat(F.year("order_date"), F.lit("-W"),
@@ -108,11 +108,11 @@ governed by least-privilege grants, scheduled idempotently, and surfaced in Supe
         )
 
         # first run creates the partitioned table…
-        weekly.writeTo("iceberg.gold.product_weekly").using("iceberg") \
+        weekly.writeTo("my.gold.product_weekly").using("iceberg") \
               .partitionedBy("iso_week").createOrReplace()
 
         # …subsequent runs recompute touched weeks and overwrite just those partitions:
-        # weekly_affected.writeTo("iceberg.gold.product_weekly").overwritePartitions()
+        # weekly_affected.writeTo("my.gold.product_weekly").overwritePartitions()
 
     `overwritePartitions()` rewrites only the ISO weeks present in the DataFrame — a late line for
     `2026-W35` recomputes only that week. Same input → same partition contents (idempotent), no

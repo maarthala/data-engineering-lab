@@ -1,5 +1,5 @@
 """JupyterHub (local stack + k8s): Keycloak login, one Jupyter container/pod per learner,
-and every learner's `iceberg` catalog pointed at their OWN Polaris lakehouse.
+and every learner's `my` (and `iceberg`) catalog pointed at their OWN Polaris lakehouse.
 
 Spawn hook (every server start): make sure <name>_lake exists (lakehouse.provision),
 give principal <name> a fresh random client secret (lakehouse.reset_secret) and hand it
@@ -140,7 +140,7 @@ async def pre_spawn(spawner):
         "GIT_AUTHOR_EMAIL": f"{spawner.user.name}@de.lan",
     })
     team = None
-    try:                                       # their team's lakehouse → `team` in Spark
+    try:                                       # their team's lakehouse → team_<team> in Spark
         team = team_of(name)
         spawner.environment["TEAM_CATALOG"] = team_catalog(team) if team else ""
         spawner.environment["TEAM_BUCKET"] = team_bucket(team) if team else ""

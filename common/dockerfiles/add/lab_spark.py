@@ -3,7 +3,8 @@ key_vault(): one of their secrets).
 
 Learner DAGs (synced from <user>-lake/dags/ by the "learners" bundle) run in the shared
 Airflow, which has no learner credentials. This helper gives a task the same Spark a notebook
-has: `iceberg` = the learner's own lakehouse (<user>_lake), `shared` = the course's shared lake.
+has: `my` = the learner's own lakehouse (<user>_lake), `shared` = the course's shared lake, and
+their team's lakehouse by its name, team_<team>.
 
     from airflow.sdk import dag, task
 
@@ -13,13 +14,13 @@ has: `iceberg` = the learner's own lakehouse (<user>_lake), `shared` = the cours
         def bronze():
             from lab_spark import lab_spark
             spark = lab_spark()                     # signs in as ravi
-            spark.sql("CREATE NAMESPACE IF NOT EXISTS iceberg.bronze")
+            spark.sql("CREATE NAMESPACE IF NOT EXISTS my.bronze")
             ...
 
 Who: the folder of the running DAG's file (learners/<user>/…), so a learner's DAG gets
 their own lakehouse. A TEAM's DAG (learners/team-<team>/…, from the team bucket) runs as the
-team: `iceberg` = the team's lakehouse team_<team>, login team_<team>_jobs — so it keeps
-working whoever is in the team. The login is a dedicated Polaris principal <user>_jobs holding the
+team (login team_<team>_jobs), so it keeps working whoever is in the team: it has team_<team>
+and `shared`, and no `my`. The login is a dedicated Polaris principal <user>_jobs holding the
 learner's own principal-role (so it can do what they can); it's created on first use and its
 secret kept in the Airflow Variable lab_jobs_<user>. (The learner's notebook login is
 re-keyed on every Jupyter start, so jobs need their own.)
@@ -111,9 +112,10 @@ def _jobs_storage_key(name):
 
 
 def lab_spark(user=None):
-    """Spark Connect session as <user>_jobs: iceberg = <user>_lake, shared = the course lake,
-    team = their team's lakehouse — and each of them by its real name too (as in SQLPad):
-    <user>_lake, polaris_lake, team_<team>."""
+    """Spark Connect session as <user>_jobs: my = <user>_lake, shared = the course lake, and
+    their team's lakehouse team_<team> — each also by its real name (as in SQLPad): <user>_lake,
+    polaris_lake. (`iceberg`, the default catalog, is my too — the older name.) In a team's DAG:
+    team_<team> and shared (iceberg = team_<team>)."""
     from pyspark.sql import SparkSession
     name, own, team = _whose(user)
     is_team = own == name
@@ -124,9 +126,9 @@ def lab_spark(user=None):
     conf = {k: v for k, v in spark.conf.getAll.items() if k == base or k.startswith(base + ".")}
     cats = [("iceberg", own), ("shared", lh.SHARED), (lh.SHARED, lh.SHARED)]
     if not is_team:
-        cats += [(own, own)]
+        cats += [("my", own), (own, own)]
     if team:
-        cats += [("team", lh.team_catalog(team)), (lh.team_catalog(team), lh.team_catalog(team))]
+        cats += [(lh.team_catalog(team), lh.team_catalog(team))]
     for cat, warehouse in cats:
         for k, v in conf.items():
             spark.conf.set(f"spark.sql.catalog.{cat}" + k[len(base):], v)
@@ -136,9 +138,9 @@ def lab_spark(user=None):
     key, secret = _jobs_storage_key(name)
     spark.conf.set("fs.s3a.access.key", key)
     spark.conf.set("fs.s3a.secret.key", secret)
-    print(f"lab_spark: " + (f"team {team} · iceberg = team = {own}" if is_team else
-          f"you are {name} · iceberg = {own}" + (f" · team = {lh.team_catalog(team)}" if team else ""))
-          + f" · shared = {lh.SHARED} (each also by its real name)")
+    print(f"lab_spark: " + (f"team {team} · {own}" if is_team else
+          f"you are {name} · my = {own}" + (f" · your team: {lh.team_catalog(team)}" if team else ""))
+          + f" · shared = {lh.SHARED}")
     return spark
 
 
@@ -219,7 +221,7 @@ def lab_dbt(command="build", project="shop", user=None):
         if not os.path.exists(os.path.join(tmp, "dbt_project.yml")):
             raise RuntimeError(f"no dbt project in {bucket}/{prefix} (save it in Jupyter's dbt/{project}/ folder)")
         print(f"lab_dbt: {'team ' + team if own == name else 'you are ' + name} · project dbt/{project}"
-              f" ({n} files) · iceberg = {own}")
+              f" ({n} files) · lakehouse {own}")
         env = {**os.environ, "SPARK_REMOTE": SPARK_REMOTE, "LAKE_WAREHOUSE": own,
                "LAKE_CREDENTIAL": _jobs_credential(name, team if own == name else None), "DBT_PROFILES_DIR": tmp,
                "DBT_SEND_ANONYMOUS_USAGE_STATS": "false", "DBT_USE_COLORS": "false"}
@@ -238,10 +240,13 @@ def _vault_fields(name, user, team=False):
     import labvault
     name_, own, t = _whose(user)
     if own == name_:                               # a team's DAG: always the team's folder
-        team = True
-    if team:                                       # the DAG owner's team: secret/<team>_team/
+        team = team or True
+    if team:                                       # team="sales" (or True: the owner's team)
         if not t:
             raise KeyError(f"{name_} is not in a team")
+        if team is not True and team != t:
+            raise PermissionError(f"{'this DAG belongs to' if own == name_ else name_ + ' is in'} the team {t}, "
+                                  f"not {team!r}")
         folder = labvault.team_folder(t)
     else:
         folder = name_
@@ -249,7 +254,7 @@ def _vault_fields(name, user, team=False):
     if d is None and not team:                     # not theirs — is it their team's?
         if t and labvault.fields(labvault.team_folder(t), name) is not None:
             raise KeyError(f"no secret {name!r} in {name_}'s folder — the team {t} has one: "
-                           f"key_vault({name!r}, team=True)")
+                           f"key_vault({name!r}, team={t!r})")
     if d is None:
         raise KeyError(f"no secret {name!r} in {folder} — add it on 🔑 My secrets{' → Team' if team else ''}")
     return d
@@ -264,7 +269,7 @@ def key_vault(name, field=None, user=None, team=False):
             from lab_spark import key_vault
             key = key_vault("WEATHER_API_KEY")
             pw = key_vault("db", "password")       # one field of a secret with several
-            tok = key_vault("API_TOKEN", team=True)  # one of the owner's TEAM's secrets
+            tok = key_vault("API_TOKEN", team="sales")  # one of the owner's team's secrets
 
     Whose: the running DAG's owner (as lab_spark), read with Airflow's vault login. Never logged.
     In a team's DAG: always the team's secrets."""
@@ -279,7 +284,7 @@ def key_vault(name, field=None, user=None, team=False):
 
 
 def key_vault_dict(name, user=None, team=False):
-    """Every field of one of the learner's (team=True: their team's) secrets as a dict."""
+    """Every field of one of the learner's (team="<team>": their team's) secrets as a dict."""
     return _vault_fields(name, user, team)
 
 

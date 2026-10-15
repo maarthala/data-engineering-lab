@@ -4,7 +4,7 @@
 **Gold** holds business-ready aggregates — the tables a dashboard or analyst queries directly.
 The beautiful part: **the SQL you learned in [Unit 2](../unit2/intro.md) works unchanged inside
 Spark.** `spark.sql("…")` runs the exact same `GROUP BY`, joins, and window functions you wrote
-for Trino — same `iceberg` catalog, same `silver.orders`, different engine.
+for Trino — same lakehouse, same `silver.orders`, different engine.
 
 ```mermaid
 flowchart LR
@@ -41,9 +41,9 @@ readable, so we lean on `spark.sql()` and reuse Unit {unit:unit2/intro.md}'s ski
 
 !!! note "`spark.sql()` — run SQL over the lakehouse from Python"
     `spark.sql("SELECT …")` hands a SQL string to Spark, which resolves table names against the
-    catalog (here `iceberg`), runs the query on the cluster, and hands back a **DataFrame** — a lazy
+    catalog (here `my`), runs the query on the cluster, and hands back a **DataFrame** — a lazy
     table you can keep chaining on or write out. It sees every table already registered in the
-    catalog, so `iceberg.silver.orders` is addressable with no extra setup. It is the exact same
+    catalog, so `my.silver.orders` is addressable with no extra setup. It is the exact same
     query text you'd paste into Trino; only the engine differs.
 
 ### Partitioning on write
@@ -52,7 +52,7 @@ so queries prune to just the periods they need. Iceberg does this with a *transf
 `partitioning.months("order_date")` — you keep the daily grain, but files are grouped by month.
 
 ## Lab
-Assume the `spark` session and a populated `iceberg.silver.orders` from
+Assume the `spark` session and a populated `my.silver.orders` from
 [4.3](transform-silver.md). Recall we treat **`status = 'delivered'`** as a completed sale.
 
 This first cell sets up the Gold schema and a small helper we'll reuse for every mart, so we only
@@ -61,14 +61,14 @@ write the "save it as an Iceberg table" logic once.
 ```python
 from pyspark.sql.functions import partitioning
 
-spark.sql("CREATE SCHEMA IF NOT EXISTS iceberg.gold")
+spark.sql("CREATE SCHEMA IF NOT EXISTS my.gold")
 
 def write_gold(df, table, partition=None):
-    w = df.writeTo(f"iceberg.gold.{table}").using("iceberg")
+    w = df.writeTo(f"my.gold.{table}").using("iceberg")
     if partition is not None:
         w = w.partitionedBy(partition)
     w.createOrReplace()
-    print("wrote iceberg.gold." + table)
+    print("wrote my.gold." + table)
 ```
 
 **Read it step by step:**
@@ -77,11 +77,11 @@ def write_gold(df, table, partition=None):
   (`years` / `months` / `days` / `hours` / `bucket`). We use it only for `partitioning.months(...)`;
   everything else is done in SQL strings. *(In Spark 3 these lived on `functions` as `F.months(...)`;
   they moved to this module in 4.0 — the old names still work but warn.)*
-- **`spark.sql("CREATE SCHEMA IF NOT EXISTS iceberg.gold")`** — creates the `gold` schema (a
-  namespace for tables) inside the `iceberg` catalog. `IF NOT EXISTS` makes it safe to re-run.
+- **`spark.sql("CREATE SCHEMA IF NOT EXISTS my.gold")`** — creates the `gold` schema (a
+  namespace for tables) inside the `my` catalog. `IF NOT EXISTS` makes it safe to re-run.
 - **`def write_gold(df, table, partition=None)`** — a helper that takes a DataFrame `df`, a target
   `table` name, and an optional `partition` transform.
-- **`df.writeTo(f"iceberg.gold.{table}").using("iceberg")`** — the DataFrame *writer*: it targets a
+- **`df.writeTo(f"my.gold.{table}").using("iceberg")`** — the DataFrame *writer*: it targets a
   fully-qualified table name in the Gold schema and declares Iceberg as the table format.
 - **`w.partitionedBy(partition)`** — only when a partition is given, tells Iceberg how to group the
   physical files on disk (see the partitioning note below).
@@ -106,7 +106,7 @@ daily = spark.sql("""
         count(DISTINCT order_id)  AS orders,
         sum(line_amount)          AS revenue,
         sum(quantity)             AS units
-    FROM iceberg.silver.orders
+    FROM my.silver.orders
     WHERE status = 'delivered'
     GROUP BY order_date
     ORDER BY order_date
@@ -118,7 +118,7 @@ write_gold(daily, "daily_sales", partition=partitioning.months("order_date"))
 
 - **`spark.sql("""…""")`** — the triple-quoted string is a multi-line SQL query; `spark.sql` runs it
   and returns the result as the `daily` DataFrame.
-- **`FROM iceberg.silver.orders`** — read the clean Silver table you built in [4.3](transform-silver.md).
+- **`FROM my.silver.orders`** — read the clean Silver table you built in [4.3](transform-silver.md).
 - **`WHERE status = 'delivered'`** — filter *rows* first: only completed sales count toward revenue.
 - **`GROUP BY order_date`** — bucket the surviving rows by day. This is what sets the grain: **one
   output row per date**.
@@ -129,7 +129,7 @@ write_gold(daily, "daily_sales", partition=partitioning.months("order_date"))
   matters: a single order can span several line-item rows, so plain `count(order_id)` would over-count.
 - **`ORDER BY order_date`** — sort the mart chronologically.
 - **`write_gold(daily, "daily_sales", partition=partitioning.months("order_date"))`** — save it as
-  `iceberg.gold.daily_sales`, partitioned by month.
+  `my.gold.daily_sales`, partitioned by month.
 
 !!! note "`partition=partitioning.months("order_date")` — keep the grain, group the files"
     The table still has one row per *day*, but Iceberg physically groups the files by *month*. When a
@@ -151,7 +151,7 @@ top = spark.sql("""
             category,
             sum(line_amount) AS revenue,
             sum(quantity)    AS units
-        FROM iceberg.silver.orders
+        FROM my.silver.orders
         WHERE status = 'delivered'
         GROUP BY product_id, product_name, category
     )
@@ -174,7 +174,7 @@ write_gold(top, "top_products")
   across all the product rows, orders them by revenue high-to-low, and stamps each one with its
   position (1 = top seller). The grain stays one row per product.
 - **`SELECT *`** — carry every column of `product_rev` through, then add the rank alongside.
-- **`write_gold(top, "top_products")`** — save as `iceberg.gold.top_products` (no partition — it's a
+- **`write_gold(top, "top_products")`** — save as `my.gold.top_products` (no partition — it's a
   small ranked list, so partitioning wouldn't help).
 
 !!! info "`GROUP BY` vs a window function"
@@ -198,7 +198,7 @@ ltv = spark.sql("""
         sum(line_amount)          AS lifetime_value,
         min(order_date)           AS first_order,
         max(order_date)           AS last_order
-    FROM iceberg.silver.orders
+    FROM my.silver.orders
     WHERE status = 'delivered'
     GROUP BY customer_id, customer_name, country
 """)
@@ -216,14 +216,14 @@ write_gold(ltv, "customer_ltv")
 - **`min(order_date) AS first_order`** and **`max(order_date) AS last_order`** — `min`/`max` are
   aggregates too: the earliest and latest dates in the group tell you when they joined and whether
   they're still active.
-- **`write_gold(ltv, "customer_ltv")`** — save as `iceberg.gold.customer_ltv`.
+- **`write_gold(ltv, "customer_ltv")`** — save as `my.gold.customer_ltv`.
 
 Verify the marts — again, plain SQL over the lakehouse:
 
 ```python
-spark.sql("SELECT * FROM iceberg.gold.daily_sales ORDER BY order_date DESC LIMIT 7").show()
-spark.sql("SELECT * FROM iceberg.gold.top_products WHERE revenue_rank <= 10").show()
-spark.sql("SELECT * FROM iceberg.gold.customer_ltv ORDER BY lifetime_value DESC LIMIT 10").show()
+spark.sql("SELECT * FROM my.gold.daily_sales ORDER BY order_date DESC LIMIT 7").show()
+spark.sql("SELECT * FROM my.gold.top_products WHERE revenue_rank <= 10").show()
+spark.sql("SELECT * FROM my.gold.customer_ltv ORDER BY lifetime_value DESC LIMIT 10").show()
 ```
 
 **Read it step by step:**
@@ -236,8 +236,8 @@ spark.sql("SELECT * FROM iceberg.gold.customer_ltv ORDER BY lifetime_value DESC 
 - **`.show()`** — prints the DataFrame as a table in the notebook. (`spark.sql` returns a DataFrame;
   `.show()` is what actually displays it.)
 
-Because it's the shared `iceberg` catalog, the **same** `gold.*` tables are now readable from
-**Trino** (Unit {unit:unit2/intro.md}) as `iceberg.gold.*` — one write, two query engines.
+Because it's one catalog in Polaris, the **same** `gold.*` tables are now readable from
+**Trino** (Unit {unit:unit2/intro.md}) as `demouser_lake.gold.*` — one write, two query engines.
 
 ## Challenge
 Build **`gold.monthly_country_sales`**: revenue and distinct-customer count **per month per
@@ -253,7 +253,7 @@ country**, for delivered orders only, sorted by month then revenue. Use `spark.s
             sum(line_amount)                    AS revenue,
             count(DISTINCT customer_id)         AS customers,
             count(DISTINCT order_id)            AS orders
-        FROM iceberg.silver.orders
+        FROM my.silver.orders
         WHERE status = 'delivered'
         GROUP BY date_format(order_date, 'yyyy-MM'), country
         ORDER BY month, revenue DESC
@@ -291,7 +291,7 @@ country**, for delivered orders only, sorted by month then revenue. Use `spark.s
 | **`createOrReplace()`** | Write the DataFrame as an Iceberg table, replacing any prior version (idempotent) |
 | **`partitionedBy(partitioning.months(…))`** | Iceberg transform partitioning for pruned reads |
 | **Window function** | Compute across related rows without collapsing (from [2.3](../unit2/window-functions.md)) |
-| **Shared catalog** | Spark writes `iceberg.gold.*`; Trino reads the same tables |
+| **Shared catalog** | Spark writes `my.gold.*`; Trino reads the same tables as `demouser_lake.gold.*` |
 
 ## You can now…
 - Reuse Unit {unit:unit2/intro.md} SQL inside Spark via `spark.sql()` over the lakehouse catalog

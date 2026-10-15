@@ -46,12 +46,12 @@ flowchart LR
 ```
 
 ## Lab
-Assume the `spark` session and populated `iceberg.bronze.*` from [4.2](read-bronze.md).
+Assume the `spark` session and populated `my.bronze.*` from [4.2](read-bronze.md).
 
 ```python
 from pyspark.sql import functions as F
 
-spark.sql("CREATE SCHEMA IF NOT EXISTS iceberg.silver")
+spark.sql("CREATE SCHEMA IF NOT EXISTS my.silver")
 ```
 
 **Read it step by step:**
@@ -59,8 +59,8 @@ spark.sql("CREATE SCHEMA IF NOT EXISTS iceberg.silver")
 - **`from pyspark.sql import functions as F`** — imports Spark's column-function library under
   the short alias `F`. Everything like `F.col(...)`, `F.to_date(...)`, `F.desc(...)` comes from
   here. Importing it as `F` is the universal PySpark convention.
-- **`spark.sql("CREATE SCHEMA IF NOT EXISTS iceberg.silver")`** — makes the `silver` schema
-  (namespace) inside the `iceberg` catalog if it doesn't already exist, so our tables have a home.
+- **`spark.sql("CREATE SCHEMA IF NOT EXISTS my.silver")`** — makes the `silver` schema
+  (namespace) inside the `my` catalog if it doesn't already exist, so our tables have a home.
   `IF NOT EXISTS` makes the cell safe to re-run.
 
 ### 1–3: clean types, nulls, duplicates
@@ -69,22 +69,22 @@ Remember the real schema (from the [schema page](../unit0/schema.md)): `orders` 
 
 ```python
 orders = (
-    spark.table("iceberg.bronze.orders")
+    spark.table("my.bronze.orders")
     .withColumn("order_date", F.to_date("order_ts"))              # derive a clean date
     .filter(F.col("order_id").isNotNull() & F.col("customer_id").isNotNull())
     .dropDuplicates(["order_id"])                                 # dedup on key
 )
 
 items = (
-    spark.table("iceberg.bronze.order_items")
+    spark.table("my.bronze.order_items")
     .withColumn("quantity", F.col("quantity").cast("int"))
     .withColumn("unit_price", F.col("unit_price").cast("decimal(12,2)"))
     .filter(F.col("order_id").isNotNull() & F.col("product_id").isNotNull())
     .dropDuplicates(["order_id", "product_id"])
 )
 
-customers = spark.table("iceberg.bronze.customers").dropDuplicates(["customer_id"])
-products  = spark.table("iceberg.bronze.products").dropDuplicates(["product_id"])
+customers = spark.table("my.bronze.customers").dropDuplicates(["customer_id"])
+products  = spark.table("my.bronze.products").dropDuplicates(["product_id"])
 ```
 
 This one cell does cleaning jobs 1–3 on all four Bronze tables. Notice the shape: each table is
@@ -94,7 +94,7 @@ on the way.
 
 **Read it step by step — `orders`:**
 
-- **`spark.table("iceberg.bronze.orders")`** — loads the Bronze `orders` table as a DataFrame
+- **`spark.table("my.bronze.orders")`** — loads the Bronze `orders` table as a DataFrame
   (a table-shaped, distributed dataset) to transform.
 - **`.withColumn("order_date", F.to_date("order_ts"))`** — **`withColumn`** adds (or replaces) a
   column. **`F.to_date`** strips the time-of-day off the `order_ts` *timestamp*, leaving a clean
@@ -206,13 +206,13 @@ Silver is only a *recipe* until we persist it. We now materialize it as a real, 
 table so Gold, Trino, and every other tool can read the single source of truth.
 
 ```python
-silver.writeTo("iceberg.silver.orders").using("iceberg").createOrReplace()
-print("rows:", spark.table("iceberg.silver.orders").count())
+silver.writeTo("my.silver.orders").using("iceberg").createOrReplace()
+print("rows:", spark.table("my.silver.orders").count())
 ```
 
 **Read it step by step:**
 
-- **`silver.writeTo("iceberg.silver.orders")`** — **`writeTo`** is the DataFrameWriterV2 entry
+- **`silver.writeTo("my.silver.orders")`** — **`writeTo`** is the DataFrameWriterV2 entry
   point that targets a catalog table by name (`catalog.schema.table`).
 - **`.using("iceberg")`** — store it in the **Iceberg** table format (the governed lakehouse
   format that gives us schema tracking, snapshots, and `MERGE` support).
@@ -236,7 +236,7 @@ incoming = (
 incoming.localCheckpoint().createOrReplaceTempView("incoming_orders")
 
 spark.sql("""
-MERGE INTO iceberg.silver.orders AS t
+MERGE INTO my.silver.orders AS t
 USING incoming_orders AS s
 ON t.order_id = s.order_id AND t.product_id = s.product_id
 WHEN MATCHED THEN UPDATE SET *
@@ -253,11 +253,11 @@ WHEN NOT MATCHED THEN INSERT *
 - **`incoming.localCheckpoint().createOrReplaceTempView("incoming_orders")`** — register the small
   batch as a named temporary view so we can name it inside SQL. A temp view is a query-able alias that
   lives only in this Spark session; nothing is written to disk. **`.localCheckpoint()`** first takes a
-  snapshot of the batch's rows: the batch is computed from `iceberg.silver.orders` itself, and Spark
+  snapshot of the batch's rows: the batch is computed from `my.silver.orders` itself, and Spark
   4.1 can't plan a `MERGE` whose source still points back at tables (*"No plan for
   TableReference…"*) — a snapshot also guarantees the source can't change while the merge rewrites
   the very table it was read from.
-- **`MERGE INTO iceberg.silver.orders AS t USING incoming_orders AS s`** — **`MERGE`** (the upsert
+- **`MERGE INTO my.silver.orders AS t USING incoming_orders AS s`** — **`MERGE`** (the upsert
   from [2.8](../unit2/merge.md)) compares a **target** table `t` against a **source** batch `s` and
   applies inserts/updates in *one* transaction.
 - **`ON t.order_id = s.order_id AND t.product_id = s.product_id`** — match on the Silver **grain
@@ -289,7 +289,7 @@ country. Rebuild `silver.orders` with the new `is_suspect` column.
         .orderBy(F.desc("count")).show())
 
     # rewrite Silver with the new column (createOrReplace handles the schema change)
-    silver_q.writeTo("iceberg.silver.orders").using("iceberg").createOrReplace()
+    silver_q.writeTo("my.silver.orders").using("iceberg").createOrReplace()
     ```
     **Read it step by step:**
 

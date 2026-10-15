@@ -41,7 +41,7 @@ open — Superset, Airflow, SQLPad — keeps its own session until you log out t
 | 🧪 Sample table | `<you>_lake.bronze.sample_orders` | 1,000 ShopFlow orders, ready to query from day one (SQLPad, Trino, Superset, `%%sql`) |
 | 📄 Practice files | `files/source/shopflow/*.csv` | small, messy customers / orders / products CSVs to load and clean |
 | 🪣 Bucket | `<you>-lake` | your own object storage (RustFS, **100 MB** limit) — your files, notebooks and DAGs |
-| 📓 Jupyter | your own server | your notebooks, with `spark` ready and `iceberg` = your lakehouse |
+| 📓 Jupyter | your own server | your notebooks, with `spark` ready and `my` = your lakehouse |
 | 🧰 SQLPad user | `<you>` | your saved queries |
 | 👥 Team | `general` at first | the team you work in, and its lakehouse `team_<team>` — see [Your team](#your-team) |
 
@@ -57,21 +57,26 @@ with the ready-made ShopFlow tables such as `gold.daily_sales`):
 
 Every lake has a **real name** that works in every tool — `<you>_lake` (yours), `polaris_lake`
 (the course's shared lake) and `team_<team>` (your team's, see [Your team](#your-team)). Jupyter adds
-**short names** on top, which the lessons use:
+two **short names** on top, for the two lakes that are always the same for you; the lessons use them:
 
-| Lake | Real name — Jupyter, SQLPad, Superset | Short name — Jupyter only | `iceberg.…` in SQLPad / Superset |
-|---|---|---|---|
-| **yours** | `<you>_lake.…`, e.g. `demouser_lake.bronze.sample_orders` | `iceberg.…` | — |
-| the **shared** lake | `polaris_lake.…`, e.g. `polaris_lake.gold.daily_sales` | `shared.…` | the shared lake |
-| your **team's** | `team_<team>.…`, e.g. `team_sales.bronze.customers` | `team.…` | — |
+| Lake | Real name — Jupyter, SQLPad, Superset | Short name — Jupyter and DAGs |
+|---|---|---|
+| **yours** | `<you>_lake.…`, e.g. `demouser_lake.bronze.sample_orders` | **`my.…`** |
+| the **shared** lake | `polaris_lake.…`, e.g. `polaris_lake.gold.daily_sales` | **`shared.…`** |
+| your **team's** | `team_<team>.…`, e.g. `team_sales.bronze.customers` | — (by its name) |
 
-So a query that uses real names runs unchanged in Jupyter and in SQLPad. Watch out for `iceberg`:
-in Jupyter it is **your** lakehouse, in SQLPad and Superset the **shared** lake.
+A team's lakehouse has no short name: it goes by its name, so it stays clear which team you mean.
+Other catalogs (ones you create on **My catalogs**, or that others share with you) also go by their
+name. A query that uses real names runs unchanged in Jupyter and in SQLPad. In SQLPad and Superset
+you may also see a catalog called `iceberg`: there it is the **shared** lake.
 
-Jupyter's first cell lists the real names it set up:
+Jupyter's first cell says what it set up:
 
 ```text
-✓ also by name, as in SQLPad: demouser_lake, team_sales, polaris_lake
+✓ you are demouser · my = your lakehouse (demouser_lake) — e.g. my.bronze.orders
+✓ shared = the course's shared lake (read-only) — e.g. shared.gold.daily_sales
+✓ your team sales: team_sales — e.g. team_sales.bronze.customers
+✓ also by name, as in SQLPad: demouser_lake, polaris_lake, team_sales
 ```
 
 ```sql
@@ -82,7 +87,7 @@ SELECT * FROM shared.gold.daily_sales LIMIT 10   -- the course's ready-made Gold
 (*Table not found*? The shared lake hasn't been filled yet — whoever runs the stack starts the
 `shopflow_medallion` DAG once, see [0.2](deploy.md#fill-the-shared-lake-once).)
 
-So in Jupyter, the Unit {unit:unit4/fundamentals.md} lessons build `iceberg.bronze/silver/gold` **in your own lakehouse** —
+So in Jupyter, the Unit {unit:unit4/fundamentals.md} lessons build `my.bronze/silver/gold` **in your own lakehouse** —
 nobody else's tables get in your way, and you can't break theirs.
 
 !!! tip "Another catalog in Spark"
@@ -163,30 +168,28 @@ has its own lakehouse, **`team_<team>`**, with `bronze` / `silver` / `gold`, and
 team reads and writes it**. Your own lakehouse stays yours; the team's is where you put tables the
 whole team works on. The top bar shows it: *"· team: sales (team_sales)"*.
 
-For a walk-through of one job done as a team (file, notebook, secret, DAG, SQLPad), see
-[Working in a team](teams.md).
+For a short overview of everything a team shares, see [Working in a team](teams.md).
 
-| Where you run it | Your team's lakehouse is |
-|---|---|
-| **Jupyter / Spark** (`spark.sql`, `%%sql`) | `team_sales.…` (its real name) or the short `team.…`, e.g. `team.bronze.customers` |
-| **SQLPad, Superset** | `team_sales.…`, e.g. `team_sales.bronze.customers` |
+The team's lakehouse goes by its name **everywhere** — Jupyter, DAGs, SQLPad and Superset:
+`team_sales.…`, e.g. `team_sales.bronze.customers`. (No short name like `my`: the name says which
+team you mean.)
 
 In SQLPad you also get a second connection, **Team sales (Trino) — <you>**: pick it and the schema
 browser on the left shows the team's `bronze` / `silver` / `gold` and their tables (SQLPad browses
 one catalog per connection — **Lakehouse (Trino) — <you>** shows yours). Both connections run your
 queries as you, so both reach both lakes by name.
 
-Jupyter sets up `team` when your server starts and says so in the first cell's output:
+Jupyter sets it up when your server starts and says so in the first cell's output:
 
 ```text
-✓ team = your team's lakehouse (team_sales) — e.g. team.bronze.customers
+✓ your team sales: team_sales — e.g. team_sales.bronze.customers
 ```
 
 Make a table there and your teammates see it straight away:
 
 ```python
-df.writeTo("team.bronze.customers").createOrReplace()
-spark.sql("SELECT * FROM team.bronze.customers ORDER BY id").show()
+df.writeTo("team_sales.bronze.customers").createOrReplace()
+spark.sql("SELECT * FROM team_sales.bronze.customers ORDER BY id").show()
 ```
 ```text
 +---+--------+-------+
@@ -196,9 +199,6 @@ spark.sql("SELECT * FROM team.bronze.customers ORDER BY id").show()
 |  2|Surendra|     FI|
 +---+--------+-------+
 ```
-
-- **`team`** — like `iceberg` (your lakehouse) and `shared` (the course's lake), a name Jupyter
-  gives a catalog; behind it is `team_<team>` in Polaris.
 
 The team also has a **bucket**, `team-<team>-lake` (limit **500 MB**): files everyone in the team
 sees, uploads and changes. Open it with **📁 My files → 👥 Team** (or **🪣 Mine** for your own
@@ -234,9 +234,10 @@ spark.read.option("header", True).csv("s3a://team-sales-lake/files/source/custom
 for **everyone in the team**: each of you can open it, switch it on and trigger it. Its `dag_id`
 must start with **`team_<team>_`**, e.g. `team_sales_daily` (one Airflow for the whole lab, so the
 prefix keeps names apart). In its tasks, `lab_spark()` works **as the team**, not as whoever
-pressed ▶: `iceberg` and `team` are both the team's lakehouse, so the DAG keeps working when people
-join or leave. `key_vault("NAME")` reads the team's secrets, and `lab_dbt()` and `run_notebook()`
-use the team's `dbt/` and `notebooks/`.
+pressed ▶, so the DAG keeps working when people join or leave. It reaches the team's lakehouse
+by its name, `team_sales.…`, and `shared`; there is no `my` in a team DAG (it isn't anyone's).
+`key_vault("NAME")` reads the team's secrets, and `lab_dbt()` and `run_notebook()` use the team's
+`dbt/` and `notebooks/`.
 
 ```python
 from datetime import datetime
@@ -249,7 +250,7 @@ def team_sales_check():
     def run():
         from lab_spark import lab_spark
         spark = lab_spark()
-        spark.sql("CREATE TABLE IF NOT EXISTS iceberg.bronze.dag_check AS SELECT 1 AS id")
+        spark.sql("CREATE TABLE IF NOT EXISTS team_sales.bronze.dag_check AS SELECT 1 AS id")
         print("rows:", spark.sql("SELECT count(*) FROM team_sales.bronze.dag_check").collect()[0][0])
     run()
 
@@ -260,7 +261,7 @@ team_sales_check()
 The task's log:
 
 ```text
-lab_spark: team sales · iceberg = team = team_sales · shared = polaris_lake (each also by its real name)
+lab_spark: team sales · team_sales · shared = polaris_lake
 rows: 1
 ```
 
@@ -372,12 +373,12 @@ the team reads and changes it, nobody else. A key the whole team uses — the AP
 supplier, the password of a shared database — goes there once, instead of everyone keeping a copy.
 
 - **🔑 My secrets → 👥 Team** shows and saves them, like your own (values stay hidden).
-- In a notebook or a DAG, add **`team=True`**:
+- In a notebook or a DAG, add **`team="<team>"`**, the team's name:
 
 ```python
-key_vault_set("API_TOKEN", "abc123", team=True)    # save one for the team
-key_vault_list(team=True)                           # the team's secret names
-token = key_vault("API_TOKEN", team=True)           # read it — in a DAG: from lab_spark import key_vault
+key_vault_set("API_TOKEN", "abc123", team="sales")    # save one for the team
+key_vault_list(team="sales")                           # the team's secret names
+token = key_vault("API_TOKEN", team="sales")           # read it — in a DAG: from lab_spark import key_vault
 ```
 ```text
 ✓ team secret API_TOKEN saved
@@ -386,6 +387,8 @@ token = key_vault("API_TOKEN", team=True)           # read it — in a DAG: from
 
 - In the vault's own UI the team folder sits next to yours (*Open the key vault* on the Team
   view goes straight there).
+- A team you aren't in is refused: *"you are not in the team 'general' — yours: sales"*. (In a
+  team's own DAG, `key_vault("NAME")` reads that team's secrets without `team=`.)
 - If a manager moves you to another team, the old team's secrets stop working for you at once;
   restart your server to reach the new team's.
 
@@ -419,9 +422,9 @@ signs up, off otherwise).
 
 ## You can now…
 - Register, sign in once and reach every tool with your lab account
-- Tell your own lakehouse (`iceberg` in Jupyter) from the shared lake (`shared` in Jupyter, `iceberg` in Trino)
+- Tell your own lakehouse (`my` in Jupyter, `<you>_lake` in SQLPad) from the shared lake (`shared` in Jupyter, `iceberg` / `polaris_lake` in SQLPad)
 - Keep notebooks and DAGs in `my_files/notebooks/` and `my_files/dags/`, and name DAGs `<you>_…`
-- Work in your team's lakehouse (`team` in Jupyter, `team_<team>` in SQLPad)
+- Work in your team's lakehouse, `team_<team>` (in every tool)
 - Create a catalog and share a namespace or table with another member
-- Keep keys and passwords in **My secrets** (the key vault) and read them with `key_vault()` — the team's with `team=True`
+- Keep keys and passwords in **My secrets** (the key vault) and read them with `key_vault()` — the team's with `team="<team>"`
 - Know when to ask a manager for a lakehouse reset or a full wipe

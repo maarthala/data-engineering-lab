@@ -218,7 +218,7 @@ dataset.to_table(filter=ds.field("country") == "US",
     PyArrow here, Spark, or Trino.
 
 !!! tip "Why this matters for the lakehouse"
-    Every Parquet file in `iceberg.bronze/silver/gold` (Unit {unit:unit4/fundamentals.md}) is Arrow-on-disk. When Spark does
+    Every Parquet file in `my.bronze/silver/gold` (Unit {unit:unit4/fundamentals.md}) is Arrow-on-disk. When Spark does
     `.toPandas()` or Trino returns rows to the Python client, Arrow is the wire format. Learning
     it explains *why* columnar + partition pruning make the whole lakehouse fast.
 

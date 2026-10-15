@@ -67,7 +67,7 @@ Tables are registered in the **Apache Polaris** catalog service. You work with t
 
 | Catalog | In a notebook | In Trino / SQLPad / Superset | What it is |
 |---|---|---|---|
-| **Your lakehouse** | `iceberg` | `demouser_lake` | yours — starts with empty `bronze` / `silver` / `gold` plus `bronze.sample_orders`; **you** build the medallion here |
+| **Your lakehouse** | `my` | `demouser_lake` | yours — starts with empty `bronze` / `silver` / `gold` plus `bronze.sample_orders`; **you** build the medallion here |
 | **The course lake** | `shared` | `iceberg` | ready-made ShopFlow tables, read-only |
 
 | Namespace | Holds | Example tables |
@@ -81,14 +81,14 @@ Units {unit:unit4/fundamentals.md}–5. List what's there any time:
 
 ```sql
 %%sql
-SHOW TABLES IN iceberg.bronze
+SHOW TABLES IN my.bronze
 ```
 ```sql
 %%sql
 SHOW TABLES IN shared.gold
 ```
 
-**Reach it:** SQL (`%%sql` / Trino), Spark (`spark.table("iceberg.gold.daily_sales")`), Superset
+**Reach it:** SQL (`%%sql` / Trino), Spark (`spark.table("shared.gold.daily_sales")`), Superset
 dashboards, and the Polaris Console — one governed copy, every engine.
 
 ## The whole picture
@@ -98,7 +98,7 @@ dashboards, and the Polaris Console — one governed copy, every engine.
 | **Postgres** (`shopflow`) | live OLTP source — 12 tables | Trino `shopflow.*`, JDBC |
 | **RustFS** `demouser-lake/files/source` | practice files + raw history you export | `s3a://…` in Spark, My files |
 | **RustFS** `demouser-lake/tables` | your catalog's table files | via the catalog (not by path) |
-| **Your lakehouse** (Polaris) | *your* Bronze/Silver/Gold tables | `iceberg.*` in notebooks, `demouser_lake.*` in Trino |
+| **Your lakehouse** (Polaris) | *your* Bronze/Silver/Gold tables | `my.*` in notebooks, `demouser_lake.*` in Trino |
 | **Course lake** (Polaris) | ready-made ShopFlow tables | `shared.*` in notebooks, `iceberg.*` in Trino |
 
 **The flow:** raw data starts in **Postgres** (live) and **files** in your bucket → your pipeline
@@ -108,4 +108,4 @@ the Gold tables for analytics.
 ## You can now…
 - Name the **three** places data lives (Postgres, your RustFS bucket, the catalogs) and what each holds
 - Tell **source** data (Postgres, raw history) from **refined** data (Bronze/Silver/Gold tables)
-- Pick the right access path for each — Trino `shopflow.*`, `s3a://…`, `iceberg.*` / `shared.*` in notebooks
+- Pick the right access path for each — Trino `shopflow.*`, `s3a://…`, `my.*` / `shared.*` in notebooks

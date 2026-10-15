@@ -444,7 +444,7 @@ In the Grid, click the `extract` square → **XCom** tab to see the stored value
 !!! warning "XCom is for small values — never for data"
     XCom lives in Airflow's own database. Pass **small** things: a count, a date, a **table name**,
     a **file path**. Never a DataFrame or thousands of rows. For real data, the first task
-    **writes a table** (e.g. `iceberg.bronze.orders`) and returns its **name**; the next task reads
+    **writes a table** (e.g. `my.bronze.orders`) and returns its **name**; the next task reads
     the table.
 
 ### 5. Conditional flow (branching)

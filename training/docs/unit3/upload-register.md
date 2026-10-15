@@ -3,9 +3,9 @@
 ## Concept
 A very common real task: someone hands you a file, you drop it in the **data lake** (RustFS), then
 make it a **catalog table** so everyone can query it in SQL and Spark — governed, shared, and
-addressable as `iceberg.<namespace>.<table>`.
+addressable as `my.<namespace>.<table>`.
 
-Three moves: **upload → read → register**. Then it's a first-class table in the `iceberg` catalog —
+Three moves: **upload → read → register**. Then it's a first-class table in the `my` catalog —
 your own lakehouse — visible to your notebooks (SQL and Spark) and the Polaris Console.
 
 > This is the ad-hoc *"someone handed me a file"* version. Ingesting ShopFlow's own sources
@@ -48,16 +48,16 @@ For Parquet it's just `spark.read.parquet("s3a://demouser-lake/files/source/uplo
 options needed).
 
 ### 3 · Register it as a catalog table
-Write the DataFrame into the governed **`iceberg`** catalog. Pick (or create) a namespace, then
+Write the DataFrame into the governed **`my`** catalog. Pick (or create) a namespace, then
 create the table:
 
 ```python
-spark.sql("CREATE NAMESPACE IF NOT EXISTS iceberg.bronze")
+spark.sql("CREATE NAMESPACE IF NOT EXISTS my.bronze")
 
-df.writeTo("iceberg.bronze.customers_upload").createOrReplace()
+df.writeTo("my.bronze.customers_upload").createOrReplace()
 ```
 
-- **`writeTo("iceberg.bronze.customers_upload")`** — target table in `iceberg` → namespace `bronze`.
+- **`writeTo("my.bronze.customers_upload")`** — target table in `my` → namespace `bronze`.
 - **`.createOrReplace()`** — create it (or replace if re-running). The data is written as Iceberg
   files in RustFS and the table is registered in Polaris.
 
@@ -68,7 +68,7 @@ You can register the file without the DataFrame step, but there's a trap. The ob
 ```sql
 %%sql
 -- DON'T: the csv.`path` shorthand accepts NO options, so it can't set header=true
-CREATE TABLE iceberg.bronze.customers_upload USING iceberg AS
+CREATE TABLE my.bronze.customers_upload USING iceberg AS
 SELECT * FROM csv.`s3a://demouser-lake/files/source/uploads/customers.csv`
 ```
 Because that shorthand can't be told that row 1 is a header, you get generic columns
@@ -90,7 +90,7 @@ OPTIONS (path 's3a://demouser-lake/files/source/uploads/customers.csv', header '
 ```
 ```sql
 %%sql
-CREATE TABLE iceberg.bronze.customers_upload USING iceberg AS
+CREATE TABLE my.bronze.customers_upload USING iceberg AS
 SELECT * FROM customers_raw
 ```
 Now the columns take their **names from the header** (`id`, `name`, `country`) with inferred types —
@@ -117,11 +117,11 @@ It's now a normal catalog table. Query it any way:
 
 ```sql
 %%sql
-SELECT * FROM iceberg.bronze.customers_upload LIMIT 10
+SELECT * FROM my.bronze.customers_upload LIMIT 10
 ```
 
 ```python
-df = spark.table("iceberg.bronze.customers_upload")   # or spark.sql("SELECT ...")
+df = spark.table("my.bronze.customers_upload")   # or spark.sql("SELECT ...")
 df.count()
 ```
 
@@ -129,14 +129,14 @@ The same table is now visible in the **Polaris Console** (your lakehouse `<usern
 every Spark session that signs in as you — one governed copy.
 
 #### From SQLPad (Trino)
-SQLPad reaches the same table by your lakehouse's **real name**, **`<username>_lake`**. `iceberg`
+SQLPad reaches the same table by your lakehouse's **real name**, **`<username>_lake`**. `my`
 is a short name only Jupyter knows — in SQLPad (and Superset) `iceberg` is the course's **shared**
 lake ([0.3](../setup/workspace.md)). The real name works in Jupyter too, so a query written with it
 runs in both:
 
 | Where | The table is |
 |---|---|
-| Jupyter (`%%sql`, `spark.table`) | `iceberg.bronze.customers_upload` or `demouser_lake.bronze.customers_upload` |
+| Jupyter (`%%sql`, `spark.table`) | `my.bronze.customers_upload` or `demouser_lake.bronze.customers_upload` |
 | SQLPad, Superset | `demouser_lake.bronze.customers_upload` |
 
 Open SQLPad, pick the connection **Lakehouse (Trino) — demouser** (your own username), and run:
@@ -202,6 +202,6 @@ pattern; only the storage URL and catalog name change.
 ## You can now…
 - Upload a file to the data lake via the RustFS console
 - Read a CSV/Parquet from `s3a://…` in a notebook
-- **Register** it as a governed `iceberg` catalog table (`writeTo().createOrReplace()` or `CREATE TABLE AS`)
+- **Register** it as a governed `my` catalog table (`writeTo().createOrReplace()` or `CREATE TABLE AS`)
 - In SQL-only mode, get **column names right** with `CREATE TEMPORARY VIEW … USING csv OPTIONS (header 'true', …)` — or declare an explicit schema — instead of the header-losing `csv.<path>` shorthand
 - Query it from SQL and Spark, and from **SQLPad** as `<username>_lake.bronze.…` (select *and* update) — and know when a **temp view** is enough instead

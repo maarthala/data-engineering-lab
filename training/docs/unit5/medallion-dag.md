@@ -41,7 +41,7 @@ The plan for this lesson is one **task per layer** and one arrow between them �
 !!! info "Where does the Spark work run? — `lab_spark()`"
     A task is plain Python running inside Airflow — but the data work is Spark, and Spark runs on
     the lab's **Spark cluster**, not inside Airflow. Each task calls **`lab_spark()`**, which opens
-    a Spark session on the cluster **signed in as you**: exactly like your notebook, `iceberg` is
+    a Spark session on the cluster **signed in as you**: exactly like your notebook, `my` is
     **your own lakehouse** (`demouser_lake`) and `shared` is the course lake. So the tables this
     DAG writes are the same ones you built by hand in Unit {unit:unit4/fundamentals.md}.
 
@@ -76,8 +76,8 @@ def medallion():
         spark = lab_spark()                                    # signed in as you
         for t in ["customers", "products", "orders", "order_items"]:
             (spark.read.format("jdbc").options(**PG, dbtable=t).load()
-                  .writeTo(f"iceberg.bronze.{t}").createOrReplace())
-            print("bronze", t, spark.table(f"iceberg.bronze.{t}").count())
+                  .writeTo(f"my.bronze.{t}").createOrReplace())
+            print("bronze", t, spark.table(f"my.bronze.{t}").count())
 
     @task
     def silver():
@@ -85,12 +85,12 @@ def medallion():
         from lab_spark import lab_spark
         from pyspark.sql import functions as F
         spark = lab_spark()
-        o = (spark.table("iceberg.bronze.orders")
+        o = (spark.table("my.bronze.orders")
              .withColumn("order_date", F.to_date("order_ts"))
              .dropDuplicates(["order_id"]))
-        i = spark.table("iceberg.bronze.order_items").dropDuplicates(["order_id", "product_id"])
-        c = spark.table("iceberg.bronze.customers")
-        p = spark.table("iceberg.bronze.products")
+        i = spark.table("my.bronze.order_items").dropDuplicates(["order_id", "product_id"])
+        c = spark.table("my.bronze.customers")
+        p = spark.table("my.bronze.products")
         silver = (i.join(o, "order_id").join(c, "customer_id", "left").join(p, "product_id", "left")
                   .select("order_id", "order_date", "customer_id",
                           F.col("full_name").alias("customer_name"), "country", "channel",
@@ -98,8 +98,8 @@ def medallion():
                           "quantity", i["unit_price"],
                           (i["quantity"] * i["unit_price"]).cast("decimal(12,2)").alias("line_amount"),
                           "status"))
-        silver.writeTo("iceberg.silver.orders").createOrReplace()
-        print("silver.orders", spark.table("iceberg.silver.orders").count())
+        silver.writeTo("my.silver.orders").createOrReplace()
+        print("silver.orders", spark.table("my.silver.orders").count())
 
     @task
     def gold():
@@ -107,13 +107,13 @@ def medallion():
         from lab_spark import lab_spark
         spark = lab_spark()
         spark.sql("""
-            CREATE OR REPLACE TABLE iceberg.gold.daily_sales AS
+            CREATE OR REPLACE TABLE my.gold.daily_sales AS
             SELECT order_date, count(DISTINCT order_id) AS orders,
                    sum(line_amount) AS revenue, sum(quantity) AS units
-            FROM iceberg.silver.orders
+            FROM my.silver.orders
             WHERE status = 'delivered'
             GROUP BY order_date""")
-        print("gold.daily_sales", spark.table("iceberg.gold.daily_sales").count())
+        print("gold.daily_sales", spark.table("my.gold.daily_sales").count())
 
     bronze() >> silver() >> gold()
 
@@ -133,7 +133,7 @@ medallion()
   session as you. The import sits *inside* the function so Airflow can read the DAG file quickly
   without starting Spark.
 - **`bronze`** — reads the four ShopFlow tables from Postgres over **JDBC** (the `PG` settings) and
-  writes each one to `iceberg.bronze.<table>` with **`createOrReplace()`** — a full reload, safe to
+  writes each one to `my.bronze.<table>` with **`createOrReplace()`** — a full reload, safe to
   re-run ([4.2](../unit4/read-bronze.md)).
 - **`silver`** — joins order lines with their order, customer and product, renames columns and
   computes `line_amount` — the Silver table from [4.3](../unit4/transform-silver.md).
@@ -166,13 +166,13 @@ idle until `bronze` reports success; `gold` waits on `silver`. If `bronze` fails
 `gold` stay grey — you never run against half-built data. Fix the failing layer, re-trigger, and
 the downstream tasks pick up the clean data.
 
-Click each task → **Logs**: you'll see `lab_spark: you are demouser · iceberg = demouser_lake` and
+Click each task → **Logs**: you'll see `lab_spark: you are demouser · my = demouser_lake` and
 the row counts each task printed (`bronze orders 40000`, `silver.orders 100000`,
 `gold.daily_sales 731`). Then confirm the result in your lakehouse — in a notebook:
 
 ```sql
 %%sql
-SELECT * FROM iceberg.gold.daily_sales ORDER BY order_date DESC LIMIT 5
+SELECT * FROM my.gold.daily_sales ORDER BY order_date DESC LIMIT 5
 ```
 
 or in SQLPad / Trino, where your lakehouse is `demouser_lake`:
@@ -196,10 +196,10 @@ per product), as its own task that runs **in parallel** with `gold` after `silve
         from lab_spark import lab_spark
         spark = lab_spark()
         spark.sql("""
-            CREATE OR REPLACE TABLE iceberg.gold.top_products AS
+            CREATE OR REPLACE TABLE my.gold.top_products AS
             SELECT product_id, product_name, category,
                    sum(line_amount) AS revenue, sum(quantity) AS units
-            FROM iceberg.silver.orders
+            FROM my.silver.orders
             WHERE status = 'delivered'
             GROUP BY product_id, product_name, category""")
     ```
@@ -233,7 +233,7 @@ per product), as its own task that runs **in parallel** with `gold` after `silve
 | **DAG** | The whole pipeline as code — tasks plus the arrows between them; "acyclic" = no loops back |
 | **Task** | One unit of work in the DAG (here, one layer = one box in the graph) |
 | **`@dag` / `@task`** | TaskFlow decorators: a function becomes the DAG / a task |
-| **`lab_spark()`** | Opens a Spark session on the cluster, signed in as you (`iceberg` = your lakehouse) |
+| **`lab_spark()`** | Opens a Spark session on the cluster, signed in as you (`my` = your lakehouse) |
 | **Dependency (`>>`)** | Run order: `a >> b` means run `a` first, then `b` only if it succeeded |
 | **Task graph** | The boxes-and-arrows drawing Airflow builds from your `>>` lines |
 | **Upstream / downstream** | Upstream = must run first; downstream = waits on it (`bronze` is upstream of `silver`) |

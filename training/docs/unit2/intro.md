@@ -53,7 +53,7 @@ flowchart TB
 
 !!! note "Same SQL, two homes"
     Everything you write this unit against `shopflow.public.*` will run **unchanged** on
-    your `iceberg.silver.*` / `iceberg.gold.*` tables once you build them in Unit {unit:unit4/fundamentals.md} — just
+    your own lakehouse's `demouser_lake.silver.*` / `demouser_lake.gold.*` tables once you build them in Unit {unit:unit4/fundamentals.md} — just
     swap the three-part name. SQL is portable across sources; that's the whole point of a
     query engine.
 
@@ -178,9 +178,9 @@ Once you've built the ShopFlow Gold tables (Unit {unit:unit4/fundamentals.md}), 
 lakehouse — just change the three-part name:
 
 ```sql
--- From Unit {unit:unit4/fundamentals.md} onward — the governed lakehouse via the iceberg catalog
-SHOW SCHEMAS FROM iceberg;          -- expect: bronze, silver, gold
-SELECT * FROM iceberg.gold.daily_sales ORDER BY order_date DESC LIMIT 14;
+-- From Unit {unit:unit4/fundamentals.md} onward — your own lakehouse, demouser_lake
+SHOW SCHEMAS FROM demouser_lake;    -- expect: bronze, silver, gold
+SELECT * FROM demouser_lake.gold.daily_sales ORDER BY order_date DESC LIMIT 14;
 ```
 
 ### Make your own space in the lakehouse

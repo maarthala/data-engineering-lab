@@ -40,15 +40,15 @@ Our governed tables are **Iceberg**, so start there. Delta follows.
 Simulate an hourly load: ten small appends into a sandbox copy of Silver.
 
 ```python
-spark.sql("CREATE NAMESPACE IF NOT EXISTS iceberg.sandbox")
-spark.sql("DROP TABLE IF EXISTS iceberg.sandbox.orders_maint PURGE")
-spark.sql("CREATE TABLE iceberg.sandbox.orders_maint USING iceberg AS "
-          "SELECT * FROM iceberg.silver.orders WHERE 1 = 0")
+spark.sql("CREATE NAMESPACE IF NOT EXISTS my.sandbox")
+spark.sql("DROP TABLE IF EXISTS my.sandbox.orders_maint PURGE")
+spark.sql("CREATE TABLE my.sandbox.orders_maint USING iceberg AS "
+          "SELECT * FROM my.silver.orders WHERE 1 = 0")
 
-orders = spark.table("iceberg.silver.orders")
+orders = spark.table("my.silver.orders")
 for hour in range(10):  # 10 "hourly" loads, each split into 4 files
     orders.where(f"order_id % 10 = {hour}").repartition(4) \
-          .writeTo("iceberg.sandbox.orders_maint").append()
+          .writeTo("my.sandbox.orders_maint").append()
 ```
 
 Iceberg exposes its own bookkeeping as **metadata tables**. Look at the files and versions
@@ -57,12 +57,12 @@ Iceberg exposes its own bookkeeping as **metadata tables**. Look at the files an
 ```sql
 %%sql
 SELECT count(*) AS data_files, round(avg(file_size_in_bytes) / 1024) AS avg_kb
-FROM iceberg.sandbox.orders_maint.files
+FROM my.sandbox.orders_maint.files
 ```
 
 ```sql
 %%sql
-SELECT snapshot_id, committed_at, operation FROM iceberg.sandbox.orders_maint.snapshots
+SELECT snapshot_id, committed_at, operation FROM my.sandbox.orders_maint.snapshots
 ```
 
 You should see about **40 small files** and one **snapshot per load**.
@@ -73,13 +73,13 @@ a new snapshot.
 
 ```sql
 %%sql
-CALL iceberg.system.rewrite_data_files(table => 'sandbox.orders_maint')
+CALL my.system.rewrite_data_files(table => 'sandbox.orders_maint')
 ```
 
 Run the `.files` query again: **40 files → 1**. Same rows, far fewer files to open.
 
 !!! info "Inside the CALL, the table name has no catalog"
-    The procedure belongs to a catalog (`iceberg.system.…`), so the `table =>` argument is just
+    The procedure belongs to a catalog (`my.system.…`), so the `table =>` argument is just
     `namespace.table`.
 
 ### Z-order: put related rows in the same files
@@ -90,7 +90,7 @@ ranges can't match.
 
 ```sql
 %%sql
-CALL iceberg.system.rewrite_data_files(
+CALL my.system.rewrite_data_files(
   table      => 'sandbox.orders_maint',
   strategy   => 'sort',
   sort_order => 'zorder(country, category)',
@@ -102,12 +102,12 @@ declare a write order on the table:
 
 ```sql
 %%sql
-ALTER TABLE iceberg.sandbox.orders_maint WRITE ORDERED BY (country, category)
+ALTER TABLE my.sandbox.orders_maint WRITE ORDERED BY (country, category)
 ```
 
 ```sql
 %%sql
-SHOW TBLPROPERTIES iceberg.sandbox.orders_maint ('sort-order')
+SHOW TBLPROPERTIES my.sandbox.orders_maint ('sort-order')
 ```
 
 ### Clean up: `expire_snapshots` + `remove_orphan_files`
@@ -116,7 +116,7 @@ snapshots gives up that history and deletes the files only they used:
 
 ```sql
 %%sql
-CALL iceberg.system.expire_snapshots(
+CALL my.system.expire_snapshots(
   table       => 'sandbox.orders_maint',
   older_than  => current_timestamp(),
   retain_last => 1)
@@ -124,7 +124,7 @@ CALL iceberg.system.expire_snapshots(
 
 ```sql
 %%sql
-SELECT count(*) AS snapshots FROM iceberg.sandbox.orders_maint.snapshots
+SELECT count(*) AS snapshots FROM my.sandbox.orders_maint.snapshots
 ```
 
 One snapshot is left, and the row count is unchanged.
@@ -134,7 +134,7 @@ crashed mid-write. Do a dry run first:
 
 ```sql
 %%sql
-CALL iceberg.system.remove_orphan_files(
+CALL my.system.remove_orphan_files(
   table          => 'sandbox.orders_maint',
   dry_run        => true,
   prefix_listing => true)
@@ -149,7 +149,7 @@ CALL iceberg.system.remove_orphan_files(
     (`prefix_listing => true` lists the files through Iceberg itself; it's required on our stack.)
 
 ### The same from Trino (and SQLPad)
-Trino runs the same maintenance with `ALTER TABLE … EXECUTE` — in Trino your notebook's `iceberg` is
+Trino runs the same maintenance with `ALTER TABLE … EXECUTE` — in Trino your notebook's `my` is
 `demouser_lake` (own account? use `<your username>_lake`):
 
 ```sql
@@ -168,7 +168,7 @@ lake:
 
 ```python
 path = "s3a://demouser-lake/tables/delta/orders_maint"     # in your own bucket
-orders = spark.table("iceberg.silver.orders")
+orders = spark.table("my.silver.orders")
 for hour in range(10):
     orders.where(f"order_id % 10 = {hour}").repartition(4) \
           .write.format("delta").mode("overwrite" if hour == 0 else "append").save(path)
@@ -241,7 +241,7 @@ without opening any data files.)
 
 ## Clean up
 ```python
-spark.sql("DROP TABLE iceberg.sandbox.orders_maint PURGE")
+spark.sql("DROP TABLE my.sandbox.orders_maint PURGE")
 spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
 ```
 (The Delta files stay in your bucket under `tables/delta/orders_maint/` — delete the folder in

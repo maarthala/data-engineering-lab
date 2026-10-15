@@ -70,11 +70,11 @@ def daily():
                .option("query", f"SELECT *, order_ts::date AS order_date FROM orders "
                                 f"WHERE order_ts::date = DATE '{ds}'")
                .load())
-        spark.sql("""CREATE TABLE IF NOT EXISTS iceberg.bronze.orders_daily (
+        spark.sql("""CREATE TABLE IF NOT EXISTS my.bronze.orders_daily (
                        order_id INT, customer_id INT, channel STRING, order_ts TIMESTAMP,
                        status STRING, currency STRING, promo_id INT, order_date DATE)
                      USING iceberg PARTITIONED BY (order_date)""")
-        day.writeTo("iceberg.bronze.orders_daily").overwritePartitions()
+        day.writeTo("my.bronze.orders_daily").overwritePartitions()
         print(f"{ds}: {day.count()} orders loaded")
 
     @task
@@ -82,19 +82,19 @@ def daily():
         """Recompute that day's row in gold.orders_per_day (MERGE = insert or update)."""
         from lab_spark import lab_spark
         spark = lab_spark()
-        spark.sql("""CREATE TABLE IF NOT EXISTS iceberg.gold.orders_per_day (
+        spark.sql("""CREATE TABLE IF NOT EXISTS my.gold.orders_per_day (
                        order_date DATE, orders BIGINT, delivered BIGINT) USING iceberg""")
         spark.sql(f"""
-            MERGE INTO iceberg.gold.orders_per_day t
+            MERGE INTO my.gold.orders_per_day t
             USING (SELECT order_date, count(*) AS orders,
                           count_if(status = 'delivered') AS delivered
-                   FROM iceberg.bronze.orders_daily
+                   FROM my.bronze.orders_daily
                    WHERE order_date = DATE '{ds}'
                    GROUP BY order_date) s
             ON t.order_date = s.order_date
             WHEN MATCHED THEN UPDATE SET *
             WHEN NOT MATCHED THEN INSERT *""")
-        print(spark.table("iceberg.gold.orders_per_day").where(f"order_date = DATE '{ds}'").collect())
+        print(spark.table("my.gold.orders_per_day").where(f"order_date = DATE '{ds}'").collect())
 
     bronze_day() >> gold_day()
 
@@ -149,7 +149,7 @@ check your lakehouse:
 
 ```sql
 %%sql
-SELECT * FROM iceberg.gold.orders_per_day ORDER BY order_date
+SELECT * FROM my.gold.orders_per_day ORDER BY order_date
 ```
 
 **Read it step by step:** one row per loaded day — `2024-01-01` with 50 orders (36 delivered),
@@ -174,12 +174,12 @@ January 1–3 run a second time.)
     ```sql
     %%sql
     SELECT order_date, orders, delivered
-    FROM iceberg.gold.orders_per_day
+    FROM my.gold.orders_per_day
     WHERE order_date BETWEEN DATE '2024-01-01' AND DATE '2024-01-31'
     ORDER BY orders DESC
     LIMIT 3
     ```
-    Check `SELECT count(*) FROM iceberg.gold.orders_per_day` too: **31** rows, not 34 — Jan 1–3
+    Check `SELECT count(*) FROM my.gold.orders_per_day` too: **31** rows, not 34 — Jan 1–3
     were *replaced*, not duplicated.
 
 !!! tip "🎯 The same scheduling on Azure, Databricks, Snowflake & Fabric"

@@ -97,7 +97,7 @@ shop:
 - **`method: session`**: run SQL through the Spark session of this Jupyter server, which
   means Spark Connect, exactly like your notebooks.
 - **`server_side_parameters`**: Spark settings for dbt's session. `iceberg` becomes the default
-  catalog, so `silver.stg_orders` means `iceberg.silver.stg_orders`, in **your** lakehouse.
+  catalog, so `silver.stg_orders` means `iceberg.silver.stg_orders`, in **your** lakehouse (`my.silver.stg_orders` in a notebook).
   **`default-namespace: silver`** is the schema for anything dbt creates without naming one
   (a few helper views, like the snapshots' in a later lesson).
 - **`{{ env_var('LAKE_WAREHOUSE') }}`**: `{{ … }}` is **Jinja**, the same template syntax as

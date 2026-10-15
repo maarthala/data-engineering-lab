@@ -27,7 +27,7 @@ sources:
   - name: bronze                 # the schema the raw table lives in
     description: Raw ShopFlow data, loaded as-is into your lakehouse.
     tables:
-      - name: sample_orders      # iceberg.bronze.sample_orders — your starter table
+      - name: sample_orders      # my.bronze.sample_orders — your starter table
         description: 1,000 ShopFlow orders, one row per order.
 ```
 

@@ -31,7 +31,7 @@ flagged `is_current = true` and left "open" (`valid_to = null`).
     Type 2 does an `UPDATE` (to close the old row) and an `INSERT` (to open the new one). Both
     need the **ACID table format** from [Unit 1](../unit1/formats.md) — a half-finished update
     must never leave the table in a broken state. So this recipe writes to an **Iceberg** table
-    in the `iceberg` catalog, the same governed lakehouse format you build Silver on in
+    in the `my` catalog, the same governed lakehouse format you build Silver on in
     [Transform to Silver](../unit4/transform-silver.md).
 
 ### Why it takes *two* statements
@@ -48,7 +48,7 @@ update the old version *or* insert the new version, but not both for the same ke
 That's the whole pattern. Let's build it.
 
 ## Lab
-> Run these cells in a **Jupyter/Spark notebook** against the `iceberg` catalog. This lab
+> Run these cells in a **Jupyter/Spark notebook** against the `my` catalog. This lab
 > **writes**, so it uses a throwaway `recipes` schema you own — the real ShopFlow data is never
 > touched.
 
@@ -58,16 +58,16 @@ First we create the dimension with its three tracking columns and load two custo
 stand on day one:
 
 ```python
-spark.sql("CREATE SCHEMA IF NOT EXISTS iceberg.recipes")
-spark.sql("DROP TABLE IF EXISTS iceberg.recipes.dim_customer")
+spark.sql("CREATE SCHEMA IF NOT EXISTS my.recipes")
+spark.sql("DROP TABLE IF EXISTS my.recipes.dim_customer")
 spark.sql("""
-CREATE TABLE iceberg.recipes.dim_customer (
+CREATE TABLE my.recipes.dim_customer (
   customer_id int, full_name string, country string,
   valid_from date, valid_to date, is_current boolean)
 """)
 
 spark.sql("""
-INSERT INTO iceberg.recipes.dim_customer VALUES
+INSERT INTO my.recipes.dim_customer VALUES
   (1,'Ada','UK', date'2024-01-01', null, true),
   (2,'Ravi','IN', date'2024-01-01', null, true)
 """)
@@ -75,8 +75,8 @@ INSERT INTO iceberg.recipes.dim_customer VALUES
 
 **Read it step by step:**
 
-- **`CREATE SCHEMA IF NOT EXISTS iceberg.recipes`** — a **schema** is a folder for tables. This
-  makes an empty `recipes` schema in the `iceberg` catalog. `IF NOT EXISTS` means "skip if it's
+- **`CREATE SCHEMA IF NOT EXISTS my.recipes`** — a **schema** is a folder for tables. This
+  makes an empty `recipes` schema in the `my` catalog. `IF NOT EXISTS` means "skip if it's
   already there", so the cell is safe to re-run.
 - **`DROP TABLE IF EXISTS …dim_customer`** — delete any old copy first so you always start from a
   clean, known state. `IF EXISTS` avoids an error on the very first run.
@@ -104,7 +104,7 @@ SELECT * FROM VALUES (2,'Ravi','SG'), (3,'Mei','SG') AS s(customer_id, full_name
 
 # step 1 — CLOSE the current row of any customer whose attributes changed
 spark.sql("""
-MERGE INTO iceberg.recipes.dim_customer t
+MERGE INTO my.recipes.dim_customer t
 USING staged s ON t.customer_id = s.customer_id AND t.is_current = true
 WHEN MATCHED AND (t.country <> s.country OR t.full_name <> s.full_name)
      THEN UPDATE SET valid_to = current_date(), is_current = false
@@ -112,11 +112,11 @@ WHEN MATCHED AND (t.country <> s.country OR t.full_name <> s.full_name)
 
 # step 2 — INSERT a new current row for changed customers AND brand-new ones
 spark.sql("""
-INSERT INTO iceberg.recipes.dim_customer
+INSERT INTO my.recipes.dim_customer
 SELECT s.customer_id, s.full_name, s.country,
        current_date() AS valid_from, cast(null AS date) AS valid_to, true AS is_current
 FROM staged s
-LEFT JOIN iceberg.recipes.dim_customer c
+LEFT JOIN my.recipes.dim_customer c
        ON c.customer_id = s.customer_id AND c.is_current = true
 WHERE c.customer_id IS NULL          -- brand-new customer
    OR c.country   <> s.country       -- or an attribute changed
@@ -124,7 +124,7 @@ WHERE c.customer_id IS NULL          -- brand-new customer
 """)
 
 spark.sql("""SELECT customer_id, country, valid_from, valid_to, is_current
-             FROM iceberg.recipes.dim_customer ORDER BY customer_id, valid_from""").show()
+             FROM my.recipes.dim_customer ORDER BY customer_id, valid_from""").show()
 ```
 
 **Read it step by step — the staged batch:**
@@ -137,7 +137,7 @@ spark.sql("""SELECT customer_id, country, valid_from, valid_to, is_current
 
 **Read it step by step — step 1, CLOSE the old version:**
 
-- **`MERGE INTO iceberg.recipes.dim_customer t USING staged s`** — the upsert from
+- **`MERGE INTO my.recipes.dim_customer t USING staged s`** — the upsert from
   [MERGE & upserts](../unit2/merge.md): compare the **target** dimension `t` against the
   **source** batch `s`.
 - **`ON t.customer_id = s.customer_id AND t.is_current = true`** — the match rule. We only pair a
@@ -156,10 +156,10 @@ spark.sql("""SELECT customer_id, country, valid_from, valid_to, is_current
 
 **Read it step by step — step 2, OPEN the new version:**
 
-- **`INSERT INTO iceberg.recipes.dim_customer SELECT …`** — insert one fresh row per qualifying
+- **`INSERT INTO my.recipes.dim_customer SELECT …`** — insert one fresh row per qualifying
   batch record, with the tell-tale shape of a **current** row: `valid_from = current_date()`,
   **`valid_to = null`** (cast to `date`), and **`is_current = true`**.
-- **`LEFT JOIN iceberg.recipes.dim_customer c ON c.customer_id = s.customer_id AND c.is_current
+- **`LEFT JOIN my.recipes.dim_customer c ON c.customer_id = s.customer_id AND c.is_current
   = true`** — join each batch row to the customer's current row *if one exists*. A **left** join
   keeps every batch row even when there's **no** matching current row — in that case all the `c.`
   columns come back `null`. That "no match" is how we detect a brand-new customer.
@@ -226,7 +226,7 @@ when a customer disappears from the source, *close* their current row (stamp `va
     ```python
     # step 1 — close changed rows, detected by a hash of ALL business columns
     spark.sql("""
-    MERGE INTO iceberg.recipes.dim_customer t
+    MERGE INTO my.recipes.dim_customer t
     USING staged s ON t.customer_id = s.customer_id AND t.is_current = true
     WHEN MATCHED AND md5(concat_ws('|', t.full_name, t.country))
                   <> md5(concat_ws('|', s.full_name, s.country))
@@ -235,11 +235,11 @@ when a customer disappears from the source, *close* their current row (stamp `va
 
     # step 2 — open new rows for brand-new OR hash-changed customers
     spark.sql("""
-    INSERT INTO iceberg.recipes.dim_customer
+    INSERT INTO my.recipes.dim_customer
     SELECT s.customer_id, s.full_name, s.country,
            current_date(), cast(null AS date), true
     FROM staged s
-    LEFT JOIN iceberg.recipes.dim_customer c
+    LEFT JOIN my.recipes.dim_customer c
            ON c.customer_id = s.customer_id AND c.is_current = true
     WHERE c.customer_id IS NULL
        OR md5(concat_ws('|', c.full_name, c.country))
@@ -257,7 +257,7 @@ when a customer disappears from the source, *close* their current row (stamp `va
 
     ```python
     spark.sql("""
-    MERGE INTO iceberg.recipes.dim_customer t
+    MERGE INTO my.recipes.dim_customer t
     USING staged s ON t.customer_id = s.customer_id AND t.is_current = true
     WHEN NOT MATCHED BY SOURCE AND t.is_current = true
          THEN UPDATE SET valid_to = current_date(), is_current = false

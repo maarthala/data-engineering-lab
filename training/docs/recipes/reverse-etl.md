@@ -13,9 +13,9 @@ table** an app reads.
 
 ```mermaid
 flowchart LR
-  G["🥇 iceberg.gold.*<br/>country_report"] --> RE[Spark write]
+  G["🥇 my.gold.*<br/>country_report"] --> RE[Spark write]
   RE -->|CSV| S3[(RustFS<br/>exports/country_report/)]
-  RE -->|writeTo| ST[(Serving table<br/>iceberg.serving.country_report)]
+  RE -->|writeTo| ST[(Serving table<br/>my.serving.country_report)]
   S3 --> BU[📥 Business users<br/>download the CSV]
   ST --> APP[🖥️ App / dashboard<br/>reads it over SQL]
 ```
@@ -34,11 +34,11 @@ Assume the `spark` session from [4.1](../unit4/fundamentals.md) — the object n
 handle to the cluster. We'll build a tiny Gold report, then publish it to two sinks.
 
 ### Cell A — a small Gold report
-In real life you'd `spark.read` an existing mart (`iceberg.gold.daily_sales`, `country_report`, …).
+In real life you'd `spark.read` an existing mart (`my.gold.daily_sales`, `country_report`, …).
 To keep the recipe self-contained we hand-build a three-row stand-in:
 
 ```python
-# a Gold report — in real life you'd read iceberg.gold.daily_sales etc.
+# a Gold report — in real life you'd read my.gold.daily_sales etc.
 report = spark.createDataFrame(
     [('US', 3940000), ('UK', 2510000), ('DE', 1330000)],
     ['country', 'revenue'])
@@ -95,21 +95,21 @@ The second sink is a table an application or dashboard reads directly over SQL: 
 **serving table** in its own namespace, holding just what the consumer needs.
 
 ```python
-spark.sql("CREATE NAMESPACE IF NOT EXISTS iceberg.serving")
-report.writeTo("iceberg.serving.country_report").createOrReplace()
+spark.sql("CREATE NAMESPACE IF NOT EXISTS my.serving")
+report.writeTo("my.serving.country_report").createOrReplace()
 ```
 
 **Read it step by step:**
 
-- **`CREATE NAMESPACE IF NOT EXISTS iceberg.serving`**: a separate namespace (schema) in your own
+- **`CREATE NAMESPACE IF NOT EXISTS my.serving`**: a separate namespace (schema) in your own
   lakehouse for tables you publish to consumers, apart from your working `bronze`/`silver`/`gold`.
-- **`report.writeTo("iceberg.serving.country_report")`**: the target table. Readers get a stable
+- **`report.writeTo("my.serving.country_report")`**: the target table. Readers get a stable
   name to point their app at, whatever you change in your pipeline behind it.
 - **`.createOrReplace()`**: replaces the table's contents each run, so re-running always leaves
   exactly one fresh copy (**idempotent**). `.append()` would *add* rows instead (the Challenge does
   this).
 
-*Produces:* `iceberg.serving.country_report` with three rows. An app or dashboard reads it with
+*Produces:* `my.serving.country_report` with three rows. An app or dashboard reads it with
 plain SQL, for example in SQLPad: `SELECT * FROM demouser_lake.serving.country_report`.
 
 !!! warning "Why not straight into the shop's Postgres?"
@@ -142,7 +142,7 @@ plain SQL, for example in SQLPad: `SELECT * FROM demouser_lake.serving.country_r
 ## Challenge
 The report is published fresh each run today (`overwrite`). Make it a **daily history** instead:
 stamp each run with its date and **append** to a history table,
-`iceberg.serving.country_report_history`, so it accumulates one batch per day. As a stretch, also write the CSV **partitioned by country** so each country gets its own
+`my.serving.country_report_history`, so it accumulates one batch per day. As a stretch, also write the CSV **partitioned by country** so each country gets its own
 folder of exports.
 
 !!! tip "The idea: append, don't overwrite"
@@ -159,7 +159,7 @@ folder of exports.
     dated = report.withColumn("run_date", F.current_date())
 
     # (1) append daily history into its own table instead of overwriting
-    hist = "iceberg.serving.country_report_history"
+    hist = "my.serving.country_report_history"
     if spark.catalog.tableExists(hist):
         dated.writeTo(hist).append()
     else:

@@ -86,7 +86,7 @@ with **Polaris** as the single catalog that every engine consults before touchin
 | **Keycloak** | The **lab accounts** (realm `de-lab`): registration, sign-in and single sign-on for every tool. Groups `learners` / `managers` decide the role inside each tool. |
 | **oauth2-proxy** | Puts the home portal behind the lab-account login. |
 | **home-api** | The home portal's backend: on your first sign-in it creates **your** lakehouse, bucket and SQLPad user; serves **My files** and **My catalogs**. |
-| **JupyterHub** | Starts **one Jupyter per member** (its own container / pod and work volume) with `iceberg` = that member's lakehouse; mirrors `my_files/notebooks/` and `my_files/dags/` to `files/src/` in their bucket. |
+| **JupyterHub** | Starts **one Jupyter per member** (its own container / pod and work volume) with `my` = that member's lakehouse; mirrors `my_files/notebooks/` and `my_files/dags/` to `files/src/` in their bucket. |
 
 ### Engines — SQL and Spark
 | Service | What it is |
@@ -100,7 +100,7 @@ with **Polaris** as the single catalog that every engine consults before touchin
 | Service | What it is |
 |---|---|
 | **Airflow** | **Schedules** the pipeline (the `shopflow_medallion` DAG runs Bronze→Silver→Gold via `spark-submit`). Three processes: **apiserver** (UI/API), **scheduler**, **dag-processor**. Metadata in Postgres; **LocalExecutor**. On k8s, DAGs + shared `src/` arrive by **git-sync**. |
-| **Jupyter** | **Notebooks** for exploration and the Spark labs — wired to Spark Connect and the `iceberg` catalog. |
+| **Jupyter** | **Notebooks** for exploration and the Spark labs — wired to Spark Connect and the `my` catalog. |
 | **Superset** | **BI dashboards** on the Gold layer — queries via Trino, caches in Redis, stores its own metadata in Postgres. |
 | **home** | The **landing portal** (nginx) — one page linking every UI. Start here. |
 

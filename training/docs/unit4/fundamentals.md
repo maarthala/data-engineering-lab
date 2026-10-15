@@ -56,7 +56,7 @@ many partitions a DataFrame has (the lab shows how) helps you reason about perfo
 ## Lab
 Connect to Spark from **Jupyter** at [http://localhost:8008](http://localhost:8008) (sign in with
 your lab account). The notebook is a lightweight **Spark Connect** client: it's pre-wired to the
-cluster's Connect server (`sc://spark-connect:15002`), and the **`iceberg`** lakehouse catalog is
+cluster's Connect server (`sc://spark-connect:15002`), and the **`my`** lakehouse catalog is
 already configured — pointing at **your own** lakehouse (`demouser_lake`), so the tables you build in
 this unit are yours alone. So the whole connection is a single line — the equivalent of Unit {unit:unit2/intro.md}'s
 `USE …`:
@@ -78,7 +78,7 @@ print(spark.version)
   pass a `.master(...)` or `.remote(...)` here to say *which* cluster — but this notebook is a
   pre-wired **Spark Connect** client (a thin client that talks to a remote Spark cluster over
   the `sc://spark-connect:15002` address the environment already set). So the address, the
-  `iceberg` catalog, and the storage credentials are all supplied by the server, and one line
+  `my` catalog, and the storage credentials are all supplied by the server, and one line
   is enough. Nothing is computed on the cluster yet — you've only opened the connection.
 - **`print(spark.version)`** — asks the cluster which Spark version it's running and prints it.
   A quick "am I really connected?" check.
@@ -92,9 +92,9 @@ print(spark.version)
 
 !!! note "Where's all the config?"
     In Unit {unit:unit2/intro.md} you saw catalogs are **admin-configured**, not created by you. Same here: the
-    cluster's Connect server already knows the **`iceberg`** catalog (object storage + Iceberg
+    cluster's Connect server already knows the **`my`** catalog (object storage + Iceberg
     REST) and the S3 credentials, so your notebook doesn't repeat any of it. You'll build the
-    lakehouse under `iceberg.bronze/silver/gold` — the *same* catalog Trino reads in Unit {unit:unit2/intro.md}.
+    lakehouse under `my.bronze/silver/gold` — your own lakehouse, which Trino (Unit {unit:unit2/intro.md}) reads as `demouser_lake`.
 
 Build a first DataFrame from a small in-memory sample and *feel* lazy evaluation. (This is a
 tiny synthetic sample, using ShopFlow's real `status` values — real revenue comes from

@@ -30,12 +30,12 @@ per country, straight from Silver:
 
 ```sql
 %%sql
-CREATE MATERIALIZED VIEW iceberg.gold.mv_country_monthly AS
+CREATE MATERIALIZED VIEW my.gold.mv_country_monthly AS
 SELECT country,
        date_trunc('MONTH', order_date) AS month,
        COUNT(DISTINCT order_id)        AS orders,
        SUM(line_amount)                AS revenue
-FROM iceberg.silver.orders
+FROM my.silver.orders
 WHERE status = 'delivered'
 GROUP BY country, date_trunc('MONTH', order_date)
 ```
@@ -45,10 +45,10 @@ governed catalog, so read it like one:
 
 ```sql
 %%sql
-SELECT * FROM iceberg.gold.mv_country_monthly ORDER BY month DESC, revenue DESC LIMIT 10
+SELECT * FROM my.gold.mv_country_monthly ORDER BY month DESC, revenue DESC LIMIT 10
 ```
 
-The same query works in **Trino / SQLPad** (`SELECT * FROM iceberg.gold.mv_country_monthly`) and in
+The same query works in **Trino / SQLPad** (`SELECT * FROM demouser_lake.gold.mv_country_monthly`) and in
 **Superset**. Point a chart at it and the chart never runs the `GROUP BY` itself.
 
 ## Refresh it: freshness is your choice
@@ -56,7 +56,7 @@ An MV does **not** update on its own. Prove it: add a fake order to Silver, then
 
 ```sql
 %%sql
-INSERT INTO iceberg.silver.orders
+INSERT INTO my.silver.orders
   (order_id, order_date, customer_id, customer_name, country, channel,
    product_id, product_name, category, quantity, unit_price, line_amount, status)
 SELECT 999999001, DATE '2099-01-15', 1, 'Test Customer', 'Atlantis', 'web',
@@ -65,31 +65,31 @@ SELECT 999999001, DATE '2099-01-15', 1, 'Test Customer', 'Atlantis', 'web',
 
 ```sql
 %%sql
-SELECT * FROM iceberg.gold.mv_country_monthly WHERE country = 'Atlantis'
+SELECT * FROM my.gold.mv_country_monthly WHERE country = 'Atlantis'
 ```
 
 Nothing shows up: the MV still holds the result from when it was created. Now refresh it:
 
 ```sql
 %%sql
-REFRESH MATERIALIZED VIEW iceberg.gold.mv_country_monthly
+REFRESH MATERIALIZED VIEW my.gold.mv_country_monthly
 ```
 
 ```sql
 %%sql
-SELECT * FROM iceberg.gold.mv_country_monthly WHERE country = 'Atlantis'
+SELECT * FROM my.gold.mv_country_monthly WHERE country = 'Atlantis'
 ```
 
 Atlantis now appears. Clean up the test row and refresh once more:
 
 ```sql
 %%sql
-DELETE FROM iceberg.silver.orders WHERE order_id = 999999001
+DELETE FROM my.silver.orders WHERE order_id = 999999001
 ```
 
 ```sql
 %%sql
-REFRESH MATERIALIZED VIEW iceberg.gold.mv_country_monthly
+REFRESH MATERIALIZED VIEW my.gold.mv_country_monthly
 ```
 
 !!! info "Stale is a feature, not a bug"
@@ -105,7 +105,7 @@ pipeline for you, runs it, and saves your query on the table as the `mv.definiti
 
 ```sql
 %%sql
-SHOW TBLPROPERTIES iceberg.gold.mv_country_monthly ('mv.definition')
+SHOW TBLPROPERTIES my.gold.mv_country_monthly ('mv.definition')
 ```
 
 That's your `SELECT`. `REFRESH` reads this property and runs the pipeline again.
@@ -122,17 +122,17 @@ Rules that follow from this:
 |---|---|
 | `CREATE OR REPLACE MATERIALIZED VIEW … AS …` | change the query (recomputes the MV) |
 | `CREATE MATERIALIZED VIEW IF NOT EXISTS … AS …` | create only if it isn't there yet (safe to re-run) |
-| `SHOW MATERIALIZED VIEWS IN iceberg.gold` | list the MVs in a namespace, with their stored SQL |
+| `SHOW MATERIALIZED VIEWS IN my.gold` | list the MVs in a namespace, with their stored SQL |
 | `DROP MATERIALIZED VIEW [IF EXISTS] …` | remove the MV |
 
 ```sql
 %%sql
-SHOW MATERIALIZED VIEWS IN iceberg.gold
+SHOW MATERIALIZED VIEWS IN my.gold
 ```
 
 ```sql
 %%sql
-DROP MATERIALIZED VIEW iceberg.gold.mv_country_monthly
+DROP MATERIALIZED VIEW my.gold.mv_country_monthly
 ```
 
 `DROP MATERIALIZED VIEW` refuses to drop a normal table, and `REFRESH` refuses to refresh one.

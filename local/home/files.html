@@ -289,7 +289,7 @@
           if (d.team) {
             $('space-title').textContent = '👥 Team files · ' + d.team;
             $('who').textContent = 'Everyone in team ' + d.team + ' sees, adds and changes these files';
-            tablesAt('team_' + d.team, 'team');
+            tablesAt('team_' + d.team);
           }
           $('example').textContent = 's3a://' + d.bucket + '/files/source/orders.csv';
           $('tree').appendChild(treeNode('', d.bucket));
@@ -477,11 +477,11 @@
 
     // where the tables are: a catalog (underscores), not this bucket (hyphens)
     function tablesAt(catalog, alias) {
-      $('tables-at').innerHTML = 'Query the tables by their catalog, <code></code> (<code></code> in Jupyter) — not by this bucket name.';
-      var c = $('tables-at').querySelectorAll('code'); c[0].textContent = catalog; c[1].textContent = alias;
+      $('tables-at').innerHTML = 'Query the tables by their catalog, <code></code>' + (alias ? ' (<code></code> in Jupyter)' : '') + ' — not by this bucket name.';
+      var c = $('tables-at').querySelectorAll('code'); c[0].textContent = catalog; if (alias) c[1].textContent = alias;
     }
     document.addEventListener('lab:me', function (e) {
-      if (!SPACE && e.detail.lakehouse) tablesAt(e.detail.lakehouse, 'iceberg');
+      if (!SPACE && e.detail.lakehouse) tablesAt(e.detail.lakehouse, 'my');
       if (e.detail.team) { $('sp-team').hidden = false; $('sp-team').textContent = '👥 Team: ' + e.detail.team; }
     });
     load().then(refresh);

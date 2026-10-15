@@ -17,7 +17,7 @@ Warm up. Confirm the signal exists — ShopFlow orders carry a `status` (`delive
 ```sql
 %%sql
 SELECT status, COUNT(*) AS orders
-FROM iceberg.silver.orders
+FROM my.silver.orders
 GROUP BY status
 ORDER BY orders DESC
 ```
@@ -32,8 +32,8 @@ Add a new Gold mart `gold.daily_cancellations` to your lakehouse and expose it i
 
 ### Requirements
 1. **Gold step.** Add a task **`gold_cancellations`** to your `demouser_medallion` DAG
-   ([5.2](../unit5/medallion-dag.md)) that reads `iceberg.silver.orders`, aggregates by
-   `order_date`, and writes `iceberg.gold.daily_cancellations` with columns `order_date`,
+   ([5.2](../unit5/medallion-dag.md)) that reads `my.silver.orders`, aggregates by
+   `order_date`, and writes `my.gold.daily_cancellations` with columns `order_date`,
    `total_orders`, `cancelled_orders`, `cancellation_rate` (0.0–1.0), using `createOrReplace`
    (idempotent). It runs after `silver`, beside the existing `gold` task.
 2. **Governance.** Share the new table **read-only** with one other member on **🗂️ My catalogs**
@@ -67,7 +67,7 @@ Add a new Gold mart `gold.daily_cancellations` to your lakehouse and expose it i
         from lab_spark import lab_spark
         from pyspark.sql import functions as F
         spark = lab_spark()
-        orders = spark.table("iceberg.silver.orders")
+        orders = spark.table("my.silver.orders")
         daily = (
             orders.groupBy("order_date")
             .agg(
@@ -82,7 +82,7 @@ Add a new Gold mart `gold.daily_cancellations` to your lakehouse and expose it i
                  .otherwise(F.lit(0.0)),
             )
         )
-        daily.writeTo("iceberg.gold.daily_cancellations").createOrReplace()
+        daily.writeTo("my.gold.daily_cancellations").createOrReplace()
     ```
 
     and wire it beside `gold` (Silver has one row per order *line*, so count **distinct orders**):

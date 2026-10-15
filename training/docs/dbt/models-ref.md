@@ -203,7 +203,7 @@ manages what's in the project now. Drop it yourself in a notebook:
 
 ```sql
 %%sql
-DROP TABLE iceberg.gold.cancelled_per_day
+DROP TABLE my.gold.cancelled_per_day
 ```
 
 ## 🎯 This runs unchanged on Azure, Databricks, Snowflake & Fabric

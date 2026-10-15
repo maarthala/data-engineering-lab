@@ -30,7 +30,7 @@ version: 2
 sources:
   - name: bronze                 # the schema the raw table lives in
     tables:
-      - name: sample_orders      # iceberg.bronze.sample_orders — your starter table
+      - name: sample_orders      # my.bronze.sample_orders — your starter table
 ```
 
 - **`version: 2`**: the format version of dbt's YAML files. Always `2`.
@@ -140,7 +140,7 @@ Previewing node 'stg_orders':
 
 ```sql
 %%sql
-SELECT channel, count(*) AS orders FROM iceberg.silver.stg_orders GROUP BY channel ORDER BY orders DESC
+SELECT channel, count(*) AS orders FROM my.silver.stg_orders GROUP BY channel ORDER BY orders DESC
 ```
 | | channel | orders |
 |---|---|---|

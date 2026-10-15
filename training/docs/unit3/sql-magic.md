@@ -3,7 +3,7 @@
 ## Concept
 Notebooks on this stack ship a **`%%sql` cell magic** — put it on the first line of a cell and write
 plain SQL, exactly like Databricks. It runs through the pre-created **`spark`** session
-([3.7](spark.md)), so it queries the same governed catalogs: **`iceberg`** = *your own* lakehouse,
+([3.7](spark.md)), so it queries the same governed catalogs: **`my`** = *your own* lakehouse,
 **`shared`** = the course's shared lake (what Trino and Superset call `iceberg` — see
 [0.3](../setup/workspace.md)). Results render as a table.
 
@@ -13,7 +13,7 @@ No setup, no connection — `spark` and `%%sql` are already there when the noteb
 > SQL — `spark.sql("…")` in a real pipeline — that's [4.4](../unit4/spark-sql-gold.md).
 
 !!! info "Three rules for every `%%sql` cell"
-    1. **Qualify with the catalog** — `iceberg.<namespace>.<table>`. A bare `SHOW SCHEMAS` or
+    1. **Qualify with the catalog** — `my.<namespace>.<table>`. A bare `SHOW SCHEMAS` or
        `orders` targets Spark's *default* catalog (not the lakehouse) and errors.
     2. **No trailing `;`** — `%%sql` runs one `spark.sql(...)`, and Spark's parser rejects a
        trailing semicolon.
@@ -36,7 +36,7 @@ SHOW SCHEMAS IN iceberg
 !!! note "The medallion tiers are empty right now — that's expected"
     `bronze` / `silver` / `gold` are **built later, in [Unit 4](../unit4/fundamentals.md)** (Spark
     reads the sources and writes these tables). Following the course in order, they exist as
-    namespaces but hold **no tables yet** — so `SELECT * FROM iceberg.gold.…` would say *table not
+    namespaces but hold **no tables yet** — so `SELECT * FROM my.gold.…` would say *table not
     found*. No problem: below you'll **create your own schema and data** to practise on, then meet
     the pipeline's tables in Unit {unit:unit4/fundamentals.md}. (Want real data right now? The ready-made tables are in the
     shared lake: `SELECT * FROM shared.gold.daily_sales LIMIT 10`.)
@@ -47,26 +47,26 @@ and insert a few rows (one statement per cell, no `;`):
 
 ```sql
 %%sql
-CREATE SCHEMA IF NOT EXISTS iceberg.sandbox
+CREATE SCHEMA IF NOT EXISTS my.sandbox
 ```
 > `CREATE SCHEMA` = `CREATE NAMESPACE` = `CREATE DATABASE` in Spark — all synonyms.
 > `IF NOT EXISTS` makes it safe to re-run.
 
 ```sql
 %%sql
-CREATE TABLE IF NOT EXISTS iceberg.sandbox.my_customers (
+CREATE TABLE IF NOT EXISTS my.sandbox.my_customers (
   customer_id int,
   full_name   string,
   country     string
 )
 ```
 > Note Spark's type names: **`string`** (not `varchar`), `int`, `double`, `date`, … Because the
-> `iceberg` catalog *is* an Iceberg catalog, the table is created as **Iceberg** automatically —
+> `my` catalog *is* an Iceberg catalog, the table is created as **Iceberg** automatically —
 > no `USING iceberg` needed.
 
 ```sql
 %%sql
-INSERT INTO iceberg.sandbox.my_customers VALUES
+INSERT INTO my.sandbox.my_customers VALUES
   (1, 'Ada Lovelace',      'UK'),
   (2, 'Alan Turing',       'UK'),
   (3, 'Grace Hopper',      'US'),
@@ -74,7 +74,7 @@ INSERT INTO iceberg.sandbox.my_customers VALUES
 ```
 
 !!! warning "403 / Forbidden is governance, not your SQL"
-    In `iceberg` (your own lakehouse) you can create anything. In `shared` (read-only) or in a
+    In `my` (your own lakehouse) you can create anything. In `shared` (read-only) or in a
     catalog another member shared with you, writing needs a **Polaris grant** — a **403 /
     Forbidden** there is RBAC, not a SQL mistake. See [Unit 6](../unit6/polaris.md).
 
@@ -83,20 +83,20 @@ INSERT INTO iceberg.sandbox.my_customers VALUES
 
 ```sql
 %%sql
-SHOW TABLES IN iceberg.sandbox          -- your new table shows up
+SHOW TABLES IN my.sandbox          -- your new table shows up
 ```
 ```sql
 %%sql
-DESCRIBE iceberg.sandbox.my_customers   -- columns + types
+DESCRIBE my.sandbox.my_customers   -- columns + types
 ```
 ```sql
 %%sql
-SELECT * FROM iceberg.sandbox.my_customers
+SELECT * FROM my.sandbox.my_customers
 ```
 ```sql
 %%sql
 SELECT country, count(*) AS customers
-FROM iceberg.sandbox.my_customers
+FROM my.sandbox.my_customers
 GROUP BY country
 ORDER BY customers DESC
 ```
@@ -106,7 +106,7 @@ table is a **real, governed Iceberg table** — visible to Trino, Superset, SQLP
 Console. Tidy up when you're done experimenting:
 ```sql
 %%sql
-DROP TABLE iceberg.sandbox.my_customers
+DROP TABLE my.sandbox.my_customers
 ```
 
 ### 4 · The same `%%sql`, on the pipeline's tables (after Unit {unit:unit4/fundamentals.md})
@@ -115,7 +115,7 @@ queries them — no new skills, just real tables. A Gold lookup:
 
 ```sql
 %%sql
-SELECT * FROM iceberg.gold.daily_sales
+SELECT * FROM my.gold.daily_sales
 ORDER BY order_date DESC
 LIMIT 10
 ```
@@ -125,7 +125,7 @@ LIMIT 10
 ```sql
 %%sql
 SELECT country, count(DISTINCT order_id) AS orders, sum(line_amount) AS revenue
-FROM iceberg.silver.orders
+FROM my.silver.orders
 GROUP BY country
 ORDER BY revenue DESC
 ```
@@ -152,7 +152,7 @@ df = spark.sql("SELECT * FROM shared.gold.daily_sales WHERE revenue > 80000")
 df.count()                              # keep working with the DataFrame in Python
 ```
 (After Unit {unit:unit4/fundamentals.md} the same pattern captures your own Gold table:
-`spark.sql("SELECT * FROM iceberg.gold.daily_sales")`.)
+`spark.sql("SELECT * FROM my.gold.daily_sales")`.)
 
 !!! tip "Raw files need a view first"
     `%%sql` works on **catalog tables** with no setup. To `%%sql` a raw file in object storage,
@@ -174,7 +174,7 @@ notebooks — write SQL against the catalog, get a table back. The `catalog.sche
 identical.
 
 ## You can now…
-- Run SQL in a notebook with `%%sql` — qualifying the `iceberg` catalog, no `;`, one per cell
+- Run SQL in a notebook with `%%sql` — qualifying the `my` catalog, no `;`, one per cell
 - **Discover** what exists with `SHOW SCHEMAS / SHOW TABLES / DESCRIBE IN iceberg`
 - **Create** your own namespace, table, and rows (`CREATE SCHEMA` / `CREATE TABLE` / `INSERT`)
 - Choose `%%sql` (display) vs `spark.sql()` (capture & keep working) appropriately

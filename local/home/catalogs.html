@@ -157,14 +157,14 @@
       var info = state.data.owned.filter(function (x) { return x.name === name; })[0];
       var head = el('div', 'card'); head.appendChild(el('h2', null, '🗂️ ' + name));
       if (info.team) {          // the team's: every member reads and writes it, nothing to share
-        head.appendChild(el('div', 'sub', 'Your team\'s lakehouse — every member of the team reads and writes it (the `team` catalog in your notebooks) · stored in ' + info.location));
+        head.appendChild(el('div', 'sub', 'Your team\'s lakehouse — every member of the team reads and writes it, by its name ' + name + ' in notebooks, SQLPad and Superset · stored in ' + info.location));
         head.appendChild(polarisLink(name)); m.appendChild(head);
         var tnb = el('div', 'card'); tnb.appendChild(el('h3', null, 'Use it'));
-        var tp = el('pre'); tp.textContent = '# notebooks: already set up as `team`\nspark.sql("SHOW TABLES IN team.bronze").show()\n\n-- SQLPad: by its name\nSELECT * FROM ' + name + '.bronze.<table>;';
+        var tp = el('pre'); tp.textContent = '# notebooks: already set up\nspark.sql("SHOW TABLES IN ' + name + '.bronze").show()\n\n-- SQLPad\nSELECT * FROM ' + name + '.bronze.<table>;';
         tnb.appendChild(tp); m.appendChild(tnb);
         return;
       }
-      head.appendChild(el('div', 'sub', (info.default ? 'Your main lakehouse (the `iceberg` catalog in your notebooks)' : 'Your catalog') + ' · stored in ' + info.location));
+      head.appendChild(el('div', 'sub', (info.default ? 'Your main lakehouse (`my` in your notebooks)' : 'Your catalog') + ' · stored in ' + info.location));
       head.appendChild(polarisLink(name));
       m.appendChild(head);
       var tree = el('div', 'card'); tree.appendChild(el('h3', null, 'Namespaces & tables — share with another learner'));
@@ -172,8 +172,8 @@
       tbody.innerHTML = '<tr><td class="sub">Loading…</td></tr>';
       var sh = el('div', 'card'); sh.appendChild(el('h3', null, 'Current shares')); var stab = el('table'); sh.appendChild(stab); m.appendChild(sh);
       var nb = el('div', 'card'); nb.appendChild(el('h3', null, 'Use it in a notebook'));
-      nb.appendChild(info.default ? (function () { var p = el('pre'); p.textContent = '# already set up as `iceberg`\nspark.sql("SHOW NAMESPACES IN iceberg").show()'; return p; })() : snippet(name));
-      nb.appendChild(el('div', 'sub', 'Create namespaces & tables from Spark, e.g. spark.sql("CREATE NAMESPACE ' + (info.default ? 'iceberg' : name) + '.sales")'));
+      nb.appendChild(info.default ? (function () { var p = el('pre'); p.textContent = '# already set up as `my`\nspark.sql("SHOW NAMESPACES IN my").show()'; return p; })() : snippet(name));
+      nb.appendChild(el('div', 'sub', 'Create namespaces & tables from Spark, e.g. spark.sql("CREATE NAMESPACE ' + (info.default ? 'my' : name) + '.sales")'));
       m.appendChild(nb);
 
       api('GET', '/tree', {catalog: name}).then(function (r) {

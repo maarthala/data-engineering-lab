@@ -67,7 +67,7 @@ In the Airflow UI, find **`<you>_dbt_shop`** (after ~30 s), switch it **on**, cl
 and open the task's **Logs**:
 
 ```text
-lab_dbt: you are dbtlab · project dbt/shop (19 files) · iceberg = dbtlab_lake
+lab_dbt: you are dbtlab · project dbt/shop (19 files) · lakehouse dbtlab_lake
 lab_dbt: $ dbt deps
 16:19:20  Running with dbt=1.12.5
 16:19:21  Installing dbt-labs/dbt_utils

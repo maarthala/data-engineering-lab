@@ -14,7 +14,7 @@ dependency-light way is a two-step hop:
 flowchart LR
   X[(RustFS<br/>new_customers.xlsx)] -->|pandas + openpyxl| P[pandas DataFrame]
   P -->|spark.createDataFrame| S[Spark DataFrame]
-  S -->|writeTo iceberg| B["🥉 iceberg.bronze.customers_excel"]
+  S -->|writeTo iceberg| B["🥉 my.bronze.customers_excel"]
 ```
 
 **pandas** *can* read Excel — via the **openpyxl** engine — so you read the file into a **pandas
@@ -110,8 +110,8 @@ print(pdf)
 
 # 2) hand it to Spark and land it in the lakehouse as a Bronze table
 sdf = spark.createDataFrame(pdf)
-sdf.writeTo("iceberg.bronze.customers_excel").using("iceberg").createOrReplace()
-spark.sql("SELECT count(*) FROM iceberg.bronze.customers_excel").show()
+sdf.writeTo("my.bronze.customers_excel").using("iceberg").createOrReplace()
+spark.sql("SELECT count(*) FROM my.bronze.customers_excel").show()
 ```
 
 **Read it step by step:**
@@ -123,14 +123,14 @@ spark.sql("SELECT count(*) FROM iceberg.bronze.customers_excel").show()
 - **`spark.createDataFrame(pdf)`** — convert the pandas DataFrame into a **Spark DataFrame**
   (`sdf`). This is the bridge from the single-machine world to the cluster: Spark infers the schema
   from pandas' columns and dtypes and takes ownership of the data.
-- **`sdf.writeTo("iceberg.bronze.customers_excel").using("iceberg").createOrReplace()`** — the Unit {unit:unit4/fundamentals.md}
-  write pattern: target the three-part name `iceberg.bronze.customers_excel` (`iceberg` catalog →
+- **`sdf.writeTo("my.bronze.customers_excel").using("iceberg").createOrReplace()`** — the Unit {unit:unit4/fundamentals.md}
+  write pattern: target the three-part name `my.bronze.customers_excel` (`my` catalog →
   `bronze` schema → table), store it as an **Iceberg** table, and **create-or-fully-replace** it.
   Trino can read it immediately — as `demouser_lake.bronze.customers_excel`.
 - **`spark.sql("SELECT count(*) …").show()`** — confirm the rows actually landed by counting them
   in the new Bronze table.
 
-*Produces:* `iceberg.bronze.customers_excel` — a raw Bronze table holding the three spreadsheet
+*Produces:* `my.bronze.customers_excel` — a raw Bronze table holding the three spreadsheet
 rows, ready for Silver cleaning later. Grain: one row per customer, exactly as in the sheet.
 
 !!! tip "Multi-sheet workbooks"
@@ -147,7 +147,7 @@ rows, ready for Silver cleaning later. Grain: one row per customer, exactly as i
 Your partner sends a workbook `s3://demouser-lake/files/source/partners.xlsx` with several tabs. You only
 care about the **`accounts`** sheet, and of its columns you only want **`account_id`** and
 **`region`**. Read *just that sheet*, keep *only those two columns*, and land the result as
-`iceberg.bronze.partner_accounts`.
+`my.bronze.partner_accounts`.
 
 !!! tip "Two arguments and a column selection"
     Point **`pd.read_excel`** at the right tab with **`sheet_name="accounts"`**, then narrow the
@@ -178,8 +178,8 @@ care about the **`accounts`** sheet, and of its columns you only want **`account
 
     # convert and land in Bronze
     sdf = spark.createDataFrame(pdf)
-    sdf.writeTo("iceberg.bronze.partner_accounts").using("iceberg").createOrReplace()
-    spark.sql("SELECT count(*) FROM iceberg.bronze.partner_accounts").show()
+    sdf.writeTo("my.bronze.partner_accounts").using("iceberg").createOrReplace()
+    spark.sql("SELECT count(*) FROM my.bronze.partner_accounts").show()
     ```
     **Read it step by step:**
 
@@ -187,7 +187,7 @@ care about the **`accounts`** sheet, and of its columns you only want **`account
     - **`pdf[["account_id", "region"]]`** — select just those two columns (a **column projection**)
       while still in pandas, dropping everything else before it ever reaches Spark.
     - **`createDataFrame` → `writeTo(...).using("iceberg").createOrReplace()`** — the same land-it
-      pattern, targeting a new Bronze table `iceberg.bronze.partner_accounts`.
+      pattern, targeting a new Bronze table `my.bronze.partner_accounts`.
 
 !!! tip "🎯 The same recipe on Azure Data Factory, Databricks & Fabric"
     **What you just did:** read an Excel file out of object storage and landed it as a Bronze
@@ -221,5 +221,5 @@ care about the **`accounts`** sheet, and of its columns you only want **`account
 ## You can now…
 - Read an `.xlsx` file from object storage with pandas + openpyxl over s3fs
 - Convert a pandas DataFrame to a Spark DataFrame with `spark.createDataFrame`
-- Land it as an `iceberg.bronze.*` table Trino can read immediately
+- Land it as an `my.bronze.*` table Trino can read immediately
 - Pick a single sheet, or all sheets, from a multi-tab workbook

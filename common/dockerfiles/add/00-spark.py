@@ -4,9 +4,9 @@
 from os import environ as _os_env
 
 # Under JupyterHub every learner has their own lakehouse (LAKE_* set by the Hub's spawn
-# hook): `iceberg` then means THEIR catalog with THEIR Polaris login, so lesson code
-# (iceberg.bronze/silver/gold…) reads and writes the learner's own tables. Empty outside
-# the Hub → the shared defaults from spark-defaults apply, as before.
+# hook): `my` (and the older name `iceberg`, still the default catalog) then means THEIR
+# catalog with THEIR Polaris login, so lesson code (my.bronze/silver/gold…) reads and writes
+# the learner's own tables. Empty outside the Hub → the shared defaults from spark-defaults apply.
 _LAKE = {k: v for k, v in {
     "spark.sql.catalog.iceberg.warehouse": _os_env.get("LAKE_WAREHOUSE"),
     "spark.sql.catalog.iceberg.credential": _os_env.get("LAKE_CREDENTIAL"),
@@ -26,9 +26,6 @@ try:
     for _k, _v in {**_LAKE, **_S3}.items():
         spark.conf.set(_k, _v)
     print(f"✓ `spark` ready via Spark Connect (Spark {spark.version})")
-    if _LAKE:
-        print(f"✓ you are {_os_env.get('LAKE_USER', '?')} · "
-              f"iceberg = your lakehouse ({_LAKE['spark.sql.catalog.iceberg.warehouse']})")
 except Exception as _e:  # noqa: BLE001
     print(f"⚠ `spark` not created ({_e}).")
     print("  Start it once spark-connect is up: spark = SparkSession.builder.getOrCreate()")
@@ -37,17 +34,34 @@ except Exception as _e:  # noqa: BLE001
 # --- My secrets: the learner's own secrets, in the lab's key vault (OpenBao) -----------------
 # The Hub gives this server VAULT_ADDR + VAULT_TOKEN, a token that reaches only secret/<you>/….
 # Values are fetched when asked for, never loaded into os.environ or printed.
+def _my_teams():
+    """Your teams on this server (from TEAM_CATALOG, team_<team>; set when the server starts)."""
+    return [c[len("team_"):] for c in _os_env.get("TEAM_CATALOG", "").split(",") if c.startswith("team_")]
+
+
+def _team_name(team):
+    """team="sales" → sales, if you're in it; team=True → your team (when you have just one)."""
+    mine = _my_teams()
+    if not mine:
+        raise RuntimeError("you are not in a team on this server — if you just joined one, restart it")
+    if team is True:
+        if len(mine) > 1:
+            raise ValueError(f"you are in several teams — say which: team={mine[0]!r}")
+        return mine[0]
+    if team not in mine:
+        raise PermissionError(f"you are not in the team {team!r} — yours: {', '.join(mine)} "
+                              "(just moved? restart your server)")
+    return team
+
+
 def _vault(method, key="", body=None, team=False):
     import json, os, urllib.error, urllib.parse, urllib.request
     addr, token, me = os.environ.get("VAULT_ADDR"), os.environ.get("VAULT_TOKEN"), os.environ.get("LAKE_USER")
     if not (addr and token and me):
         raise RuntimeError("no key vault login on this server — restart it "
                            "(File → Hub Control Panel → Stop My Server → Start)")
-    if team:                                   # the team's folder: team_sales → secret/sales_team/
-        cat = os.environ.get("TEAM_CATALOG", "")
-        if not cat.startswith("team_"):
-            raise RuntimeError("you are not in a team on this server — if you just joined one, restart it")
-        me = cat[len("team_"):] + "_team"
+    if team:                                   # the team's folder: sales → secret/sales_team/
+        me = _team_name(team) + "_team"
     kind = "metadata" if method == "LIST" else "data"
     url = f"{addr}/v1/secret/{kind}/{me}/{urllib.parse.quote(key, safe='')}"
     if method == "LIST":
@@ -74,19 +88,20 @@ def _vault(method, key="", body=None, team=False):
 def _fields(name, team=False):
     """All fields of one of your (or your team's) secrets, without the page's bookkeeping."""
     body = _vault("GET", name, team=team)
-    if body is None and not team and _os_env.get("TEAM_CATALOG", "").startswith("team_"):
+    if body is None and not team and len(_my_teams()) == 1:
         try:                                   # not yours — is it your team's?
             found = _vault("GET", name, team=True) is not None
         except Exception:  # noqa: BLE001
             found = False
         if found:
-            t = _os_env["TEAM_CATALOG"][len("team_"):]
+            t = _my_teams()[0]
             raise KeyError(f"no secret {name!r} in your folder — your team {t} has one: "
-                           f"key_vault({name!r}, team=True)")
+                           f"key_vault({name!r}, team={t!r})")
     if body is None:
         where = "the team's" if team else "yours"
+        arg = f"team={_team_name(team)!r}" if team else ""
         raise KeyError(f"no secret {name!r} — add it on 🔑 My secrets"
-                       f"{' → Team' if team else ''} (key_vault_list({'team=True' if team else ''}) lists {where})")
+                       f"{' → Team' if team else ''} (key_vault_list({arg}) lists {where})")
     return {k: v for k, v in body["data"]["data"].items() if k not in ("secret", "updated")}
 
 
@@ -94,7 +109,7 @@ def key_vault(name, field=None, team=False):
     """One of your secrets from the lab's key vault ("🔑 My secrets"); never printed:
         key = key_vault("WEATHER_API_KEY")       # a secret saved on the page → its value
         pw  = key_vault("db", "password")        # one field of a secret with several
-        tok = key_vault("API_TOKEN", team=True)  # one of your TEAM's secrets (My secrets → Team)
+        tok = key_vault("API_TOKEN", team="sales")  # one of your team's secrets (My secrets → Team)
     Without a field: the value (one field: that one; several: all of them as JSON text).
     A missing name or field raises KeyError."""
     d = _fields(name, team)
@@ -111,21 +126,21 @@ def key_vault(name, field=None, team=False):
 
 
 def key_vault_dict(name, team=False):
-    """Every field of one of your (team=True: your team's) secrets as a dict:
+    """Every field of one of your (team="<team>": that team's) secrets as a dict:
         db = key_vault_dict("db")                # {"username": "...", "password": "..."}
     A secret saved on the page has one field, value: {"value": "..."}."""
     return _fields(name, team)
 
 
 def key_vault_list(team=False):
-    """The names of your secrets — team=True: your team's (never the values)."""
+    """The names of your secrets — team="<team>": that team's (never the values)."""
     body = _vault("LIST", team=team)
     return sorted(k for k in (body or {}).get("data", {}).get("keys", []) if not k.endswith("/"))
 
 
 def key_vault_set(name, value, secret=True, team=False):
     """Save a secret from code (same as 🔑 My secrets → Save). secret=False: the page shows it.
-    team=True: in your team's folder, for everyone in the team."""
+    team="<team>": in that team's folder, for everyone in the team. (team=True: your only team.)"""
     import re, time
     if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", name):
         raise ValueError("name: letters, digits and _ only, not starting with a digit (max 64)")
@@ -162,28 +177,32 @@ def use_catalog(catalog, alias=None, quiet=False):
     return alias
 
 
-# The course's shared lake (read-only for learners) as `shared` — e.g. shared.gold.daily_sales —
-# next to your own `iceberg`. Only under JupyterHub; elsewhere `iceberg` IS the shared lake.
+# Short names for the two lakes that are always the same for you: `my` = your own lakehouse,
+# `shared` = the course's shared lake (read-only for learners). A team's lakehouse has no short
+# name — you may be in more than one team — it goes by its real name, team_<team>, as do all
+# three (the names SQLPad and Superset use, so the same query runs in both). Only under
+# JupyterHub; elsewhere `iceberg` IS the shared lake.
 if _LAKE:
     try:
+        use_catalog(_os_env["LAKE_WAREHOUSE"], "my", quiet=True)
         use_catalog(_os_env.get("SHARED_CATALOG", "polaris_lake"), "shared", quiet=True)
+        print(f"✓ you are {_os_env.get('LAKE_USER', '?')} · my = your lakehouse ({_os_env['LAKE_WAREHOUSE']})"
+              " — e.g. my.bronze.orders")
         print("✓ shared = the course's shared lake (read-only) — e.g. shared.gold.daily_sales")
     except Exception as _e:  # noqa: BLE001
-        print(f"⚠ shared catalog not set ({_e})")
-    if _os_env.get("TEAM_CATALOG"):       # your team's lakehouse (every member reads and writes)
-        try:
-            use_catalog(_os_env["TEAM_CATALOG"], "team", quiet=True)
-            print(f"✓ team = your team's lakehouse ({_os_env['TEAM_CATALOG']}) — e.g. team.bronze.customers")
-        except Exception as _e:  # noqa: BLE001
-            print(f"⚠ team catalog not set ({_e})")
-    # … and every catalog by its real name as well, the names SQLPad and Superset use — so the
-    # same query runs in both: <you>_lake, team_<team>, polaris_lake (the course's shared lake)
+        print(f"⚠ my / shared catalogs not set ({_e})")
+    for _c in _os_env.get("TEAM_CATALOG", "").split(","):     # your team's lakehouse (all in it read + write)
+        if _c:
+            try:
+                use_catalog(_c, quiet=True)
+                print(f"✓ your team {_c[len('team_'):]}: {_c} — e.g. {_c}.bronze.customers")
+            except Exception as _e:  # noqa: BLE001
+                print(f"⚠ team catalog {_c} not set ({_e})")
     try:
-        _names = [c for c in (_os_env.get("LAKE_WAREHOUSE"), _os_env.get("TEAM_CATALOG"),
-                              _os_env.get("SHARED_CATALOG", "polaris_lake")) if c]
+        _names = [c for c in (_os_env.get("LAKE_WAREHOUSE"), _os_env.get("SHARED_CATALOG", "polaris_lake")) if c]
         for _c in _names:
             use_catalog(_c, quiet=True)
-        print(f"✓ also by name, as in SQLPad: {', '.join(_names)}")
+        print(f"✓ also by name, as in SQLPad: {', '.join(_names + [c for c in _os_env.get('TEAM_CATALOG', '').split(',') if c])}")
     except Exception as _e:  # noqa: BLE001
         print(f"⚠ catalogs by name not set ({_e})")
 
@@ -235,6 +254,8 @@ def _mv_run(name, query):
         }
         if _LAKE or _S3:   # the pipeline runs in its own session — give it the learner's lakehouse + key
             spec["configuration"] = {**_LAKE, **_S3}
+            spec["configuration"].update({k: v for k, v in spark.conf.getAll.items()   # (my, team_<team> …)
+                                          if k.startswith(f"spark.sql.catalog.{catalog}.") or k == f"spark.sql.catalog.{catalog}"})
         with open(f"{work}/spark-pipeline.yml", "w") as f:
             _json.dump(spec, f)
         with open(f"{work}/transformations/{view}.sql", "w") as f:
@@ -294,7 +315,7 @@ def _mv_handle(sql):
         return pd.DataFrame(rows, columns=["materialized_view", "definition"])
     elif _re.match(r"(CREATE|REFRESH|DROP)\s+.*?MATERIALIZED\s+VIEW", sql, _re.I | _re.S):
         raise ValueError("use a fully-qualified name: catalog.namespace.view "
-                         "(e.g. iceberg.gold.revenue_by_region)")
+                         "(e.g. my.gold.revenue_by_region)")
     else:
         return None
     rows = spark.table(name).count()
@@ -312,7 +333,7 @@ try:
         return _re.sub(r"\$\{(\w+)\}", lambda m: str(ns.get(m[1], _os.environ.get(m[1], m[0]))), cell)
 
     @register_cell_magic
-    def sql(line, cell):  # usage:  %%sql \n SELECT ... FROM iceberg.gold.tbl
+    def sql(line, cell):  # usage:  %%sql \n SELECT ... FROM my.gold.tbl
         cell = _sql_vars(cell)
         mv = _mv_handle(cell)
         if mv is not None:

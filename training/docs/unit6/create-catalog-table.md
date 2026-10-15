@@ -59,28 +59,28 @@ Grant your admin write access so you can create tables in it: on the catalog →
 A **namespace** (schema) is a folder for tables. A **table** has a schema and holds rows.
 
 !!! note "Make the new catalog visible to Spark"
-    The notebook's `spark` knows **`iceberg`** (your own lakehouse `demouser_lake`) and
+    The notebook's `spark` knows **`my`** (your own lakehouse `demouser_lake`) and
     **`shared`** out of the box. A brand-new catalog needs one line first —
     `use_catalog("demouser_learn")` — after which `spark.sql("… demouser_learn.demo.sales …")`
-    works with your login. The steps below use **`iceberg`** so they run as-is; swap in
+    works with your login. The steps below use **`my`** so they run as-is; swap in
     your `demouser_learn` catalog to build there instead.
 
 In a notebook (`spark` is already there):
 
 ```python
 # namespace (schema) — metadata only, nothing in RustFS yet
-spark.sql("CREATE NAMESPACE IF NOT EXISTS iceberg.demo")
+spark.sql("CREATE NAMESPACE IF NOT EXISTS my.demo")
 
 # table — writes the first metadata.json to RustFS
 spark.sql("""
-CREATE TABLE IF NOT EXISTS iceberg.demo.sales (
+CREATE TABLE IF NOT EXISTS my.demo.sales (
     id int, product string, amount double, sold_on date
 ) USING iceberg
 """)
 
 # rows — writes Parquet data + manifests
 spark.sql("""
-INSERT INTO iceberg.demo.sales VALUES
+INSERT INTO my.demo.sales VALUES
     (1,'Widget',120.50, DATE'2026-01-05'),
     (2,'Gadget', 75.00, DATE'2026-01-06'),
     (3,'Widget', 60.25, DATE'2026-02-01')
@@ -101,15 +101,15 @@ table with data.
 All three work — pick by need:
 
 ```python
-spark.table("iceberg.demo.sales").show()                 # DataFrame API
+spark.table("my.demo.sales").show()                 # DataFrame API
 ```
 ```python
-spark.sql("SELECT * FROM iceberg.demo.sales ORDER BY id").show()
+spark.sql("SELECT * FROM my.demo.sales ORDER BY id").show()
 ```
 ```sql
 %%sql
 SELECT product, sum(amount) AS revenue
-FROM iceberg.demo.sales
+FROM my.demo.sales
 GROUP BY product
 ```
 

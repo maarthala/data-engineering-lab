@@ -159,8 +159,8 @@ That error is the point: you don't stage results in the source system. A compute
 save it as a table:
 
 ```python
-spark.createDataFrame(by_country).writeTo("iceberg.gold.country_revenue").createOrReplace()
-spark.table("iceberg.gold.country_revenue").toPandas()      # read it back
+spark.createDataFrame(by_country).writeTo("my.gold.country_revenue").createOrReplace()
+spark.table("my.gold.country_revenue").toPandas()      # read it back
 ```
 
 **Read it step by step:**
@@ -169,8 +169,8 @@ spark.table("iceberg.gold.country_revenue").toPandas()      # read it back
   image of `read_sql`. It works on databases you're allowed to write to, such as a team's
   reporting database, but not on production.
 - **`spark.createDataFrame(by_country)`**: copies the small pandas DataFrame into Spark.
-- **`.writeTo("iceberg.gold.country_revenue")`**: the target table in **your own** lakehouse
-  (`iceberg` = your `demouser_lake`), in its `gold` layer.
+- **`.writeTo("my.gold.country_revenue")`**: the target table in **your own** lakehouse
+  (`my` = your `demouser_lake`), in its `gold` layer.
 - **`.createOrReplace()`**: creates the table, or replaces it if it already exists, so you can
   re-run the cell. (`.append()` would add rows to an existing table instead.)
 - **The final `spark.table(...).toPandas()`** reads the table straight back so you can confirm the
@@ -193,16 +193,16 @@ daily
 
 - **`spark.sql(...)`** runs the query on the Spark cluster. Spark goes through Polaris, so you see
   only the tables you're allowed to see.
-- **`shared.gold.daily_sales`** is a table in the course's **shared** lake. `iceberg` is **your own**
+- **`shared.gold.daily_sales`** is a table in the course's **shared** lake. `my` is **your own**
   lakehouse. Once you've built tables in [Unit 4](../unit4/fundamentals.md), read them with
-  `spark.sql("SELECT * FROM iceberg.gold.daily_sales").toPandas()`.
+  `spark.sql("SELECT * FROM my.gold.daily_sales").toPandas()`.
 - **`.toPandas()`** brings the result back into Python as a plain pandas DataFrame, the same as
   `pd.read_sql` does for Postgres. Keep it small (use `LIMIT` or aggregate first), because the
   whole result is copied into your notebook.
 
 !!! tip "Postgres vs the lakehouse from Python: which connection?"
     Use the **Postgres** engine to read the *raw source*, and **Spark** to read the *lakehouse*
-    (`iceberg` / `shared`). Both give you ordinary DataFrames that you can then transform with
+    (`my` / `shared`). Both give you ordinary DataFrames that you can then transform with
     [pandas](pandas.md). If you want to query the lakehouse with plain SQL instead, use
     **SQLPad** ([Unit 2](../unit2/intro.md)).
 

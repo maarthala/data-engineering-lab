@@ -112,7 +112,7 @@ use `microk8s kubectl`.
 ## 5. First steps (what to actually do)
 1. **Register a lab account** at `http://de.lan` — first sign-in creates your lakehouse
    `<user>_lake`, bucket `<user>-lake` (100 MB) and SQLPad user; Jupyter starts your own pod.
-2. **Governed tables via Spark** — in Jupyter, `iceberg` = your own lakehouse
+2. **Governed tables via Spark** — in Jupyter, `my` (formerly `iceberg`, still works) = your own lakehouse
    (`bronze`/`silver`/`gold`), `shared` = the course lake. Spark Connect reads/writes through
    Polaris, which enforces each learner's access.
    **Personas** (governance lessons): `http://polaris-console.de.lan/login?local=1` with
@@ -147,8 +147,8 @@ lakehouse, catalogs and bucket use, and
 writes its lakehouse `team_<team>` and its bucket `team-<team>-lake` (500 MB, `TEAM_QUOTA_MB`;
 My files → Team, Jupyter's `<team>_team/` folder, e.g. `sales_team/` (next to `my_files/`), the RustFS console, `s3a://…` in Spark),
 a SQLPad connection per member, `Team <team> (Trino) — <user>` (browses the team catalog),
-and its key vault folder `secret/<team>_team/` (My secrets → Team, `key_vault(…, team=True)`; vault group `team-<team>`),
-and team DAGs: `<team>_team/dags/` → Airflow, `dag_id` `team_<team>_…`, shared with the Airflow role `lab_team_<team>` (set on a move and at sign-in); their tasks run as `team_<team>_jobs` (`iceberg` = the team's lakehouse).
+and its key vault folder `secret/<team>_team/` (My secrets → Team, `key_vault(…, team="<team>")`; vault group `team-<team>`),
+and team DAGs: `<team>_team/dags/` → Airflow, `dag_id` `team_<team>_…`, shared with the Airflow role `lab_team_<team>` (set on a move and at sign-in); their tasks run as `team_<team>_jobs` (`team_<team>` + `shared`, no `my`).
 
 - **Create team** — Keycloak group `team-<team>` + its lakehouse; **Delete team** once it's empty
 - Pick a team on the left (filter by name); on the right, **Add members** — search by name, pick

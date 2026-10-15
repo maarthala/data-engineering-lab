@@ -37,7 +37,7 @@ flowchart LR
 ```
 
 > Work in a notebook ([3.7](../unit3/spark.md)): `%%sql` cells for SQL ([3.8](../unit3/sql-magic.md)), Python cells
-> for the cleaning. Everything lands in **your own** lakehouse (`iceberg` = `<username>_lake`).
+> for the cleaning. Everything lands in **your own** lakehouse (`my` = `<username>_lake`).
 > Steps 1–3 use the upload-and-register flow from [3.9](../unit3/upload-register.md).
 
 ## Lab
@@ -91,7 +91,7 @@ OPTIONS (path 's3a://demouser-lake/files/source/cleaning/messy_customers.csv', h
 
 ```sql
 %%sql
-CREATE OR REPLACE TABLE iceberg.bronze.messy_customers USING iceberg AS
+CREATE OR REPLACE TABLE my.bronze.messy_customers USING iceberg AS
 SELECT * FROM messy_customers_csv
 ```
 
@@ -103,7 +103,7 @@ OPTIONS (path 's3a://demouser-lake/files/source/cleaning/messy_orders.csv', head
 
 ```sql
 %%sql
-CREATE OR REPLACE TABLE iceberg.bronze.messy_orders USING iceberg AS
+CREATE OR REPLACE TABLE my.bronze.messy_orders USING iceberg AS
 SELECT * FROM messy_orders_csv
 ```
 
@@ -115,7 +115,7 @@ SELECT * FROM messy_orders_csv
 - **No `inferSchema`** — on purpose. Every column stays **`string`**, exactly as written in the
   file. Bronze keeps the data **as it arrived**; turning text into numbers and dates is the
   cleaning job (step 7), where *you* decide what to do with `'abc'`.
-- **`CREATE OR REPLACE TABLE iceberg.bronze.… USING iceberg AS SELECT * FROM …_csv`** — copy the
+- **`CREATE OR REPLACE TABLE my.bronze.… USING iceberg AS SELECT * FROM …_csv`** — copy the
   view into a real Iceberg table in your `bronze` namespace (re-running replaces it).
 - **Column names are copied as they are** — `Customer ID`, ` Full Name `, `EMAIL`, spaces and
   all. Iceberg allows that, but such names are awkward to type in every query; you'll fix them in
@@ -127,8 +127,8 @@ Check that both arrived:
 
 ```sql
 %%sql
-SELECT 'messy_customers' AS tbl, count(*) AS n FROM iceberg.bronze.messy_customers
-UNION ALL SELECT 'messy_orders', count(*) FROM iceberg.bronze.messy_orders
+SELECT 'messy_customers' AS tbl, count(*) AS n FROM my.bronze.messy_customers
+UNION ALL SELECT 'messy_orders', count(*) FROM my.bronze.messy_orders
 ```
 
 ```
@@ -169,8 +169,8 @@ Load the two tables and look at the column names first:
 from pyspark.sql import functions as F
 import re
 
-raw_c = spark.table("iceberg.bronze.messy_customers")
-raw_o = spark.table("iceberg.bronze.messy_orders")
+raw_c = spark.table("my.bronze.messy_customers")
+raw_o = spark.table("my.bronze.messy_orders")
 raw_c.columns
 ```
 
@@ -675,12 +675,12 @@ good.select("order_id", "amount", "is_outlier").orderBy("order_id").show()
 
 ### 14 · Write Silver — and check it
 ```python
-spark.sql("CREATE NAMESPACE IF NOT EXISTS iceberg.silver")
+spark.sql("CREATE NAMESPACE IF NOT EXISTS my.silver")
 
-c.writeTo("iceberg.silver.clean_customers").using("iceberg").createOrReplace()
-good.writeTo("iceberg.silver.clean_orders").using("iceberg").createOrReplace()
+c.writeTo("my.silver.clean_customers").using("iceberg").createOrReplace()
+good.writeTo("my.silver.clean_orders").using("iceberg").createOrReplace()
 (bad.withColumn("rejected_at", F.current_timestamp())
-    .writeTo("iceberg.silver.rejected_orders").using("iceberg").createOrReplace())
+    .writeTo("my.silver.rejected_orders").using("iceberg").createOrReplace())
 ```
 
 - **`writeTo(...).createOrReplace()`** — write a DataFrame as a catalog table ([3.9](../unit3/upload-register.md)).
@@ -689,9 +689,9 @@ good.writeTo("iceberg.silver.clean_orders").using("iceberg").createOrReplace()
 
 ```sql
 %%sql
-SELECT 'clean_customers' AS tbl, count(*) AS n FROM iceberg.silver.clean_customers
-UNION ALL SELECT 'clean_orders',    count(*) FROM iceberg.silver.clean_orders
-UNION ALL SELECT 'rejected_orders', count(*) FROM iceberg.silver.rejected_orders
+SELECT 'clean_customers' AS tbl, count(*) AS n FROM my.silver.clean_customers
+UNION ALL SELECT 'clean_orders',    count(*) FROM my.silver.clean_orders
+UNION ALL SELECT 'rejected_orders', count(*) FROM my.silver.rejected_orders
 ```
 
 ```
@@ -707,7 +707,7 @@ UNION ALL SELECT 'rejected_orders', count(*) FROM iceberg.silver.rejected_orders
 ```sql
 %%sql
 SELECT reject_reason, count(*) AS n
-FROM iceberg.silver.rejected_orders
+FROM my.silver.rejected_orders
 GROUP BY reject_reason
 ORDER BY n DESC, reject_reason
 ```
@@ -729,7 +729,7 @@ ORDER BY n DESC, reject_reason
 104's old version). Nothing vanished without a trace.
 
 !!! check "Check your work"
-    `spark.table("iceberg.silver.clean_orders").printSchema()` shows real types now —
+    `spark.table("my.silver.clean_orders").printSchema()` shows real types now —
     `order_id: integer`, `order_ts: timestamp`, `amount: decimal(10,2)`, `is_outlier: boolean` —
     instead of all `string`. `clean_customers` has the new `has_email`, `first_name`,
     `last_name` and `email_domain` columns.
@@ -765,7 +765,7 @@ raw_o.select("channel").distinct().limit(50).show()           # at most 50 spell
 ❌ **Avoid** — rebuilding Silver from **all** of Bronze every day:
 
 ```python
-good.writeTo("iceberg.silver.clean_orders").using("iceberg").createOrReplace()   # every day, all rows
+good.writeTo("my.silver.clean_orders").using("iceberg").createOrReplace()   # every day, all rows
 ```
 
 At millions of rows that's hours of work to change a few thousand.
@@ -774,14 +774,14 @@ At millions of rows that's hours of work to change a few thousand.
 
 ```python
 # 1) only rows that arrived since the last run (needs an ingested_at column in Bronze)
-batch = spark.table("iceberg.bronze.messy_orders").filter(F.col("ingested_at") > last_run)
+batch = spark.table("my.bronze.messy_orders").filter(F.col("ingested_at") > last_run)
 
 # 2) … run the same cleaning steps on `batch` → `good` …
 
 # 3) upsert into Silver
 good.localCheckpoint().createOrReplaceTempView("orders_batch")
 spark.sql("""
-MERGE INTO iceberg.silver.clean_orders AS t
+MERGE INTO my.silver.clean_orders AS t
 USING orders_batch AS s
 ON t.order_id = s.order_id
 WHEN MATCHED AND s.order_ts > t.order_ts THEN UPDATE SET *
@@ -858,7 +858,7 @@ good.writeTo(...)                       # … and again from Bronze
 ```python
 good = good.cache()        # keep `good` in cluster memory after its first use
 q1, q3 = good.select(F.percentile_approx("amount", [0.25, 0.75]).alias("q")).first()["q"]
-good.writeTo("iceberg.silver.clean_orders").using("iceberg").createOrReplace()
+good.writeTo("my.silver.clean_orders").using("iceberg").createOrReplace()
 good.unpersist()           # free the memory
 ```
 
@@ -869,7 +869,7 @@ good.unpersist()           # free the memory
 ❌ **Avoid** — writing whatever comes out, no matter how much was rejected:
 
 ```python
-good.writeTo("iceberg.silver.clean_orders").using("iceberg").createOrReplace()
+good.writeTo("my.silver.clean_orders").using("iceberg").createOrReplace()
 ```
 
 If the source suddenly sends broken dates, half the rows go to the reject table and nobody notices
@@ -946,7 +946,7 @@ good = (good.join(F.broadcast(limits.select("currency", "low", "high")), on="cur
 ❌ **Avoid** — one big unpartitioned table:
 
 ```python
-good.writeTo("iceberg.silver.clean_orders").using("iceberg").createOrReplace()
+good.writeTo("my.silver.clean_orders").using("iceberg").createOrReplace()
 ```
 
 Every query for "last week" then reads **all** files.
@@ -956,7 +956,7 @@ Every query for "last week" then reads **all** files.
 ```python
 from pyspark.sql.functions.partitioning import days
 
-(good.writeTo("iceberg.silver.clean_orders")
+(good.writeTo("my.silver.clean_orders")
      .using("iceberg")
      .partitionedBy(days("order_ts"))
      .createOrReplace())
@@ -964,7 +964,7 @@ from pyspark.sql.functions.partitioning import days
 
 ```sql
 %%sql
-SELECT partition, record_count FROM iceberg.silver.clean_orders.partitions ORDER BY 1
+SELECT partition, record_count FROM my.silver.clean_orders.partitions ORDER BY 1
 ```
 
 ```
@@ -979,14 +979,14 @@ SELECT partition, record_count FROM iceberg.silver.clean_orders.partitions ORDER
 
 ```sql
 %%sql
-CALL iceberg.system.rewrite_data_files(table => 'silver.clean_orders')
+CALL my.system.rewrite_data_files(table => 'silver.clean_orders')
 ```
 
 - **`partitionedBy(days("order_ts"))`** — store the rows in folders **per day** of `order_ts`.
   A query with `WHERE order_ts >= '2024-11-08'` then skips every other day's files. Iceberg
   derives the day itself ("hidden partitioning") — no extra `order_date` column needed.
 - **`….partitions`** — an Iceberg **metadata table**: one row per partition, with its row count.
-- **`CALL iceberg.system.rewrite_data_files(...)`** — merge many small files into fewer big
+- **`CALL my.system.rewrite_data_files(...)`** — merge many small files into fewer big
   ones (daily batches leave lots of small files). Run it now and then — see
   [4.7 Table maintenance](table-maintenance.md).
 

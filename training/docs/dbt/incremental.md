@@ -75,7 +75,7 @@ In a notebook:
 
 ```sql
 %%sql
-SELECT count(*) AS orders, max(order_date) AS newest FROM iceberg.gold.fct_orders
+SELECT count(*) AS orders, max(order_date) AS newest FROM my.gold.fct_orders
 ```
 
 | | orders | newest |
@@ -90,13 +90,13 @@ orders cancelled, **998** (dated 2025-05-29) and **557** (2025-05-25). In a note
 
 ```sql
 %%sql
-INSERT INTO iceberg.bronze.sample_orders VALUES
+INSERT INTO my.bronze.sample_orders VALUES
   (1001, 42, 'web', TIMESTAMP_NTZ '2025-05-30 09:15:00', 'placed', 'EUR', NULL),
   (1002, 77, 'app', TIMESTAMP_NTZ '2025-05-30 11:40:00', 'placed', 'USD', NULL)
 ```
 ```sql
 %%sql
-UPDATE iceberg.bronze.sample_orders SET status = 'cancelled' WHERE order_id IN (998, 557)
+UPDATE my.bronze.sample_orders SET status = 'cancelled' WHERE order_id IN (998, 557)
 ```
 
 - **`INSERT INTO … VALUES (…), (…)`** adds rows, one `( )` per row, values in column order.
@@ -135,7 +135,7 @@ orders that changed:
 
 ```sql
 %%sql
-SELECT order_id, order_date, status, loaded_at FROM iceberg.gold.fct_orders
+SELECT order_id, order_date, status, loaded_at FROM my.gold.fct_orders
 WHERE order_id IN (557, 998, 1001, 1002) ORDER BY order_id
 ```
 
@@ -170,7 +170,7 @@ dbt run -s fct_orders --full-refresh
 
 ```sql
 %%sql
-SELECT order_id, status FROM iceberg.gold.fct_orders WHERE order_id IN (557, 998) ORDER BY order_id
+SELECT order_id, status FROM my.gold.fct_orders WHERE order_id IN (557, 998) ORDER BY order_id
 ```
 
 | | order_id | status |
@@ -187,15 +187,15 @@ Undo the simulated day, so the counts in other lessons still match:
 
 ```sql
 %%sql
-DELETE FROM iceberg.bronze.sample_orders WHERE order_id IN (1001, 1002)
+DELETE FROM my.bronze.sample_orders WHERE order_id IN (1001, 1002)
 ```
 ```sql
 %%sql
-UPDATE iceberg.bronze.sample_orders SET status = 'delivered' WHERE order_id = 998
+UPDATE my.bronze.sample_orders SET status = 'delivered' WHERE order_id = 998
 ```
 ```sql
 %%sql
-UPDATE iceberg.bronze.sample_orders SET status = 'shipped' WHERE order_id = 557
+UPDATE my.bronze.sample_orders SET status = 'shipped' WHERE order_id = 557
 ```
 
 Then `dbt run -s fct_orders --full-refresh` once more.

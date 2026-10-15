@@ -7,7 +7,7 @@ runs across a cluster. This page is a gentle first contact from the notebook; **
 goes deep and builds the whole ShopFlow lakehouse with it.
 
 On our stack the notebook is a lightweight **Spark Connect** client with a ready-made `spark` session: it sends your code to the
-cluster's Connect server, which already has the **`iceberg`** lakehouse catalog configured. So
+cluster's Connect server, which already has the **`my`** lakehouse catalog configured. So
 `spark` is pre-created for you — nothing to connect.
 
 ### What Spark is (and why it's "lazy")
@@ -54,7 +54,7 @@ print(spark.version)   # `spark` already exists — quick "am I connected?" chec
 The **`spark`** object (a **`SparkSession`**) is your handle to the cluster — every DataFrame, every
 `spark.sql(...)`, every read and write goes through it. It's a **Spark Connect** client: a thin
 local object that ships your code to the remote cluster's Connect server (pre-wired to
-`sc://spark-connect:15002`), and two lakehouse catalogs are ready: **`iceberg`** — *your own*
+`sc://spark-connect:15002`), and two lakehouse catalogs are ready: **`my`** — *your own*
 lakehouse (`demouser_lake`, empty until you build it in Unit {unit:unit4/fundamentals.md}) — and **`shared`** — the course's
 shared lake with the ready-made ShopFlow tables (read-only; see [0.3](../setup/workspace.md)).
 
@@ -128,7 +128,7 @@ spark.sql("SELECT * FROM shared.gold.daily_sales ORDER BY order_date DESC LIMIT 
 
 - **`spark.sql("SELECT …")`** — hand Spark a plain SQL string and get back a DataFrame.
   `shared.gold.daily_sales` resolves to the real Gold table in the shared lake — the *same* one
-  Trino and Superset read. (Your own `iceberg.gold` has no tables yet — you'll build them in
+  Trino and Superset read. (Your own `my.gold` has no tables yet — you'll build them in
   [Unit 4](../unit4/fundamentals.md).) Note `spark.sql(...)` on its own is still **lazy**:
   it returns a DataFrame plan, it doesn't run the query.
 - **`.show()`** — the **action** that runs the SQL and prints the 7 rows.
@@ -232,7 +232,7 @@ these jobs for you. The *code* is identical — only how it's launched changes.
 
 ## Challenge
 From the notebook, use Spark to compute **delivered revenue per country** from
-`iceberg.silver.orders` (built in Unit {unit:unit4/fundamentals.md}), then bring the small result back to pandas and print it
+`my.silver.orders` (built in Unit {unit:unit4/fundamentals.md}), then bring the small result back to pandas and print it
 sorted by revenue.
 
 ??? note "Solution"
@@ -240,7 +240,7 @@ sorted by revenue.
     from pyspark.sql import functions as F
 
     result = (
-        spark.table("iceberg.silver.orders")
+        spark.table("my.silver.orders")
         .filter(F.col("status") == "delivered")
         .groupBy("country")
         .agg(F.sum("line_amount").alias("revenue"))
@@ -251,7 +251,7 @@ sorted by revenue.
     (Requires the Silver table from [Unit 4](../unit4/transform-silver.md). The aggregation runs
     distributed in Spark; only the tiny per-country result is pulled to pandas.)
 
-    **Read it step by step:** `spark.table("iceberg.silver.orders")` loads the Silver table as a
+    **Read it step by step:** `spark.table("my.silver.orders")` loads the Silver table as a
     DataFrame (lazy) — a shorthand for `spark.sql("SELECT * FROM …")`. The `.filter → .groupBy →
     .agg` chain is all **lazy transformations** — still nothing has run. **`.toPandas()`** is the
     **action** that finally runs the whole distributed aggregation and pulls the small result down,
@@ -276,7 +276,7 @@ sorted by revenue.
 | **Transformation** | A **lazy** step (`select`, `filter`/`where`, `groupBy`, `withColumn`, `join`) — builds the plan, runs nothing |
 | **Action** | The step that **triggers** the computation (`show`, `count`, `collect`, `write`, `toPandas`) |
 | **Lazy evaluation** | Spark stacks up transformations and only runs when an **action** asks for a result — letting it optimise the whole plan |
-| **`spark.sql(...)`** | Run SQL over the `iceberg` catalog; returns a DataFrame (still lazy until an action) |
+| **`spark.sql(...)`** | Run SQL over the `my` catalog; returns a DataFrame (still lazy until an action) |
 | **`toPandas()` / `createDataFrame()`** | Spark → pandas (collects to one machine) / pandas → Spark (scales out) |
 | **Spark job / `spark-submit`** | Run the same code non-interactively (Airflow schedules it) |
 | **UDF / pandas UDF** | Your own Python function used on Spark columns; the pandas version works on whole batches (faster) |

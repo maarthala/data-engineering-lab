@@ -28,7 +28,7 @@ flowchart LR
 ### 1 · Prototype the logic in a notebook
 Open Jupyter ([http://localhost:8008](http://localhost:8008)) and write the transformation
 **interactively** — run a cell, see the result, adjust. `spark` is already there, signed in as you
-(`iceberg` = your lakehouse). This is the fastest feedback loop for getting the *data logic* right —
+(`my` = your lakehouse). This is the fastest feedback loop for getting the *data logic* right —
 exactly what you did in [Unit 4](../unit4/read-bronze.md). Your `my_files/notebooks/` folder already has a
 small, complete example: **`load_sample_orders.ipynb`** reads a CSV from your bucket and replaces
 `bronze.sample_orders`. Open it and **Run All**.
@@ -103,7 +103,7 @@ Open the UI at [http://localhost:8001](http://localhost:8001) (sign in with your
 **a) The Airflow task log** (did the job run correctly?) — click the task → **Logs**:
 
 ```
-lab_spark: you are demouser · iceberg = demouser_lake · shared = polaris_lake
+lab_spark: you are demouser · my = demouser_lake · your team: team_general · shared = polaris_lake
 run_notebook: files/src/notebooks/load_sample_orders.ipynb — 4 code cells
 1000 rows read from s3a://demouser-lake/files/source/shopflow/sample_orders.csv
 bronze.sample_orders replaced
@@ -115,7 +115,7 @@ snapshot per run:
 
 ```sql
 %%sql
-SELECT committed_at, operation FROM iceberg.bronze.sample_orders.snapshots ORDER BY committed_at DESC
+SELECT committed_at, operation FROM my.bronze.sample_orders.snapshots ORDER BY committed_at DESC
 ```
 
 **c) The Spark cluster** (how did it run?) — next section.

@@ -146,7 +146,7 @@ Drop the top view first: `v_delivered_revenue` reads from `v_order_summary`.
 ## Where views can live (and who can read them)
 | | Trino | Spark (Unit {unit:unit3/python-essentials.md}+) |
 |---|---|---|
-| Create a view in the lakehouse (`iceberg.…`) | ✓ | ✓ |
+| Create a view in your lakehouse (`demouser_lake.…`; `my.…` in Spark) | ✓ | ✓ |
 | Create a view in `shopflow` (Postgres) | ✗ the connector doesn't allow it | n/a |
 | Read a view created by **Trino** | ✓ | ✓ |
 | Read a view created by **Spark** | ✗ "unsupported dialect 'spark'" | ✓ |

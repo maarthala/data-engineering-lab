@@ -101,8 +101,8 @@ Or force it explicitly:
 ```python
 from pyspark.sql import functions as F
 
-big   = spark.table("iceberg.silver.orders")
-small = spark.table("iceberg.silver.customers")
+big   = spark.table("my.silver.orders")
+small = spark.table("my.silver.customers")
 
 joined = big.join(F.broadcast(small), "customer_id")   # broadcast the small side
 ```
@@ -115,7 +115,7 @@ If you reuse a DataFrame across several actions, **cache** it so Spark doesn't r
 plan each time:
 
 ```python
-df = spark.table("iceberg.silver.orders").filter("status = 'delivered'")
+df = spark.table("my.silver.orders").filter("status = 'delivered'")
 df.cache()          # keep in memory after first action
 df.count()          # first action → computes & caches
 df.groupBy("channel").count().show()   # reuses the cache

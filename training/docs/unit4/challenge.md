@@ -31,7 +31,7 @@ work of a data engineer: take a business question, express it as an aggregation 
 governed Silver layer, and ship a named, reusable mart.
 
 A good Gold mart is: built **only** from Silver (never re-reading raw sources),
-**business-meaningful**, written to the shared **`iceberg`** catalog (so Trino can read it), and
+**business-meaningful**, written to your own lakehouse **`my`** (so Trino can read it, as `demouser_lake`), and
 **partitioned** if it's naturally sliced by date.
 
 ## Lab
@@ -43,18 +43,18 @@ one analytical column that requires a **window function** (Unit {unit:unit2/intr
 dominate on any given day.
 
 ### Requirements
-1. Source **only** from `iceberg.silver.orders`.
+1. Source **only** from `my.silver.orders`.
 2. Grain: one row per `(category, order_date)`.
 3. Columns: `order_date`, `category`, `revenue`, `units`, `orders`,
    `pct_of_day` (this category's revenue ÷ that day's total revenue).
 4. Write as an **Iceberg** table, **partitioned by month of `order_date`**.
-5. Create it as `iceberg.gold.category_daily_revenue` and verify with a query.
+5. Create it as `my.gold.category_daily_revenue` and verify with a query.
 
 ### Starter scaffold
 
 ```python
 from pyspark.sql.functions import partitioning
-spark.sql("CREATE SCHEMA IF NOT EXISTS iceberg.gold")
+spark.sql("CREATE SCHEMA IF NOT EXISTS my.gold")
 # TODO: aggregate, add pct_of_day via a window, write the Iceberg table.
 ```
 
@@ -78,7 +78,7 @@ building it, confirm the **same** table is readable from Trino (it should be —
                 sum(line_amount)          AS revenue,
                 sum(quantity)             AS units,
                 count(DISTINCT order_id)  AS orders
-            FROM iceberg.silver.orders
+            FROM my.silver.orders
             WHERE status = 'delivered'
             GROUP BY order_date, category
         )
@@ -95,20 +95,20 @@ building it, confirm the **same** table is readable from Trino (it should be —
         ORDER BY order_date, revenue DESC
     """)
 
-    (cat_daily.writeTo("iceberg.gold.category_daily_revenue")
+    (cat_daily.writeTo("my.gold.category_daily_revenue")
         .using("iceberg")
         .partitionedBy(partitioning.months("order_date"))
         .createOrReplace())
 
     # verify
     spark.sql("""
-        SELECT * FROM iceberg.gold.category_daily_revenue
+        SELECT * FROM my.gold.category_daily_revenue
         ORDER BY order_date DESC, revenue DESC
         LIMIT 15
     """).show()
     ```
     The window `sum(revenue) OVER (PARTITION BY order_date)` computes each day's total
-    alongside the per-category rows — no self-join needed. Your notebook's `iceberg` is your own
+    alongside the per-category rows — no self-join needed. Your notebook's `my` is your own
     lakehouse, which Trino calls `demouser_lake` (own account? `<your username>_lake`) — the identical
     table opens there:
     ```sql
@@ -120,10 +120,10 @@ building it, confirm the **same** table is readable from Trino (it should be —
     **Walk through the solution step by step.** The whole thing is one read → transform →
     aggregate → write pipeline, expressed as a single `spark.sql` query plus one `writeTo`.
 
-    - **Read (the `FROM`).** `FROM iceberg.silver.orders` reads *only* from Silver — the clean,
+    - **Read (the `FROM`).** `FROM my.silver.orders` reads *only* from Silver — the clean,
       governed detail table from lesson {lesson:unit4/transform-silver.md}. We never touch the raw lake here; requirement 1 is
       "source from Silver alone", and honouring it is what keeps Gold consistent (everyone
-      aggregates the same trusted rows). `iceberg.silver.orders` is already one row per order
+      aggregates the same trusted rows). `my.silver.orders` is already one row per order
       line, with `line_amount`, `quantity`, `order_date`, `category`, and `status` columns ready
       to roll up.
     - **Filter (`WHERE status = 'delivered'`).** Revenue only counts orders that actually
@@ -147,7 +147,7 @@ building it, confirm the **same** table is readable from Trino (it should be —
       with no second query and no self-join back to a "daily totals" table.
     - **Order (`ORDER BY order_date, revenue DESC`).** Purely for readable output — biggest
       category first within each day. It doesn't change the stored data.
-    - **Write (`writeTo(...).createOrReplace()`).** `writeTo("iceberg.gold.category_daily_revenue")`
+    - **Write (`writeTo(...).createOrReplace()`).** `writeTo("my.gold.category_daily_revenue")`
       targets the Gold schema in the shared catalog; `.using("iceberg")` writes it as an Iceberg
       table (so Trino and Spark read the identical files); `.partitionedBy(partitioning.months("order_date"))`
       satisfies requirement 4 — Iceberg buckets the data files by *month of* `order_date`, so a

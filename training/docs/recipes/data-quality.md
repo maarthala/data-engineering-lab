@@ -35,7 +35,7 @@ Both strategies lean on one Spark **action**: **`count()`**. Most DataFrame oper
 exactly what you need to *measure* quality and decide.
 
 ## Lab
-Assume the `spark` session (Spark Connect) and the `iceberg` catalog from Unit {unit:unit4/fundamentals.md}.
+Assume the `spark` session (Spark Connect) and the `my` catalog from Unit {unit:unit4/fundamentals.md}.
 
 ### 1 · Encode the rules and split the batch
 We start with a tiny raw batch that has two deliberately bad rows — one with a missing `country`,
@@ -82,28 +82,28 @@ Now persist the split. Good rows become a clean Silver-bound table; bad rows go 
 **reject table** so they're preserved for inspection instead of thrown away:
 
 ```python
-spark.sql("CREATE SCHEMA IF NOT EXISTS iceberg.recipes")
-good.writeTo("iceberg.recipes.orders_clean").using("iceberg").createOrReplace()
-bad.writeTo("iceberg.recipes.orders_reject").using("iceberg").createOrReplace()
+spark.sql("CREATE SCHEMA IF NOT EXISTS my.recipes")
+good.writeTo("my.recipes.orders_clean").using("iceberg").createOrReplace()
+bad.writeTo("my.recipes.orders_reject").using("iceberg").createOrReplace()
 ```
 
 **Read it step by step:**
 
-- **`spark.sql("CREATE SCHEMA IF NOT EXISTS iceberg.recipes")`** — make the `recipes` namespace
-  inside the `iceberg` catalog if it doesn't exist, so our two tables have a home. `IF NOT EXISTS`
+- **`spark.sql("CREATE SCHEMA IF NOT EXISTS my.recipes")`** — make the `recipes` namespace
+  inside the `my` catalog if it doesn't exist, so our two tables have a home. `IF NOT EXISTS`
   keeps the cell safe to re-run.
-- **`good.writeTo("iceberg.recipes.orders_clean").using("iceberg").createOrReplace()`** — persist
+- **`good.writeTo("my.recipes.orders_clean").using("iceberg").createOrReplace()`** — persist
   the passing rows as an **Iceberg** table (the governed lakehouse format from
   [4.3](../unit4/transform-silver.md)). **`createOrReplace`** is *idempotent* — re-running the
   notebook rebuilds the table cleanly instead of appending duplicates.
-- **`bad.writeTo("iceberg.recipes.orders_reject").using("iceberg").createOrReplace()`** — the same
+- **`bad.writeTo("my.recipes.orders_reject").using("iceberg").createOrReplace()`** — the same
   write, aimed at a separate **reject table**. This is the whole quarantine idea in one line: the
   bad rows aren't discarded, they're *isolated* somewhere you can query them, spot patterns, fix
   the source, and reprocess later. Good data flowed on regardless.
 
 !!! tip "The reject table is a feature, not a graveyard"
     A quarantine table you never look at is just a slow leak. Query it: `SELECT * FROM
-    iceberg.recipes.orders_reject`. In production you'd alert on its size, review the top failure
+    my.recipes.orders_reject`. In production you'd alert on its size, review the top failure
     reasons, and — once the upstream bug is fixed — reprocess the rescued rows back into Silver.
 
 ### 3 · Add a fail-fast gate
@@ -170,7 +170,7 @@ Harden the gate with three upgrades:
 
     # 3 · row-count-delta fail-fast vs yesterday
     today = good.count()
-    yesterday = spark.table("iceberg.recipes.orders_clean").count()  # last good run
+    yesterday = spark.table("my.recipes.orders_clean").count()  # last good run
     assert today >= 0.5 * yesterday, \
         f"Volume dropped {1 - today/yesterday:.0%} vs yesterday — feed may be broken"
     ```

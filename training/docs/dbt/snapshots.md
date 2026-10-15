@@ -73,7 +73,7 @@ The first run copies every order, all valid from now. In a notebook:
 
 ```sql
 %%sql
-SELECT order_id, status, dbt_valid_from, dbt_valid_to FROM iceberg.snapshots.orders_snapshot
+SELECT order_id, status, dbt_valid_from, dbt_valid_to FROM my.snapshots.orders_snapshot
 WHERE order_id = 557
 ```
 
@@ -88,7 +88,7 @@ Order 557 is delivered:
 
 ```sql
 %%sql
-UPDATE iceberg.bronze.sample_orders SET status = 'delivered' WHERE order_id = 557
+UPDATE my.bronze.sample_orders SET status = 'delivered' WHERE order_id = 557
 ```
 
 ```bash
@@ -101,7 +101,7 @@ dbt snapshot
 
 ```sql
 %%sql
-SELECT order_id, status, dbt_valid_from, dbt_valid_to FROM iceberg.snapshots.orders_snapshot
+SELECT order_id, status, dbt_valid_from, dbt_valid_to FROM my.snapshots.orders_snapshot
 WHERE order_id = 557 ORDER BY dbt_valid_from
 ```
 
@@ -116,7 +116,7 @@ change, so they still have one version each:
 
 ```sql
 %%sql
-SELECT count(*) AS rows, count(dbt_valid_to) AS closed FROM iceberg.snapshots.orders_snapshot
+SELECT count(*) AS rows, count(dbt_valid_to) AS closed FROM my.snapshots.orders_snapshot
 ```
 
 | | rows | closed |
@@ -129,7 +129,7 @@ SELECT count(*) AS rows, count(dbt_valid_to) AS closed FROM iceberg.snapshots.or
 
 ```sql
 %%sql
-UPDATE iceberg.bronze.sample_orders SET status = 'shipped' WHERE order_id = 557
+UPDATE my.bronze.sample_orders SET status = 'shipped' WHERE order_id = 557
 ```
 
 and run `dbt snapshot` once more. The snapshot doesn't "undo"; it records a **third** version:
@@ -147,7 +147,7 @@ History only grows. That's the point.
 
 ```sql
 %%sql
-SELECT order_id, status FROM iceberg.snapshots.orders_snapshot
+SELECT order_id, status FROM my.snapshots.orders_snapshot
 WHERE dbt_valid_to IS NULL AND order_id IN (557, 998) ORDER BY order_id
 ```
 
@@ -160,7 +160,7 @@ WHERE dbt_valid_to IS NULL AND order_id IN (557, 998) ORDER BY order_id
 ended yet:
 
 ```sql
-SELECT order_id, status FROM iceberg.snapshots.orders_snapshot
+SELECT order_id, status FROM my.snapshots.orders_snapshot
 WHERE dbt_valid_from <= TIMESTAMP '2026-10-13 16:09:30'
   AND (dbt_valid_to > TIMESTAMP '2026-10-13 16:09:30' OR dbt_valid_to IS NULL)
 ```
