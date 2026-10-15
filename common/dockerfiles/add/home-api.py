@@ -451,6 +451,11 @@ def _trino_sync_loop():
     """Learner catalogs live in Trino's memory — re-add them (Trino restarts); and keep Trino's
     access rules in step with Polaris (owners, shares) — every 30 s."""
     import time
+    try:                                    # teams made before a folder existed get it now
+        for t in labadmin.teams():
+            lh.make_team_folders(t["bucket"])
+    except Exception as e:  # noqa: BLE001
+        print(f"[home-api] team folders: {e}", flush=True)
     n = 0
     while True:
         try:

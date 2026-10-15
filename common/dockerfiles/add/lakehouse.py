@@ -696,14 +696,27 @@ _TEAM_README = {
 }
 
 
-def make_team_folders(bucket):
-    """The team bucket's folders, each with a README (best effort, like make_folders)."""
+def make_team_folders(bucket, wait=0):
+    """The team bucket's folders, each with a README. A brand-new bucket refuses writes until the
+    object store's quota scan has seen it — `wait` seconds to keep trying (else best effort, like
+    make_folders). Returns how many folders are still missing."""
+    import time
+    end = time.time() + wait
+    while True:
+        missing = _team_folders_once(bucket)
+        if not missing or time.time() >= end:
+            return missing
+        time.sleep(2)
+
+
+def _team_folders_once(bucket):
     import io
     try:                                        # files/shared/ of the first team buckets: only its README → gone
         if list_all(bucket, "files/shared/") == ["files/shared/README.md"]:
             delete_object(bucket, "files/shared/README.md")
     except Exception:  # noqa: BLE001
         pass
+    missing = 0
     for f, text in _TEAM_README.items():
         try:
             _s3("HEAD", bucket, f + "README.md").close()
@@ -711,7 +724,8 @@ def make_team_folders(bucket):
             try:
                 put_object(bucket, f + "README.md", io.BytesIO(text.encode()), len(text.encode()), "text/markdown")
             except urllib.error.HTTPError:
-                pass
+                missing += 1
+    return missing
 
 
 def create_team_lake(team):
@@ -719,7 +733,7 @@ def create_team_lake(team):
     t, cat, bucket = _admin_token(), team_catalog(team), team_bucket(team)
     create_bucket(bucket)
     set_quota(bucket, TEAM_QUOTA_MB)
-    make_team_folders(bucket)
+    make_team_folders(bucket, wait=60)                 # notebooks / dags / dbt / source, like a member's
     loc = f"s3://{bucket}/tables/{cat}"
     _ok(_call("POST", f"{_M}/catalogs", {"catalog": {
         "name": cat, "type": "INTERNAL",
