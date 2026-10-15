@@ -168,6 +168,11 @@ whole team works on. The top bar shows it: *"· team: sales (team_sales)"*.
 | **Jupyter / Spark** (`spark.sql`, `%%sql`) | `team_sales.…` (its real name) or the short `team.…`, e.g. `team.bronze.customers` |
 | **SQLPad, Superset** | `team_sales.…`, e.g. `team_sales.bronze.customers` |
 
+In SQLPad you also get a second connection, **Team sales (Trino) — <you>**: pick it and the schema
+browser on the left shows the team's `bronze` / `silver` / `gold` and their tables (SQLPad browses
+one catalog per connection — **Lakehouse (Trino) — <you>** shows yours). Both connections run your
+queries as you, so both reach both lakes by name.
+
 Jupyter sets up `team` when your server starts and says so in the first cell's output:
 
 ```text

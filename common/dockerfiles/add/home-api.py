@@ -466,6 +466,8 @@ def _trino_sync_loop():
                 labvault.team_setup(t["team"])
                 for m in t["members"]:
                     labvault.set_member_policy(lh.lake_name(m), t["team"])
+            for m in t["members"]:
+                lh.sqlpad_team_connection(lh.lake_name(m), t["team"])     # SQLPad: browse the team
     except Exception as e:  # noqa: BLE001
         print(f"[home-api] team folders: {e}", flush=True)
     n = 0

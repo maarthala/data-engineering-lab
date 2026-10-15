@@ -427,7 +427,8 @@ def _sqlpad_delete(who):
     auth = {"Authorization": "Basic " + base64.b64encode(lh.SQLPAD_ADMIN.encode()).decode()}
     _, conns = _http("GET", f"{lh.SQLPAD}/api/connections", headers=auth)
     for c in conns or []:
-        if c["name"] == f"Lakehouse (Trino) — {who}":
+        if c["name"] == f"Lakehouse (Trino) — {who}" or (
+                c["name"].startswith("Team ") and c["name"].endswith(f" (Trino) — {who}")):
             _http("DELETE", f"{lh.SQLPAD}/api/connections/{c['id']}", headers=auth)
     _, users = _http("GET", f"{lh.SQLPAD}/api/users", headers=auth)
     for u in users or []:
@@ -526,6 +527,10 @@ def set_team(user, team, kc=None, g=None, publish=True):
     manager = any(x["name"] == "managers" for x in groups or [])
     lh.put_storage_policy(name, admin=manager, team=None if manager else team)   # team bucket files
     _vault(lambda n: labvault.set_member_policy(n, team), name)                  # team secrets
+    try:                                                                          # SQLPad: browse the team
+        lh.sqlpad_team_connection(name, team)
+    except Exception as e:  # noqa: BLE001
+        print(f"[labadmin] sqlpad team connection {user}: {e}", flush=True)
     if publish:
         lh.publish_trino_rules()
     return {"user": user, "team": team, "from": [x["name"][len(TEAM_GROUP):] for x in old]}

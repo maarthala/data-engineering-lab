@@ -355,6 +355,41 @@ def _admin_token():
     return tok["access_token"]
 
 
+def _sqlpad(method, path, body=None):
+    auth = "Basic " + __import__("base64").b64encode(SQLPAD_ADMIN.encode()).decode()
+    r = urllib.request.Request(SQLPAD + path, method=method, headers={
+        "Authorization": auth, "Content-Type": "application/json"},
+        data=None if body is None else json.dumps(body).encode())
+    with urllib.request.urlopen(r, timeout=10) as resp:
+        return json.loads(resp.read() or b"null")
+
+
+def sqlpad_team_connection(name, team):
+    """The member's second SQLPad connection, "Team <team> (Trino) — <user>": Trino as them, default
+    catalog team_<team>, so SQLPad's schema browser shows the team's tables (it browses one catalog
+    per connection). Another team's (the member moved) goes; team=None: none."""
+    user = storage_user(name)
+    label = f"Team {team} (Trino) — {user}" if team else None
+    for c in _sqlpad("GET", "/api/connections"):
+        if c["name"].startswith("Team ") and c["name"].endswith(f" (Trino) — {user}") and c["name"] != label:
+            _sqlpad("DELETE", f"/api/connections/{c['id']}")
+    if not team:
+        return None
+    body = {"name": label, "driver": "trino", "data": {
+        "host": TRINO_HOST, "port": TRINO_PORT, "username": name, "catalog": team_catalog(team)}}
+    conn = next((c for c in _sqlpad("GET", "/api/connections") if c["name"] == label), None)
+    if conn is None:
+        conn = _sqlpad("POST", "/api/connections", body)
+    elif {k: (conn.get("data") or {}).get(k) for k in body["data"]} != body["data"]:
+        conn = _sqlpad("PUT", f"/api/connections/{conn['id']}", body)
+    users = {u["email"]: u for u in _sqlpad("GET", "/api/users")}
+    u = users.get(user)
+    if u and u["role"] != "admin" and not any(
+            a["connectionId"] == conn["id"] and a["userId"] == u["id"] for a in _sqlpad("GET", "/api/connection-accesses")):
+        _sqlpad("POST", "/api/connection-accesses", {"connectionId": conn["id"], "userId": u["id"], "duration": 0})
+    return label
+
+
 def invite_sqlpad(name, admin=False):
     """Pre-create the learner in SQLPad (user id = Keycloak username). SQLPad's OIDC login
     only auto-creates users whose EMAIL domain is allowed — our learners have no email —
@@ -412,6 +447,10 @@ def provision(name, manager=False):
         team = None
     put_storage_policy(name, admin=manager, team=team)
     invite_sqlpad(name, admin=manager)
+    try:
+        sqlpad_team_connection(name, team_of(name))      # (managers too: browse their team)
+    except Exception as e:  # noqa: BLE001 — SQLPad down: the next provision call
+        print(f"[lakehouse] sqlpad team connection {name}: {e}", flush=True)
     t = _admin_token()
     m, cat = "/api/management/v1", f"{name}_lake"
     loc = f"s3://{bucket}/tables/{cat}"
