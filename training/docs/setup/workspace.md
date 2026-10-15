@@ -298,9 +298,9 @@ Broke your lakehouse, or want a clean slate for the next unit? Ask your **platfo
 | **Wipe** | everything: tables, extra catalogs, the shares you gave, your bucket, your Jupyter files, your secrets | your account; you're back to a new member's setup (lakehouse, sample table, starter files) |
 
 The same page lets managers create members (in the team they pick), give someone a new password
-and delete an account. **🧩 Teams** creates teams (and deletes empty ones) and adds members to a
-team: search a member by name; one who is in another team moves (✕ sends a member back to the
-default team). **⚙️ Settings** switches **self-registration** on or off (on while a new batch
+and delete an account. **🧩 Teams** lists the teams on the left; pick one to see its members on the right,
+add members (search by name, pick several; one who is in another team moves) or remove them (back
+to the default team). It also creates teams and deletes empty ones. **⚙️ Settings** switches **self-registration** on or off (on while a new batch
 signs up, off otherwise).
 
 ## You can now…

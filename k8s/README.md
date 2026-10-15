@@ -147,8 +147,10 @@ lakehouse, catalogs and bucket use, and
 writes its lakehouse `team_<team>` (bucket `team-<team>-lake`).
 
 - **Create team** — Keycloak group `team-<team>` + its lakehouse; **Delete team** once it's empty
-- **Add** a member — search by name; a member in another team moves (loses that team's
-  lakehouse, their tables stay there); **✕** sends a member back to the default team
+- Pick a team on the left (filter by name); on the right, **Add members** — search by name, pick
+  several, add them at once; a member in another team moves (loses that team's lakehouse, their
+  tables stay there)
+- **Members** — filter, tick (or select all shown) and **Remove selected**: back to the default team
 
 **⚙️ Settings** (`/settings.html`):
 

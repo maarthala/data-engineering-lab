@@ -19,6 +19,7 @@ team_<team> (lakehouse.create_team_lake) is owned by all its members:
   teams()                    the teams, their members and bucket use
   create_team(team)          group + lakehouse · delete_team(team): only an empty team
   set_team(user, team)       move a member (they lose the old team's lake, gain the new one)
+  add_to_team(team, users)   move several members into a team at once · people(): who is where
   ensure_team(user)          a member without a team joins DEFAULT_TEAM ("general")
 """
 import json
@@ -502,12 +503,12 @@ def delete_team(team):
     return {"team": team, "dropped": dropped, "bucket": bucket}
 
 
-def set_team(user, team):
+def set_team(user, team, kc=None, g=None, publish=True):
     """Move <user> into <team> (out of any other): the old team's lake is no longer theirs,
     what they made in it stays there."""
-    kc = _kc_token()
+    kc = kc or _kc_token()
     _check(user, kc)
-    g = _kc_group(TEAM_GROUP + (team or ""), kc)
+    g = g or _kc_group(TEAM_GROUP + (team or ""), kc)
     if not g:
         raise AdminError(f"no team {team}")
     uid, name = _kc_user(user, kc)["id"], lh.lake_name(user)
@@ -519,8 +520,35 @@ def set_team(user, team):
     if st != 204:
         raise RuntimeError(f"add {user} to {team}: HTTP {st} {body!r}")
     lh.join_team(name, team)
-    lh.publish_trino_rules()
+    if publish:
+        lh.publish_trino_rules()
     return {"user": user, "team": team, "from": [x["name"][len(TEAM_GROUP):] for x in old]}
+
+
+def add_to_team(team, users):
+    """Move each of `users` into <team> (one Keycloak login, Trino rules written once).
+    Returns who moved from where, and who couldn't be moved (with why)."""
+    kc = _kc_token()
+    g = _kc_group(TEAM_GROUP + (team or ""), kc)
+    if not g:
+        raise AdminError(f"no team {team}")
+    moved, failed = [], []
+    for u in dict.fromkeys(x.strip().lower() for x in users or [] if x and x.strip()):
+        try:
+            moved.append(set_team(u, team, kc, g, publish=False))
+        except Exception as e:  # noqa: BLE001 — the others still move
+            failed.append({"user": u, "error": str(e)})
+    lh.publish_trino_rules()
+    return {"team": team, "moved": moved, "failed": failed}
+
+
+def people():
+    """Every lab account with its team (Keycloak only — quick, for the Teams page)."""
+    kc = _kc_token()
+    _, users = _kc("GET", f"/admin/realms/{REALM}/users?max=1000&briefRepresentation=true", token=kc)
+    team_of = {m: t_["team"] for t_ in teams(kc) for m in t_["members"]}
+    return [{"user": u["username"], "team": team_of.get(u["username"])}
+            for u in sorted(users or [], key=lambda u: u["username"])]
 
 
 def ensure_team(user):

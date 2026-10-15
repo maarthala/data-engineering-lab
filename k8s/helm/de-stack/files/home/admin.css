@@ -58,3 +58,21 @@ td.acts{white-space:nowrap}
 .teams{display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:14px}
 .hint{font-size:.82rem; color:var(--gold); margin-top:6px}
 
+
+/* Teams: team list on the left, the selected team on the right */
+.split{display:grid; grid-template-columns:300px minmax(0,1fr); gap:14px; align-items:start}
+@media (max-width:900px){ .split{grid-template-columns:1fr} }
+.tlist{display:flex; flex-direction:column; gap:2px; max-height:60vh; overflow-y:auto; margin:8px 0}
+.tlist a{display:flex; justify-content:space-between; gap:8px; padding:7px 10px; border-radius:8px; color:var(--ink); text-decoration:none; border:1px solid transparent}
+.tlist a:hover{border-color:var(--line)}
+.tlist a.on{background:var(--panel2); border-color:var(--accent)}
+.tlist .n{color:var(--muted); font-size:.85rem}
+input.wide{width:100%}
+.scroll{max-height:55vh; overflow-y:auto; border:1px solid var(--line); border-radius:10px}
+.scroll th{position:sticky; top:0; background:var(--panel)}
+.picker{position:relative; flex:1; min-width:220px}
+.drop{position:absolute; z-index:5; left:0; right:0; top:calc(100% + 4px); background:var(--panel2); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow); max-height:280px; overflow-y:auto}
+.drop div{padding:7px 10px; cursor:pointer; display:flex; justify-content:space-between; gap:10px}
+.drop div:hover, .drop div.on{background:rgba(109,139,255,.15)}
+.drop .from{color:var(--muted); font-size:.82rem}
+.bar{display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; margin:10px 0 8px}
