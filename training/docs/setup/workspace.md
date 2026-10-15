@@ -163,6 +163,9 @@ has its own lakehouse, **`team_<team>`**, with `bronze` / `silver` / `gold`, and
 team reads and writes it**. Your own lakehouse stays yours; the team's is where you put tables the
 whole team works on. The top bar shows it: *"· team: sales (team_sales)"*.
 
+For a walk-through of one job done as a team (file, notebook, secret, DAG, SQLPad), see
+[Working in a team](teams.md).
+
 | Where you run it | Your team's lakehouse is |
 |---|---|
 | **Jupyter / Spark** (`spark.sql`, `%%sql`) | `team_sales.…` (its real name) or the short `team.…`, e.g. `team.bronze.customers` |

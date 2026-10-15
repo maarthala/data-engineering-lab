@@ -87,6 +87,7 @@ nav:
       - "Database schema": unit0/schema.md
       - "Stack architecture": unit0/stack.md
       - "Data in the stack — what's where": unit0/data-inventory.md
+      - "Working in a team": setup/teams.md
   - "Foundations":
       - "What is Data Engineering": unit1/what-is-de.md
       - "Lake vs Warehouse vs Lakehouse": unit1/lakehouse.md
