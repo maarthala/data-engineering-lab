@@ -109,13 +109,19 @@
     .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--line);
            padding:10px 16px; border-radius:10px; box-shadow:var(--shadow); display:none; max-width:90vw; z-index:11}
     .toast.err{border-color:var(--danger); color:#ffb3b0}
+    .pagebar{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px}
+    .spaces{display:flex; gap:6px}
+    .spaces a{color:var(--muted); text-decoration:none; padding:4px 12px; border-radius:9px; border:1px solid transparent; font-size:.9rem}
+    .spaces a:hover{color:var(--ink); border-color:var(--line)}
+    .spaces a.on{color:var(--ink); background:var(--panel2); border-color:var(--line)}
     @media (max-width:760px){ .app{grid-template-columns:1fr} aside{max-height:30vh; border-right:0; border-bottom:1px solid var(--line)} }
   </style>
 </head>
 <body>
   <header id="lab-top"></header>
   <script src="/lab-header.js?v=7"></script>
-  <div class="pagebar"><h1>📁 My files <span class="dot">·</span> <span class="bucket" id="bucket">…</span></h1></div>
+  <div class="pagebar"><h1>📁 My files <span class="dot">·</span> <span class="bucket" id="bucket">…</span></h1>
+    <nav class="spaces"><a href="/files.html" id="sp-mine">🪣 Mine</a><a href="/files.html?space=team" id="sp-team" hidden>👥 Team</a></nav></div>
 
   <div class="app">
     <aside>
@@ -152,7 +158,7 @@
         </div>
         <div class="vbody" id="v-body"></div>
       </div>
-      <div class="hint">Only you can see this bucket (limit <span id="quota">100</span> MB). Use a file from Spark with its path — click ⧉ to copy it, e.g. <code id="example">s3a://…/files/source/orders.csv</code></div>
+      <div class="hint"><span id="who">Only you can see this bucket</span> (limit <span id="quota">100</span> MB). Use a file from Spark with its path — click ⧉ to copy it, e.g. <code id="example">s3a://…/files/source/orders.csv</code></div>
     </main>
   </div>
 
@@ -165,8 +171,12 @@
 
   <script>
     // "My files": everything goes through /api/files (home-api behind the Keycloak login);
-    // the server always uses YOUR bucket — there is no bucket name to choose here.
+    // the server always uses YOUR bucket, or with ?space=team YOUR team's bucket — there is no
+    // bucket name to choose here.
     var $ = function (id) { return document.getElementById(id); };
+    var SPACE = new URLSearchParams(location.search).get('space') === 'team' ? 'team' : '';
+    function withSpace(params) { params = params || {}; if (SPACE) params.space = SPACE; return params; }
+    $(SPACE ? 'sp-team' : 'sp-mine').className = 'on';
     var state = {prefix: decodeURIComponent(location.hash.slice(1) || ''), bucket: '', tables: {}};
     var nodes = {};   // prefix -> {li, ul, caret, label, loaded, open}
 
@@ -179,7 +189,7 @@
       do { n /= 1024; i++; } while (n >= 1024 && i < u.length - 1); return n.toFixed(n < 10 ? 1 : 0) + ' ' + u[i]; }
     function when(iso) { return iso ? new Date(iso).toLocaleString() : ''; }
     function api(method, path, params) {
-      var q = new URLSearchParams(params || {}).toString();
+      var q = new URLSearchParams(withSpace(params)).toString();
       return fetch('/api/files' + path + (q ? '?' + q : ''), {method: method, credentials: 'same-origin'})
         .then(function (r) { return r.json().then(function (j) { return {ok: r.ok, status: r.status, body: j}; }); });
     }
@@ -273,6 +283,8 @@
         var d = r.body;
         if (!state.bucket) {                     // first load: build the tree root
           state.bucket = d.bucket; $('bucket').textContent = d.bucket;
+          $('quota').textContent = d.quota_mb;
+          if (d.team) $('who').textContent = 'Everyone in team ' + d.team + ' sees, adds and changes these files';
           $('example').textContent = 's3a://' + d.bucket + '/files/source/orders.csv';
           $('tree').appendChild(treeNode('', d.bucket));
         }
@@ -292,7 +304,7 @@
           rows.appendChild(tr);
         });
         d.files.forEach(function (f) {
-          var a = el('a', null, '📄 ' + f.name); a.href = '/api/files/download?' + new URLSearchParams({key: f.key});
+          var a = el('a', null, '📄 ' + f.name); a.href = '/api/files/download?' + new URLSearchParams(withSpace({key: f.key}));
           a.onclick = function (e) { e.preventDefault(); view(f, d.bucket); };
           var tr = el('tr'); tr.appendChild(cell(a, 'name')); tr.appendChild(el('td', 'num', size(f.size))); tr.appendChild(el('td', 'num', when(f.modified)));
           tr.appendChild(cell(group([
@@ -353,7 +365,7 @@
       });
     }
     function view(f, bucket) {
-      var url = '/api/files/download?' + new URLSearchParams({key: f.key});
+      var url = '/api/files/download?' + new URLSearchParams(withSpace({key: f.key}));
       $('list').style.display = 'none'; $('viewer').classList.add('on');
       $('v-name').textContent = '📄 ' + f.name; $('v-meta').textContent = size(f.size) + ' · ' + when(f.modified);
       $('v-dl').onclick = function () { location.href = url; };
@@ -402,7 +414,7 @@
       inp.onkeydown = function (e) { if (e.key === 'Enter') create(); if (e.key === 'Escape') tr.remove(); };
     }
     function delFile(f) {
-      dialog({title: 'Delete file?', html: 'Delete <b>' + f.name.replace(/</g, '&lt;') + '</b> from your bucket? This cannot be undone.'}).then(function (yes) {
+      dialog({title: 'Delete file?', html: 'Delete <b>' + f.name.replace(/</g, '&lt;') + '</b> from ' + (SPACE ? 'the team bucket — for everyone in the team' : 'your bucket') + '? This cannot be undone.'}).then(function (yes) {
         if (!yes) return;
         api('DELETE', '', {key: f.key}).then(function (r) { r.ok ? (toast('Deleted ' + f.name), load()) : toast(r.body.error, true); });
       });
@@ -433,7 +445,7 @@
         p.appendChild(el('span', null, '⬆ ' + file.name)); var tr = el('div', 'track'), fillEl = el('div', 'fill'); tr.appendChild(fillEl); p.appendChild(tr);
         $('uploads').appendChild(p);
         var xhr = new XMLHttpRequest();
-        xhr.open('PUT', '/api/files/upload?' + new URLSearchParams({key: key}));
+        xhr.open('PUT', '/api/files/upload?' + new URLSearchParams(withSpace({key: key})));
         xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
         xhr.upload.onprogress = function (e) { if (e.lengthComputable) fillEl.style.width = (100 * e.loaded / e.total) + '%'; };
         xhr.onload = function () {
@@ -457,7 +469,9 @@
     list.addEventListener('dragleave', function (e) { if (e.target === list.querySelector('.drop')) list.classList.remove('dragging'); });
     list.addEventListener('drop', function (e) { e.preventDefault(); list.classList.remove('dragging'); if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files); });
 
-    document.addEventListener('lab:me', function (e) { if (e.detail.quota_mb) $('quota').textContent = e.detail.quota_mb; });
+    document.addEventListener('lab:me', function (e) {
+      if (e.detail.team) { $('sp-team').hidden = false; $('sp-team').textContent = '👥 Team: ' + e.detail.team; }
+    });
     load().then(refresh);
   </script>
 </body>

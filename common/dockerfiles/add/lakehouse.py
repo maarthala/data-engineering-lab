@@ -135,17 +135,19 @@ def storage_user(name):
     return name.replace("_", "-")
 
 
-def put_storage_policy(name, admin=False):
+def put_storage_policy(name, admin=False, team=None):
     """Policy named after the learner (Keycloak sends the username as the `policy` claim on
-    the object-store console login): their own bucket only — or everything for managers.
-    (RustFS doesn't expand ${jwt:…} in resource names, so it's one policy per learner.)"""
-    bucket = bucket_name(name)
+    the object-store console login): their own bucket and their team's bucket — or everything
+    for managers. Their Jupyter and job keys carry the same policy, so a move to another team
+    takes effect at once. (RustFS doesn't expand ${jwt:…} in resource names, so it's one policy
+    per learner.)"""
+    buckets = [bucket_name(name)] + ([team_bucket(team)] if team else [])
     doc = {"Version": "2012-10-17", "Statement": [
         {"Effect": "Allow", "Action": ["admin:*"]},
         {"Effect": "Allow", "Action": ["s3:*"], "Resource": ["arn:aws:s3:::*"]}]} if admin else {
         "Version": "2012-10-17", "Statement": [
             {"Effect": "Allow", "Action": ["s3:ListBucket", "s3:GetBucketLocation", "s3:ListBucketMultipartUploads"],
-             "Resource": [f"arn:aws:s3:::{bucket}"]},
+             "Resource": [f"arn:aws:s3:::{b}" for b in buckets]},
             # the console's bucket Settings page — read-only. (RustFS action names; its only quota
             # permission is admin:SetBucketQuota, which would let learners raise their own limit —
             # so the quota card stays hidden for learners.)
@@ -154,10 +156,10 @@ def put_storage_policy(name, admin=False):
                 "s3:GetBucketEncryption", "s3:GetBucketPolicy", "s3:GetBucketPolicyStatus",
                 "s3:GetReplicationConfiguration", "s3:GetBucketNotification", "s3:GetBucketCors",
                 "s3:GetBucketObjectLockConfiguration"],
-             "Resource": [f"arn:aws:s3:::{bucket}"]},
+             "Resource": [f"arn:aws:s3:::{b}" for b in buckets]},
             {"Effect": "Allow", "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject",
                                            "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"],
-             "Resource": [f"arn:aws:s3:::{bucket}/*"]}]}
+             "Resource": [f"arn:aws:s3:::{b}/*" for b in buckets]}]}
     return _admin("PUT", "add-canned-policy", {"name": storage_user(name)}, json.dumps(doc).encode())
 
 
@@ -404,7 +406,11 @@ def provision(name, manager=False):
     set_quota(bucket)
     make_folders(bucket)
     seed_files(bucket)
-    put_storage_policy(name, admin=manager)
+    try:
+        team = None if manager else team_of(name)
+    except RuntimeError:
+        team = None
+    put_storage_policy(name, admin=manager, team=team)
     invite_sqlpad(name, admin=manager)
     t = _admin_token()
     m, cat = "/api/management/v1", f"{name}_lake"
@@ -679,11 +685,34 @@ def team_bucket(team):
     return bucket_name(TEAM_PREFIX + team)
 
 
+_TEAM_README = {
+    "files/source/": "Files for the whole team — everyone in the team sees, uploads and reads them\n"
+                     "(My files → Team, Jupyter's team bucket, s3a://<this bucket>/files/source/… in Spark).\n",
+    "files/shared/": "Anything else the team shares: notebooks to copy, notes, results.\n",
+    "tables/": "Table storage of the team's lakehouse (tables/team_<team>/<namespace>/<table>/). Managed\n"
+               "by the catalog — create and drop tables with SQL / Spark, don't edit files here.\n",
+}
+
+
+def make_team_folders(bucket):
+    """The team bucket's folders, each with a README (best effort, like make_folders)."""
+    import io
+    for f, text in _TEAM_README.items():
+        try:
+            _s3("HEAD", bucket, f + "README.md").close()
+        except urllib.error.HTTPError:
+            try:
+                put_object(bucket, f + "README.md", io.BytesIO(text.encode()), len(text.encode()), "text/markdown")
+            except urllib.error.HTTPError:
+                pass
+
+
 def create_team_lake(team):
     """Bucket team-<team>-lake + catalog team_<team> with bronze/silver/gold (idempotent)."""
     t, cat, bucket = _admin_token(), team_catalog(team), team_bucket(team)
     create_bucket(bucket)
     set_quota(bucket, TEAM_QUOTA_MB)
+    make_team_folders(bucket)
     loc = f"s3://{bucket}/tables/{cat}"
     _ok(_call("POST", f"{_M}/catalogs", {"catalog": {
         "name": cat, "type": "INTERNAL",
@@ -707,6 +736,7 @@ def join_team(name, team):
         create_team_lake(team)                       # the group is there, its lake isn't (yet)
         st = _call("PUT", path, {"catalogRole": {"name": "owner"}}, t)[0]
     _ok(st, f"join {team}")
+    make_team_folders(team_bucket(team))           # (teams made before team files had none)
 
 
 def leave_team(name, team):

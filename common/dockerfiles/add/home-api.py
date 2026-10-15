@@ -6,8 +6,9 @@ GET /api/me  → who is logged in (from the headers oauth2-proxy sets after the 
                principal-role <name> owning the catalog, plus read access to the shared
                lake. Idempotent — every step accepts "already exists" (409).
 
-"My files" — the learner's OWN bucket <name>-lake only. The bucket always comes from
-the logged-in user; nothing from the browser can point at another bucket.
+"My files" — the learner's OWN bucket <name>-lake, or with space=team their team's bucket
+team-<team>-lake. The bucket always comes from the logged-in user (and their team); nothing
+from the browser can point at another bucket.
   GET    /api/files?prefix=a/b/            one folder level (folders, files, is-table)
   GET    /api/files/download?key=…          download a file
   PUT    /api/files/upload?key=…            upload (raw body, streamed)
@@ -130,15 +131,20 @@ class Handler(BaseHTTPRequestHandler):
         return key
 
     def _files(self, method):
-        """All /api/files* calls. Bucket = the logged-in learner's own, always."""
+        """All /api/files* calls. Bucket = the logged-in learner's own, or (space=team) their team's."""
         path, q = self._route()
         user = self._user()
         if not user:
             return self._json(401, {"error": "not logged in"})
         name = lake_name(user)
-        bucket = bucket_name(name)
+        bucket, team, quota = bucket_name(name), None, lh.QUOTA_MB
         try:
             self._ensure(name)
+            if q.get("space") == "team":
+                team = lh.team_of(name)
+                if not team:
+                    return self._json(404, {"error": "you are not in a team yet"})
+                bucket, quota = lh.team_bucket(team), lh.TEAM_QUOTA_MB
             if method == "GET" and path == "/api/files":
                 prefix = (q.get("prefix") or "").lstrip("/")
                 folders, files = lh.list_dir(bucket, prefix)
@@ -146,7 +152,7 @@ class Handler(BaseHTTPRequestHandler):
                     folders = [f for f in folders if f != ".lab/"]
                 kids = {f[len(prefix):] for f in folders}
                 return self._json(200, {
-                    "bucket": bucket, "prefix": prefix,
+                    "bucket": bucket, "prefix": prefix, "team": team, "quota_mb": quota,
                     "is_table": {"metadata/", "data/"} <= kids or "metadata/" in kids,
                     "folders": [{"name": f[len(prefix):].rstrip("/"), "prefix": f} for f in folders],
                     "files": [dict(f, name=f["key"][len(prefix):]) for f in files]})
@@ -173,8 +179,8 @@ class Handler(BaseHTTPRequestHandler):
                 except urllib.error.HTTPError as e:
                     msg = e.read().lower()
                     if b"quota exceeded" in msg:
-                        return self._json(413, {"error": f"Your bucket is full — the limit is "
-                                                         f"{lh.QUOTA_MB} MB. Delete files you no longer need."})
+                        return self._json(413, {"error": f"{'The team bucket' if team else 'Your bucket'} is full — "
+                                                         f"the limit is {quota} MB. Delete files you no longer need."})
                     if b"quota check temporarily unavailable" in msg:   # brand-new bucket, not scanned yet
                         return self._json(503, {"error": "Your storage is still being prepared — "
                                                          "try the upload again in a few seconds."})

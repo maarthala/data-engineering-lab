@@ -144,7 +144,8 @@ lakehouse, catalogs and bucket use, and
 - **Delete** — the account and everything it owns
 
 **🧩 Teams** (`/teams.html`): every member is in one team (new members: `general`) and reads and
-writes its lakehouse `team_<team>` (bucket `team-<team>-lake`).
+writes its lakehouse `team_<team>` and its bucket `team-<team>-lake` (500 MB, `TEAM_QUOTA_MB`;
+My files → Team, Jupyter's team bucket, the RustFS console, `s3a://…` in Spark).
 
 - **Create team** — Keycloak group `team-<team>` + its lakehouse; **Delete team** once it's empty
 - Pick a team on the left (filter by name); on the right, **Add members** — search by name, pick

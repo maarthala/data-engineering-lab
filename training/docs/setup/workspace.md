@@ -175,8 +175,26 @@ spark.sql("SELECT * FROM team.bronze.customers ORDER BY id").show()
 
 - **`team`** — like `iceberg` (your lakehouse) and `shared` (the course's lake), a name Jupyter
   gives a catalog; behind it is `team_<team>` in Polaris.
-- If a manager **moves** you to another team, you lose the old team's lakehouse and get the new
-  one (in Jupyter after your next server start). The tables you made stay with the old team.
+
+The team also has a **bucket**, `team-<team>-lake` (limit **500 MB**): files everyone in the team
+sees, uploads and changes. Open it with **📁 My files → 👥 Team** (or **🪣 Mine** for your own
+bucket), in Jupyter's file browser as *team bucket (team-sales-lake)*, and in the RustFS console
+next to your own bucket. Put files the team needs in `files/source/`, and read them in Spark by
+their path:
+
+```python
+spark.read.option("header", True).csv("s3a://team-sales-lake/files/source/customers.csv").show()
+```
+```text
++---+----+
+| id|name|
++---+----+
+|  1| Ada|
++---+----+
+```
+- If a manager **moves** you to another team, you lose the old team's lakehouse and bucket and get
+  the new ones (in Jupyter after your next server start). The tables and files you made stay with
+  the old team.
 - A team lakehouse isn't shared from **My catalogs**: being in the team is the access.
 
 ## My catalogs — create and share

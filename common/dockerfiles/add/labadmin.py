@@ -520,6 +520,9 @@ def set_team(user, team, kc=None, g=None, publish=True):
     if st != 204:
         raise RuntimeError(f"add {user} to {team}: HTTP {st} {body!r}")
     lh.join_team(name, team)
+    _, groups = _kc("GET", f"/admin/realms/{REALM}/users/{uid}/groups", token=kc)
+    manager = any(x["name"] == "managers" for x in groups or [])
+    lh.put_storage_policy(name, admin=manager, team=None if manager else team)   # team bucket files
     if publish:
         lh.publish_trino_rules()
     return {"user": user, "team": team, "from": [x["name"][len(TEAM_GROUP):] for x in old]}
