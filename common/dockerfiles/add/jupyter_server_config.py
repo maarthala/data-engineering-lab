@@ -103,14 +103,8 @@ c.JupyterFs.resources = [
         },
     }
 ]
-# … and their team's bucket (team-<team>-lake, every member of the team reads and writes it),
-# with the same key: its policy covers both. A move to another team shows after a restart.
-if _OWN and os.environ.get("TEAM_BUCKET"):
-    c.JupyterFs.resources.append(dict(c.JupyterFs.resources[0],
-                                      name=f"team bucket ({os.environ['TEAM_BUCKET']})",
-                                      url=f"s3://{os.environ['TEAM_BUCKET']}"))
 # JupyterHub learners: ~/work/notebooks, ~/work/dags and ~/work/dbt live in the normal file browser
-# and are mirrored to their own bucket (dags/ → Airflow). See lab_sync.py.
+# and are mirrored to their own bucket (dags/ → Airflow); ~/work/team to their team's bucket. See lab_sync.py.
 import sys  # noqa: E402
 sys.path.insert(0, "/etc/jupyter")
 import lab_sync  # noqa: E402

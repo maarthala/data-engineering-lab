@@ -116,9 +116,10 @@ save, rename and delete in them is copied to your bucket straight away.
 | `notebooks/` | `files/src/notebooks/` | your notebooks (`.ipynb`) |
 | `dags/` | `files/src/dags/` | your Airflow DAGs (`.py`) — **Airflow picks them up in ~30 s** |
 | `dbt/` | `files/src/dbt/` | your dbt projects — dbt's generated `target/`, `logs/` and `dbt_packages/` stay in Jupyter only |
+| `team/` | your **team's** bucket, `files/` | notebooks and files for the whole team — see [Your team](#your-team) |
 
 Files you upload elsewhere (My files, the RustFS console) appear in Jupyter the next time your
-server starts (**File → Hub Control Panel → Stop My Server → Start**). Anything outside these three
+server starts (**File → Hub Control Panel → Stop My Server → Start**). Anything outside these
 folders stays in your Jupyter workspace only.
 
 **📁 My files** (landing page) is a file manager for your bucket — browse, upload, download, new
@@ -192,9 +193,20 @@ spark.sql("SELECT * FROM team.bronze.customers ORDER BY id").show()
 
 The team also has a **bucket**, `team-<team>-lake` (limit **500 MB**): files everyone in the team
 sees, uploads and changes. Open it with **📁 My files → 👥 Team** (or **🪣 Mine** for your own
-bucket), in Jupyter's file browser as *team bucket (team-sales-lake)*, and in the RustFS console
-next to your own bucket. Put files the team needs in `files/source/`, and read them in Spark by
-their path:
+bucket), in Jupyter as the **`team/`** folder, and in the RustFS console next to your own bucket.
+
+In Jupyter, `team/` is a normal folder: open `team/shared/`, then **+ → Notebook** makes a notebook
+there, and every save goes to the team bucket at once. Opening the folder (or a file in it) first
+brings in your teammates' changes — their new and edited files, and files they deleted go. If two
+people edit the same notebook at the same time, the last save wins, so agree who edits what (or
+use git).
+
+| Jupyter folder | Team bucket | For |
+|---|---|---|
+| `team/source/` | `files/source/` | files the team needs (CSV, Parquet …) |
+| `team/shared/` | `files/shared/` | notebooks and anything else the team shares |
+
+Read the team's files in Spark by their path:
 
 ```python
 spark.read.option("header", True).csv("s3a://team-sales-lake/files/source/customers.csv").show()
