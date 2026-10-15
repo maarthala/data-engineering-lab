@@ -189,8 +189,8 @@ Run through this checklist once — if all three pass, you're ready for Unit {un
 1. **Sign in to the landing page** — open [http://localhost:8000](http://localhost:8000). You're sent
    to the **DE Learning Lab** login page: sign in as **`demouser` / `demouser`** (the default account
    the course examples use), **Register** your own, or use `manager` / `manager`. After signing in you see the lab's tools in four columns and,
-   in the top bar, **"your lakehouse: <name>_lake ✓"** — your own private lakehouse, created on
-   first login.
+   on **📁 My files**, **"bucket <name>-lake · lakehouse <name>_lake"** — your own private
+   lakehouse, created on first login.
 2. **Single sign-on works** — open **🗂️ My catalogs**, then **Open in Polaris Console ↗** next to
    your lakehouse `<name>_lake`. The Console signs you in with your lab account without asking
    again and shows your lakehouse.

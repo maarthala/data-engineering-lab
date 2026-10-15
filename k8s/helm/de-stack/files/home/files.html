@@ -123,8 +123,9 @@
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=7"></script>
-  <div class="pagebar"><h1><span id="space-title">📁 My files</span> <span class="dot">·</span> <span class="muted-label">bucket</span> <span class="bucket" id="bucket">…</span></h1>
+  <script src="/lab-header.js?v=8"></script>
+  <div class="pagebar"><h1><span id="space-title">📁 My files</span> <span class="dot">·</span> <span class="muted-label">bucket</span> <span class="bucket" id="bucket">…</span>
+    <span class="dot" id="lh-dot" hidden>·</span> <span class="muted-label" id="lh-label" hidden>lakehouse</span> <span class="bucket" id="lakehouse"></span></h1>
     <nav class="spaces"><a href="/files.html" id="sp-mine">🪣 Mine</a><a href="/files.html?space=team" id="sp-team" hidden>👥 Team</a><a href="/files.html?space=shared" id="sp-shared">🤝 Shared with me</a></nav></div>
 
   <div class="app">
@@ -307,7 +308,7 @@
           if (d.team) {
             $('space-title').textContent = '👥 Team files · ' + d.team;
             $('who').textContent = 'Everyone in team ' + d.team + ' sees, adds and changes these files';
-            tablesAt('team_' + d.team);
+            tablesAt('team_' + d.team); lakehouse('team_' + d.team);
           }
           $('example').textContent = 's3a://' + d.bucket + '/files/source/orders.csv';
           if (OWNER) {
@@ -316,7 +317,7 @@
               (d.share.access === 'write' ? 'read + write' : 'read-only') + ', their tables read-only here (change tables with SQL)';
             $('quota').parentNode.childNodes.forEach(function (n) { if (n.nodeType === 3 && n.textContent.indexOf('(limit') >= 0) n.textContent = ' (their limit '; });
             $('example').textContent = 's3a://' + d.bucket + '/files/source/…';
-            tablesAt(LAKE);
+            tablesAt(LAKE); lakehouse(LAKE);
           }
           $('tree').appendChild(treeNode('', OWNER ? LAKE : d.bucket));
         }
@@ -511,12 +512,13 @@
     list.addEventListener('drop', function (e) { e.preventDefault(); list.classList.remove('dragging'); if (e.dataTransfer.files.length && !state.readonly) uploadFiles(e.dataTransfer.files); });
 
     // where the tables are: a catalog (underscores), not this bucket (hyphens)
+    function lakehouse(name) { $('lakehouse').textContent = name; $('lh-dot').hidden = $('lh-label').hidden = !name; }
     function tablesAt(catalog, alias) {
       $('tables-at').innerHTML = 'Query the tables by their catalog, <code></code>' + (alias ? ' (<code></code> in Jupyter)' : '') + ' — not by this bucket name.';
       var c = $('tables-at').querySelectorAll('code'); c[0].textContent = catalog; if (alias) c[1].textContent = alias;
     }
     document.addEventListener('lab:me', function (e) {
-      if (!SPACE && e.detail.lakehouse) tablesAt(e.detail.lakehouse, 'my');
+      if (!SPACE && e.detail.lakehouse) { tablesAt(e.detail.lakehouse, 'my'); lakehouse(e.detail.lakehouse); }
       if (e.detail.team) { $('sp-team').hidden = false; $('sp-team').textContent = '👥 Team: ' + e.detail.team; }
     });
 

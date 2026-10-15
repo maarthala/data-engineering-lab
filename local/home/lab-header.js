@@ -1,6 +1,6 @@
 // The lab's top bar — the same on every page (home, My files, My catalogs, My secrets).
 // A page puts <header id="lab-top"></header> where the bar goes and loads this script; it draws
-// the brand, who's signed in + their lakehouse, the page links (current one highlighted; managers
+// the brand, who's signed in (and a warning if their lakehouse isn't ready), the page links (current one highlighted; managers
 // also get Manage members) and Log out. /api/me (home-api, behind the Keycloak login) also creates the learner's lakehouse
 // on first call. Pages that need the same data listen for the "lab:me" event.
 (function () {
@@ -57,9 +57,7 @@
       document.getElementById('me-name').textContent = me.user;
       var lake = document.getElementById('me-lake');
       if (me.status === 'ready') {
-        lake.textContent = 'your lakehouse: ' + me.lakehouse + ' ✓ · bucket: ' + me.bucket +
-          (me.team ? ' · team: ' + me.team + ' (' + me.team_lakehouse + ')' : '');
-        lake.className = 'lake ok';
+        lake.hidden = true;                      // bucket + lakehouse: on 📁 My files
       } else {
         lake.textContent = 'lakehouse not ready — ' + (me.detail || 'try again shortly');
         lake.className = 'lake err';

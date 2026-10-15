@@ -6,8 +6,8 @@ its own files, lakehouse, secrets and DAGs. **Everyone in the team reads and wri
 nobody outside the team sees them. Your own workspace stays yours: use the team's for work you
 share.
 
-Once you're in a team, the top bar shows it, e.g. *"· team: sales (team_sales)"*, and the 👥 Team
-views below appear. Below, replace `sales` with your
+Once you're in a team, the 👥 Team views below appear (e.g. **📁 My files → 👥 Team: sales**, and
+`team_sales` on **🗂️ My catalogs**). Below, replace `sales` with your
 team's name.
 
 | What | Yours | Your team's |

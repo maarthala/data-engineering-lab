@@ -45,8 +45,8 @@ open — Superset, Airflow, SQLPad — keeps its own session until you log out t
 | 🧰 SQLPad user | `<you>` | your saved queries |
 | 👥 Team | none at first | the team a manager adds you to, and its lakehouse `team_<team>` — see [Your team](#your-team) |
 
-The top bar of the landing page shows it: **"your lakehouse: `<you>_lake` ✓ · bucket:
-`<you>-lake`"**, plus **📁 My files**, **🗂️ My catalogs**, **🔑 My secrets** and **Log out**. Below it, the
+**📁 My files** shows both at the top: **"bucket `<you>-lake` · lakehouse `<you>_lake`"**. The top
+bar has **📁 My files**, **🗂️ My catalogs**, **🔑 My secrets** and **Log out**. Below it, the
 tools are grouped in four columns — *Build & explore* (Notebook, Compute, SQL workbench),
 *Pipelines* (Airflow), *Visualize* (Superset) and *Lakehouse* (My files, My catalogs, Storage).
 
@@ -167,7 +167,8 @@ A new member is in **no team** (only their own lakehouse). A manager creates tea
 members; a member is then in **one team**. The team
 has its own lakehouse, **`team_<team>`**, with `bronze` / `silver` / `gold`, and **everyone in the
 team reads and writes it**. Your own lakehouse stays yours; the team's is where you put tables the
-whole team works on. The top bar shows it: *"· team: sales (team_sales)"*.
+whole team works on. **📁 My files** then has a **👥 Team: sales** tab, and **🗂️ My catalogs**
+lists `team_sales`.
 
 For a short overview of everything a team shares, see [Working in a team](teams.md).
 
