@@ -52,7 +52,7 @@
     .tbl td:first-child{padding-left:38px; color:var(--muted)}
     .cardhead{display:flex; align-items:center; justify-content:space-between; gap:8px} .cardhead h3{margin:0}
     .invite{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:8px}
-    .invite input{width:170px} .invite select{max-width:100%}
+    .invite input{width:240px} .invite select{max-width:100%}
     pre{margin:0; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; overflow:auto; font-size:.86rem}
     .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--line);
            padding:10px 16px; border-radius:10px; box-shadow:var(--shadow); display:none; z-index:10}
@@ -181,12 +181,27 @@
       ihead.appendChild(el('h3', null, '🤝 Invite a member'));
       var iopen = el('button', 'small', 'Invite…'); ihead.appendChild(iopen); inv.appendChild(ihead);
       var ibody = el('div'); ibody.style.display = 'none'; ibody.style.marginTop = '10px';
-      var who = el('input'); who.type = 'text'; who.placeholder = 'member username';
+      var who = el('input'); who.type = 'text'; who.placeholder = 'member username (type 3+ letters)'; who.autocomplete = 'off';
+      // lookup: from 3 characters, matching members as suggestions
+      var found = el('datalist'); found.id = 'members-found'; who.setAttribute('list', found.id);
+      var lookT, lookQ = '';
+      who.oninput = function () {
+        clearTimeout(lookT); var q = who.value.trim().toLowerCase();
+        if (q.length < 3) { found.innerHTML = ''; lookQ = ''; return; }
+        lookT = setTimeout(function () {
+          if (q === lookQ) return; lookQ = q;
+          api('GET', '/members', {q: q}).then(function (r) {
+            if (!r.ok || who.value.trim().toLowerCase() !== q) return;
+            found.innerHTML = '';
+            r.body.forEach(function (n) { found.appendChild(el('option')).value = n; });
+          });
+        }, 250);
+      };
       var acc = el('select'); acc.innerHTML = '<option value="read">read</option><option value="write">read + write</option>';
       var scope = el('select'); scope.innerHTML = '<option value="">the whole lake</option>';
       var go = el('button', 'primary small', 'Invite');
       var irow = el('div', 'invite'); [who, acc, el('span', 'sub', 'to'), scope, go].forEach(function (x) { irow.appendChild(x); });
-      ibody.appendChild(irow);
+      ibody.appendChild(irow); ibody.appendChild(found);
       ibody.appendChild(el('div', 'sub', 'The whole lake: every namespace and its tables, also ones you make later (read + write: they can also create and drop tables). Or one namespace (e.g. bronze) and all its tables. They find it under Shared with me.'));
       inv.appendChild(ibody); m.appendChild(inv);
       var scoped = false;

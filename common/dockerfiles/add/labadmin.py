@@ -616,6 +616,19 @@ def people():
             for u in sorted(users or [], key=lambda u: u["username"])]
 
 
+def lookup(text, me=None, limit=8):
+    """Usernames containing `text` (3+ characters), for the invite box — names only, the member
+    themselves left out, names starting with `text` first."""
+    text = (text or "").strip().lower()
+    if len(text) < 3:
+        return []
+    _, users = _kc("GET", f"/admin/realms/{REALM}/users?" + urllib.parse.urlencode(
+        {"username": text, "exact": "false", "briefRepresentation": "true", "max": 50}), token=_kc_token())
+    names = [u["username"] for u in users or [] if u.get("enabled", True) and u["username"] != me
+             and text in u["username"]]
+    return sorted(names, key=lambda n: (not n.startswith(text), n))[:limit]
+
+
 def ensure_team(user):
     """Re-attach the member's team lake, if they are in a team (e.g. after their Polaris role was
     recreated). A member in no team stays in none — managers add members to teams."""

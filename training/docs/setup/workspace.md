@@ -276,7 +276,7 @@ rows: 1
 **🗂️ My catalogs** (landing page) lists the catalogs you own and the ones shared with you:
 
 - **＋ New** creates a catalog `<you>_<name>`, stored in your bucket under `tables/<you>_<name>/`.
-- **🤝 Invite a member** to a catalog — **read** or **read + write** — to the **whole lake**
+- **🤝 Invite a member** to a catalog (type 3 letters of their username to look them up) — **read** or **read + write** — to the **whole lake**
   (every namespace and table, also ones you make later) or to one namespace (e.g. `gold`), and
   **revoke** it again under **Shared with**. Polaris enforces it: they see exactly what you shared.
 - **Open in Polaris Console ↗** opens the catalog in the Console, signed in as you — browse
