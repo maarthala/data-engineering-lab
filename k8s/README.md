@@ -69,7 +69,7 @@ deploy playbook runs it). None of the laptop defaults (`manager` / `manager` …
 
 ### First sign-in after deploying
 Read the manager password and sign in at `http://de.lan` as **`manager`** — that's the account
-for 👥 **Manage members** (create members, self-registration on/off) and admin in every tool:
+for 🛠️ **Manage** (members, teams, self-registration on/off) and admin in every tool:
 
 ```bash
 kubectl -n de-stack get secret de-stack-secrets -o jsonpath='{.data.manager-password}' | base64 -d; echo
@@ -131,8 +131,8 @@ use `microk8s kubectl`.
 
 ### Manage members (managers only)
 Signed in as a manager (Keycloak group `managers`, e.g. `manager`), the landing page shows
-**👥 Manage members** (`/manage.html`): every lab account with its lakehouse, catalogs and bucket
-use, and
+**🛠️ Manage**, three pages. **👥 Members** (`/manage.html`): every lab account with its team,
+lakehouse, catalogs and bucket use, and
 
 - **Create member** — account + lakehouse, bucket, SQLPad user (random password shown once; the
   learner picks their own at first sign-in)
@@ -142,6 +142,15 @@ use, and
 - **Wipe** — back to a new member's setup: only their lakehouse (bronze/silver/gold + sample
   table), starter files and a fresh Jupyter; extra catalogs deleted, the shares they gave revoked
 - **Delete** — the account and everything it owns
+
+**🧩 Teams** (`/teams.html`): every member is in one team (new members: `general`) and reads and
+writes its lakehouse `team_<team>` (bucket `team-<team>-lake`).
+
+- **Create team** — Keycloak group `team-<team>` + its lakehouse; **Delete team** once it's empty
+- **Add** a member — search by name; a member in another team moves (loses that team's
+  lakehouse, their tables stay there); **✕** sends a member back to the default team
+
+**⚙️ Settings** (`/settings.html`):
 
 - **Self-registration** on / off — the Register link on the sign-in page (Keycloak's realm
   setting). Turn it on while a new batch signs up, off otherwise; managers can always create

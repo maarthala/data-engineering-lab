@@ -23,6 +23,14 @@ data:
 {{ .Files.Get "files/home/catalogs.html" | indent 4 }}
   manage.html: |
 {{ .Files.Get "files/home/manage.html" | indent 4 }}
+  teams.html: |
+{{ .Files.Get "files/home/teams.html" | indent 4 }}
+  settings.html: |
+{{ .Files.Get "files/home/settings.html" | indent 4 }}
+  admin.js: |
+{{ .Files.Get "files/home/admin.js" | indent 4 }}
+  admin.css: |
+{{ .Files.Get "files/home/admin.css" | indent 4 }}
   secrets.html: |
 {{ .Files.Get "files/home/secrets.html" | indent 4 }}
   variables.html: |
@@ -58,6 +66,10 @@ spec:
             - { name: html, mountPath: /usr/share/nginx/html/files.html, subPath: files.html }
             - { name: html, mountPath: /usr/share/nginx/html/catalogs.html, subPath: catalogs.html }
             - { name: html, mountPath: /usr/share/nginx/html/manage.html, subPath: manage.html }
+            - { name: html, mountPath: /usr/share/nginx/html/teams.html, subPath: teams.html }
+            - { name: html, mountPath: /usr/share/nginx/html/settings.html, subPath: settings.html }
+            - { name: html, mountPath: /usr/share/nginx/html/admin.js, subPath: admin.js }
+            - { name: html, mountPath: /usr/share/nginx/html/admin.css, subPath: admin.css }
             - { name: html, mountPath: /usr/share/nginx/html/secrets.html, subPath: secrets.html }
             - { name: html, mountPath: /usr/share/nginx/html/variables.html, subPath: variables.html }   # → secrets.html
             - { name: html, mountPath: /usr/share/nginx/html/lab-header.js, subPath: lab-header.js }

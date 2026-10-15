@@ -1,0 +1,60 @@
+/* Shared look of the managers' pages (manage.html, teams.html, settings.html). */
+:root{
+  --bg:#0b1020; --panel:#141b2e; --panel2:#1b2438; --line:#2a3550;
+  --ink:#e8edf7; --muted:#9aa8c7; --accent:#6d8bff; --accent2:#39d0c4; --danger:#ff6b6b; --gold:#e2b93b;
+  --shadow:0 10px 30px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{margin:0; color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:radial-gradient(1200px 600px at 80% -10%, rgba(109,139,255,.18), transparent 60%),
+             radial-gradient(900px 500px at -10% 10%, rgba(57,208,196,.12), transparent 55%), var(--bg)}
+button{font:inherit; cursor:pointer; border-radius:9px; padding:6px 12px; border:1px solid var(--line); background:var(--panel2); color:var(--ink)}
+button:hover{border-color:var(--accent)}
+button:disabled{opacity:.5; cursor:wait}
+button.primary{border:0; font-weight:700; color:#0b1020; background:linear-gradient(135deg,var(--accent),var(--accent2))}
+button.small{padding:3px 9px; font-size:.82rem}
+button.danger{border-color:rgba(255,107,107,.55); color:#ffb3b0}
+select{font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:5px 8px}
+input[type=text], input[type=password]{font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:6px 9px; outline:none}
+input:focus{border-color:var(--accent)}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--accent2)}
+.pagebar{padding:10px 28px; border-bottom:1px solid var(--line); background:rgba(20,27,46,.45)}
+.pagebar h1{margin:0; font-size:1.1rem; font-weight:800} .pagebar h1 .dot{color:var(--accent)}
+main{padding:18px 28px; display:flex; flex-direction:column; gap:14px}
+.card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px}
+.card h3{margin:0 0 10px; font-size:.95rem; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em}
+.sub{color:var(--muted); font-size:.88rem}
+.row{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+.wrap{overflow-x:auto}
+table{width:100%; border-collapse:collapse}
+td,th{padding:8px 10px; border-bottom:1px solid var(--line); text-align:left; font-size:.92rem; vertical-align:middle}
+th{color:var(--muted); font-size:.75rem; text-transform:uppercase; letter-spacing:.05em}
+tr:last-child td{border-bottom:0}
+td.r{text-align:right; white-space:nowrap}
+td.acts{white-space:nowrap}
+.tag{font-size:.7rem; padding:1px 7px; border-radius:999px; border:1px solid var(--line); color:var(--muted); margin-left:6px}
+.tag.mgr{border-color:rgba(226,185,59,.55); color:#f3d98b}
+.muted{color:var(--muted)}
+.confirm td{background:rgba(255,107,107,.07)}
+.result{border-color:rgba(57,208,196,.5)}
+.result.err{border-color:var(--danger)}
+.secret{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:1.05rem; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:6px 10px}
+.placeholder{color:var(--muted); padding:40px; text-align:center}
+.switch{display:inline-flex; align-items:center; gap:10px; cursor:pointer; user-select:none}
+.switch .track{width:44px; height:24px; border-radius:999px; background:var(--panel2); border:1px solid var(--line); position:relative; transition:.15s}
+.switch .knob{position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:var(--muted); transition:.15s}
+.switch.on .track{background:rgba(57,208,196,.35); border-color:var(--accent2)}
+.switch.on .knob{left:22px; background:var(--accent2)}
+.switch.busy{opacity:.5; cursor:wait}
+/* tabs: Members · Teams · Settings */
+.tabs{display:flex; gap:6px; margin-top:8px}
+.tabs a{color:var(--muted); text-decoration:none; padding:5px 12px; border-radius:9px; border:1px solid transparent; font-size:.92rem}
+.tabs a:hover{color:var(--ink); border-color:var(--line)}
+.tabs a.on{color:var(--ink); background:var(--panel2); border-color:var(--line)}
+.chip{display:inline-flex; align-items:center; gap:6px; padding:3px 4px 3px 10px; border:1px solid var(--line); border-radius:999px; margin:0 6px 6px 0; font-size:.88rem}
+.chip button{padding:0 7px; border-radius:999px; font-size:.8rem; line-height:1.4}
+.teams{display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:14px}
+.hint{font-size:.82rem; color:var(--gold); margin-top:6px}
+

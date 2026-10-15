@@ -290,17 +290,18 @@ straight in **your folder** `secret/<you>/`: one entry per secret, the same ones
 
 Broke your lakehouse, or want a clean slate for the next unit? Ask your **platform manager**
 (on your laptop stack, that's you: sign in as `manager`). On the landing page they have
-**👥 Manage members**, with two resets:
+**🛠️ Manage**, whose **👥 Members** page has two resets:
 
 | | What goes | What stays |
 |---|---|---|
 | **Reset lakehouse** | every table and view in your catalogs (bronze / silver / gold and the sample table come back) | your files, notebooks, DAGs, catalogs and shares |
 | **Wipe** | everything: tables, extra catalogs, the shares you gave, your bucket, your Jupyter files, your secrets | your account; you're back to a new member's setup (lakehouse, sample table, starter files) |
 
-The same page lets managers create members, give someone a new password, delete an account, and
-switch **self-registration** on or off (on while a new batch signs up, off otherwise). Its
-**Teams** card creates teams (and deletes empty ones), and the **Team** column of the member list
-moves a member to another team.
+The same page lets managers create members (in the team they pick), give someone a new password
+and delete an account. **🧩 Teams** creates teams (and deletes empty ones) and adds members to a
+team: search a member by name; one who is in another team moves (✕ sends a member back to the
+default team). **⚙️ Settings** switches **self-registration** on or off (on while a new batch
+signs up, off otherwise).
 
 ## You can now…
 - Register, sign in once and reach every tool with your lab account

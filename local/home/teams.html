@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teams — Epireum's Data Engineering Lab</title>
+  <link rel="stylesheet" href="/admin.css?v=1">
+</head>
+<body>
+  <header id="lab-top"></header>
+  <script src="/lab-header.js?v=7"></script>
+  <main id="main">
+    <div class="placeholder">Loading…</div>
+  </main>
+  <script src="/admin.js?v=1"></script>
+  <script>
+    // 🧩 Teams — every member is in exactly one team and reads and writes its lakehouse
+    // team_<team>. Adding a member who is in another team moves them (their old team's lakehouse
+    // is no longer theirs; what they made there stays). Removing moves them to the default team.
+    var el = admin.el, n = 0;
+    admin.page('🧩 Teams');
+
+    function createCard(reload) {
+      var name = el('input', {type: 'text', placeholder: 'team name (a-z, 0-9)', autocomplete: 'off'});
+      var b = el('button', {class: 'primary', text: 'Create team'});
+      function go() {
+        var team = name.value.trim().toLowerCase();
+        if (!team) return name.focus();
+        admin.act(b, 'team-create', {team: team}, 'Created team ' + team, function (r) {
+          return [['Lakehouse ' + r.catalog + ' (bronze / silver / gold) and bucket ' + r.bucket + '. Add its members below.']];
+        }, reload);
+      }
+      b.addEventListener('click', go);
+      name.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
+      return el('div', {class: 'card'}, [
+        el('h3', {text: 'Create a team'}),
+        el('div', {class: 'row'}, [name, b]),
+        el('div', {class: 'sub', style: 'margin-top:8px',
+          text: 'A team gets its own lakehouse, which every member of the team reads and writes. Each member is in one team; new members start in the default team.'})]);
+    }
+
+    function teamCard(t, members, reload) {
+      var teamOf = {};
+      members.forEach(function (m) { teamOf[m.user] = m.team; });
+
+      // members: one chip each; ✕ moves them back to the default team
+      var chips = el('div');
+      if (!t.members.length) chips.appendChild(el('div', {class: 'sub', text: 'No members yet.'}));
+      t.members.forEach(function (u) {
+        var chip = el('span', {class: 'chip'}, [u]);
+        if (!t['default']) {
+          var x = el('button', {class: 'small', text: '✕', title: 'Remove — back to the default team'});
+          x.addEventListener('click', function () {
+            admin.act(x, 'move', {user: u, team: defaultTeam}, u + ' removed from ' + t.team, function (r) {
+              return [[u + ' is back in ' + r.team + '. The tables they made in team_' + t.team + ' stay there.']];
+            }, reload);
+          });
+          chip.appendChild(x);
+        }
+        chips.appendChild(chip);
+      });
+
+      // add a member: search by name (suggestions show each member's current team)
+      var list = el('datalist', {id: 'who-' + (++n)});
+      members.forEach(function (m) {
+        if (m.team !== t.team) list.appendChild(el('option', {value: m.user, label: m.team ? 'in ' + m.team : 'no team yet'}));
+      });
+      var who = el('input', {type: 'text', list: list.id, placeholder: 'search a member…', autocomplete: 'off'});
+      var add = el('button', {class: 'primary small', text: 'Add'});
+      var hint = el('div', {class: 'hint', hidden: ''});
+      function check() {
+        var u = who.value.trim().toLowerCase(), from = teamOf[u];
+        if (u in teamOf && from && from !== t.team) {
+          hint.textContent = u + ' is in ' + from + ' — adding them here takes them out of ' + from +
+                             ' (they lose its lakehouse; their tables there stay).';
+          hint.hidden = false; add.textContent = 'Move here';
+        } else { hint.hidden = true; add.textContent = 'Add'; }
+      }
+      function go() {
+        var u = who.value.trim().toLowerCase();
+        if (!(u in teamOf)) { hint.textContent = 'No member called ' + (u || '…') + '.'; hint.hidden = false; return who.focus(); }
+        if (teamOf[u] === t.team) { hint.textContent = u + ' is already in ' + t.team + '.'; hint.hidden = false; return; }
+        admin.act(add, 'move', {user: u, team: t.team}, u + ' added to ' + t.team, function (r) {
+          return [[u + ' now reads and writes team_' + r.team + (r.from.length ? ', no longer team_' + r.from.join(', team_') : '') +
+                   '. In Jupyter from their next server start.']];
+        }, reload);
+      }
+      who.addEventListener('input', check);
+      who.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
+      add.addEventListener('click', go);
+
+      var del = null;
+      if (!t.members.length && !t['default']) {
+        del = el('button', {class: 'small danger', text: 'Delete team'});
+        del.addEventListener('click', function () {
+          if (!del.dataset.armed) { del.dataset.armed = '1'; del.textContent = 'Delete its tables and files too?'; return; }
+          admin.act(del, 'team-delete', {team: t.team}, 'Deleted team ' + t.team, function (r) {
+            return [['Its lakehouse team_' + r.team + ' (' + r.dropped + ' table(s)/view(s)) and bucket ' + r.bucket + ' are gone.']];
+          }, reload);
+        });
+      }
+
+      return el('div', {class: 'card'}, [
+        el('h3', {}, [t.team + ' (' + t.members.length + ')', t['default'] ? el('span', {class: 'tag', text: 'default'}) : null]),
+        el('div', {class: 'sub', style: 'margin-bottom:10px'}, ['Lakehouse ', el('code', {text: t.catalog}),
+          ' · bucket ', el('code', {text: t.bucket}), t.bucket_mb == null ? '' : ' (' + t.bucket_mb + ' MB)']),
+        chips,
+        el('div', {class: 'row', style: 'margin-top:8px'}, [who, list, add]),
+        hint,
+        t['default'] ? el('div', {class: 'sub', style: 'margin-top:8px',
+          text: 'New members start here. To take someone out, add them to another team.'}) : null,
+        del ? el('div', {style: 'margin-top:10px'}, [del]) : null]);
+    }
+
+    var defaultTeam = 'general';
+    function load() {
+      return Promise.all([admin.api('GET', '/api/admin/teams'), admin.api('GET', '/api/admin/members')]).then(function (r) {
+        var teams = r[0].teams, members = r[1].members;
+        teams.forEach(function (t) { if (t['default']) defaultTeam = t.team; });
+        admin.fill([createCard(load), el('div', {class: 'teams'},
+          teams.map(function (t) { return teamCard(t, members, load); }))]);
+      }).catch(admin.failed);
+    }
+    load();
+  </script>
+</body>
+</html>

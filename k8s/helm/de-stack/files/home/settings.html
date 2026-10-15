@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — Epireum's Data Engineering Lab</title>
+  <link rel="stylesheet" href="/admin.css?v=1">
+</head>
+<body>
+  <header id="lab-top"></header>
+  <script src="/lab-header.js?v=7"></script>
+  <main id="main">
+    <div class="placeholder">Loading…</div>
+  </main>
+  <script src="/admin.js?v=1"></script>
+  <script>
+    // ⚙️ Settings — lab-wide switches. For now: self-registration on the sign-in page.
+    var el = admin.el;
+    admin.page('⚙️ Settings');
+
+    function registrationCard(on) {
+      var sw = el('span', {class: 'switch', role: 'switch', tabindex: '0'},
+                  [el('span', {class: 'track'}, [el('span', {class: 'knob'})]), el('b', {text: '…'})]);
+      var label = sw.lastChild;
+      function paint(on) {
+        sw.className = 'switch' + (on ? ' on' : ''); sw.setAttribute('aria-checked', on ? 'true' : 'false');
+        label.textContent = on ? 'On — the sign-in page shows Register' : 'Off — only managers create accounts';
+      }
+      function toggle() {
+        if (sw.classList.contains('busy')) return;
+        var want = !sw.classList.contains('on');
+        sw.classList.add('busy');
+        admin.api('POST', '/api/admin/settings', {registration: want})
+          .then(function (r) { paint(r.registration); })
+          .catch(function (e) { admin.show('Could not change self-registration', [e.message], null, true); })
+          .then(function () { sw.classList.remove('busy'); });
+      }
+      sw.addEventListener('click', toggle);
+      sw.addEventListener('keydown', function (e) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(); } });
+      paint(on);
+      return el('div', {class: 'card'}, [
+        el('h3', {text: 'Self-registration'}),
+        el('div', {class: 'row'}, [sw]),
+        el('div', {class: 'sub', style: 'margin-top:8px',
+          text: 'Turn it on while a new batch signs up, then off again. While it\'s on, anyone who can reach the sign-in page can create an account. New members start in the default team.'})]);
+    }
+
+    admin.api('GET', '/api/admin/settings')
+      .then(function (r) { admin.fill([registrationCard(r.registration)]); })
+      .catch(admin.failed);
+  </script>
+</body>
+</html>

@@ -239,6 +239,12 @@ def members():
         _, members = _kc("GET", f"/admin/realms/{REALM}/groups/{gid}/members?max=1000", token=kc)
         managers = {m["username"] for m in members or []}
     team_of = {m: t_["team"] for t_ in teams(kc) for m in t_["members"]}
+    for u in users or []:                     # every member is in a team: e.g. one who never
+        if u["username"] not in team_of:      # signed in since teams came → the default team
+            try:
+                team_of[u["username"]] = ensure_team(u["username"])
+            except Exception as e:  # noqa: BLE001 — listed without a team; tried again next time
+                print(f"[labadmin] team for {u['username']}: {e}", flush=True)
     out = []
     for u in sorted(users or [], key=lambda u: u["username"]):
         name = lh.lake_name(u["username"])

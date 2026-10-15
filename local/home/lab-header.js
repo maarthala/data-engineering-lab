@@ -30,7 +30,8 @@
   if (!top) return;
   var here = location.pathname.replace(/\/+$/, '') || '/';
   function link(href, text) {
-    var on = (href === '/' ? (here === '/' || here === '/index.html') : here === href);
+    var on = (href === '/' ? (here === '/' || here === '/index.html') :
+              href === '/manage.html' ? /^\/(manage|teams|settings)\.html$/.test(here) : here === href);
     return '<a class="btn' + (on ? ' on' : '') + '" href="' + href + '">' + text + '</a>';
   }
   top.innerHTML =
@@ -39,7 +40,7 @@
     '<div class="tag">Your gateway to a Data Engineering career</div></div></a>' +
     '<div class="me" id="me" hidden><span>Hi <b id="me-name"></b></span><span class="lake" id="me-lake"></span>' +
     link('/', '🏠 Home') + link('/files.html', '📁 My files') + link('/catalogs.html', '🗂️ My catalogs') + link('/secrets.html', '🔑 My secrets') +
-    '<span id="me-admin" hidden>' + link('/manage.html', '👥 Manage members') + '</span>' +
+    '<span id="me-admin" hidden>' + link('/manage.html', '🛠️ Manage') + '</span>' +
     '<a class="btn" id="me-out" href="#">Log out</a></div>';
 
   var k8s = /(^|\.)de\.lan$/.test(location.hostname);
