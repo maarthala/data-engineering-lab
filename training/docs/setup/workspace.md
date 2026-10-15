@@ -286,6 +286,9 @@ rows: 1
 - **🤝 Invite a member** to a catalog (type 3 letters of their username to look them up) — **read** or **read + write** — to the **whole lake**
   (every namespace and table, also ones you make later) or to one namespace (e.g. `gold`), and
   **revoke** it again under **Shared with**. Polaris enforces it: they see exactly what you shared.
+  The whole of your main lake (`<you>_lake`) also shares **your files** (`files/` in your
+  bucket), with the same access: they find them under **📁 My files → 🤝 Shared with me**.
+  Revoking the lake takes the files back too.
 - **Open in Polaris Console ↗** opens the catalog in the Console, signed in as you — browse
   it, add namespaces and tables. (The Console's own **Catalogs** list shows `0` for members:
   listing *all* catalogs is admin-only, so open yours from here.)

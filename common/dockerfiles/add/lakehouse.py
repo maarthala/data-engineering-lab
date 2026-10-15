@@ -757,7 +757,8 @@ def _describe_share(cat, role, t):
 
 def share(name, cat, grantee, access, namespace=None, table=None):
     """Give another learner read / write on a catalog you own — all of it (namespace empty: every
-    namespace and table, also ones made later), or only one namespace or table."""
+    namespace and table, also ones made later), or only one namespace or table. The whole of
+    your main lake <name>_lake also shares your files (files/ in your bucket), the same access."""
     if access not in ("read", "write"):
         raise ValueError("access must be read or write")
     grantee = lake_name(grantee or "")
@@ -788,7 +789,11 @@ def share(name, cat, grantee, access, namespace=None, table=None):
                   {"grant": {"type": "catalog", "privilege": priv}}, t)[0], f"grant {priv}")
     _ok(_call("PUT", f"{_M}/principal-roles/{grantee}/catalog-roles/{cat}", {"catalogRole": {"name": role}}, t)[0],
         "assign share")
-    return {"role": role, "grantee": grantee, "access": access, "namespace": namespace, "table": table}
+    files = None
+    if not ns and cat == f"{name}_lake":               # the lake = its tables + your files
+        files = share_folder(name, "files/", grantee, access)["path"]
+    return {"role": role, "grantee": grantee, "access": access, "namespace": namespace, "table": table,
+            "files": files}
 
 
 def list_shares(name, cat):
@@ -816,6 +821,15 @@ def revoke(name, cat, role):
         raise PermissionError("not your catalog")
     for p in _get(f"{_M}/catalogs/{cat}/catalog-roles/{role}/principal-roles", t).get("roles", []):
         _ok(_call("DELETE", f"{_M}/principal-roles/{p['name']}/catalog-roles/{cat}/{role}", token=t)[0], "unassign")
+        if role.endswith("_c_all") and cat == f"{name}_lake":   # the lake's files went with it
+            other = {"read": "write", "write": "read"}[role.split("_")[-3]]
+            if _call("GET", f"{_M}/catalogs/{cat}/catalog-roles/share_{p['name']}_{other}_c_all", token=t)[0] == 200:
+                share_folder(name, "files/", p["name"], other)        # still invited the other way
+                continue
+            try:
+                unshare_folder(name, "files/", p["name"])
+            except ValueError:                         # already stopped on My files
+                pass
     _ok(_call("DELETE", f"{_M}/catalogs/{cat}/catalog-roles/{role}", token=t)[0], "delete share")
 
 

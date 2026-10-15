@@ -125,7 +125,9 @@ bound to the other user's principal-role:
 | the **whole lake**, **read** / **write** | the namespace set, granted on the catalog — every namespace and table, also later ones (write adds `TABLE_DROP`) |
 | always | `CATALOG_READ_PROPERTIES` + `NAMESPACE_LIST` (open the catalog, see namespace names) |
 
-Revoke deletes that catalog-role. In [6.4](grant-and-query.md) you build the same chain by
+Inviting a member to your whole main lake also shares your **files** (`files/` in your bucket,
+same access) through their storage policy, not Polaris: tables and files go together.
+Revoke deletes that catalog-role (and the files share). In [6.4](grant-and-query.md) you build the same chain by
 hand in the Console, as the Polaris admin.
 
 !!! info "Governed everywhere — Spark, the Console, SQLPad and Superset"

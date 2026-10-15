@@ -158,7 +158,10 @@
           var tr = el('tr'); tr.appendChild(el('td', null, what(s)));
           var td = el('td'); td.appendChild(el('span', 'tag ' + s.access, s.access === 'write' ? 'read + write' : 'read')); tr.appendChild(td); t.appendChild(tr);
         });
-        acc.appendChild(t); m.appendChild(acc);
+        acc.appendChild(t);
+        if (/_lake$/.test(name) && c.shares.some(function (s) { return s.scope === 'lake' || !s.namespace; }))
+          acc.appendChild(el('div', 'sub', 'Their files come with the lake: 📁 My files → 🤝 Shared with me.'));
+        m.appendChild(acc);
         var nb = el('div', 'card'); nb.appendChild(el('h3', null, 'Use it in a notebook'));
         nb.appendChild(snippet(name, c.shares[0].namespace, c.shares[0].table)); m.appendChild(nb);
         return;
@@ -202,7 +205,9 @@
       var go = el('button', 'primary small', 'Invite');
       var irow = el('div', 'invite'); [who, acc, el('span', 'sub', 'to'), scope, go].forEach(function (x) { irow.appendChild(x); });
       ibody.appendChild(irow); ibody.appendChild(found);
-      ibody.appendChild(el('div', 'sub', 'The whole lake: every namespace and its tables, also ones you make later (read + write: they can also create and drop tables). Or one namespace (e.g. bronze) and all its tables. They find it under Shared with me.'));
+      ibody.appendChild(el('div', 'sub', 'The whole lake: every namespace and its tables, also ones you make later (read + write: they can also create and drop tables)' +
+        (info.default ? ', and your files (files/ in your bucket, under 📁 My files → 🤝 Shared with me for them)' : '') +
+        '. Or one namespace (e.g. bronze) and all its tables. They find it under Shared with me.'));
       inv.appendChild(ibody); m.appendChild(inv);
       var scoped = false;
       iopen.onclick = function () {
@@ -261,7 +266,7 @@
         api('POST', '/shares', p).then(function (r) {
           go.disabled = false;
           if (!r.ok) return toast(r.body.error, true);
-          toast('Invited ' + r.body.grantee); who.value = ''; shares();
+          toast('Invited ' + r.body.grantee + (r.body.files ? ' — tables and files' : '')); who.value = ''; shares();
         });
       }
       go.onclick = invite; who.onkeydown = function (e) { if (e.key === 'Enter') invite(); };
@@ -273,7 +278,7 @@
           stab.innerHTML = '<tr><th>Member</th><th>What</th><th>Access</th><th></th></tr>';
           r.body.forEach(function (s) {
             var tr = el('tr'); tr.appendChild(el('td', null, s.grantees.join(', ')));
-            tr.appendChild(el('td', null, what(s)));
+            tr.appendChild(el('td', null, what(s) + (info.default && (s.scope === 'lake' || !s.namespace) ? ' + your files' : '')));
             var a = el('td'); a.appendChild(el('span', 'tag ' + s.access, s.access === 'write' ? 'read + write' : 'read')); tr.appendChild(a);
             var td = el('td', 'r'), b = el('button', 'small danger', 'Revoke'); td.appendChild(b); tr.appendChild(td);
             b.onclick = function () { api('DELETE', '/shares', {catalog: name, role: s.role}).then(function (x) {
