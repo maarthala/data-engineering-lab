@@ -225,6 +225,11 @@ def _vault_fields(name, user, team=False):
             raise KeyError(f"{name_} is not in a team")
         folder = labvault.team_folder(t)
     d = labvault.fields(folder, name)
+    if d is None and not team:                     # not theirs — is it their team's?
+        t = lh.team_of(name_)
+        if t and labvault.fields(labvault.team_folder(t), name) is not None:
+            raise KeyError(f"no secret {name!r} in {name_}'s folder — the team {t} has one: "
+                           f"key_vault({name!r}, team=True)")
     if d is None:
         raise KeyError(f"no secret {name!r} in {folder} — add it on 🔑 My secrets{' → Team' if team else ''}")
     return d

@@ -74,6 +74,15 @@ def _vault(method, key="", body=None, team=False):
 def _fields(name, team=False):
     """All fields of one of your (or your team's) secrets, without the page's bookkeeping."""
     body = _vault("GET", name, team=team)
+    if body is None and not team and _os_env.get("TEAM_CATALOG", "").startswith("team_"):
+        try:                                   # not yours — is it your team's?
+            found = _vault("GET", name, team=True) is not None
+        except Exception:  # noqa: BLE001
+            found = False
+        if found:
+            t = _os_env["TEAM_CATALOG"][len("team_"):]
+            raise KeyError(f"no secret {name!r} in your folder — your team {t} has one: "
+                           f"key_vault({name!r}, team=True)")
     if body is None:
         where = "the team's" if team else "yours"
         raise KeyError(f"no secret {name!r} — add it on 🔑 My secrets"
