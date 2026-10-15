@@ -36,8 +36,8 @@ Add a new Gold mart `gold.daily_cancellations` to your lakehouse and expose it i
    `order_date`, and writes `my.gold.daily_cancellations` with columns `order_date`,
    `total_orders`, `cancelled_orders`, `cancellation_rate` (0.0–1.0), using `createOrReplace`
    (idempotent). It runs after `silver`, beside the existing `gold` task.
-2. **Governance.** Share the new table **read-only** with one other member on **🗂️ My catalogs**
-   ([6.4](../unit6/grant-and-query.md)) — nothing more than that one table.
+2. **Governance.** Share your **`gold`** layer **read-only** with one other member on **🗂️ My catalogs**
+   ([6.4](../unit6/grant-and-query.md)) — nothing more than `gold`.
 3. **BI.** Add a Superset **Dataset** on `demouser_lake` → `gold` → `daily_cancellations` and a
    **line chart** of `cancellation_rate` over `order_date`, on your executive dashboard
    ([7.1](../unit7/dashboards.md)).
@@ -95,8 +95,8 @@ Add a new Gold mart `gold.daily_cancellations` to your lakehouse and expose it i
     **2. Governance — share it read-only (My catalogs)**
 
     **🗂️ My catalogs** → `demouser_lake` → **🤝 Invite a member**: the other member's username →
-    **read** → to **table gold.daily_cancellations** → **Invite**.
-    Behind the scenes that's a Polaris catalog role with `TABLE_READ_DATA` on that one table, bound
+    **read** → to **namespace gold** → **Invite**.
+    Behind the scenes that's a Polaris catalog role with `TABLE_READ_DATA` on `gold` (its tables), bound
     to their principal-role — the least-privilege grant chain from [6.4](../unit6/grant-and-query.md).
 
     **3. Superset**

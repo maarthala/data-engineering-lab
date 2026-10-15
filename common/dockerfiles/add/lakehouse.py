@@ -619,17 +619,16 @@ def create_catalog(name, short):
     return {"name": cat, "location": loc}
 
 
-def catalog_tree(name, cat):
-    """Namespaces + tables of a catalog the learner owns (for the share picker)."""
+def catalog_tree(name, cat, namespace=None):
+    """Namespaces of a catalog the learner owns, or (namespace given) that namespace's tables —
+    the page lists namespaces and loads a namespace's tables when it's opened."""
     t = _admin_token()
     if not _owned(name, cat, t):
         raise PermissionError("not your catalog")
-    out = []
-    for ns in _get(f"/api/catalog/v1/{cat}/namespaces", t)["namespaces"]:
-        n = ".".join(ns)
-        tables = _get(f"/api/catalog/v1/{cat}/namespaces/{urllib.parse.quote(chr(31).join(ns))}/tables", t)
-        out.append({"namespace": n, "tables": [i["name"] for i in tables.get("identifiers", [])]})
-    return out
+    if namespace:
+        ns = urllib.parse.quote(chr(31).join(namespace.split(".")))
+        return [i["name"] for i in _get(f"/api/catalog/v1/{cat}/namespaces/{ns}/tables", t).get("identifiers", [])]
+    return [".".join(ns) for ns in _get(f"/api/catalog/v1/{cat}/namespaces", t)["namespaces"]]
 
 
 def _share_role(grantee, access, namespace, table=None):

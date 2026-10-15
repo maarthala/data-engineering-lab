@@ -277,7 +277,7 @@ rows: 1
 
 - **＋ New** creates a catalog `<you>_<name>`, stored in your bucket under `tables/<you>_<name>/`.
 - **🤝 Invite a member** to a catalog — **read** or **read + write** — to the **whole lake**
-  (every namespace and table, also ones you make later) or to one namespace or table, and
+  (every namespace and table, also ones you make later) or to one namespace (e.g. `gold`), and
   **revoke** it again under **Shared with**. Polaris enforces it: they see exactly what you shared.
 - **Open in Polaris Console ↗** opens the catalog in the Console, signed in as you — browse
   it, add namespaces and tables. (The Console's own **Catalogs** list shows `0` for members:
@@ -427,6 +427,6 @@ signs up, off otherwise).
 - Tell your own lakehouse (`my` in Jupyter, `<you>_lake` in SQLPad) from the shared lake (`shared` in Jupyter, `iceberg` / `polaris_lake` in SQLPad)
 - Keep notebooks and DAGs in `my_files/notebooks/` and `my_files/dags/`, and name DAGs `<you>_…`
 - Work in your team's lakehouse, `team_<team>` (in every tool)
-- Create a catalog and share a namespace or table with another member
+- Create a catalog and share a namespace with another member
 - Keep keys and passwords in **My secrets** (the key vault) and read them with `key_vault()` — the team's with `team="<team>"`
 - Know when to ask a manager for a lakehouse reset or a full wipe

@@ -108,9 +108,9 @@ Open **Open in Polaris Console ↗** on the same page: you see the catalog and i
 **names**, but only `gold` lists tables. Seeing that `silver` exists isn't access to it.
 
 ### 4 · Owner: widen, then revoke
-- Share **one table** with write: **🤝 Invite a member** → `learner2` → **read + write** → to
-  **table silver.orders_clean** → **Invite**. learner2 can now `INSERT` / `DELETE` in that one table — and still can't read
-  anything else in `silver`.
+- Share **`silver`** with write: **🤝 Invite a member** → `learner2` → **read + write** → to
+  **namespace silver** → **Invite**. learner2 can now read `silver.orders_clean` and `INSERT` /
+  `DELETE` in it (and in every other `silver` table).
 - **Revoke** both shares under **Shared with**. learner2's next query answers
   *Forbidden* — grants are checked on every request, there's nothing to log out of.
 
@@ -122,7 +122,6 @@ bound to the other user's principal-role:
 |---|---|
 | namespace, **read** | `TABLE_LIST`, `TABLE_READ_DATA`, `TABLE_READ_PROPERTIES`, `NAMESPACE_READ_PROPERTIES` |
 | namespace, **write** | the read set + `TABLE_WRITE_DATA`, `TABLE_WRITE_PROPERTIES`, `TABLE_CREATE` |
-| table, **read** / **write** | the same, on that one table |
 | the **whole lake**, **read** / **write** | the namespace set, granted on the catalog — every namespace and table, also later ones (write adds `TABLE_DROP`) |
 | always | `CATALOG_READ_PROPERTIES` + `NAMESPACE_LIST` (open the catalog, see namespace names) |
 
@@ -159,5 +158,5 @@ through workspace roles and OneLake security.
 ## You can now…
 - Explain how **Polaris governs every engine** over one Iceberg lakehouse, per user
 - Read your own RBAC chain: principal → principal-role → catalog-role → grants
-- **Invite** a member to your whole lake, a namespace or a single table, read or write, and **revoke** it
+- **Invite** a member to your whole lake or one namespace, read or write, and **revoke** it
 - Tell *metadata* denial (`Forbidden`) from *storage* denial (`Access Denied` on vended creds)

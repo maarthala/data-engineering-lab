@@ -21,9 +21,9 @@ from the browser can point at another bucket.
 (read / write) and revoke. Polaris enforces the access; ownership is checked here.
   GET    /api/catalogs                                   owned + shared-with-me
   POST   /api/catalogs?name=sales                        create <user>_sales
-  GET    /api/catalogs/tree?catalog=…                    namespaces + tables (owner)
+  GET    /api/catalogs/tree?catalog=…[&namespace=…]     namespaces, or one namespace's tables (owner)
   GET    /api/catalogs/shares?catalog=…                  who has what (owner)
-  POST   /api/catalogs/shares?catalog&grantee&access[&namespace[&table]]  (no namespace: the whole lake)
+  POST   /api/catalogs/shares?catalog&grantee&access[&namespace]  (no namespace: the whole lake)
   DELETE /api/catalogs/shares?catalog=…&role=…           revoke
 
 "Manage members" — managers only (Keycloak group `managers`). Actions run in the background
@@ -229,12 +229,12 @@ class Handler(BaseHTTPRequestHandler):
                 _rules_now()
                 return self._json(200, out)
             if method == "GET" and path == "/api/catalogs/tree":
-                return self._json(200, lh.catalog_tree(name, q.get("catalog", "")))
+                return self._json(200, lh.catalog_tree(name, q.get("catalog", ""), q.get("namespace") or None))
             if method == "GET" and path == "/api/catalogs/shares":
                 return self._json(200, lh.list_shares(name, q.get("catalog", "")))
             if method == "POST" and path == "/api/catalogs/shares":
                 out = lh.share(name, q.get("catalog", ""), q.get("grantee", "").strip(),
-                               q.get("access", "read"), q.get("namespace") or None, q.get("table") or None)
+                               q.get("access", "read"), q.get("namespace") or None)
                 _rules_now()
                 return self._json(200, out)
             if method == "DELETE" and path == "/api/catalogs/shares":
