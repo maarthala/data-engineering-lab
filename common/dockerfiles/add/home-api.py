@@ -16,9 +16,8 @@ from the browser can point at another bucket.
   POST   /api/files/mkdir?prefix=a/new/     new folder
   DELETE /api/files?key=…                   delete a file
   DELETE /api/files/folder?prefix=…[&confirm_table=1]  delete a folder (tables need confirm)
-  GET    /api/files/shares              folders I share (by_me) and folders shared with me (with_me)
-  POST   /api/files/shares?folder&grantee&access   share a folder under files/ (read | write)
-  DELETE /api/files/shares?folder&grantee         stop sharing it
+  GET    /api/files/shares              files I share (by_me) / shared with me (with_me) — they
+                                         come with a whole-lake invite on My catalogs
 
 "My catalogs" — catalogs the learner owns or that are shared with them; create a catalog
 <name>_<x> (stored in their bucket); invite another learner to it (the whole lake or a namespace)
@@ -147,19 +146,13 @@ class Handler(BaseHTTPRequestHandler):
         share = None                                 # space=shared: the folder share in use
         try:
             self._ensure(name)
-            # folders I share / folders shared with me
+            # files shared with me (they come with a whole-lake invite — see lh.share)
             if method == "GET" and path == "/api/files/shares":
                 rows = lh.folder_shares()
                 return self._json(200, {
                     "by_me": [r for r in rows if r["owner"] == name],
                     "with_me": [dict(r, path=f"s3a://{bucket_name(r['owner'])}/{r['folder']}")
                                 for r in rows if r["grantee"] == name]})
-            if method == "POST" and path == "/api/files/shares":
-                return self._json(200, lh.share_folder(name, q.get("folder"), q.get("grantee", "").strip(),
-                                                       q.get("access", "read")))
-            if method == "DELETE" and path == "/api/files/shares":
-                lh.unshare_folder(name, q.get("folder"), lake_name(q.get("grantee", "")))
-                return self._json(200, {"revoked": True})
             if q.get("space") == "team":
                 team = lh.team_of(name)
                 if not team:

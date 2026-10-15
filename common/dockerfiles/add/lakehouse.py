@@ -165,7 +165,7 @@ def put_storage_policy(name, admin=False, team=None):
     return _admin("PUT", "add-canned-policy", {"name": storage_user(name)}, json.dumps(doc).encode())
 
 
-# ---- Shared folders: a member gives another member read / write on one folder of their files ----
+# ---- Shared files: a whole-lake invite (share()) also gives read / write on the owner's files/ ----
 # Kept in one JSON file in the platform bucket (members can't reach it); the grantee's storage
 # policy above gets a rule per folder, so their Jupyter, DAG and console keys all see it at once.
 SHARES_BUCKET, SHARES_KEY = "lab-admin", "folder-shares.json"

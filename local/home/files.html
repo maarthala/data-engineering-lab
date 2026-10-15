@@ -117,11 +117,6 @@
     .spaces a.on{color:var(--ink); background:var(--panel2); border-color:var(--line)}
     .stag{font-size:.68rem; margin-left:6px; padding:1px 7px; border-radius:999px; border:1px solid rgba(57,208,196,.5); color:var(--accent2)}
     .stag.write{border-color:rgba(226,185,59,.55); color:#f3d98b}
-    .dialog.share{width:min(560px,94vw)} .dialog.share p{white-space:normal}
-    .srow{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px}
-    .srow input{flex:1; min-width:180px; width:auto; margin:0} .dialog select{font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:7px 9px}
-    .slist{border-top:1px solid var(--line); margin-top:4px; padding-top:10px; font-size:.9rem}
-    .slist .it{display:flex; align-items:center; gap:8px; padding:4px 0} .slist .it span:first-child{flex:1}
     @media (max-width:760px){ .app{grid-template-columns:1fr} aside{max-height:30vh; border-right:0; border-bottom:1px solid var(--line)} }
   </style>
 </head>
@@ -176,17 +171,6 @@
     <input type="text" id="d-input" autocomplete="off">
     <div class="row"><button id="d-cancel">Cancel</button><button id="d-ok" class="danger">Delete</button></div>
   </div></div>
-  <div class="scrim" id="s-scrim"><div class="dialog share">
-    <h3 id="s-title">🤝 Share folder</h3>
-    <p class="hint">They get this folder and everything in it (also files added later) — in <b>My files → 🤝 Shared with me</b>,
-      and in Spark by its path. Not your other folders, not your tables (share those on 🗂️ My catalogs).</p>
-    <div class="srow"><input type="text" id="s-who" placeholder="member username (type 3+ letters)" autocomplete="off" list="s-found">
-      <datalist id="s-found"></datalist>
-      <select id="s-acc"><option value="read">read</option><option value="write">read + write</option></select>
-      <button class="primary" id="s-go">Share</button></div>
-    <div class="slist" id="s-list"></div>
-    <div class="row" style="margin-top:12px"><button id="s-close">Close</button></div>
-  </div></div>
   <div class="toast" id="toast"></div>
 
   <script>
@@ -202,7 +186,7 @@
     function withSpace(params) { params = params || {}; if (SPACE) params.space = SPACE; if (OWNER) params.owner = OWNER; return params; }
     $(SPACE ? 'sp-' + SPACE : 'sp-mine').className = 'on';
     function inRoot(p) { return p.indexOf(ROOT) === 0 ? p : ROOT; }
-    var state = {prefix: inRoot(decodeURIComponent(location.hash.slice(1) || '')), bucket: '', tables: {}, shares: {}, readonly: false};
+    var state = {prefix: inRoot(decodeURIComponent(location.hash.slice(1) || '')), bucket: '', tables: {}, readonly: false};
     var nodes = {};   // prefix -> {li, ul, caret, label, loaded, open}
 
     // ---------- helpers ----------
@@ -337,13 +321,8 @@
         }
         d.folders.forEach(function (f) {
           var a = el('a', null, (state.tables[f.prefix] ? '🧊 ' : '📁 ') + f.name); a.href = '#' + encodeURIComponent(f.prefix);
-          var tr = el('tr'), nm = cell(a, 'name'); tr.appendChild(nm); tr.appendChild(el('td', 'num', '—')); tr.appendChild(el('td', 'num'));
+          var tr = el('tr'); tr.appendChild(cell(a, 'name')); tr.appendChild(el('td', 'num', '—')); tr.appendChild(el('td', 'num'));
           var acts = [];
-          if (!SPACE && f.prefix.indexOf('files/') === 0) {          // your own files: share a folder
-            var n = (state.shares[f.prefix] || []).length;
-            if (n) nm.appendChild(el('span', 'stag', '🤝 ' + n));
-            acts.push(iconBtn('🤝', 'Share this folder with a member', '', function () { shareDialog(f); }));
-          }
           if (!state.readonly) acts.push(iconBtn('🗑', 'Delete folder', 'del', function () { delFolder(f); }));
           tr.appendChild(cell(group(acts), 'act'));
           rows.appendChild(tr);
@@ -524,65 +503,24 @@
       if (e.detail.team) { $('sp-team').hidden = false; $('sp-team').textContent = '👥 Team: ' + e.detail.team; }
     });
 
-    // ---------- folder shares ----------
-    function shareApi(method, params) {
-      var q = new URLSearchParams(params || {}).toString();
-      return fetch('/api/files/shares' + (q ? '?' + q : ''), {method: method, credentials: 'same-origin'})
+    // ---------- 🤝 Shared with me: files that come with a lake another member invited you to ----------
+    function shareApi(method) {
+      return fetch('/api/files/shares', {method: method, credentials: 'same-origin'})
         .then(function (r) { return r.json().then(function (j) { return {ok: r.ok, body: j}; }); });
     }
     function loadShares() {
-      return shareApi('GET').then(function (r) {
-        state.shares = {}; state.withMe = r.ok ? r.body.with_me : [];
-        if (r.ok) r.body.by_me.forEach(function (s) { (state.shares[s.folder] = state.shares[s.folder] || []).push(s); });
-      });
-    }
-    var lookT;
-    $('s-who').oninput = function () {                     // member lookup, from 3 letters
-      clearTimeout(lookT); var q = this.value.trim().toLowerCase(), box = $('s-found');
-      if (q.length < 3) { box.innerHTML = ''; return; }
-      lookT = setTimeout(function () {
-        fetch('/api/catalogs/members?q=' + encodeURIComponent(q), {credentials: 'same-origin'}).then(function (r) { return r.json(); })
-          .then(function (names) { box.innerHTML = ''; (names || []).forEach(function (n) { box.appendChild(el('option')).value = n; }); });
-      }, 250);
-    };
-    function shareDialog(f) {
-      $('s-title').textContent = '🤝 Share ' + f.prefix;
-      $('s-who').value = ''; $('s-scrim').style.display = 'flex'; $('s-who').focus();
-      function list() {
-        var box = $('s-list'), rows = state.shares[f.prefix] || []; box.innerHTML = '';
-        box.appendChild(el('div', 'hint', rows.length ? 'Shared with' : 'Not shared with anyone yet.'));
-        rows.forEach(function (s) {
-          var it = el('div', 'it'); it.appendChild(el('span', null, s.grantee));
-          it.appendChild(el('span', 'stag' + (s.access === 'write' ? ' write' : ''), s.access === 'write' ? 'read + write' : 'read'));
-          var b = el('button', 'danger', 'Revoke'); b.style.padding = '3px 9px'; it.appendChild(b);
-          b.onclick = function () { shareApi('DELETE', {folder: f.prefix, grantee: s.grantee}).then(function (r) {
-            if (!r.ok) return toast(r.body.error, true); toast('Stopped sharing with ' + s.grantee); loadShares().then(function () { list(); load(); }); }); };
-          box.appendChild(it);
-        });
-      }
-      list();
-      function go() {
-        var who = $('s-who').value.trim(); if (!who) return $('s-who').focus();
-        $('s-go').disabled = true;
-        shareApi('POST', {folder: f.prefix, grantee: who, access: $('s-acc').value}).then(function (r) {
-          $('s-go').disabled = false;
-          if (!r.ok) return toast(r.body.error, true);
-          toast('Shared with ' + r.body.grantee); $('s-who').value = ''; loadShares().then(function () { list(); load(); });
-        });
-      }
-      $('s-go').onclick = go; $('s-who').onkeydown = function (e) { if (e.key === 'Enter') go(); };
-      $('s-close').onclick = function () { $('s-scrim').style.display = 'none'; };
+      return shareApi('GET').then(function (r) { state.withMe = r.ok ? r.body.with_me : []; });
     }
     function sharedWithMe() {                              // ?space=shared without a folder: the list
       $('space-title').textContent = '🤝 Shared with me'; $('bucket').parentNode.querySelectorAll('.dot,.muted-label,.bucket').forEach(function (x) { x.hidden = true; });
       document.querySelector('aside').hidden = true; document.querySelector('.app').style.gridTemplateColumns = '1fr';
       $('table-banner').hidden = true; document.querySelector('.btns').style.display = 'none';
-      $('crumbs').textContent = 'Folders other members shared with you';
+      $('crumbs').textContent = 'Files of members who invited you to their whole lake (🗂️ My catalogs)';
       document.querySelector('thead tr').innerHTML = '<th>Folder</th><th>Shared by</th><th>Access</th><th>Spark path</th>';
       $('who').parentNode.innerHTML = 'Open a folder to browse it. In Spark, read its files by path, e.g. <code>spark.read.csv("s3a://…/files/source/orders.csv", header=True)</code>.';
       loadShares().then(function () {
         var rows = $('rows'); rows.innerHTML = '';
-        if (!state.withMe.length) { var e = el('tr'), td = el('td', 'empty', 'Nothing shared with you yet.'); td.colSpan = 4; e.appendChild(td); rows.appendChild(e); return; }
+        if (!state.withMe.length) { var e = el('tr'), td = el('td', 'empty', 'Nothing shared with you yet — when a member invites you to their whole lake, their files show up here.'); td.colSpan = 4; e.appendChild(td); rows.appendChild(e); return; }
         state.withMe.forEach(function (s) {
           var a = el('a', null, '🤝 ' + s.folder); a.href = '/files.html?' + new URLSearchParams({space: 'shared', owner: s.owner, folder: s.folder}) + '#' + encodeURIComponent(s.folder);
           var tr = el('tr'); tr.appendChild(cell(a, 'name')); tr.appendChild(el('td', null, s.owner));
@@ -592,7 +530,7 @@
       });
     }
     if (SPACE === 'shared' && !OWNER) sharedWithMe();
-    else (SPACE ? Promise.resolve() : loadShares()).then(load).then(refresh);
+    else load().then(refresh);
   </script>
 </body>
 </html>
