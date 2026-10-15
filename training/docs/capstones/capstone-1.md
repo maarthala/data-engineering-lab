@@ -58,7 +58,7 @@ Add a new Gold mart `gold.daily_cancellations` to your lakehouse and expose it i
 
 ??? note "Solution"
 
-    **1. Gold step — a new task in `dags/medallion.py`**
+    **1. Gold step — a new task in `my_files/dags/medallion.py`**
 
     ```python
     @task

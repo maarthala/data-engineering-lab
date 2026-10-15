@@ -21,7 +21,7 @@ mapping, a calendar. Seeds are for small, hand-made data you'd otherwise type in
 for loading real data (that's Bronze's job).
 
 ## Lab
-Continue in `~/work/dbt/shop` with the project from
+Continue in `~/work/my_files/dbt/shop` with the project from
 [Models, ref() and materializations](models-ref.md).
 
 ### 1 · Describe what "correct" means: `schema.yml`

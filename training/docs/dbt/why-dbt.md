@@ -69,8 +69,8 @@ flowchart LR
 - dbt sends each model's SQL to **Spark Connect**, like your notebooks do, **as you**: it
   reads and writes only **your** lakehouse (`<you>_lake`), with your login. Another member's
   catalog or the shared lake is refused, as everywhere else.
-- Your project lives in Jupyter's **`dbt/`** folder, mirrored to your bucket like `notebooks/`
-  and `dags/` ([Your files](../setup/workspace.md#your-files-notebooks-dags-data)).
+- Your project lives in Jupyter's **`my_files/dbt/`** folder, mirrored to your bucket like `my_files/notebooks/`
+  and `my_files/dags/` ([Your files](../setup/workspace.md#your-files-notebooks-dags-data)).
 
 ## 🎯 This runs unchanged on Azure, Databricks, Snowflake & Fabric
 dbt is the same tool everywhere; only the **adapter** (the plugin that talks to the engine)

@@ -29,7 +29,7 @@ How does dbt decide a row **changed**? You pick a **strategy**:
 `sample_orders` has no updated-at column, so this lesson uses **`check`** on `status`.
 
 ## Lab
-Continue in `~/work/dbt/shop`.
+Continue in `~/work/my_files/dbt/shop`.
 
 ### 1 · Declare the snapshot
 Create a folder **`snapshots/`** in the project (next to `models/`) and a file

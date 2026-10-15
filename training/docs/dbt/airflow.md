@@ -17,7 +17,7 @@ lab_dbt("build")            # = `dbt build` in your project
 What it does, step by step:
 
 1. Takes **your project** from your bucket: `files/src/dbt/shop/`, the mirror of Jupyter's
-   `dbt/shop/` folder.
+   `my_files/dbt/shop/` folder.
 2. Signs in **as you**: your lakehouse, with your jobs login (the same one `lab_spark()` uses;
    your notebook login changes at every Jupyter start, so jobs get their own).
 3. Runs **`dbt deps`** if the project has a `packages.yml`, then your command, and prints dbt's
@@ -28,7 +28,7 @@ Your `profiles.yml` works unchanged: it reads your lakehouse and login from envi
 variables, and `lab_dbt()` sets those for the run.
 
 ## Lab
-You need the project from the previous lessons in `dbt/shop/`, and the Airflow UI.
+You need the project from the previous lessons in `my_files/dbt/shop/`, and the Airflow UI.
 
 !!! warning "Airflow runs the copy in your bucket"
     Files you **save in Jupyter's editor** reach your bucket straight away. Files created or
@@ -37,7 +37,7 @@ You need the project from the previous lessons in `dbt/shop/`, and the Airflow U
     version of a model, that's why. Check in **📁 My files** → `files/src/dbt/shop/`.
 
 ### 1 · One task: build everything
-New file in Jupyter's **`dags/`** folder, **`<you>_dbt_shop.py`** (with your username, like every
+New file in Jupyter's **`my_files/dags/`** folder, **`<you>_dbt_shop.py`** (with your username, like every
 DAG: [Airflow basics](../unit5/basics.md#in-the-lab-your-dags-live-in-jupyters-dags-folder)):
 
 ```python

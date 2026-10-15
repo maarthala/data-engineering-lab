@@ -49,7 +49,7 @@ kinds of bucket:
   - **`files/source/shopflow/`** — practice files to ingest: `customers.csv`, `orders.csv`,
     `products.csv` (small and messy) and `sample_orders.csv`; lesson [4.2](../unit4/read-bronze.md)
     exports the raw order **history** (Parquet, partitioned by `dt=`) here too.
-  - **`files/src/notebooks/`** and **`files/src/dags/`** — Jupyter's `notebooks/` and `dags/`
+  - **`files/src/notebooks/`** and **`files/src/dags/`** — Jupyter's `my_files/notebooks/` and `my_files/dags/`
     folders, kept in sync (DAGs → Airflow).
   - **`tables/`** — where your catalogs keep their table files (`tables/demouser_lake/<namespace>/…`).
     You read these *through the catalog*, not by path.

@@ -21,7 +21,7 @@ Your source is the starter table every member has: **`bronze.sample_orders`**, 1
 orders ([Your lab account & workspace](../setup/workspace.md)).
 
 ### 1 · Declare the source
-In Jupyter's file browser, open `dbt/shop/models/`, create a folder **`staging`**, and in it a
+In Jupyter's file browser, open `my_files/dbt/shop/models/`, create a folder **`staging`**, and in it a
 new file **`sources.yml`**:
 
 ```yaml
@@ -59,7 +59,7 @@ from {{ source('bronze', 'sample_orders') }}
   table name when it **compiles** the model.
 
 ### 3 · See the SQL dbt will run: `dbt compile`
-In the terminal (`cd ~/work/dbt/shop` first):
+In the terminal (`cd ~/work/my_files/dbt/shop` first):
 
 ```bash
 dbt compile -s stg_orders

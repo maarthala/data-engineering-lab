@@ -18,7 +18,7 @@ You tell dbt three things:
 | a **filter** inside `{% if is_incremental() %}` | which rows count as "new" on later runs |
 
 ## Lab
-Continue in `~/work/dbt/shop`.
+Continue in `~/work/my_files/dbt/shop`.
 
 ### 1 · The incremental model
 New file **`models/marts/fct_orders.sql`**, a fact table of orders

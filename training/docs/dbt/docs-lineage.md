@@ -15,7 +15,7 @@ report, an ML model. It adds the last box to the graph: *which dashboard breaks 
 model changes?*
 
 ## Lab
-Continue in `~/work/dbt/shop`.
+Continue in `~/work/my_files/dbt/shop`.
 
 ### 1 · Describe the source and the models
 Add **`description:`** lines. In `models/staging/sources.yml`:
@@ -152,7 +152,7 @@ dbt docs generate --static
   that opens in any browser with no server.
 
 ### 5 · Open it
-In Jupyter's file browser, go to `dbt/shop/target/`, right-click **`static_index.html`** →
+In Jupyter's file browser, go to `my_files/dbt/shop/target/`, right-click **`static_index.html`** →
 **Download**, and open the downloaded file in your browser. What's in it:
 
 - **Left: Project tab**: your folders (sources, models, seeds, snapshots, exposures, macros);

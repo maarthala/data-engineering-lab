@@ -22,7 +22,7 @@ A **package** is someone else's macros (and tests), installed into your project.
     check it whenever a model with Jinja behaves oddly.
 
 ## Lab
-Continue in `~/work/dbt/shop`.
+Continue in `~/work/my_files/dbt/shop`.
 
 ### 1 · A setting you can change per run: `var()`
 In [Incremental models](incremental.md), the lookback window was a fixed `3`. Make it a

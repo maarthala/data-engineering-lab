@@ -20,7 +20,7 @@ flowchart LR
 
 ## Lab
 ### The brief
-Build **`gold.monthly_channel_groups`** in your `dbt/shop` project: one row per **month** and
+Build **`gold.monthly_channel_groups`** in your `my_files/dbt/shop` project: one row per **month** and
 **channel group**, with:
 
 | Column | Meaning |

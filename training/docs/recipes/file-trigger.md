@@ -35,9 +35,9 @@ at RustFS instead of AWS. (Inside the stack RustFS is reached at `http://storage
 ## Lab
 
 ### 1 · Drop the DAG in the dags folder
-Just like every DAG in [Unit 5](../unit5/basics.md), this is one Python file in your **`dags/`**
+Just like every DAG in [Unit 5](../unit5/basics.md), this is one Python file in your **`my_files/dags/`**
 folder. Create it in Jupyter's file browser (<http://localhost:8008>) as
-**`dags/ingest_on_file_arrival.py`**.
+**`my_files/dags/ingest_on_file_arrival.py`**.
 
 Read the whole thing first — it's a two-task pipeline, a sensor that waits then a task that runs —
 and then we'll walk it piece by piece.

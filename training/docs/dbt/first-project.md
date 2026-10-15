@@ -3,7 +3,7 @@
 ## Concept
 A dbt **project** is a folder with one settings file (`dbt_project.yml`) and your models in
 `models/`. dbt also needs to know **how to connect** to the engine; that's `profiles.yml`.
-You already have a starter project: Jupyter's **`dbt/shop/`** folder.
+You already have a starter project: Jupyter's **`my_files/dbt/shop/`** folder.
 
 ```
 dbt/shop/
@@ -29,7 +29,7 @@ In Jupyter: **File → New → Terminal**. A terminal is a window where you type
 line you type runs when you press Enter. Go to the project and list its files:
 
 ```bash
-cd ~/work/dbt/shop
+cd ~/work/my_files/dbt/shop
 ls
 ```
 ```text
@@ -37,7 +37,7 @@ dbt_project.yml  macros  models  profiles.yml
 ```
 
 - **`cd`** (*change directory*) moves into a folder. `~` is your home folder, so
-  `~/work/dbt/shop` is the `dbt/shop/` you see in Jupyter's file browser.
+  `~/work/my_files/dbt/shop` is the `my_files/dbt/shop/` you see in Jupyter's file browser.
 - **`ls`** lists what's in the folder.
 
 !!! tip "Every dbt command runs in the project folder"
@@ -153,7 +153,7 @@ If something's wrong instead:
 
 | You see | What's wrong |
 |---|---|
-| `project path </home/jovyan/work/dbt_project.yml> not found` (`dbt debug`) | you're not in the project folder: `cd ~/work/dbt/shop` |
+| `project path </home/jovyan/work/dbt_project.yml> not found` (`dbt debug`) | you're not in the project folder: `cd ~/work/my_files/dbt/shop` |
 | `Invalid value for '--profiles-dir': Path '/home/jovyan/.dbt' does not exist` (`dbt run` …) | the same: wrong folder, so dbt can't find `profiles.yml` |
 | `Runtime Error` … `Syntax error near line 4` | a YAML mistake on that line: usually a tab or a wrong indentation |
 
@@ -167,7 +167,7 @@ A **macro** is a reusable piece of Jinja, like a function. You'll write your own
 unit; for now, leave this one as it is.
 
 !!! note "Where your files are kept"
-    `dbt/` is mirrored to your bucket (`files/src/dbt/`) like `notebooks/` and `dags/`: files
+    `my_files/dbt/` is mirrored to your bucket (`files/src/dbt/`) like `my_files/notebooks/` and `my_files/dags/`: files
     you save in Jupyter's editor are copied straight away. dbt's generated folders, `target/`
     and `logs/`, stay in Jupyter only: dbt rebuilds them on every run.
     ([Your files](../setup/workspace.md#your-files-notebooks-dags-data))

@@ -48,7 +48,7 @@ The plan for this lesson is one **task per layer** and one arrow between them â€
 ## Lab
 
 ### 1. Create the DAG
-In Jupyter's **`dags/`** folder create **`medallion.py`**. Each layer is a `@task` function; the
+In Jupyter's **`my_files/dags/`** folder create **`medallion.py`**. Each layer is a `@task` function; the
 last line wires them with `>>`:
 
 ```python

@@ -126,7 +126,7 @@ governed by least-privilege grants, scheduled idempotently, and surfaced in Supe
     Polaris enforces it — the same grant chain as [6.4](../unit6/grant-and-query.md). (In a company
     you'd grant **groups**, e.g. *analysts*, not individual people.)
 
-    **4 — Airflow, idempotent + no catchup** — `dags/product_weekly.py`:
+    **4 — Airflow, idempotent + no catchup** — `my_files/dags/product_weekly.py`:
 
         import pendulum
         from airflow.sdk import dag, task

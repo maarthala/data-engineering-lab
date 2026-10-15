@@ -169,7 +169,7 @@ def lab_dbt(command="build", project="shop", user=None):
         @task
         def build():
             from lab_spark import lab_dbt
-            lab_dbt("build")                       # = `dbt build` in ~/work/dbt/shop
+            lab_dbt("build")                       # = `dbt build` in ~/work/my_files/dbt/shop
 
     The project is their bucket's files/src/dbt/<project>/ (Jupyter's dbt/<project>/ folder,
     mirrored on save), copied to a fresh folder for this run. Their own profiles.yml is used:

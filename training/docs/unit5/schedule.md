@@ -36,7 +36,7 @@ dates the scheduler **missed**? Three ideas answer them:
 ## Lab
 
 ### 1. A daily DAG with retries
-In Jupyter's **`dags/`** folder create **`daily.py`**. Each run loads one day — the run's business
+In Jupyter's **`my_files/dags/`** folder create **`daily.py`**. Each run loads one day — the run's business
 date, which the tasks receive as **`ds`** — into Bronze, then refreshes that day in Gold.
 
 ```python

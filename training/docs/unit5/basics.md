@@ -68,15 +68,15 @@ flowchart LR
   B -.->|logs and status| UI["Web UI"]
 ```
 
-## In the lab: your DAGs live in Jupyter's `dags/` folder
-You don't need to install anything to do the labs. Every DAG you write goes into the **`dags/`**
+## In the lab: your DAGs live in Jupyter's `my_files/dags/` folder
+You don't need to install anything to do the labs. Every DAG you write goes into the **`my_files/dags/`**
 folder in Jupyter's file browser (your bucket's `files/src/dags/`); the lab's Airflow loads it
 from there within about **30 seconds**. One Airflow is shared by the whole class, so one rule
 keeps names apart: **every `dag_id` starts with your username and `_`** — `demouser_…` for the
 default account. (A DAG that breaks the rule shows up under Airflow's **import errors** with the
 name it expects.) In the Airflow UI you see **your own DAGs** (you can run, edit and delete them)
 and the platform's DAGs (read-only) — other members' DAGs and runs stay private to them.
-Your `dags/` folder already holds one example: `load_sample_orders.py`.
+Your `my_files/dags/` folder already holds one example: `load_sample_orders.py`.
 
 ## Optional: Airflow on your own machine
 The professional workflow is: **write a DAG, test it locally on your own machine, and only *then*
@@ -176,7 +176,7 @@ yet still reports the run "successful" (a common surprise — pick any date betw
 ### 4. Ship it
 Once the DAG passes locally, deploy it:
 
-- **In the lab:** save the file in Jupyter's **`dags/`** folder — Airflow loads it within ~30 s.
+- **In the lab:** save the file in Jupyter's **`my_files/dags/`** folder — Airflow loads it within ~30 s.
 - **In a company:** **commit + push** to the Git repo the shared Airflow **git-syncs** — never edit
   files on the server directly.
 
@@ -199,7 +199,7 @@ Take the tour:
 - The **▶ Trigger** button runs a DAG on demand.
 
 ### 2. Write your first DAG
-Open Jupyter (<http://localhost:8008>), and in the file browser open the **`dags/`** folder →
+Open Jupyter (<http://localhost:8008>), and in the file browser open the **`my_files/dags/`** folder →
 right-click → **New File** → name it `hello_shopflow.py`:
 
 This one file is a complete pipeline. It's short on purpose — two trivial tasks that just print
@@ -318,7 +318,7 @@ through **XCom** (*cross-communication*): a task **pushes** a value, Airflow sto
 database, and a later task **pulls** it.
 
 The easiest way is the **TaskFlow** style: write tasks as plain Python functions. Create
-`dags/xcom_demo.py`:
+`my_files/dags/xcom_demo.py`:
 
 ```python
 from airflow.sdk import dag, task
@@ -450,7 +450,7 @@ In the Grid, click the `extract` square → **XCom** tab to see the stored value
 ### 5. Conditional flow (branching)
 Sometimes the next step depends on the data: *new orders arrived → process them; nothing new →
 skip*. A **branch** task decides at run time which task(s) run next; the others are **skipped**.
-Create `dags/branch_demo.py`:
+Create `my_files/dags/branch_demo.py`:
 
 ```python
 from airflow.sdk import dag, task
@@ -545,7 +545,7 @@ and `skip_processing` is skipped.
     other path to take.
 
 ### 6. Other important concepts: retries, parameters, one task per item
-Three things almost every real DAG uses. Create `dags/concepts_demo.py`:
+Three things almost every real DAG uses. Create `my_files/dags/concepts_demo.py`:
 
 ```python
 from airflow.sdk import dag, task, Param, get_current_context
@@ -630,7 +630,7 @@ concepts_demo()
     | **Callbacks** | run a function on failure — e.g. send a Slack/e-mail alert (`on_failure_callback`) | Airflow docs |
 
 !!! note "Clean up"
-    Delete `xcom_demo.py`, `branch_demo.py` and `concepts_demo.py` from `dags/` when you're done —
+    Delete `xcom_demo.py`, `branch_demo.py` and `concepts_demo.py` from `my_files/dags/` when you're done —
     Airflow stops loading them within about a minute.
 
 ## Challenge

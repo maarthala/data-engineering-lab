@@ -183,11 +183,11 @@ def storage_key(name, purpose="files"):
 
 
 _README = {
-    "files/src/notebooks/": "Your notebooks — the notebooks/ folder in Jupyter, kept in sync.\n",
-    "files/src/dags/": "Airflow DAGs — the dags/ folder in Jupyter, kept in sync. Any .py here shows up\n"
+    "files/src/notebooks/": "Your notebooks — the my_files/notebooks/ folder in Jupyter, kept in sync.\n",
+    "files/src/dags/": "Airflow DAGs — the my_files/dags/ folder in Jupyter, kept in sync. Any .py here shows up\n"
                        "in Airflow within ~30 seconds. The dag_id must start with your username + '_',\n"
                        "e.g. dag_id=\"ravi_daily_sales\".\n",
-    "files/src/dbt/": "Your dbt projects — the dbt/ folder in Jupyter, kept in sync (dbt's target/, logs/\n"
+    "files/src/dbt/": "Your dbt projects — the my_files/dbt/ folder in Jupyter, kept in sync (dbt's target/, logs/\n"
                       "and dbt_packages/ are rebuilt on every run and stay in Jupyter only).\n",
     "files/source/": "Raw files to ingest (CSV, Parquet, JSON …) — the 'Read the lake' lesson exports ShopFlow here.\n",
     "tables/": "Table storage for your catalogs (tables/<catalog>/<namespace>/<table>/). Managed by\n"
@@ -687,8 +687,10 @@ def team_bucket(team):
 
 _TEAM_README = {
     "files/source/": "Files for the whole team — everyone in the team sees, uploads and reads them\n"
-                     "(My files → Team, Jupyter's team bucket, s3a://<this bucket>/files/source/… in Spark).\n",
-    "files/shared/": "Anything else the team shares: notebooks to copy, notes, results.\n",
+                     "(My files → Team, s3a://<this bucket>/files/source/… in Spark).\n",
+    "files/src/notebooks/": "The team's notebooks — the my_team/notebooks/ folder in everyone's Jupyter.\n",
+    "files/src/dags/": "The team's Airflow DAGs — the my_team/dags/ folder in everyone's Jupyter.\n",
+    "files/src/dbt/": "The team's dbt projects — the my_team/dbt/ folder in everyone's Jupyter.\n",
     "tables/": "Table storage of the team's lakehouse (tables/team_<team>/<namespace>/<table>/). Managed\n"
                "by the catalog — create and drop tables with SQL / Spark, don't edit files here.\n",
 }
@@ -697,6 +699,11 @@ _TEAM_README = {
 def make_team_folders(bucket):
     """The team bucket's folders, each with a README (best effort, like make_folders)."""
     import io
+    try:                                        # files/shared/ of the first team buckets: only its README → gone
+        if list_all(bucket, "files/shared/") == ["files/shared/README.md"]:
+            delete_object(bucket, "files/shared/README.md")
+    except Exception:  # noqa: BLE001
+        pass
     for f, text in _TEAM_README.items():
         try:
             _s3("HEAD", bucket, f + "README.md").close()

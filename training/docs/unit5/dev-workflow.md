@@ -29,12 +29,12 @@ flowchart LR
 Open Jupyter ([http://localhost:8008](http://localhost:8008)) and write the transformation
 **interactively** — run a cell, see the result, adjust. `spark` is already there, signed in as you
 (`iceberg` = your lakehouse). This is the fastest feedback loop for getting the *data logic* right —
-exactly what you did in [Unit 4](../unit4/read-bronze.md). Your `notebooks/` folder already has a
+exactly what you did in [Unit 4](../unit4/read-bronze.md). Your `my_files/notebooks/` folder already has a
 small, complete example: **`load_sample_orders.ipynb`** reads a CSV from your bucket and replaces
 `bronze.sample_orders`. Open it and **Run All**.
 
 ### 2 · Schedule the notebook as it is
-The quickest way to automate a working notebook is to run it from a DAG, unchanged. Your `dags/`
+The quickest way to automate a working notebook is to run it from a DAG, unchanged. Your `my_files/dags/`
 folder has one ready: **`load_sample_orders.py`**:
 
 ```python
@@ -65,7 +65,7 @@ load_sample_orders()
 
 **Read it step by step:**
 
-- **`run_notebook("load_sample_orders.ipynb")`** — fetches the notebook from your `notebooks/`
+- **`run_notebook("load_sample_orders.ipynb")`** — fetches the notebook from your `my_files/notebooks/`
   folder and runs its code cells **top to bottom**, the way Jupyter would: `spark` is a session
   signed in as you and `%%sql` works. If a cell fails, the task fails and its log names the cell.
 - **One task** — the whole notebook is one box in the Graph. Fine for a small job; for a real
@@ -82,7 +82,7 @@ functions and drop the scratch (`show()`, exploratory counts). One task per laye
 easy to pinpoint and lets you re-run just the broken step.
 
 ### 4 · Ship the DAG
-Never edit in the portal — deploy the *file*: save it in Jupyter's **`dags/`** folder (your
+Never edit in the portal — deploy the *file*: save it in Jupyter's **`my_files/dags/`** folder (your
 bucket's `files/src/dags/`). Airflow picks it up within ~30 s. The `dag_id` must start with your
 username + `_`; if it doesn't — or the file has an error — it shows up under **import errors** in
 the Airflow UI.
@@ -90,7 +90,7 @@ the Airflow UI.
 !!! note "In a company: Git, not a folder"
     In a real team the DAGs folder is a **Git repository** that the shared Airflow **git-syncs**:
     you `git push`, review, merge — and the scheduler picks the change up. Same idea as your
-    `dags/` folder, plus history and review.
+    `my_files/dags/` folder, plus history and review.
 
 ### 5 · Run it in Airflow
 Open the UI at [http://localhost:8001](http://localhost:8001) (sign in with your lab account):
@@ -154,7 +154,7 @@ long-running **Spark Connect server**. Watch it in the **Spark Master UI** at
 | **Job vs DAG** | The data *logic* (a notebook / task code) vs the *orchestration* (the Airflow DAG) |
 | **`run_notebook()`** | Run one of your notebooks from a DAG task, top to bottom, as you |
 | **`lab_spark()`** | Open a Spark session on the cluster as you, inside a task |
-| **Ship** | Save the DAG file in `dags/` (lab) / `git push` to the git-synced repo (company) |
+| **Ship** | Save the DAG file in `my_files/dags/` (lab) / `git push` to the git-synced repo (company) |
 | **Import errors** | Airflow's list of DAG files that failed to load — and why |
 | **Spark Master UI** | `:8002` — cluster status, workers, and the running Spark Connect server |
 | **Application UI** | Jobs / Stages / SQL / Executors for the Spark Connect server |
@@ -162,5 +162,5 @@ long-running **Spark Connect server**. Watch it in the **Spark Master UI** at
 ## You can now…
 - Follow the full loop: **notebook → scheduled notebook → tasks → ship → run → verify**
 - Schedule a notebook unchanged with `run_notebook`, and know when to split it into tasks
-- Ship a DAG by saving it in `dags/`, and find the reason in **import errors** when it doesn't load
+- Ship a DAG by saving it in `my_files/dags/`, and find the reason in **import errors** when it doesn't load
 - Verify a run in **three** places: the task log, the output data, and the **Spark Master UI**
