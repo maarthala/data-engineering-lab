@@ -90,7 +90,9 @@ def _jobs_storage_key(name):
 
 
 def lab_spark(user=None):
-    """Spark Connect session: iceberg = <user>_lake (as <user>_jobs), shared = the course lake."""
+    """Spark Connect session as <user>_jobs: iceberg = <user>_lake, shared = the course lake,
+    team = their team's lakehouse — and each of them by its real name too (as in SQLPad):
+    <user>_lake, polaris_lake, team_<team>."""
     from pyspark.sql import SparkSession
     name = lh.lake_name(user or _current_user())
     if not re.fullmatch(r"[a-z0-9_]+", name):
@@ -100,7 +102,12 @@ def lab_spark(user=None):
     # same settings as the server's own `iceberg` catalog — only the warehouse + login differ
     base = "spark.sql.catalog.iceberg"
     conf = {k: v for k, v in spark.conf.getAll.items() if k == base or k.startswith(base + ".")}
-    for cat, warehouse in (("iceberg", f"{name}_lake"), ("shared", lh.SHARED)):
+    team = lh.team_of(name)
+    cats = [("iceberg", f"{name}_lake"), ("shared", lh.SHARED), (f"{name}_lake", f"{name}_lake"),
+            (lh.SHARED, lh.SHARED)]
+    if team:
+        cats += [("team", lh.team_catalog(team)), (lh.team_catalog(team), lh.team_catalog(team))]
+    for cat, warehouse in cats:
         for k, v in conf.items():
             spark.conf.set(f"spark.sql.catalog.{cat}" + k[len(base):], v)
         spark.conf.set(f"spark.sql.catalog.{cat}.warehouse", warehouse)
@@ -109,7 +116,8 @@ def lab_spark(user=None):
     key, secret = _jobs_storage_key(name)
     spark.conf.set("fs.s3a.access.key", key)
     spark.conf.set("fs.s3a.secret.key", secret)
-    print(f"lab_spark: you are {name} · iceberg = {name}_lake · shared = {lh.SHARED}")
+    print(f"lab_spark: you are {name} · iceberg = {name}_lake · shared = {lh.SHARED}"
+          + (f" · team = {lh.team_catalog(team)}" if team else "") + " (each also by its real name)")
     return spark
 
 

@@ -797,8 +797,9 @@ def _trino_principal(t):
 
 
 def trino_catalog(cat, t=None):
-    """Make Polaris catalog `cat` queryable in Trino as `cat` (grant + CREATE CATALOG)."""
-    if not re.fullmatch(r"[a-z0-9_]+", cat) or cat == SHARED:
+    """Make Polaris catalog `cat` queryable in Trino as `cat` (grant + CREATE CATALOG). The shared
+    lake too: Trino's `iceberg` is it, and `polaris_lake` its real name (read-only for members)."""
+    if not re.fullmatch(r"[a-z0-9_]+", cat):
         return
     t = t or _admin_token()
     m, cid = "/api/management/v1", TRINO_LOGIN.split(":", 1)[0]
@@ -848,8 +849,7 @@ def sync_trino():
     """Re-add every learner catalog to Trino (after a Trino restart they're gone)."""
     t = _admin_token()
     for c in _get(f"/api/management/v1/catalogs", t)["catalogs"]:
-        if c["name"] != SHARED:
-            trino_catalog(c["name"], t)
+        trino_catalog(c["name"], t)
 
 
 # ---- Trino access rules (who may query what) --------------------------------------------
@@ -886,7 +886,7 @@ def trino_rules():
     write = {(u, c) for u, c, _, _, a in shares if a == "write"}
     catalogs += [{"user": q(u), "catalog": q(c), "allow": "all" if (u, c) in write else "read-only"}
                  for u, c in sorted({(u, c) for u, c, *_ in shares})]
-    catalogs += [{"catalog": "iceberg|shopflow|adventureworks|system", "allow": "read-only"}]
+    catalogs += [{"catalog": f"iceberg|{re.escape(SHARED)}|shopflow|adventureworks|system", "allow": "read-only"}]
     schemas = [{"user": TRINO_ADMINS, "owner": True}]
     schemas += [{"user": q(u), "catalog": q(c), "owner": True} for u, c in owned]
     schemas += [{"owner": False}]
@@ -895,7 +895,7 @@ def trino_rules():
     for u, c, ns, tbl, access in shares:
         tables.append({"user": q(u), "catalog": q(c), "schema": q(ns), "table": q(tbl) if tbl else ".*",
                        "privileges": ["SELECT", "INSERT", "DELETE", "UPDATE"] if access == "write" else ["SELECT"]})
-    tables += [{"catalog": "iceberg|shopflow|adventureworks|system", "privileges": ["SELECT"]}]
+    tables += [{"catalog": f"iceberg|{re.escape(SHARED)}|shopflow|adventureworks|system", "privileges": ["SELECT"]}]
     functions = [{"user": TRINO_ADMINS, "privileges": ["EXECUTE", "GRANT_EXECUTE", "OWNERSHIP"]}]
     functions += [{"user": q(u), "catalog": q(c), "privileges": ["EXECUTE", "GRANT_EXECUTE", "OWNERSHIP"]} for u, c in owned]
     functions += [{"privileges": ["EXECUTE"]}]

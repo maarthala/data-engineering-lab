@@ -55,10 +55,24 @@ tools are grouped in four columns — *Build & explore* (Notebook, Compute, SQL 
 There are two kinds of lake — **yours** and the course's **shared** one (read-only for members,
 with the ready-made ShopFlow tables such as `gold.daily_sales`):
 
-| Where you run it | `iceberg.…` means | The shared lake is |
-|---|---|---|
-| **Jupyter / Spark** (`spark.sql`, `%%sql`) | **your** lakehouse `<you>_lake` | `shared.…` — e.g. `shared.gold.daily_sales` |
-| **Trino, SQLPad, Superset** | the **shared** lake | `iceberg.…` |
+Every lake has a **real name** that works in every tool — `<you>_lake` (yours), `polaris_lake`
+(the course's shared lake) and `team_<team>` (your team's, see [Your team](#your-team)). Jupyter adds
+**short names** on top, which the lessons use:
+
+| Lake | Real name — Jupyter, SQLPad, Superset | Short name — Jupyter only | `iceberg.…` in SQLPad / Superset |
+|---|---|---|---|
+| **yours** | `<you>_lake.…`, e.g. `demouser_lake.bronze.sample_orders` | `iceberg.…` | — |
+| the **shared** lake | `polaris_lake.…`, e.g. `polaris_lake.gold.daily_sales` | `shared.…` | the shared lake |
+| your **team's** | `team_<team>.…`, e.g. `team_sales.bronze.customers` | `team.…` | — |
+
+So a query that uses real names runs unchanged in Jupyter and in SQLPad. Watch out for `iceberg`:
+in Jupyter it is **your** lakehouse, in SQLPad and Superset the **shared** lake.
+
+Jupyter's first cell lists the real names it set up:
+
+```text
+✓ also by name, as in SQLPad: demouser_lake, team_sales, polaris_lake
+```
 
 ```sql
 %%sql
@@ -149,8 +163,8 @@ whole team works on. The top bar shows it: *"· team: sales (team_sales)"*.
 
 | Where you run it | Your team's lakehouse is |
 |---|---|
-| **Jupyter / Spark** (`spark.sql`, `%%sql`) | `team.…`, e.g. `team.bronze.customers` |
-| **SQLPad, Superset** | its real name, e.g. `team_sales.bronze.customers` |
+| **Jupyter / Spark** (`spark.sql`, `%%sql`) | `team_sales.…` (its real name) or the short `team.…`, e.g. `team.bronze.customers` |
+| **SQLPad, Superset** | `team_sales.…`, e.g. `team_sales.bronze.customers` |
 
 Jupyter sets up `team` when your server starts and says so in the first cell's output:
 

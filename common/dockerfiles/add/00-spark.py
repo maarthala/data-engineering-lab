@@ -155,6 +155,16 @@ if _LAKE:
             print(f"✓ team = your team's lakehouse ({_os_env['TEAM_CATALOG']}) — e.g. team.bronze.customers")
         except Exception as _e:  # noqa: BLE001
             print(f"⚠ team catalog not set ({_e})")
+    # … and every catalog by its real name as well, the names SQLPad and Superset use — so the
+    # same query runs in both: <you>_lake, team_<team>, polaris_lake (the course's shared lake)
+    try:
+        _names = [c for c in (_os_env.get("LAKE_WAREHOUSE"), _os_env.get("TEAM_CATALOG"),
+                              _os_env.get("SHARED_CATALOG", "polaris_lake")) if c]
+        for _c in _names:
+            use_catalog(_c, quiet=True)
+        print(f"✓ also by name, as in SQLPad: {', '.join(_names)}")
+    except Exception as _e:  # noqa: BLE001
+        print(f"⚠ catalogs by name not set ({_e})")
 
 
 # --- Materialized views for `%%sql` ------------------------------------------------

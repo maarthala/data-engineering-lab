@@ -129,13 +129,14 @@ The same table is now visible in the **Polaris Console** (your lakehouse `<usern
 every Spark session that signs in as you — one governed copy.
 
 #### From SQLPad (Trino)
-SQLPad reaches the same table, but under a **different name**. In Jupyter, `iceberg` is *your*
-lakehouse; in SQLPad (and Superset), `iceberg` is the course's **shared** lake, so your own lakehouse
-goes by its real name, **`<username>_lake`** ([0.3](../setup/workspace.md)):
+SQLPad reaches the same table by your lakehouse's **real name**, **`<username>_lake`**. `iceberg`
+is a short name only Jupyter knows — in SQLPad (and Superset) `iceberg` is the course's **shared**
+lake ([0.3](../setup/workspace.md)). The real name works in Jupyter too, so a query written with it
+runs in both:
 
 | Where | The table is |
 |---|---|
-| Jupyter (`%%sql`, `spark.table`) | `iceberg.bronze.customers_upload` |
+| Jupyter (`%%sql`, `spark.table`) | `iceberg.bronze.customers_upload` or `demouser_lake.bronze.customers_upload` |
 | SQLPad, Superset | `demouser_lake.bronze.customers_upload` |
 
 Open SQLPad, pick the connection **Lakehouse (Trino) — demouser** (your own username), and run:
