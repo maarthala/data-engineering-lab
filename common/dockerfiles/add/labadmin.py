@@ -406,6 +406,10 @@ def delete(user):
     except Exception as e:
         airflow = False
         print(f"[labadmin] airflow {user}: {e}", flush=True)
+    try:                                                 # folders they shared / were shared
+        lh.forget_folder_shares(name)
+    except Exception as e:  # noqa: BLE001
+        print(f"[labadmin] folder shares {user}: {e}", flush=True)
     try:                                                 # bucket, its policy and keys
         lh._s3("HEAD", bucket).close()
         _empty_prefix(bucket, "")

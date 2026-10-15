@@ -115,6 +115,13 @@
     .spaces a{color:var(--muted); text-decoration:none; padding:4px 12px; border-radius:9px; border:1px solid transparent; font-size:.9rem}
     .spaces a:hover{color:var(--ink); border-color:var(--line)}
     .spaces a.on{color:var(--ink); background:var(--panel2); border-color:var(--line)}
+    .stag{font-size:.68rem; margin-left:6px; padding:1px 7px; border-radius:999px; border:1px solid rgba(57,208,196,.5); color:var(--accent2)}
+    .stag.write{border-color:rgba(226,185,59,.55); color:#f3d98b}
+    .dialog.share{width:min(560px,94vw)} .dialog.share p{white-space:normal}
+    .srow{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px}
+    .srow input{flex:1; min-width:180px; width:auto; margin:0} .dialog select{font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:7px 9px}
+    .slist{border-top:1px solid var(--line); margin-top:4px; padding-top:10px; font-size:.9rem}
+    .slist .it{display:flex; align-items:center; gap:8px; padding:4px 0} .slist .it span:first-child{flex:1}
     @media (max-width:760px){ .app{grid-template-columns:1fr} aside{max-height:30vh; border-right:0; border-bottom:1px solid var(--line)} }
   </style>
 </head>
@@ -122,7 +129,7 @@
   <header id="lab-top"></header>
   <script src="/lab-header.js?v=7"></script>
   <div class="pagebar"><h1><span id="space-title">📁 My files</span> <span class="dot">·</span> <span class="muted-label">bucket</span> <span class="bucket" id="bucket">…</span></h1>
-    <nav class="spaces"><a href="/files.html" id="sp-mine">🪣 Mine</a><a href="/files.html?space=team" id="sp-team" hidden>👥 Team</a></nav></div>
+    <nav class="spaces"><a href="/files.html" id="sp-mine">🪣 Mine</a><a href="/files.html?space=team" id="sp-team" hidden>👥 Team</a><a href="/files.html?space=shared" id="sp-shared">🤝 Shared with me</a></nav></div>
 
   <div class="app">
     <aside>
@@ -169,6 +176,17 @@
     <input type="text" id="d-input" autocomplete="off">
     <div class="row"><button id="d-cancel">Cancel</button><button id="d-ok" class="danger">Delete</button></div>
   </div></div>
+  <div class="scrim" id="s-scrim"><div class="dialog share">
+    <h3 id="s-title">🤝 Share folder</h3>
+    <p class="hint">They get this folder and everything in it (also files added later) — in <b>My files → 🤝 Shared with me</b>,
+      and in Spark by its path. Not your other folders, not your tables (share those on 🗂️ My catalogs).</p>
+    <div class="srow"><input type="text" id="s-who" placeholder="member username (type 3+ letters)" autocomplete="off" list="s-found">
+      <datalist id="s-found"></datalist>
+      <select id="s-acc"><option value="read">read</option><option value="write">read + write</option></select>
+      <button class="primary" id="s-go">Share</button></div>
+    <div class="slist" id="s-list"></div>
+    <div class="row" style="margin-top:12px"><button id="s-close">Close</button></div>
+  </div></div>
   <div class="toast" id="toast"></div>
 
   <script>
@@ -176,10 +194,15 @@
     // the server always uses YOUR bucket, or with ?space=team YOUR team's bucket — there is no
     // bucket name to choose here.
     var $ = function (id) { return document.getElementById(id); };
-    var SPACE = new URLSearchParams(location.search).get('space') === 'team' ? 'team' : '';
-    function withSpace(params) { params = params || {}; if (SPACE) params.space = SPACE; return params; }
-    $(SPACE ? 'sp-team' : 'sp-mine').className = 'on';
-    var state = {prefix: decodeURIComponent(location.hash.slice(1) || ''), bucket: '', tables: {}};
+    var URLQ = new URLSearchParams(location.search), SPACE = URLQ.get('space');
+    SPACE = SPACE === 'team' || SPACE === 'shared' ? SPACE : '';
+    // 🤝 Shared with me: another member's folder (?space=shared&owner=…&folder=…) — the page is
+    // rooted at that folder; without owner it lists what's shared with you
+    var OWNER = SPACE === 'shared' ? URLQ.get('owner') || '' : '', ROOT = OWNER ? URLQ.get('folder') || '' : '';
+    function withSpace(params) { params = params || {}; if (SPACE) params.space = SPACE; if (OWNER) params.owner = OWNER; return params; }
+    $(SPACE ? 'sp-' + SPACE : 'sp-mine').className = 'on';
+    function inRoot(p) { return p.indexOf(ROOT) === 0 ? p : ROOT; }
+    var state = {prefix: inRoot(decodeURIComponent(location.hash.slice(1) || '')), bucket: '', tables: {}, shares: {}, readonly: false};
     var nodes = {};   // prefix -> {li, ul, caret, label, loaded, open}
 
     // ---------- helpers ----------
@@ -218,7 +241,7 @@
 
     // ---------- tree ----------
     function treeNode(prefix, name) {
-      var li = el('li'), row = el('div', 'node'), caret = el('span', 'caret', '▸'), label = el('span', null, (prefix ? '📁 ' : '🪣 ') + name);
+      var li = el('li'), row = el('div', 'node'), caret = el('span', 'caret', '▸'), label = el('span', null, (prefix && prefix !== ROOT ? '📁 ' : SPACE === 'shared' ? '🤝 ' : '🪣 ') + name);
       row.appendChild(caret); row.appendChild(label); li.appendChild(row);
       var ul = el('ul'); ul.style.display = 'none'; li.appendChild(ul);
       var n = nodes[prefix] = {li: li, ul: ul, caret: caret, row: row, label: label, loaded: false, open: false};
@@ -257,7 +280,7 @@
       if (n.open) { n.open = false; n.ul.style.display = 'none'; n.caret.textContent = '▸'; } else expand(prefix);
     }
     function revealPath(prefix) {           // expand the root, every ancestor and the current folder
-      var parts = prefix.split('/').filter(Boolean), acc = '', chain = [''];
+      var parts = prefix.slice(ROOT.length).split('/').filter(Boolean), acc = ROOT, chain = [ROOT];
       parts.forEach(function (p) { acc += p + '/'; chain.push(acc); });
       return chain.reduce(function (pr, p) { return pr.then(function () { return expand(p); }); }, Promise.resolve());
     }
@@ -268,9 +291,10 @@
     // ---------- list ----------
     function crumbs() {
       var c = $('crumbs'); c.innerHTML = '';
-      var root = el('a', null, '🪣 ' + state.bucket); root.href = '#'; c.appendChild(root);
-      var acc = '';
-      state.prefix.split('/').filter(Boolean).forEach(function (part) {
+      var root = el('a', null, (ROOT ? '🤝 ' + state.bucket + '/' + ROOT.replace(/\/$/, '') : '🪣 ' + state.bucket));
+      root.href = '#' + encodeURIComponent(ROOT); c.appendChild(root);
+      var acc = ROOT;
+      state.prefix.slice(ROOT.length).split('/').filter(Boolean).forEach(function (part) {
         acc += part + '/'; c.appendChild(el('span', 'sep', '/'));
         var a = el('a', null, part); a.href = '#' + encodeURIComponent(acc); c.appendChild(a);
       });
@@ -292,21 +316,36 @@
             tablesAt('team_' + d.team);
           }
           $('example').textContent = 's3a://' + d.bucket + '/files/source/orders.csv';
-          $('tree').appendChild(treeNode('', d.bucket));
+          if (d.share) {
+            state.readonly = d.share.access !== 'write';
+            $('space-title').textContent = '🤝 Shared by ' + OWNER;
+            $('who').textContent = OWNER + ' shared this folder with you, ' + (state.readonly ? 'read-only' : 'read + write') + ' (their bucket';
+            $('quota').parentNode.childNodes.forEach(function (n) { if (n.nodeType === 3 && n.textContent.indexOf('(limit') >= 0) n.textContent = ', limit '; });
+            $('example').textContent = 's3a://' + d.bucket + '/' + ROOT + '…';
+            ['mkdir', 'upload'].forEach(function (id) { $(id).hidden = state.readonly; });
+          }
+          $('tree').appendChild(treeNode(ROOT, ROOT ? ROOT.split('/').filter(Boolean).pop() : d.bucket));
         }
         if (nodes[state.prefix]) fill(state.prefix, d.folders);
         if (d.is_table) { state.tables[state.prefix] = true; markTable(state.prefix); }
         $('table-banner').style.display = d.is_table ? 'block' : 'none';
         crumbs();
         var rows = $('rows'); rows.innerHTML = '';
-        if (state.prefix) {
+        if (state.prefix && state.prefix !== ROOT) {
           var up = el('a', null, '⬑  ..'); up.href = '#' + encodeURIComponent(parentOf(state.prefix));
           var tr = el('tr'); tr.appendChild(cell(up, 'name')); tr.appendChild(el('td')); tr.appendChild(el('td')); tr.appendChild(el('td')); rows.appendChild(tr);
         }
         d.folders.forEach(function (f) {
           var a = el('a', null, (state.tables[f.prefix] ? '🧊 ' : '📁 ') + f.name); a.href = '#' + encodeURIComponent(f.prefix);
-          var tr = el('tr'); tr.appendChild(cell(a, 'name')); tr.appendChild(el('td', 'num', '—')); tr.appendChild(el('td', 'num'));
-          tr.appendChild(cell(group([iconBtn('🗑', 'Delete folder', 'del', function () { delFolder(f); })]), 'act'));
+          var tr = el('tr'), nm = cell(a, 'name'); tr.appendChild(nm); tr.appendChild(el('td', 'num', '—')); tr.appendChild(el('td', 'num'));
+          var acts = [];
+          if (!SPACE && f.prefix.indexOf('files/') === 0) {          // your own files: share a folder
+            var n = (state.shares[f.prefix] || []).length;
+            if (n) nm.appendChild(el('span', 'stag', '🤝 ' + n));
+            acts.push(iconBtn('🤝', 'Share this folder with a member', '', function () { shareDialog(f); }));
+          }
+          if (!state.readonly) acts.push(iconBtn('🗑', 'Delete folder', 'del', function () { delFolder(f); }));
+          tr.appendChild(cell(group(acts), 'act'));
           rows.appendChild(tr);
         });
         d.files.forEach(function (f) {
@@ -319,12 +358,12 @@
               (navigator.clipboard ? navigator.clipboard.writeText(p) : Promise.reject()).then(
                 function () { toast('Copied ' + p); }, function () { toast(p); });
             }),
-            iconBtn('⬇', 'Download', '', function () { location.href = a.href; }),
-            iconBtn('🗑', 'Delete file', 'del', function () { delFile(f); })]), 'act'));
+            iconBtn('⬇', 'Download', '', function () { location.href = a.href; })].concat(
+            state.readonly ? [] : [iconBtn('🗑', 'Delete file', 'del', function () { delFile(f); })])), 'act'));
           rows.appendChild(tr);
         });
         if (!d.folders.length && !d.files.length) {
-          var e = el('tr'); var td = el('td', 'empty', 'This folder is empty — drop files here or click “Upload”.'); td.colSpan = 4; e.appendChild(td); rows.appendChild(e);
+          var e = el('tr'); var td = el('td', 'empty', state.readonly ? 'This folder is empty.' : 'This folder is empty — drop files here or click “Upload”.'); td.colSpan = 4; e.appendChild(td); rows.appendChild(e);
         }
       });
     }
@@ -420,7 +459,7 @@
       inp.onkeydown = function (e) { if (e.key === 'Enter') create(); if (e.key === 'Escape') tr.remove(); };
     }
     function delFile(f) {
-      dialog({title: 'Delete file?', html: 'Delete <b>' + f.name.replace(/</g, '&lt;') + '</b> from ' + (SPACE ? 'the team bucket — for everyone in the team' : 'your bucket') + '? This cannot be undone.'}).then(function (yes) {
+      dialog({title: 'Delete file?', html: 'Delete <b>' + f.name.replace(/</g, '&lt;') + '</b> from ' + (SPACE === 'team' ? 'the team bucket — for everyone in the team' : SPACE ? OWNER + '\'s shared folder' : 'your bucket') + '? This cannot be undone.'}).then(function (yes) {
         if (!yes) return;
         api('DELETE', '', {key: f.key}).then(function (r) { r.ok ? (toast('Deleted ' + f.name), load()) : toast(r.body.error, true); });
       });
@@ -469,11 +508,11 @@
     $('refresh').onclick = function () { closeViewer(); if (nodes[state.prefix]) nodes[state.prefix].loaded = false; refresh(); };
     $('upload').onclick = function () { $('picker').click(); };
     $('picker').onchange = function () { uploadFiles(this.files); this.value = ''; };
-    window.addEventListener('hashchange', function () { closeViewer(); state.prefix = decodeURIComponent(location.hash.slice(1) || ''); refresh(); });
+    window.addEventListener('hashchange', function () { closeViewer(); state.prefix = inRoot(decodeURIComponent(location.hash.slice(1) || '')); refresh(); });
     var list = $('list');
     ['dragenter', 'dragover'].forEach(function (ev) { list.addEventListener(ev, function (e) { e.preventDefault(); list.classList.add('dragging'); }); });
     list.addEventListener('dragleave', function (e) { if (e.target === list.querySelector('.drop')) list.classList.remove('dragging'); });
-    list.addEventListener('drop', function (e) { e.preventDefault(); list.classList.remove('dragging'); if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files); });
+    list.addEventListener('drop', function (e) { e.preventDefault(); list.classList.remove('dragging'); if (e.dataTransfer.files.length && !state.readonly) uploadFiles(e.dataTransfer.files); });
 
     // where the tables are: a catalog (underscores), not this bucket (hyphens)
     function tablesAt(catalog, alias) {
@@ -484,7 +523,76 @@
       if (!SPACE && e.detail.lakehouse) tablesAt(e.detail.lakehouse, 'my');
       if (e.detail.team) { $('sp-team').hidden = false; $('sp-team').textContent = '👥 Team: ' + e.detail.team; }
     });
-    load().then(refresh);
+
+    // ---------- folder shares ----------
+    function shareApi(method, params) {
+      var q = new URLSearchParams(params || {}).toString();
+      return fetch('/api/files/shares' + (q ? '?' + q : ''), {method: method, credentials: 'same-origin'})
+        .then(function (r) { return r.json().then(function (j) { return {ok: r.ok, body: j}; }); });
+    }
+    function loadShares() {
+      return shareApi('GET').then(function (r) {
+        state.shares = {}; state.withMe = r.ok ? r.body.with_me : [];
+        if (r.ok) r.body.by_me.forEach(function (s) { (state.shares[s.folder] = state.shares[s.folder] || []).push(s); });
+      });
+    }
+    var lookT;
+    $('s-who').oninput = function () {                     // member lookup, from 3 letters
+      clearTimeout(lookT); var q = this.value.trim().toLowerCase(), box = $('s-found');
+      if (q.length < 3) { box.innerHTML = ''; return; }
+      lookT = setTimeout(function () {
+        fetch('/api/catalogs/members?q=' + encodeURIComponent(q), {credentials: 'same-origin'}).then(function (r) { return r.json(); })
+          .then(function (names) { box.innerHTML = ''; (names || []).forEach(function (n) { box.appendChild(el('option')).value = n; }); });
+      }, 250);
+    };
+    function shareDialog(f) {
+      $('s-title').textContent = '🤝 Share ' + f.prefix;
+      $('s-who').value = ''; $('s-scrim').style.display = 'flex'; $('s-who').focus();
+      function list() {
+        var box = $('s-list'), rows = state.shares[f.prefix] || []; box.innerHTML = '';
+        box.appendChild(el('div', 'hint', rows.length ? 'Shared with' : 'Not shared with anyone yet.'));
+        rows.forEach(function (s) {
+          var it = el('div', 'it'); it.appendChild(el('span', null, s.grantee));
+          it.appendChild(el('span', 'stag' + (s.access === 'write' ? ' write' : ''), s.access === 'write' ? 'read + write' : 'read'));
+          var b = el('button', 'danger', 'Revoke'); b.style.padding = '3px 9px'; it.appendChild(b);
+          b.onclick = function () { shareApi('DELETE', {folder: f.prefix, grantee: s.grantee}).then(function (r) {
+            if (!r.ok) return toast(r.body.error, true); toast('Stopped sharing with ' + s.grantee); loadShares().then(function () { list(); load(); }); }); };
+          box.appendChild(it);
+        });
+      }
+      list();
+      function go() {
+        var who = $('s-who').value.trim(); if (!who) return $('s-who').focus();
+        $('s-go').disabled = true;
+        shareApi('POST', {folder: f.prefix, grantee: who, access: $('s-acc').value}).then(function (r) {
+          $('s-go').disabled = false;
+          if (!r.ok) return toast(r.body.error, true);
+          toast('Shared with ' + r.body.grantee); $('s-who').value = ''; loadShares().then(function () { list(); load(); });
+        });
+      }
+      $('s-go').onclick = go; $('s-who').onkeydown = function (e) { if (e.key === 'Enter') go(); };
+      $('s-close').onclick = function () { $('s-scrim').style.display = 'none'; };
+    }
+    function sharedWithMe() {                              // ?space=shared without a folder: the list
+      $('space-title').textContent = '🤝 Shared with me'; $('bucket').parentNode.querySelectorAll('.dot,.muted-label,.bucket').forEach(function (x) { x.hidden = true; });
+      document.querySelector('aside').hidden = true; document.querySelector('.app').style.gridTemplateColumns = '1fr';
+      $('table-banner').hidden = true; document.querySelector('.btns').style.display = 'none';
+      $('crumbs').textContent = 'Folders other members shared with you';
+      document.querySelector('thead tr').innerHTML = '<th>Folder</th><th>Shared by</th><th>Access</th><th>Spark path</th>';
+      $('who').parentNode.innerHTML = 'Open a folder to browse it. In Spark, read its files by path, e.g. <code>spark.read.csv("s3a://…/files/source/orders.csv", header=True)</code>.';
+      loadShares().then(function () {
+        var rows = $('rows'); rows.innerHTML = '';
+        if (!state.withMe.length) { var e = el('tr'), td = el('td', 'empty', 'Nothing shared with you yet.'); td.colSpan = 4; e.appendChild(td); rows.appendChild(e); return; }
+        state.withMe.forEach(function (s) {
+          var a = el('a', null, '🤝 ' + s.folder); a.href = '/files.html?' + new URLSearchParams({space: 'shared', owner: s.owner, folder: s.folder}) + '#' + encodeURIComponent(s.folder);
+          var tr = el('tr'); tr.appendChild(cell(a, 'name')); tr.appendChild(el('td', null, s.owner));
+          var t = el('td'); t.appendChild(el('span', 'stag' + (s.access === 'write' ? ' write' : ''), s.access === 'write' ? 'read + write' : 'read')); tr.appendChild(t);
+          tr.appendChild(el('td', 'hint', s.path)); rows.appendChild(tr);
+        });
+      });
+    }
+    if (SPACE === 'shared' && !OWNER) sharedWithMe();
+    else (SPACE ? Promise.resolve() : loadShares()).then(load).then(refresh);
   </script>
 </body>
 </html>

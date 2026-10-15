@@ -160,7 +160,115 @@ def put_storage_policy(name, admin=False, team=None):
             {"Effect": "Allow", "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject",
                                            "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"],
              "Resource": [f"arn:aws:s3:::{b}/*" for b in buckets]}]}
+    if not admin:
+        doc["Statement"] += _shared_folder_statements(name)
     return _admin("PUT", "add-canned-policy", {"name": storage_user(name)}, json.dumps(doc).encode())
+
+
+# ---- Shared folders: a member gives another member read / write on one folder of their files ----
+# Kept in one JSON file in the platform bucket (members can't reach it); the grantee's storage
+# policy above gets a rule per folder, so their Jupyter, DAG and console keys all see it at once.
+SHARES_BUCKET, SHARES_KEY = "lab-admin", "folder-shares.json"
+_READ = ["s3:GetObject"]
+_WRITE = _READ + ["s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"]
+
+
+def folder_shares():
+    """Every folder share: [{owner, folder, grantee, access}]."""
+    try:
+        with _s3("GET", SHARES_BUCKET, SHARES_KEY) as r:
+            return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        if e.code == 404:                          # nothing shared yet (or no bucket yet)
+            return []
+        raise
+
+
+def _save_folder_shares(rows):
+    import io
+    create_bucket(SHARES_BUCKET)
+    body = json.dumps(rows, indent=1).encode()
+    put_object(SHARES_BUCKET, SHARES_KEY, io.BytesIO(body), len(body), "application/json")
+
+
+def _shared_folder_statements(name):
+    out = []
+    for s in folder_shares():
+        if s["grantee"] != name:
+            continue
+        b, f = bucket_name(s["owner"]), s["folder"]           # f ends with /
+        out += [{"Effect": "Allow", "Action": ["s3:ListBucket"], "Resource": [f"arn:aws:s3:::{b}"],
+                 "Condition": {"StringLike": {"s3:prefix": [f.rstrip("/"), f, f + "*"]}}},
+                {"Effect": "Allow", "Action": ["s3:GetBucketLocation"], "Resource": [f"arn:aws:s3:::{b}"]},
+                {"Effect": "Allow", "Action": _WRITE if s["access"] == "write" else _READ,
+                 "Resource": [f"arn:aws:s3:::{b}/{f}*", f"arn:aws:s3:::{b}/{f.rstrip('/')}"]}]
+    return out
+
+
+def _refresh_policy(name):
+    """Rebuild a member's storage policy (after their folder shares changed). Managers reach
+    every bucket anyway — their policy stays."""
+    try:
+        with _signed("GET", "/minio/admin/v3/info-canned-policy", {"name": storage_user(name)}) as r:
+            if "admin:*" in r.read().decode():
+                return
+    except urllib.error.HTTPError:
+        pass
+    try:
+        team = team_of(name)
+    except Exception:  # noqa: BLE001 — Polaris down: the own bucket + shares still
+        team = None
+    put_storage_policy(name, team=team)
+
+
+def share_folder(name, folder, grantee, access):
+    """Give another member read / write on one folder under files/ of your bucket (and everything
+    in it, also files added later). Sharing it again changes the access."""
+    if access not in ("read", "write"):
+        raise ValueError("access must be read or write")
+    folder = (folder or "").strip("/") + "/"
+    if not folder.startswith("files/") or ".." in folder.split("/"):
+        raise ValueError("pick a folder under files/")
+    grantee = lake_name(grantee or "")
+    if grantee == name:
+        raise ValueError("that's you")
+    if not grantee or _call("GET", f"{_M}/principal-roles/{grantee}", token=_admin_token())[0] != 200:
+        raise ValueError(f"no member called {grantee}")
+    rows = [s for s in folder_shares() if (s["owner"], s["folder"], s["grantee"]) != (name, folder, grantee)]
+    rows.append({"owner": name, "folder": folder, "grantee": grantee, "access": access})
+    _save_folder_shares(rows)
+    _refresh_policy(grantee)
+    return {"folder": folder, "grantee": grantee, "access": access, "path": f"s3a://{bucket_name(name)}/{folder}"}
+
+
+def unshare_folder(name, folder, grantee):
+    folder = (folder or "").strip("/") + "/"
+    rows = folder_shares()
+    keep = [s for s in rows if (s["owner"], s["folder"], s["grantee"]) != (name, folder, grantee)]
+    if len(keep) == len(rows):
+        raise ValueError("not shared")
+    _save_folder_shares(keep)
+    _refresh_policy(grantee)
+
+
+def folder_share_of(name, owner, key):
+    """The share that lets <name> reach <key> in <owner>'s bucket, or None."""
+    best = None
+    for s in folder_shares():
+        if s["grantee"] == name and s["owner"] == owner and (key + "/").startswith(s["folder"]):
+            if not best or len(s["folder"]) > len(best["folder"]):
+                best = s
+    return best
+
+
+def forget_folder_shares(name):
+    """A member is deleted: drop the folders they shared and the ones shared with them."""
+    rows = folder_shares()
+    gone = [s for s in rows if name in (s["owner"], s["grantee"])]
+    if gone:
+        _save_folder_shares([s for s in rows if s not in gone])
+        for g in {s["grantee"] for s in gone} - {name}:
+            _refresh_policy(g)
 
 
 def storage_key(name, purpose="files"):

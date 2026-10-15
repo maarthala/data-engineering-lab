@@ -133,6 +133,13 @@ folder, delete. The **RustFS console** (Storage tile) shows the same bucket. (It
 **Settings** page is for managers — members get *Access Denied* there; everything about
 your files works in the browser view and My files.)
 
+**Share a folder** with another member: on a folder under `files/`, click **🤝**, type 3 letters
+of their username, pick **read** or **read + write** → **Share**. They get that folder and
+everything in it (also files added later), not your other folders: under **📁 My files →
+🤝 Shared with me**, in Spark by its path (e.g.
+`spark.read.csv("s3a://demouser-lake/files/source/shopflow/", header=True)`). The same **🤝** lists who has it, with **Revoke**. Tables are shared on **🗂️ My
+catalogs** instead.
+
 !!! warning "100 MB per member"
     Your bucket holds at most **100 MB** — plenty for code and lesson data. If it's full, saving
     shows an error ("saved in Jupyter, but NOT in your bucket"); delete files you no longer need.

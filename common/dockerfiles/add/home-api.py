@@ -7,7 +7,8 @@ GET /api/me  → who is logged in (from the headers oauth2-proxy sets after the 
                lake. Idempotent — every step accepts "already exists" (409).
 
 "My files" — the learner's OWN bucket <name>-lake, or with space=team their team's bucket
-team-<team>-lake. The bucket always comes from the logged-in user (and their team); nothing
+team-<team>-lake, or with space=shared&owner=<member> a folder that member shared with them.
+The bucket always comes from the logged-in user (their team, their folder shares); nothing
 from the browser can point at another bucket.
   GET    /api/files?prefix=a/b/            one folder level (folders, files, is-table)
   GET    /api/files/download?key=…          download a file
@@ -15,9 +16,12 @@ from the browser can point at another bucket.
   POST   /api/files/mkdir?prefix=a/new/     new folder
   DELETE /api/files?key=…                   delete a file
   DELETE /api/files/folder?prefix=…[&confirm_table=1]  delete a folder (tables need confirm)
+  GET    /api/files/shares              folders I share (by_me) and folders shared with me (with_me)
+  POST   /api/files/shares?folder&grantee&access   share a folder under files/ (read | write)
+  DELETE /api/files/shares?folder&grantee         stop sharing it
 
 "My catalogs" — catalogs the learner owns or that are shared with them; create a catalog
-<name>_<x> (stored in their bucket); invite another learner to it (the whole lake, a namespace or a table)
+<name>_<x> (stored in their bucket); invite another learner to it (the whole lake or a namespace)
 (read / write) and revoke. Polaris enforces the access; ownership is checked here.
   GET    /api/catalogs                                   owned + shared-with-me
   POST   /api/catalogs?name=sales                        create <user>_sales
@@ -140,13 +144,39 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(401, {"error": "not logged in"})
         name = lake_name(user)
         bucket, team, quota = bucket_name(name), None, lh.QUOTA_MB
+        share = None                                 # space=shared: the folder share in use
         try:
             self._ensure(name)
+            # folders I share / folders shared with me
+            if method == "GET" and path == "/api/files/shares":
+                rows = lh.folder_shares()
+                return self._json(200, {
+                    "by_me": [r for r in rows if r["owner"] == name],
+                    "with_me": [dict(r, path=f"s3a://{bucket_name(r['owner'])}/{r['folder']}")
+                                for r in rows if r["grantee"] == name]})
+            if method == "POST" and path == "/api/files/shares":
+                return self._json(200, lh.share_folder(name, q.get("folder"), q.get("grantee", "").strip(),
+                                                       q.get("access", "read")))
+            if method == "DELETE" and path == "/api/files/shares":
+                lh.unshare_folder(name, q.get("folder"), lake_name(q.get("grantee", "")))
+                return self._json(200, {"revoked": True})
             if q.get("space") == "team":
                 team = lh.team_of(name)
                 if not team:
                     return self._json(404, {"error": "you are not in a team yet"})
                 bucket, quota = lh.team_bucket(team), lh.TEAM_QUOTA_MB
+            if q.get("space") == "shared":           # another member's folder, shared with me
+                owner = lake_name(q.get("owner", ""))
+                where = (q.get("prefix") or q.get("key") or "").lstrip("/")
+                share = lh.folder_share_of(name, owner, where.rstrip("/"))
+                if not share:
+                    return self._json(403, {"error": "that folder isn't shared with you"})
+                if method != "GET" and share["access"] != "write":
+                    return self._json(403, {"error": "shared with you read-only"})
+                if method == "DELETE" and path == "/api/files/folder" and \
+                        where.rstrip("/") + "/" == share["folder"]:
+                    return self._json(403, {"error": "the shared folder itself stays — its owner deletes it"})
+                bucket = bucket_name(owner)
             if method == "GET" and path == "/api/files":
                 prefix = (q.get("prefix") or "").lstrip("/")
                 folders, files = lh.list_dir(bucket, prefix)
@@ -155,6 +185,7 @@ class Handler(BaseHTTPRequestHandler):
                 kids = {f[len(prefix):] for f in folders}
                 return self._json(200, {
                     "bucket": bucket, "prefix": prefix, "team": team, "quota_mb": quota,
+                    "share": share,
                     "is_table": {"metadata/", "data/"} <= kids or "metadata/" in kids,
                     "folders": [{"name": f[len(prefix):].rstrip("/"), "prefix": f} for f in folders],
                     "files": [dict(f, name=f["key"][len(prefix):]) for f in files]})
@@ -209,6 +240,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(404, {"error": "not found"})
         except ValueError as e:
             return self._json(400, {"error": str(e)})
+        except PermissionError as e:
+            return self._json(403, {"error": str(e)})
         except urllib.error.HTTPError as e:
             return self._json(404 if e.code == 404 else 502, {"error": f"storage: HTTP {e.code}"})
         except Exception as e:                       # show it on the page, don't crash
