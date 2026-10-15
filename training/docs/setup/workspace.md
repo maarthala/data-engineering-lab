@@ -108,8 +108,8 @@ Your bucket is organised like an Azure / Fabric lakehouse — **Files** and **Ta
 **Tables** is managed by the catalog: create and drop tables with SQL / Spark, don't edit files
 there. **Files** is yours to use freely.
 
-In Jupyter's **file browser** you see two folders: **`my_files/`** (yours) and **`my_team/`**
-(your team's, see [Your team](#your-team)). Each holds `notebooks/`, `dags/` and `dbt/`, **mirrored
+In Jupyter's **file browser** you see two folders: **`my_files/`** (yours) and one named after
+your team, e.g. **`sales_team/`** (see [Your team](#your-team)). Each holds `notebooks/`, `dags/` and `dbt/`, **mirrored
 to `files/src/`** in its bucket: every save, rename and delete in them is copied there straight away.
 
 | Jupyter folder | In your bucket | For |
@@ -117,7 +117,7 @@ to `files/src/`** in its bucket: every save, rename and delete in them is copied
 | `my_files/notebooks/` | `files/src/notebooks/` | your notebooks (`.ipynb`) |
 | `my_files/dags/` | `files/src/dags/` | your Airflow DAGs (`.py`) — **Airflow picks them up in ~30 s** |
 | `my_files/dbt/` | `files/src/dbt/` | your dbt projects — dbt's generated `target/`, `logs/` and `dbt_packages/` stay in Jupyter only |
-| `my_team/notebooks/`, `my_team/dags/`, `my_team/dbt/` | the **team's** bucket, `files/src/…` | the same for the whole team — see [Your team](#your-team) |
+| `<team>_team/notebooks/`, `…/dags/`, `…/dbt/` (e.g. `sales_team/`) | the **team's** bucket, `files/src/…` | the same for the whole team — see [Your team](#your-team) |
 
 Files you upload elsewhere (My files, the RustFS console) appear in Jupyter the next time your
 server starts (**File → Hub Control Panel → Stop My Server → Start**). Anything outside these
@@ -194,9 +194,9 @@ spark.sql("SELECT * FROM team.bronze.customers ORDER BY id").show()
 
 The team also has a **bucket**, `team-<team>-lake` (limit **500 MB**): files everyone in the team
 sees, uploads and changes. Open it with **📁 My files → 👥 Team** (or **🪣 Mine** for your own
-bucket), in Jupyter as the **`my_team/`** folder, and in the RustFS console next to your own bucket.
+bucket), in Jupyter as the folder named after the team, **`<team>_team/`** (e.g. `sales_team/`), and in the RustFS console next to your own bucket.
 
-In Jupyter, `my_team/` works like `my_files/`: open `my_team/notebooks/`, then **+ → Notebook**
+In Jupyter, `sales_team/` works like `my_files/`: open `sales_team/notebooks/`, then **+ → Notebook**
 makes a notebook there, and every save goes to the team bucket at once. Opening a folder (or a file)
 in it first brings in your teammates' changes — their new and edited files, and files they deleted
 go. If two people edit the same notebook at the same time, the last save wins, so agree who edits
@@ -204,9 +204,9 @@ what (or use git).
 
 | Jupyter folder | Team bucket | For |
 |---|---|---|
-| `my_team/notebooks/` | `files/src/notebooks/` | the team's notebooks |
-| `my_team/dags/` | `files/src/dags/` | the team's Airflow DAGs |
-| `my_team/dbt/` | `files/src/dbt/` | the team's dbt projects |
+| `sales_team/notebooks/` | `files/src/notebooks/` | the team's notebooks |
+| `sales_team/dags/` | `files/src/dags/` | the team's Airflow DAGs |
+| `sales_team/dbt/` | `files/src/dbt/` | the team's dbt projects |
 
 Files to load (CSV, Parquet …) go in the bucket's `files/source/` (**📁 My files → 👥 Team**).
 Read the team's files in Spark by their path:

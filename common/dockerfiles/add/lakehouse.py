@@ -688,9 +688,9 @@ def team_bucket(team):
 _TEAM_README = {
     "files/source/": "Files for the whole team — everyone in the team sees, uploads and reads them\n"
                      "(My files → Team, s3a://<this bucket>/files/source/… in Spark).\n",
-    "files/src/notebooks/": "The team's notebooks — the my_team/notebooks/ folder in everyone's Jupyter.\n",
-    "files/src/dags/": "The team's Airflow DAGs — the my_team/dags/ folder in everyone's Jupyter.\n",
-    "files/src/dbt/": "The team's dbt projects — the my_team/dbt/ folder in everyone's Jupyter.\n",
+    "files/src/notebooks/": "The team's notebooks — the {folder}/notebooks/ folder in everyone's Jupyter.\n",
+    "files/src/dags/": "The team's Airflow DAGs — the {folder}/dags/ folder in everyone's Jupyter.\n",
+    "files/src/dbt/": "The team's dbt projects — the {folder}/dbt/ folder in everyone's Jupyter.\n",
     "tables/": "Table storage of the team's lakehouse (tables/team_<team>/<namespace>/<table>/). Managed\n"
                "by the catalog — create and drop tables with SQL / Spark, don't edit files here.\n",
 }
@@ -717,9 +717,14 @@ def _team_folders_once(bucket):
     except Exception:  # noqa: BLE001
         pass
     missing = 0
+    folder = bucket[len("team-"):-len("-lake")].replace("-", "_") + "_team"     # its Jupyter folder
     for f, text in _TEAM_README.items():
+        text = text.replace("{folder}", folder)
         try:
-            _s3("HEAD", bucket, f + "README.md").close()
+            with get_object(bucket, f + "README.md") as r:
+                if b"my_team/" not in r.read():          # (the folder was called my_team at first)
+                    continue
+            raise urllib.error.HTTPError(None, 404, "old text", None, None)
         except urllib.error.HTTPError:
             try:
                 put_object(bucket, f + "README.md", io.BytesIO(text.encode()), len(text.encode()), "text/markdown")

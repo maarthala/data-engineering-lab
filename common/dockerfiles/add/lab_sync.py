@@ -1,7 +1,7 @@
 """Jupyter's two top folders ↔ the two buckets a learner works in.
 
   my_files/{notebooks,dags,dbt}  ↔  s3://<user>-lake/files/src/{notebooks,dags,dbt}/
-  my_team/{notebooks,dags,dbt}   ↔  s3://team-<team>-lake/files/src/{notebooks,dags,dbt}/
+  <team>_team/{notebooks,dags,dbt} ↔ s3://team-<team>-lake/files/src/{notebooks,dags,dbt}/  (e.g. sales_team)
 
 (JupyterLab's normal file browser, root = the learner's volume ~/work.) Airflow's "learners"
 bundle reads the dags. dbt's generated folders (target/, logs/, dbt_packages/) stay local.
@@ -12,7 +12,7 @@ my_files — only the learner writes it:
   save           upload            delete  remove in the bucket
   rename / move  remove old + upload new
 
-my_team — the whole team writes it (TEAM_BUCKET, from the Hub), so the bucket is the truth:
+<team>_team — the whole team writes it (TEAM_BUCKET, from the Hub), so the bucket is the truth:
 opening a folder (or a file) in it first pulls teammates' changes — new and newer files come
 down, files a teammate deleted go. Saves, deletes and renames go up at once, as above. Moved to
 another team (or none) → the old team's copies are cleared at the next server start.
@@ -32,19 +32,21 @@ from jupyter_server.services.contents.largefilemanager import LargeFileManager
 from tornado import web
 
 FOLDERS = ("notebooks", "dags", "dbt")
-MINE, TEAM = "my_files", "my_team"
+TEAM_BUCKET = os.environ.get("TEAM_BUCKET", "")
+MINE = "my_files"
+# the team's folder is named after it: team-sales-lake → sales_team
+TEAM = (TEAM_BUCKET[len("team-"):-len("-lake")].replace("-", "_") + "_team") if TEAM_BUCKET else "_no_team"
 # dbt rebuilds these on every run — mirroring them would only fill the bucket
 DBT_GENERATED = {"target", "logs", "dbt_packages"}
 PREFIX = "files/src/"                          # their place in both buckets: files/src/notebooks, …
 ROOT = "/home/jovyan/work"                     # the learner's persistent volume
 BUCKET = os.environ.get("LAKE_BUCKET", "")
-TEAM_BUCKET = os.environ.get("TEAM_BUCKET", "")
 ENABLED = bool(BUCKET and os.environ.get("LAKE_S3_KEY"))
-MARK = ".team-bucket"                          # in ~/work/my_team: whose copies these are
+MARK = ".team-bucket"                          # in ~/work/<team>_team: whose copies these are
 log = logging.getLogger("lab_sync")
 _fs = None
-_known = set()                                 # my_team paths seen in the bucket (or put there)
-_pulled = {}                                   # my_team dir → when it was last pulled
+_known = set()                                 # team folder paths seen in the bucket (or put there)
+_pulled = {}                                   # team folder dir → when it was last pulled
 
 
 def fs():
@@ -80,7 +82,7 @@ def synced(path):
 
 
 def _remote(rel):
-    """my_files/dags/a.py → <bucket>/files/src/dags/a.py (also for folders: my_team → …/files/src)."""
+    """my_files/dags/a.py → <bucket>/files/src/dags/a.py (also folders: sales_team → …/files/src)."""
     parts = _parts(rel)
     return f"{_bucket(rel)}/{PREFIX}{'/'.join(parts[1:])}".rstrip("/")
 
@@ -128,9 +130,9 @@ def _remove(rel):
         _known.difference_update({k for k in _known if k == rel or k.startswith(rel.rstrip("/") + "/")})
 
 
-# ---- my_team: the bucket is the truth -----------------------------------------------------
+# ---- the team folder: the bucket is the truth --------------------------------------------
 def _team_remote(rel_dir, recursive):
-    """{rel: mtime} of the team bucket's files under rel_dir (my_team/…), and its sub-folders."""
+    """{rel: mtime} of the team bucket's files under rel_dir (<team>_team/…), and its sub-folders."""
     base = _remote(rel_dir)
     try:
         found = (fs().find(base, detail=True, withdirs=True) if recursive
@@ -149,7 +151,7 @@ def _team_remote(rel_dir, recursive):
 
 
 def pull_team(rel_dir=TEAM, recursive=False, every=3.0):
-    """Bring rel_dir (my_team or below) up to date with the team bucket (at most every `every` s)."""
+    """Bring rel_dir (the team folder or below) up to date with the team bucket (at most every `every` s)."""
     if not (ENABLED and TEAM_BUCKET):
         return
     rel_dir = rel_dir.strip("/") or TEAM
@@ -192,14 +194,16 @@ def pull_team(rel_dir=TEAM, recursive=False, every=3.0):
 
 
 def _team_start(root):
-    """Server start: copies from another team (the member moved) go; then a full pull."""
-    team = Path(root, TEAM)
-    mark = team / MARK
-    owner = mark.read_text().strip() if mark.exists() else ""
-    if team.exists() and owner != TEAM_BUCKET:
-        shutil.rmtree(team, ignore_errors=True)       # not this team's files (or no team now)
+    """Server start: copies of another team (the member moved, or the folder had another name)
+    go — every folder marked as a team copy that isn't this team's; then a full pull."""
+    for d in Path(root).iterdir():
+        mark = d / MARK
+        if d.is_dir() and mark.exists() and (d.name != TEAM or mark.read_text().strip() != TEAM_BUCKET):
+            shutil.rmtree(d, ignore_errors=True)
     if not TEAM_BUCKET:
         return
+    team = Path(root, TEAM)
+    mark = team / MARK
     for top in FOLDERS:
         Path(team, top).mkdir(parents=True, exist_ok=True)
     mark.write_text(TEAM_BUCKET + "\n")
@@ -217,11 +221,11 @@ def _move_old_layout(root):
             if not Path(new, item.name).exists():
                 shutil.move(str(item), str(Path(new, item.name)))
         shutil.rmtree(old, ignore_errors=True)        # what's left was already in my_files/
-    shutil.rmtree(Path(root, "team"), ignore_errors=True)   # the first team folder: comes back as my_team/
+    shutil.rmtree(Path(root, "team"), ignore_errors=True)   # the first team folder: comes back as <team>_team/
 
 
 def initial_sync(root):
-    """Server start: my_files — newest copy of every file wins, in both directions; my_team —
+    """Server start: my_files — newest copy of every file wins, in both directions; <team>_team —
     the team bucket's copy."""
     if not ENABLED:
         return
@@ -260,7 +264,7 @@ def initial_sync(root):
 
 
 class SyncedFileManager(LargeFileManager):
-    """The normal file manager + mirroring of my_files/ (own bucket) and my_team/ (team bucket).
+    """The normal file manager + mirroring of my_files/ (own bucket) and <team>_team/ (team bucket).
     Works on real file paths (relative to ROOT), whatever the server's root_dir is."""
 
     def _rel(self, path):

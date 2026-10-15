@@ -104,7 +104,7 @@ c.JupyterFs.resources = [
     }
 ]
 # JupyterHub learners: my_files/{notebooks,dags,dbt} in the normal file browser are mirrored to their
-# own bucket (dags → Airflow), my_team/{notebooks,dags,dbt} to their team's bucket. See lab_sync.py.
+# own bucket (dags → Airflow), <team>_team/{notebooks,dags,dbt} (e.g. sales_team) to their team's bucket. See lab_sync.py.
 import sys  # noqa: E402
 sys.path.insert(0, "/etc/jupyter")
 import lab_sync  # noqa: E402
