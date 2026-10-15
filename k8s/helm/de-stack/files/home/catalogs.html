@@ -53,6 +53,10 @@
     .cardhead{display:flex; align-items:center; justify-content:space-between; gap:8px} .cardhead h3{margin:0}
     .invite{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:8px}
     .invite input{width:240px} .invite select{max-width:100%}
+    .lookup{position:relative} .lookup ul{position:absolute; left:0; right:0; top:calc(100% + 4px); z-index:5; margin:0; padding:4px;
+      list-style:none; background:var(--panel2); border:1px solid var(--line); border-radius:9px; box-shadow:var(--shadow)}
+    .lookup li{padding:6px 10px; border-radius:7px; cursor:pointer; font-size:.92rem} .lookup li.on, .lookup li:hover{background:rgba(109,139,255,.18)}
+    .lookup li.none{color:var(--muted); cursor:default; background:none}
     pre{margin:0; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; overflow:auto; font-size:.86rem}
     .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--line);
            padding:10px 16px; border-radius:10px; box-shadow:var(--shadow); display:none; z-index:10}
@@ -185,26 +189,34 @@
       var iopen = el('button', 'small', 'Invite…'); ihead.appendChild(iopen); inv.appendChild(ihead);
       var ibody = el('div'); ibody.style.display = 'none'; ibody.style.marginTop = '10px';
       var who = el('input'); who.type = 'text'; who.placeholder = 'member username (type 3+ letters)'; who.autocomplete = 'off';
-      // lookup: from 3 characters, matching members as suggestions
-      var found = el('datalist'); found.id = 'members-found'; who.setAttribute('list', found.id);
-      var lookT, lookQ = '';
+      // lookup: from 3 letters, the matching members in a list under the box (↑ ↓ Enter, or click)
+      var look = el('div', 'lookup'), found = el('ul'); found.hidden = true; look.appendChild(who); look.appendChild(found);
+      var lookT, pick = -1;
+      function names() { return Array.prototype.filter.call(found.children, function (li) { return !li.classList.contains('none'); }); }
+      function mark(i) { var n = names(); pick = n.length ? (i + n.length) % n.length : -1; n.forEach(function (li, j) { li.classList.toggle('on', j === pick); }); }
+      function choose(n) { who.value = n; found.hidden = true; acc.focus(); }
       who.oninput = function () {
         clearTimeout(lookT); var q = who.value.trim().toLowerCase();
-        if (q.length < 3) { found.innerHTML = ''; lookQ = ''; return; }
+        if (q.length < 3) { found.hidden = true; return; }
         lookT = setTimeout(function () {
-          if (q === lookQ) return; lookQ = q;
           api('GET', '/members', {q: q}).then(function (r) {
             if (!r.ok || who.value.trim().toLowerCase() !== q) return;
-            found.innerHTML = '';
-            r.body.forEach(function (n) { found.appendChild(el('option')).value = n; });
+            found.innerHTML = ''; pick = -1;
+            if (!r.body.length) found.appendChild(el('li', 'none', 'no member matches “' + q + '”'));
+            r.body.forEach(function (n) {
+              var li = el('li', null, n); found.appendChild(li);
+              li.onmousedown = function (e) { e.preventDefault(); choose(n); };
+            });
+            found.hidden = false;
           });
-        }, 250);
+        }, 200);
       };
+      who.onblur = function () { found.hidden = true; };
       var acc = el('select'); acc.innerHTML = '<option value="read">read</option><option value="write">read + write</option>';
       var scope = el('select'); scope.innerHTML = '<option value="">the whole lake</option>';
       var go = el('button', 'primary small', 'Invite');
-      var irow = el('div', 'invite'); [who, acc, el('span', 'sub', 'to'), scope, go].forEach(function (x) { irow.appendChild(x); });
-      ibody.appendChild(irow); ibody.appendChild(found);
+      var irow = el('div', 'invite'); [look, acc, el('span', 'sub', 'to'), scope, go].forEach(function (x) { irow.appendChild(x); });
+      ibody.appendChild(irow);
       ibody.appendChild(el('div', 'sub', 'The whole lake: every namespace and its tables, also ones you make later (read + write: they can also create and drop tables)' +
         (info.default ? ', and your files (files/ in your bucket, under 📁 My files → 🤝 Shared with me for them)' : '') +
         '. Or one namespace (e.g. bronze) and all its tables. They find it under Shared with me.'));
@@ -269,7 +281,14 @@
           toast('Invited ' + r.body.grantee + (r.body.files ? ' — tables and files' : '')); who.value = ''; shares();
         });
       }
-      go.onclick = invite; who.onkeydown = function (e) { if (e.key === 'Enter') invite(); };
+      go.onclick = invite;
+      who.onkeydown = function (e) {
+        var open = !found.hidden && names().length;
+        if (e.key === 'ArrowDown' && open) { e.preventDefault(); mark(pick + 1); }
+        else if (e.key === 'ArrowUp' && open) { e.preventDefault(); mark(pick - 1); }
+        else if (e.key === 'Escape') found.hidden = true;
+        else if (e.key === 'Enter') { if (open && pick >= 0) choose(names()[pick].textContent); else invite(); }
+      };
       function shares() {
         api('GET', '/shares', {catalog: name}).then(function (r) {
           stab.innerHTML = '';

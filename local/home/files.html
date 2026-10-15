@@ -50,6 +50,7 @@
     .node.active{background:rgba(109,139,255,.16); color:var(--ink); font-weight:600}
     .caret{width:16px; text-align:center; font-size:.75rem; color:var(--muted); flex:none}
     .caret.leaf{visibility:hidden}
+    .badge.cat{border-color:rgba(109,139,255,.55); color:#b9c6ff}
     .badge{font-size:.68rem; margin-left:6px; padding:1px 6px; border-radius:999px; border:1px solid rgba(226,185,59,.5); color:#f3d98b}
     main{display:flex; flex-direction:column; min-width:0; min-height:0; padding:16px 20px; gap:12px}
     .toolbar{display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
@@ -144,6 +145,9 @@
       </div>
       <div class="banner" id="table-banner">🧊 This folder is an <b>Iceberg table</b>. Don't upload into or delete files here —
         it breaks the table. Change it with SQL instead, e.g. <code>DROP TABLE … PURGE</code>.</div>
+      <div class="banner" id="cat-note" style="border-color:rgba(109,139,255,.5); background:rgba(109,139,255,.08); color:#c9d3ff">🗂️ One folder per
+        <b>catalog</b> (your lakehouse, and catalogs you add on 🗂️ My catalogs), then one per namespace and table. These are the
+        tables' files — change tables with SQL, not here.</div>
       <div class="uploads" id="uploads"></div>
       <div class="list" id="list">
         <table>
@@ -205,6 +209,8 @@
     function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
     function go(prefix) { location.hash = encodeURIComponent(prefix); }
     function parentOf(prefix) { var p = prefix.split('/').filter(Boolean).slice(0, -1).join('/'); return p ? p + '/' : ''; }
+    // tables/<catalog>/ — one folder per catalog (your lake, extra catalogs like <you>_sales)
+    function isCatalog(prefix) { return /^tables\/[^\/]+\/$/.test(prefix); }
     function looksLikeTable(childNames) { return childNames.indexOf('metadata') >= 0; }
 
     // ---------- dialog (replaces browser prompt/confirm) ----------
@@ -232,6 +238,7 @@
       caret.onclick = function (e) { e.stopPropagation(); toggle(prefix); };
       row.onclick = function () { go(prefix); };
       if (state.tables[prefix]) markTable(prefix);
+      else if (isCatalog(prefix)) { label.textContent = '🗂️ ' + name; label.appendChild(el('span', 'badge cat', 'catalog')); }
       return li;
     }
     function markTable(prefix) {
@@ -313,6 +320,7 @@
         if (nodes[state.prefix]) fill(state.prefix, d.folders);
         if (d.is_table) { state.tables[state.prefix] = true; markTable(state.prefix); }
         $('table-banner').style.display = d.is_table ? 'block' : 'none';
+        $('cat-note').style.display = state.prefix === 'tables/' || isCatalog(state.prefix) ? 'block' : 'none';
         crumbs();
         var rows = $('rows'); rows.innerHTML = '';
         if (state.prefix && state.prefix !== ROOT) {
@@ -320,8 +328,10 @@
           var tr = el('tr'); tr.appendChild(cell(up, 'name')); tr.appendChild(el('td')); tr.appendChild(el('td')); tr.appendChild(el('td')); rows.appendChild(tr);
         }
         d.folders.forEach(function (f) {
-          var a = el('a', null, (state.tables[f.prefix] ? '🧊 ' : '📁 ') + f.name); a.href = '#' + encodeURIComponent(f.prefix);
-          var tr = el('tr'); tr.appendChild(cell(a, 'name')); tr.appendChild(el('td', 'num', '—')); tr.appendChild(el('td', 'num'));
+          var cat = isCatalog(f.prefix) && !state.tables[f.prefix];
+          var a = el('a', null, (state.tables[f.prefix] ? '🧊 ' : cat ? '🗂️ ' : '📁 ') + f.name); a.href = '#' + encodeURIComponent(f.prefix);
+          var tr = el('tr'), nm = cell(a, 'name'); tr.appendChild(nm);
+          if (cat) nm.appendChild(el('span', 'badge cat', 'catalog')); tr.appendChild(el('td', 'num', '—')); tr.appendChild(el('td', 'num'));
           var acts = [];
           if (!state.readonly) acts.push(iconBtn('🗑', 'Delete folder', 'del', function () { delFolder(f); }));
           tr.appendChild(cell(group(acts), 'act'));
