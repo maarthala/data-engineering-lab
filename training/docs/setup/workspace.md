@@ -226,6 +226,41 @@ spark.read.option("header", True).csv("s3a://team-sales-lake/files/source/custom
 |  1| Ada|
 +---+----+
 ```
+
+**Team DAGs.** A `.py` saved in `sales_team/dags/` shows up in Airflow within about 30 seconds,
+for **everyone in the team**: each of you can open it, switch it on and trigger it. Its `dag_id`
+must start with **`team_<team>_`**, e.g. `team_sales_daily` (one Airflow for the whole lab, so the
+prefix keeps names apart). In its tasks, `lab_spark()` works **as the team**, not as whoever
+pressed ▶: `iceberg` and `team` are both the team's lakehouse, so the DAG keeps working when people
+join or leave. `key_vault("NAME")` reads the team's secrets, and `lab_dbt()` and `run_notebook()`
+use the team's `dbt/` and `notebooks/`.
+
+```python
+from datetime import datetime
+from airflow.sdk import dag, task
+
+
+@dag(dag_id="team_sales_check", schedule=None, start_date=datetime(2026, 1, 1), catchup=False)
+def team_sales_check():
+    @task
+    def run():
+        from lab_spark import lab_spark
+        spark = lab_spark()
+        spark.sql("CREATE TABLE IF NOT EXISTS iceberg.bronze.dag_check AS SELECT 1 AS id")
+        print("rows:", spark.sql("SELECT count(*) FROM team_sales.bronze.dag_check").collect()[0][0])
+    run()
+
+
+team_sales_check()
+```
+
+The task's log:
+
+```text
+lab_spark: team sales · iceberg = team = team_sales · shared = polaris_lake (each also by its real name)
+rows: 1
+```
+
 - If a manager **moves** you to another team, you lose the old team's lakehouse and bucket and get
   the new ones (in Jupyter after your next server start). The tables and files you made stay with
   the old team.

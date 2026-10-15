@@ -113,16 +113,45 @@ def _hub_forget(user):
 
 
 # ---- Airflow: the member's role, account, job logins and DAG history (on delete) ----------
-def _airflow_forget(user, name):
-    """Best effort; needs AIRFLOW_ADMIN=user:password. False if Airflow couldn't be reached."""
+def _airflow_auth():
+    """Headers for Airflow's API as AIRFLOW_ADMIN=user:password, or None if it can't be reached."""
     adm = os.environ.get("AIRFLOW_ADMIN", "")
     if ":" not in adm:
-        return False
+        return None
     u, p = adm.split(":", 1)
     st, tok = _http("POST", f"{AIRFLOW}/auth/token", {"username": u, "password": p})
     if st not in (200, 201):
+        return None
+    return {"Authorization": f"Bearer {tok['access_token']}"}
+
+
+def _airflow_team(user, team):
+    """The member's Airflow role for the team's DAGs: lab_team_<team> instead of any other team's,
+    at once (the next sign-in would do the same, from the Keycloak group). Best effort — a member
+    who never opened Airflow has no account yet."""
+    h = _airflow_auth()
+    if not h:
         return False
-    h = {"Authorization": f"Bearer {tok['access_token']}"}
+    q = urllib.parse.quote(user)
+    st, u = _http("GET", f"{AIRFLOW}/auth/fab/v1/users/{q}", headers=h)
+    if st != 200:
+        return st == 404
+    want = f"lab_team_{team}"
+    names = [r["name"] for r in u.get("roles", []) if not r["name"].startswith("lab_team_")]
+    if "Admin" in names:
+        return True
+    _http("POST", f"{AIRFLOW}/auth/fab/v1/roles", {"name": want, "actions": []}, headers=h)   # 409 if there
+    st, _ = _http("PATCH", f"{AIRFLOW}/auth/fab/v1/users/{q}?update_mask=roles",
+                  {"roles": [{"name": n} for n in names + [want]]}, headers=h)
+    return st == 200
+
+
+def _airflow_forget(user, name, h=None):
+    """Best effort; needs AIRFLOW_ADMIN=user:password. False if Airflow couldn't be reached.
+    user=None: a team's job identity team_<team> (its DAGs, job logins, role lab_team_<team>)."""
+    h = h or _airflow_auth()
+    if not h:
+        return False
     _, dags = _http("GET", f"{AIRFLOW}/api/v2/dags?" + urllib.parse.urlencode(
         {"dag_id_pattern": f"{name}_", "limit": 1000}), headers=h)
     for d in (dags or {}).get("dags", []) if isinstance(dags, dict) else []:
@@ -130,8 +159,9 @@ def _airflow_forget(user, name):
             _http("DELETE", f"{AIRFLOW}/api/v2/dags/{urllib.parse.quote(d['dag_id'])}", headers=h)
     for var in (f"lab_jobs_{name}", f"lab_jobs_s3_{name}"):   # their job logins (lab_spark)
         _http("DELETE", f"{AIRFLOW}/api/v2/variables/{var}", headers=h)
-    _http("DELETE", f"{AIRFLOW}/auth/fab/v1/users/{urllib.parse.quote(user)}", headers=h)
-    for role in {f"lab_{user}", f"lab_{name}"}:
+    if user:
+        _http("DELETE", f"{AIRFLOW}/auth/fab/v1/users/{urllib.parse.quote(user)}", headers=h)
+    for role in {f"lab_{user or name}", f"lab_{name}"}:
         _http("DELETE", f"{AIRFLOW}/auth/fab/v1/roles/{urllib.parse.quote(role)}", headers=h)
     return True
 
@@ -501,6 +531,19 @@ def delete_team(team):
     except urllib.error.HTTPError:
         pass
     secrets_removed = _vault(labvault.team_forget, team)  # its secrets, vault group, policy
+    jobs = cat                                             # the team's DAGs ran as team_<team>
+    lh._call("DELETE", f"{lh._M}/principals/{jobs}_jobs", token=t)
+    lh._call("DELETE", f"{lh._M}/principal-roles/{jobs}", token=t)
+    try:
+        _airflow_forget(None, jobs)                        # its DAG history, job logins, role
+    except Exception as e:  # noqa: BLE001
+        print(f"[labadmin] airflow team {team}: {e}", flush=True)
+    who = lh.storage_user(jobs)
+    for op, q in (("remove-user", {"accessKey": f"{who}-jobs"}), ("remove-canned-policy", {"name": who})):
+        try:
+            lh._admin("DELETE", op, q)
+        except urllib.error.HTTPError:
+            pass
     _kc("DELETE", f"/admin/realms/{REALM}/groups/{g['id']}", token=kc)
     lh.publish_trino_rules()
     return {"team": team, "dropped": dropped, "bucket": bucket, "secrets_removed": secrets_removed}
@@ -527,6 +570,10 @@ def set_team(user, team, kc=None, g=None, publish=True):
     manager = any(x["name"] == "managers" for x in groups or [])
     lh.put_storage_policy(name, admin=manager, team=None if manager else team)   # team bucket files
     _vault(lambda n: labvault.set_member_policy(n, team), name)                  # team secrets
+    try:                                                                          # team DAGs in Airflow
+        _airflow_team(user, team)
+    except Exception as e:  # noqa: BLE001
+        print(f"[labadmin] airflow team role {user}: {e}", flush=True)
     try:                                                                          # SQLPad: browse the team
         lh.sqlpad_team_connection(name, team)
     except Exception as e:  # noqa: BLE001

@@ -38,7 +38,7 @@ You need the project from the previous lessons in `my_files/dbt/shop/`, and the 
 
 ### 1 · One task: build everything
 New file in Jupyter's **`my_files/dags/`** folder, **`<you>_dbt_shop.py`** (with your username, like every
-DAG: [Airflow basics](../unit5/basics.md#in-the-lab-your-dags-live-in-jupyters-dags-folder)):
+DAG: [Airflow basics](../unit5/basics.md#in-the-lab-your-dags-live-in-jupyters-my_filesdags-folder)):
 
 ```python
 from datetime import datetime

@@ -1,5 +1,7 @@
 """Airflow cluster policy: learner DAGs (bundle "learners", synced from <user>-lake/files/src/dags/)
-must have a dag_id starting with <user>_ — one shared Airflow, so names can't clash.
+must have a dag_id starting with <user>_ — one shared Airflow, so names can't clash. A team's DAGs
+(team-<team>-lake → folder team-<team>/) start with team_<team>_ and are shared with the role
+lab_team_<team>, which everyone in the team holds (airflow_webserver_config.py, labadmin.set_team).
 A DAG that breaks the rule shows up as an import error naming the expected prefix.
 
 Visibility: a learner DAG is readable / editable / runnable only by its owner's role lab_<user>
@@ -20,7 +22,8 @@ def dag_policy(dag):
     prefix = user.replace("-", "_") + "_"
     if not dag.dag_id.startswith(prefix):
         raise AirflowClusterPolicyViolation(
-            f"DAG id {dag.dag_id!r} must start with {prefix!r} (your username) — rename it, "
+            f"DAG id {dag.dag_id!r} must start with {prefix!r} "
+            f"({'the team' if user.startswith('team-') else 'your username'}) — rename it, "
             f"e.g. dag_id='{prefix}{dag.dag_id}'")
     dag.access_control = {f"lab_{user.replace('-', '_')}": {
         "DAGs": {"can_read", "can_edit", "can_delete"},

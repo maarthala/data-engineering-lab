@@ -468,6 +468,10 @@ def _trino_sync_loop():
                     labvault.set_member_policy(lh.lake_name(m), t["team"])
             for m in t["members"]:
                 lh.sqlpad_team_connection(lh.lake_name(m), t["team"])     # SQLPad: browse the team
+                try:                       # Airflow: the team's DAGs (else at their next Airflow sign-in)
+                    labadmin._airflow_team(m, t["team"])
+                except Exception as e:  # noqa: BLE001 — Airflow still starting
+                    print(f"[home-api] airflow team role {m}: {e}", flush=True)
     except Exception as e:  # noqa: BLE001
         print(f"[home-api] team folders: {e}", flush=True)
     n = 0

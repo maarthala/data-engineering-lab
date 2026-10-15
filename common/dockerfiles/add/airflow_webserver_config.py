@@ -2,7 +2,7 @@
 
 On when KEYCLOAK_ENABLED=1, otherwise Airflow's normal database login. Users are created
 on first sign-in; Keycloak groups map to Airflow roles and are re-synced every login
-(managers → Admin, learners → Learner + their own lab_<user> role). Learners have no email, so the username is the
+(managers → Admin, learners → Learner + their own lab_<user> role + lab_team_<team>). Learners have no email, so the username is the
 identity (placeholder <user>@de.lan for FAB's unique-email column).
 
 Endpoints come from Keycloak's discovery document fetched on the INTERNAL address:
@@ -88,9 +88,16 @@ if os.environ.get("KEYCLOAK_ENABLED") == "1":
             self._learner_role()                         # exists before the role sync needs it
             user = super().auth_user_oauth(userinfo)
             if user and not any(r.name == "Admin" for r in user.roles):
-                own = self.find_role(f"lab_{user.username}") or self.add_role(f"lab_{user.username}")
-                if own not in user.roles:
-                    user.roles.append(own)
+                # their own lab_<user> (their DAGs) + lab_team_<team> (their team's DAGs, from
+                # the Keycloak group team-<team>) — the same names the dag policy shares DAGs with
+                want = [f"lab_{user.username.replace('-', '_')}"] + [
+                    "lab_team_" + g[len("team-"):] for g in userinfo.get("role_keys", []) if g.startswith("team-")]
+                roles = [r for r in user.roles if not r.name.startswith("lab_team_") or r.name in want]
+                for name in want:
+                    if not any(r.name == name for r in roles):
+                        roles.append(self.find_role(name) or self.add_role(name))
+                if {r.name for r in roles} != {r.name for r in user.roles}:
+                    user.roles = roles
                     self.update_user(user)
             return user
 

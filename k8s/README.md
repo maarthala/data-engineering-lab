@@ -147,7 +147,8 @@ lakehouse, catalogs and bucket use, and
 writes its lakehouse `team_<team>` and its bucket `team-<team>-lake` (500 MB, `TEAM_QUOTA_MB`;
 My files → Team, Jupyter's `<team>_team/` folder, e.g. `sales_team/` (next to `my_files/`), the RustFS console, `s3a://…` in Spark),
 a SQLPad connection per member, `Team <team> (Trino) — <user>` (browses the team catalog),
-and its key vault folder `secret/<team>_team/` (My secrets → Team, `key_vault(…, team=True)`; vault group `team-<team>`).
+and its key vault folder `secret/<team>_team/` (My secrets → Team, `key_vault(…, team=True)`; vault group `team-<team>`),
+and team DAGs: `<team>_team/dags/` → Airflow, `dag_id` `team_<team>_…`, shared with the Airflow role `lab_team_<team>` (set on a move and at sign-in); their tasks run as `team_<team>_jobs` (`iceberg` = the team's lakehouse).
 
 - **Create team** — Keycloak group `team-<team>` + its lakehouse; **Delete team** once it's empty
 - Pick a team on the left (filter by name); on the right, **Add members** — search by name, pick

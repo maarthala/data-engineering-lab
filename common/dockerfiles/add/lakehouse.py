@@ -728,7 +728,9 @@ _TEAM_README = {
     "files/source/": "Files for the whole team — everyone in the team sees, uploads and reads them\n"
                      "(My files → Team, s3a://<this bucket>/files/source/… in Spark).\n",
     "files/src/notebooks/": "The team's notebooks — the {folder}/notebooks/ folder in everyone's Jupyter.\n",
-    "files/src/dags/": "The team's Airflow DAGs — the {folder}/dags/ folder in everyone's Jupyter.\n",
+    "files/src/dags/": "The team's Airflow DAGs — the {folder}/dags/ folder in everyone's Jupyter. They show up\n"
+                       "in Airflow for everyone in the team; the dag_id must start with {prefix}. In their\n"
+                       "tasks lab_spark() works as the team: iceberg = the team's lakehouse.\n",
     "files/src/dbt/": "The team's dbt projects — the {folder}/dbt/ folder in everyone's Jupyter.\n",
     "tables/": "Table storage of the team's lakehouse (tables/team_<team>/<namespace>/<table>/). Managed\n"
                "by the catalog — create and drop tables with SQL / Spark, don't edit files here.\n",
@@ -758,11 +760,12 @@ def _team_folders_once(bucket):
     missing = 0
     folder = bucket[len("team-"):-len("-lake")].replace("-", "_") + "_team"     # its Jupyter folder
     for f, text in _TEAM_README.items():
-        text = text.replace("{folder}", folder)
+        text = text.replace("{folder}", folder).replace("{prefix}", "team_" + folder[:-len("_team")] + "_")
         try:
             with get_object(bucket, f + "README.md") as r:
-                if b"my_team/" not in r.read():          # (the folder was called my_team at first)
-                    continue
+                old = r.read()                           # (the folder was called my_team at first;
+                if b"my_team/" not in old and (f != "files/src/dags/" or b"dag_id" in old):
+                    continue                             #  the dags README had no dag_id rule)
             raise urllib.error.HTTPError(None, 404, "old text", None, None)
         except urllib.error.HTTPError:
             try:
@@ -810,6 +813,21 @@ def leave_team(name, team):
                   token=_admin_token())
     if st not in (204, 404):
         raise RuntimeError(f"leave {team}: HTTP {st}")
+
+
+def team_jobs_role(team):
+    """What the team's DAGs run as (lab_spark in a team DAG): the Polaris principal-role team_<team>
+    — owner of the team's lake, reader of the shared lake — and the storage policy team-<team>
+    on the team bucket. Its login team_<team>_jobs is made by lab_spark. Idempotent. (Usernames
+    team-… are reserved, so these names never clash with a member's.)"""
+    t, cat, role = _admin_token(), team_catalog(team), team_catalog(team)
+    _ok(_call("POST", f"{_M}/principal-roles", {"principalRole": {"name": role}}, t)[0], "team principal-role")
+    _ok(_call("PUT", f"{_M}/principal-roles/{role}/catalog-roles/{cat}", {"catalogRole": {"name": "owner"}}, t)[0],
+        "team owner")
+    if _call("GET", f"{_M}/catalogs/{SHARED}", token=t)[0] == 200:
+        _ok(_call("PUT", f"{_M}/principal-roles/{role}/catalog-roles/{SHARED}",
+                  {"catalogRole": {"name": "learner_reader"}}, t)[0], "team reader")
+    put_storage_policy(role)                          # team_sales → policy team-sales on team-sales-lake
 
 
 def team_of(name):
