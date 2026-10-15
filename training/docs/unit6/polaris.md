@@ -79,12 +79,13 @@ SELECT * FROM my.bronze.sample_orders WHERE status <> 'cancelled'
 ```
 
 ### 2 · Owner: share `gold`, read-only
-🗂️ **My catalogs** → `demouser_lake` → on the **`gold`** row click **🤝 Share** → type
-`learner2` → **read** → **Share**. **Current shares** now lists it.
+🗂️ **My catalogs** → `demouser_lake` → **🤝 Invite a member**: type `learner2` → **read** → to
+**namespace gold** → **Invite**. **Shared with** now lists it. (The first choice, *the whole
+lake*, would share every namespace and table — here we share only `gold`.)
 
 ### 3 · Other user: use it
 As **learner2** (private window): 🗂️ **My catalogs** → **Shared with me** → `demouser_lake`
-shows exactly what you got (`gold` · all tables · read) and the notebook lines to use it.
+shows exactly what you got (*namespace gold (all its tables)* · read) and the notebook lines to use it.
 In learner2's notebook (Jupyter, same private window):
 
 ```python
@@ -107,13 +108,13 @@ Open **Open in Polaris Console ↗** on the same page: you see the catalog and i
 **names**, but only `gold` lists tables. Seeing that `silver` exists isn't access to it.
 
 ### 4 · Owner: widen, then revoke
-- Share **one table** with write: on `silver` → `orders_clean` → **🤝 Share** → `learner2` →
-  **write**. learner2 can now `INSERT` / `DELETE` in that one table — and still can't read
+- Share **one table** with write: **🤝 Invite a member** → `learner2` → **read + write** → to
+  **table silver.orders_clean** → **Invite**. learner2 can now `INSERT` / `DELETE` in that one table — and still can't read
   anything else in `silver`.
-- **Revoke** both shares under **Current shares**. learner2's next query answers
+- **Revoke** both shares under **Shared with**. learner2's next query answers
   *Forbidden* — grants are checked on every request, there's nothing to log out of.
 
-### 5 · What Share built
+### 5 · What an invite builds
 Each share is a **catalog-role** in *your* catalog (e.g. `share_learner2_read_n_gold`),
 bound to the other user's principal-role:
 
@@ -122,6 +123,7 @@ bound to the other user's principal-role:
 | namespace, **read** | `TABLE_LIST`, `TABLE_READ_DATA`, `TABLE_READ_PROPERTIES`, `NAMESPACE_READ_PROPERTIES` |
 | namespace, **write** | the read set + `TABLE_WRITE_DATA`, `TABLE_WRITE_PROPERTIES`, `TABLE_CREATE` |
 | table, **read** / **write** | the same, on that one table |
+| the **whole lake**, **read** / **write** | the namespace set, granted on the catalog — every namespace and table, also later ones (write adds `TABLE_DROP`) |
 | always | `CATALOG_READ_PROPERTIES` + `NAMESPACE_LIST` (open the catalog, see namespace names) |
 
 Revoke deletes that catalog-role. In [6.4](grant-and-query.md) you build the same chain by
@@ -157,5 +159,5 @@ through workspace roles and OneLake security.
 ## You can now…
 - Explain how **Polaris governs every engine** over one Iceberg lakehouse, per user
 - Read your own RBAC chain: principal → principal-role → catalog-role → grants
-- **Share** a namespace or a single table, read or write, and **revoke** it
+- **Invite** a member to your whole lake, a namespace or a single table, read or write, and **revoke** it
 - Tell *metadata* denial (`Forbidden`) from *storage* denial (`Access Denied` on vended creds)

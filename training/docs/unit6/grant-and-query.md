@@ -40,7 +40,8 @@ Sign in to the Console as `root` / `s3cr3t` (your laptop stack — on a team sta
 
 !!! tip "Members: the same grant, without the admin"
     Sharing *your own* tables with another member doesn't need root: on **🗂️ My catalogs**
-    pick a namespace or table → **Share** → their username → **read** or **read + write**.
+    **🤝 Invite a member** → their username → **read** or **read + write** → the whole lake, a
+    namespace or a table → **Invite**.
     Behind the scenes it creates exactly the chain below (a catalog role with these
     privileges, bound to their principal-role) — and **Revoke** removes it.
 

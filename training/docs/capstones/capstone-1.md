@@ -94,8 +94,8 @@ Add a new Gold mart `gold.daily_cancellations` to your lakehouse and expose it i
 
     **2. Governance — share it read-only (My catalogs)**
 
-    **🗂️ My catalogs** → `demouser_lake` → in *Namespaces & tables* find `gold` →
-    `daily_cancellations` → **Share** → the other member's username → **read** → **Share**.
+    **🗂️ My catalogs** → `demouser_lake` → **🤝 Invite a member**: the other member's username →
+    **read** → to **table gold.daily_cancellations** → **Invite**.
     Behind the scenes that's a Polaris catalog role with `TABLE_READ_DATA` on that one table, bound
     to their principal-role — the least-privilege grant chain from [6.4](../unit6/grant-and-query.md).
 

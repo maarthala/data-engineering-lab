@@ -276,8 +276,9 @@ rows: 1
 **🗂️ My catalogs** (landing page) lists the catalogs you own and the ones shared with you:
 
 - **＋ New** creates a catalog `<you>_<name>`, stored in your bucket under `tables/<you>_<name>/`.
-- **Share** a namespace or a single table with another member — **read** or **write** — and
-  **revoke** it again. Polaris enforces it: they see exactly what you shared.
+- **🤝 Invite a member** to a catalog — **read** or **read + write** — to the **whole lake**
+  (every namespace and table, also ones you make later) or to one namespace or table, and
+  **revoke** it again under **Shared with**. Polaris enforces it: they see exactly what you shared.
 - **Open in Polaris Console ↗** opens the catalog in the Console, signed in as you — browse
   it, add namespaces and tables. (The Console's own **Catalogs** list shows `0` for members:
   listing *all* catalogs is admin-only, so open yours from here.)

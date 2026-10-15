@@ -558,6 +558,10 @@ _SHARE_PRIVS = {
                              "TABLE_WRITE_DATA", "TABLE_WRITE_PROPERTIES", "TABLE_CREATE"],
     ("table", "read"): ["TABLE_READ_PROPERTIES", "TABLE_READ_DATA"],
     ("table", "write"): ["TABLE_READ_PROPERTIES", "TABLE_READ_DATA", "TABLE_WRITE_DATA", "TABLE_WRITE_PROPERTIES"],
+    # the whole lake (granted on the catalog: every namespace and table in it, also ones made later)
+    ("catalog", "read"): ["NAMESPACE_READ_PROPERTIES", "TABLE_LIST", "TABLE_READ_PROPERTIES", "TABLE_READ_DATA"],
+    ("catalog", "write"): ["NAMESPACE_READ_PROPERTIES", "TABLE_LIST", "TABLE_READ_PROPERTIES", "TABLE_READ_DATA",
+                           "TABLE_WRITE_DATA", "TABLE_WRITE_PROPERTIES", "TABLE_CREATE", "TABLE_DROP"],
 }
 
 
@@ -629,6 +633,8 @@ def catalog_tree(name, cat):
 
 
 def _share_role(grantee, access, namespace, table=None):
+    if not namespace:                                   # the whole lake
+        return f"share_{grantee}_{access}_c_all"
     tail = re.sub(r"[^a-z0-9_]", "_", f"{namespace}__{table}" if table else namespace)
     return f"share_{grantee}_{access}_{'t' if table else 'n'}_{tail}"[:120]
 
@@ -638,11 +644,13 @@ def _describe_share(cat, role, t):
     g = next((x for x in grants if x.get("namespace")), {})      # skip the catalog-level browse grants
     privs = {x["privilege"] for x in grants}
     return {"role": role, "namespace": ".".join(g.get("namespace", [])), "table": g.get("tableName"),
-            "access": "write" if "TABLE_WRITE_DATA" in privs else "read"}
+            "access": "write" if "TABLE_WRITE_DATA" in privs else "read",
+            "scope": "table" if g.get("tableName") else "namespace" if g else "lake"}
 
 
-def share(name, cat, grantee, access, namespace, table=None):
-    """Give another learner read / write on a namespace or table of a catalog you own."""
+def share(name, cat, grantee, access, namespace=None, table=None):
+    """Give another learner read / write on a catalog you own — all of it (namespace empty: every
+    namespace and table, also ones made later), or only one namespace or table."""
     if access not in ("read", "write"):
         raise ValueError("access must be read or write")
     grantee = lake_name(grantee or "")
@@ -655,12 +663,14 @@ def share(name, cat, grantee, access, namespace, table=None):
         raise PermissionError("not your catalog")
     if _call("GET", f"{_M}/principal-roles/{grantee}", token=t)[0] != 200:
         raise ValueError(f"no learner called {grantee}")
-    ns = namespace.split(".")
+    ns = namespace.split(".") if namespace else None
     role = _share_role(grantee, access, namespace, table)
     _ok(_call("POST", f"{_M}/catalogs/{cat}/catalog-roles", {"catalogRole": {"name": role}}, t)[0], "share role")
-    kind = "table" if table else "namespace"
+    kind = "table" if table else "namespace" if ns else "catalog"
     for priv in _SHARE_PRIVS[(kind, access)]:
-        g = {"type": kind, "namespace": ns, "privilege": priv}
+        g = {"type": kind, "privilege": priv}
+        if ns:
+            g["namespace"] = ns
         if table:
             g["tableName"] = table
         _ok(_call("PUT", f"{_M}/catalogs/{cat}/catalog-roles/{role}/grants", {"grant": g}, t)[0], f"grant {priv}")
@@ -976,8 +986,10 @@ def trino_rules():
     tables = [{"user": TRINO_ADMINS, "privileges": _ALL}]
     tables += [{"user": q(u), "catalog": q(c), "privileges": _ALL} for u, c in owned]
     for u, c, ns, tbl, access in shares:
-        tables.append({"user": q(u), "catalog": q(c), "schema": q(ns), "table": q(tbl) if tbl else ".*",
-                       "privileges": ["SELECT", "INSERT", "DELETE", "UPDATE"] if access == "write" else ["SELECT"]})
+        tables.append({"user": q(u), "catalog": q(c), "schema": q(ns) if ns else ".*", "table": q(tbl) if tbl else ".*",
+                       "privileges": (["SELECT"] if access != "write" else       # whole lake, write: also
+                                      ["SELECT", "INSERT", "DELETE", "UPDATE"] + (["OWNERSHIP"] if not ns else []))})
+                       # create / drop tables, as in Spark (Polaris TABLE_CREATE / TABLE_DROP)
     tables += [{"catalog": f"iceberg|{re.escape(SHARED)}|shopflow|adventureworks|system", "privileges": ["SELECT"]}]
     functions = [{"user": TRINO_ADMINS, "privileges": ["EXECUTE", "GRANT_EXECUTE", "OWNERSHIP"]}]
     functions += [{"user": q(u), "catalog": q(c), "privileges": ["EXECUTE", "GRANT_EXECUTE", "OWNERSHIP"]} for u, c in owned]

@@ -120,8 +120,8 @@ governed by least-privilege grants, scheduled idempotently, and surfaced in Supe
 
     **3 — Share the product, keep the plumbing private (My catalogs):**
 
-    **🗂️ My catalogs** → `demouser_lake` → `gold` → `product_weekly` → **Share** → the other
-    member → **read**. They can now `SELECT` that one table (in Spark after
+    **🗂️ My catalogs** → `demouser_lake` → **🤝 Invite a member**: the other member → **read** →
+    to **table gold.product_weekly** → **Invite**. They can now `SELECT` that one table (in Spark after
     `use_catalog("demouser_lake")`, or in Trino); `silver` and everything else stay yours alone.
     Polaris enforces it — the same grant chain as [6.4](../unit6/grant-and-query.md). (In a company
     you'd grant **groups**, e.g. *analysts*, not individual people.)

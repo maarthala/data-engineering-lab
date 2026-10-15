@@ -48,8 +48,8 @@
     tr:last-child td{border-bottom:0}
     td.r{text-align:right; white-space:nowrap}
     .ns td:first-child{font-weight:600} .tbl td:first-child{padding-left:30px; color:var(--muted)}
-    .shareform td{background:rgba(57,208,196,.06)}
-    .shareform input{width:170px}
+    .invite{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:8px}
+    .invite input{width:170px} .invite select{max-width:100%}
     pre{margin:0; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; overflow:auto; font-size:.86rem}
     .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--line);
            padding:10px 16px; border-radius:10px; box-shadow:var(--shadow); display:none; z-index:10}
@@ -96,6 +96,12 @@
       return fetch('/api/catalogs' + path + (q ? '?' + q : ''), {method: method, credentials: 'same-origin'})
         .then(function (r) { return r.json().then(function (j) { return {ok: r.ok, body: j}; }); });
     }
+    // what a share covers, in words
+    function what(s) {
+      return s.scope === 'lake' || !s.namespace ? 'the whole lake (every namespace and table)'
+        : s.table ? 'table ' + s.namespace + '.' + s.table : 'namespace ' + s.namespace + ' (all its tables)';
+    }
+
     function snippet(cat, ns, table) {
       var pre = el('pre');
       pre.textContent = 'use_catalog("' + cat + '")\n' +
@@ -144,9 +150,9 @@
         card.appendChild(polarisLink(name));
         m.appendChild(card);
         var acc = el('div', 'card'); acc.appendChild(el('h3', null, 'What you can access'));
-        var t = el('table'); t.innerHTML = '<tr><th>Namespace</th><th>Table</th><th>Access</th></tr>';
+        var t = el('table'); t.innerHTML = '<tr><th>What</th><th>Access</th></tr>';
         c.shares.forEach(function (s) {
-          var tr = el('tr'); tr.appendChild(el('td', null, s.namespace)); tr.appendChild(el('td', null, s.table || 'all tables'));
+          var tr = el('tr'); tr.appendChild(el('td', null, what(s)));
           var td = el('td'); td.appendChild(el('span', 'tag ' + s.access, s.access === 'write' ? 'read + write' : 'read')); tr.appendChild(td); t.appendChild(tr);
         });
         acc.appendChild(t); m.appendChild(acc);
@@ -167,10 +173,19 @@
       head.appendChild(el('div', 'sub', (info.default ? 'Your main lakehouse (`my` in your notebooks)' : 'Your catalog') + ' · stored in ' + info.location));
       head.appendChild(polarisLink(name));
       m.appendChild(head);
-      var tree = el('div', 'card'); tree.appendChild(el('h3', null, 'Namespaces & tables — share with another learner'));
+      var inv = el('div', 'card'); inv.appendChild(el('h3', null, '🤝 Invite a member'));
+      var who = el('input'); who.type = 'text'; who.placeholder = 'member username';
+      var acc = el('select'); acc.innerHTML = '<option value="read">read</option><option value="write">read + write</option>';
+      var scope = el('select'); scope.innerHTML = '<option value="">the whole lake</option>';
+      var go = el('button', 'primary small', 'Invite');
+      var irow = el('div', 'invite'); [who, acc, el('span', 'sub', 'to'), scope, go].forEach(function (x) { irow.appendChild(x); });
+      inv.appendChild(irow);
+      inv.appendChild(el('div', 'sub', 'The whole lake: every namespace and table, also ones you make later (read + write: they can also create and drop tables). Or pick one namespace or table. They find it under Shared with me.'));
+      m.appendChild(inv);
+      var sh = el('div', 'card'); sh.appendChild(el('h3', null, 'Shared with')); var stab = el('table'); sh.appendChild(stab); m.appendChild(sh);
+      var tree = el('div', 'card'); tree.appendChild(el('h3', null, 'Namespaces & tables'));
       var tbody = el('table'); tree.appendChild(tbody); m.appendChild(tree);
       tbody.innerHTML = '<tr><td class="sub">Loading…</td></tr>';
-      var sh = el('div', 'card'); sh.appendChild(el('h3', null, 'Current shares')); var stab = el('table'); sh.appendChild(stab); m.appendChild(sh);
       var nb = el('div', 'card'); nb.appendChild(el('h3', null, 'Use it in a notebook'));
       nb.appendChild(info.default ? (function () { var p = el('pre'); p.textContent = '# already set up as `my`\nspark.sql("SHOW NAMESPACES IN my").show()'; return p; })() : snippet(name));
       nb.appendChild(el('div', 'sub', 'Create namespaces & tables from Spark, e.g. spark.sql("CREATE NAMESPACE ' + (info.default ? 'my' : name) + '.sales")'));
@@ -181,47 +196,38 @@
         if (!r.ok) { tbody.innerHTML = ''; return toast(r.body.error, true); }
         if (!r.body.length) { var e = el('tr'); var td = el('td', 'sub', 'No namespaces yet — create one from a notebook (see below).'); e.appendChild(td); tbody.appendChild(e); }
         r.body.forEach(function (ns) {
-          tbody.appendChild(row('📁 ' + ns.namespace, ns.namespace, null, 'ns'));
-          ns.tables.forEach(function (t) { tbody.appendChild(row('▦ ' + t, ns.namespace, t, 'tbl')); });
+          tbody.appendChild(row('📁 ' + ns.namespace, 'ns'));
+          scope.appendChild(el('option', null, 'namespace ' + ns.namespace)).value = ns.namespace;
+          ns.tables.forEach(function (t) {
+            tbody.appendChild(row('▦ ' + t, 'tbl'));
+            scope.appendChild(el('option', null, 'table ' + ns.namespace + '.' + t)).value = ns.namespace + '\u0000' + t;
+          });
         });
       });
       shares();
 
-      function row(label, ns, table, cls) {
-        var tr = el('tr', cls); tr.appendChild(el('td', null, label));
-        var td = el('td', 'r'); var b = el('button', 'small', '🤝 Share'); td.appendChild(b); tr.appendChild(td);
-        b.onclick = function () { shareForm(tr, ns, table); };
-        return tr;
+      function row(label, cls) { var tr = el('tr', cls); tr.appendChild(el('td', null, label)); return tr; }
+      function invite() {
+        if (!who.value.trim()) return who.focus();
+        var p = {catalog: name, grantee: who.value.trim(), access: acc.value};
+        if (scope.value) { var parts = scope.value.split('\u0000'); p.namespace = parts[0]; if (parts[1]) p.table = parts[1]; }
+        go.disabled = true;
+        api('POST', '/shares', p).then(function (r) {
+          go.disabled = false;
+          if (!r.ok) return toast(r.body.error, true);
+          toast('Invited ' + r.body.grantee); who.value = ''; shares();
+        });
       }
-      function shareForm(after, ns, table) {
-        var old = tbody.querySelector('tr.shareform'); if (old) old.remove();
-        var tr = el('tr', 'shareform'), td = el('td'); td.colSpan = 2;
-        var who = el('input'); who.type = 'text'; who.placeholder = 'learner username';
-        var acc = el('select'); acc.innerHTML = '<option value="read">read</option><option value="write">read + write</option>';
-        var go = el('button', 'primary small', 'Share'), cancel = el('button', 'small', 'Cancel');
-        td.appendChild(document.createTextNode('Share ' + (table ? 'table ' + ns + '.' + table : 'namespace ' + ns + ' (all its tables)') + ' with '));
-        [who, acc, go, cancel].forEach(function (x) { td.appendChild(document.createTextNode(' ')); td.appendChild(x); });
-        tr.appendChild(td); after.parentNode.insertBefore(tr, after.nextSibling); who.focus();
-        cancel.onclick = function () { tr.remove(); };
-        function submit() {
-          if (!who.value.trim()) return who.focus();
-          var p = {catalog: name, grantee: who.value.trim(), access: acc.value, namespace: ns}; if (table) p.table = table;
-          api('POST', '/shares', p).then(function (r) {
-            if (!r.ok) return toast(r.body.error, true);
-            toast('Shared with ' + r.body.grantee); tr.remove(); shares();
-          });
-        }
-        go.onclick = submit; who.onkeydown = function (e) { if (e.key === 'Enter') submit(); if (e.key === 'Escape') tr.remove(); };
-      }
+      go.onclick = invite; who.onkeydown = function (e) { if (e.key === 'Enter') invite(); };
       function shares() {
         api('GET', '/shares', {catalog: name}).then(function (r) {
           stab.innerHTML = '';
           if (!r.ok) return toast(r.body.error, true);
-          if (!r.body.length) { var e = el('tr'); e.appendChild(el('td', 'sub', 'Not shared with anyone.')); stab.appendChild(e); return; }
-          stab.innerHTML = '<tr><th>Learner</th><th>Namespace</th><th>Table</th><th>Access</th><th></th></tr>';
+          if (!r.body.length) { var e = el('tr'); e.appendChild(el('td', 'sub', 'No one yet.')); stab.appendChild(e); return; }
+          stab.innerHTML = '<tr><th>Member</th><th>What</th><th>Access</th><th></th></tr>';
           r.body.forEach(function (s) {
             var tr = el('tr'); tr.appendChild(el('td', null, s.grantees.join(', ')));
-            tr.appendChild(el('td', null, s.namespace)); tr.appendChild(el('td', null, s.table || 'all tables'));
+            tr.appendChild(el('td', null, what(s)));
             var a = el('td'); a.appendChild(el('span', 'tag ' + s.access, s.access === 'write' ? 'read + write' : 'read')); tr.appendChild(a);
             var td = el('td', 'r'), b = el('button', 'small danger', 'Revoke'); td.appendChild(b); tr.appendChild(td);
             b.onclick = function () { api('DELETE', '/shares', {catalog: name, role: s.role}).then(function (x) {

@@ -17,13 +17,13 @@ from the browser can point at another bucket.
   DELETE /api/files/folder?prefix=…[&confirm_table=1]  delete a folder (tables need confirm)
 
 "My catalogs" — catalogs the learner owns or that are shared with them; create a catalog
-<name>_<x> (stored in their bucket); share a namespace/table with another learner
+<name>_<x> (stored in their bucket); invite another learner to it (the whole lake, a namespace or a table)
 (read / write) and revoke. Polaris enforces the access; ownership is checked here.
   GET    /api/catalogs                                   owned + shared-with-me
   POST   /api/catalogs?name=sales                        create <user>_sales
   GET    /api/catalogs/tree?catalog=…                    namespaces + tables (owner)
   GET    /api/catalogs/shares?catalog=…                  who has what (owner)
-  POST   /api/catalogs/shares?catalog&grantee&access&namespace[&table]
+  POST   /api/catalogs/shares?catalog&grantee&access[&namespace[&table]]  (no namespace: the whole lake)
   DELETE /api/catalogs/shares?catalog=…&role=…           revoke
 
 "Manage members" — managers only (Keycloak group `managers`). Actions run in the background
@@ -234,7 +234,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, lh.list_shares(name, q.get("catalog", "")))
             if method == "POST" and path == "/api/catalogs/shares":
                 out = lh.share(name, q.get("catalog", ""), q.get("grantee", "").strip(),
-                               q.get("access", "read"), q.get("namespace", ""), q.get("table") or None)
+                               q.get("access", "read"), q.get("namespace") or None, q.get("table") or None)
                 _rules_now()
                 return self._json(200, out)
             if method == "DELETE" and path == "/api/catalogs/shares":
