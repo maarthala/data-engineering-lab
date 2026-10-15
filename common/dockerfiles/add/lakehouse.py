@@ -306,9 +306,10 @@ _README = {
 def make_folders(bucket):
     """The layout folders (FOLDERS), each with a README (a real file — an empty "folder marker"
     object shows up as an endless folder-inside-itself in s3fs-based browsers). Best
-    effort: a brand-new bucket refuses writes until the quota scanner has seen it — the
-    next provision call creates them."""
+    effort: a brand-new bucket refuses writes until the quota scanner has seen it (fill_bucket
+    keeps trying). Returns how many are still missing."""
     import io
+    missing = 0
     for f in FOLDERS:
         key = f + "README.md"
         try:
@@ -319,7 +320,8 @@ def make_folders(bucket):
                 put_object(bucket, key, io.BytesIO(body), len(body), "text/markdown")
                 delete_object(bucket, f)              # old empty marker, if any
             except urllib.error.HTTPError:
-                pass
+                missing += 1
+    return missing
 
 
 # Starter files every learner gets, copied from <this dir>/seed/ to the same path in their bucket:
@@ -334,9 +336,11 @@ SEED_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "seed")
 
 
 def seed_files(bucket):
+    """Copy the starter files in; returns how many could not be written yet."""
     import io
+    missing = 0
     if not os.path.isdir(SEED_DIR):
-        return
+        return 0
     lake = bucket[:-len("-lake")].replace("-", "_") + "_lake"
     # On Kubernetes the seed is a ConfigMap mount: `files` is a link into the hidden
     # ..<timestamp>/ folder (with a ..data link beside it) — follow links, skip hidden entries.
@@ -359,8 +363,31 @@ def seed_files(bucket):
                                                                                          "application/octet-stream")
             try:
                 put_object(bucket, key, io.BytesIO(body), len(body), ctype)
-            except urllib.error.HTTPError:                # new bucket not scanned yet — next call
-                pass
+            except urllib.error.HTTPError:                # new bucket not scanned yet — fill_bucket retries
+                missing += 1
+    return missing
+
+
+def fill_bucket(bucket, wait=300):
+    """The folders + starter files of a member's bucket. A brand-new bucket refuses writes for
+    ~30 s (the object store's quota scan), so when something is missing this keeps trying in
+    the background (up to `wait` seconds) instead of holding up the sign-in."""
+    if not (make_folders(bucket) + seed_files(bucket)):
+        return
+    import threading, time
+
+    def retry():
+        end = time.time() + wait
+        while time.time() < end:
+            time.sleep(3)
+            try:
+                if not (make_folders(bucket) + seed_files(bucket)):
+                    print(f"[lakehouse] {bucket}: folders and starter files in", flush=True)
+                    return
+            except Exception as e:  # noqa: BLE001 — storage hiccup: try again
+                print(f"[lakehouse] {bucket}: {e}", flush=True)
+        print(f"[lakehouse] {bucket}: folders still missing after {wait}s", flush=True)
+    threading.Thread(target=retry, daemon=True, name=f"fill-{bucket}").start()
 
 
 def set_quota(bucket, mb=QUOTA_MB):
@@ -547,8 +574,7 @@ def provision(name, manager=False):
     bucket = bucket_name(name)
     create_bucket(bucket)
     set_quota(bucket)
-    make_folders(bucket)
-    seed_files(bucket)
+    fill_bucket(bucket)
     try:
         team = None if manager else team_of(name)
     except RuntimeError:
