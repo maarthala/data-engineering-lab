@@ -213,18 +213,24 @@ def lab_dbt(command="build", project="shop", user=None):
                 raise RuntimeError(f"dbt {' '.join(args)} failed (exit {proc.returncode}) — see the log above")
 
 
-def _vault_fields(name, user):
+def _vault_fields(name, user, team=False):
     import labvault
     name_ = lh.lake_name(user or _current_user())
     if not re.fullmatch(r"[a-z0-9_]+", name_):
         raise ValueError(f"bad learner name {name_!r}")
-    d = labvault.fields(name_, name)
+    folder = name_
+    if team:                                       # the DAG owner's team: secret/<team>_team/
+        t = lh.team_of(name_)
+        if not t:
+            raise KeyError(f"{name_} is not in a team")
+        folder = labvault.team_folder(t)
+    d = labvault.fields(folder, name)
     if d is None:
-        raise KeyError(f"no secret {name!r} for {name_} — add it on 🔑 My secrets")
+        raise KeyError(f"no secret {name!r} in {folder} — add it on 🔑 My secrets{' → Team' if team else ''}")
     return d
 
 
-def key_vault(name, field=None, user=None):
+def key_vault(name, field=None, user=None, team=False):
     """One of the learner's secrets ("My secrets", the key vault) in a DAG task — the same as
     key_vault() in a notebook:
 
@@ -233,9 +239,10 @@ def key_vault(name, field=None, user=None):
             from lab_spark import key_vault
             key = key_vault("WEATHER_API_KEY")
             pw = key_vault("db", "password")       # one field of a secret with several
+            tok = key_vault("API_TOKEN", team=True)  # one of the owner's TEAM's secrets
 
     Whose: the running DAG's owner (as lab_spark), read with Airflow's vault login. Never logged."""
-    d = _vault_fields(name, user)
+    d = _vault_fields(name, user, team)
     if field is not None:
         if field not in d:
             raise KeyError(f"secret {name!r} has no field {field!r} — its fields: {', '.join(sorted(d)) or '—'}")
@@ -245,9 +252,9 @@ def key_vault(name, field=None, user=None):
     return next(iter(d.values())) if len(d) == 1 else json.dumps(d)
 
 
-def key_vault_dict(name, user=None):
-    """Every field of one of the learner's secrets as a dict (as key_vault_dict() in a notebook)."""
-    return _vault_fields(name, user)
+def key_vault_dict(name, user=None, team=False):
+    """Every field of one of the learner's (team=True: their team's) secrets as a dict."""
+    return _vault_fields(name, user, team)
 
 
 lab_secret = key_vault          # the first name (DAGs written before the rename keep working)

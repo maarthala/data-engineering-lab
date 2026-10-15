@@ -249,7 +249,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(500, {"error": str(e)})
 
     def _env(self, method):
-        """All /api/env calls — the logged-in learner's own secrets, in their vault folder."""
+        """All /api/env calls — the logged-in learner's own secrets (or with space=team their
+        team's), in their vault folder secret/<name>/ (secret/<team>_team/)."""
         path, q = self._route()
         user = self._user()
         if not user:
@@ -259,10 +260,17 @@ class Handler(BaseHTTPRequestHandler):
             self._ensure(name)
             if path != "/api/env":
                 return self._json(404, {"error": "not found"})
+            team = None
+            if q.get("space") == "team":
+                team = lh.team_of(name)
+                if not team:
+                    return self._json(404, {"error": "you are not in a team yet"})
+                name = labvault.team_folder(team)        # every call below: the team's folder
             if method == "GET":
-                labvault.import_env_file(name)          # once: the old My variables file
+                if not team:
+                    labvault.import_env_file(name)      # once: the old My variables file
                 rows = [(k, labvault.get(name, k)) for k in labvault.names(name)]
-                return self._json(200, {"vars": [
+                return self._json(200, {"team": team, "folder": name, "vars": [
                     {"name": k, "secret": v["secret"], "updated": v["updated"],
                      **({} if v["secret"] else {"value": v["value"]})}
                     for k, v in rows if v]})
@@ -451,9 +459,13 @@ def _trino_sync_loop():
     """Learner catalogs live in Trino's memory — re-add them (Trino restarts); and keep Trino's
     access rules in step with Polaris (owners, shares) — every 30 s."""
     import time
-    try:                                    # teams made before a folder existed get it now
+    try:                                    # teams made before a folder (or team secrets) existed
         for t in labadmin.teams():
             lh.make_team_folders(t["bucket"])
+            if labvault.enabled():
+                labvault.team_setup(t["team"])
+                for m in t["members"]:
+                    labvault.set_member_policy(lh.lake_name(m), t["team"])
     except Exception as e:  # noqa: BLE001
         print(f"[home-api] team folders: {e}", flush=True)
     n = 0

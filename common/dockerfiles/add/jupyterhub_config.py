@@ -139,6 +139,7 @@ async def pre_spawn(spawner):
         "GIT_AUTHOR_NAME": spawner.user.name,
         "GIT_AUTHOR_EMAIL": f"{spawner.user.name}@de.lan",
     })
+    team = None
     try:                                       # their team's lakehouse → `team` in Spark
         team = team_of(name)
         spawner.environment["TEAM_CATALOG"] = team_catalog(team) if team else ""
@@ -149,7 +150,7 @@ async def pre_spawn(spawner):
         try:
             labvault.import_env_file(name)     # once: the old My variables file
             spawner.environment.update({"VAULT_ADDR": labvault.VAULT,
-                                        "VAULT_TOKEN": labvault.member_token(name)})
+                                        "VAULT_TOKEN": labvault.member_token(name, team)})
         except Exception as e:  # noqa: BLE001 — Jupyter still starts; key_vault() says why
             spawner.log.warning("vault token for %s: %s", name, e)
     spawner.log.info("lakehouse %s_lake ready for %s", name, spawner.user.name)

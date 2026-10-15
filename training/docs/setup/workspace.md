@@ -322,6 +322,30 @@ straight in **your folder** `secret/<you>/`: one entry per secret, the same ones
   *View secret* box), because the vault refuses. The UI can't show an empty folder, so while yours
   is empty the link opens **Create secret** with `<you>/` filled in: type the name after the `/`.
 
+### Your team's secrets
+
+Your team has a folder too, **`secret/<team>_team/`** (e.g. `secret/sales_team/`): everyone in
+the team reads and changes it, nobody else. A key the whole team uses — the API token for a
+supplier, the password of a shared database — goes there once, instead of everyone keeping a copy.
+
+- **🔑 My secrets → 👥 Team** shows and saves them, like your own (values stay hidden).
+- In a notebook or a DAG, add **`team=True`**:
+
+```python
+key_vault_set("API_TOKEN", "abc123", team=True)    # save one for the team
+key_vault_list(team=True)                           # the team's secret names
+token = key_vault("API_TOKEN", team=True)           # read it — in a DAG: from lab_spark import key_vault
+```
+```text
+✓ team secret API_TOKEN saved
+['API_TOKEN']
+```
+
+- In the vault's own UI the team folder sits next to yours (*Open the key vault* on the Team
+  view goes straight there).
+- If a manager moves you to another team, the old team's secrets stop working for you at once;
+  restart your server to reach the new team's.
+
 !!! note "Coming from My variables?"
     The lab used to load these into `os.environ` ("My variables"). Your values moved into the
     vault on their own; read them with `key_vault("NAME")` instead of `os.environ["NAME"]`. Why
@@ -356,5 +380,5 @@ signs up, off otherwise).
 - Keep notebooks and DAGs in `my_files/notebooks/` and `my_files/dags/`, and name DAGs `<you>_…`
 - Work in your team's lakehouse (`team` in Jupyter, `team_<team>` in SQLPad)
 - Create a catalog and share a namespace or table with another member
-- Keep keys and passwords in **My secrets** (the key vault) and read them with `key_vault()`
+- Keep keys and passwords in **My secrets** (the key vault) and read them with `key_vault()` — the team's with `team=True`
 - Know when to ask a manager for a lakehouse reset or a full wipe

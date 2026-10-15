@@ -8,7 +8,8 @@
 #                VAULT_OIDC_CLIENT_SECRET — "Sign in with the lab account" (Keycloak, client vault)
 # Members get a token from the Hub at each Jupyter start: role member, policy member-<name>,
 # which reaches only secret/<name>/… (labvault.py). Signed in to the UI with Keycloak they get
-# lab-member: the same folder, picked by their username. Managers (Keycloak group) get lab-manager.
+# lab-member: the same folder, picked by their username. Managers (Keycloak group) get lab-manager;
+# members of a team (Keycloak group team-<team>) its folder secret/<team>_team/ (set up by labvault).
 set -e
 export BAO_ADDR="${BAO_ADDR:-http://vault:8200}"
 : "${VAULT_ADMIN_TOKEN:?VAULT_ADMIN_TOKEN is not set}"
@@ -30,6 +31,8 @@ path "sys/auth/oidc"                { capabilities = ["create", "read", "update"
 path "auth/oidc/config"             { capabilities = ["create", "read", "update"] }
 path "auth/oidc/role/*"             { capabilities = ["create", "read", "update"] }
 path "identity/group/name/managers" { capabilities = ["create", "read", "update"] }
+path "sys/policies/acl/team-*"      { capabilities = ["create", "read", "update", "delete"] }
+path "identity/group/name/team-*"   { capabilities = ["create", "read", "update", "delete"] }
 path "identity/group-alias"         { capabilities = ["create", "update"] }
 path "identity/lookup/entity"       { capabilities = ["update"] }
 path "identity/entity/id/*"         { capabilities = ["delete"] }

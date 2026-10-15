@@ -37,12 +37,17 @@ except Exception as _e:  # noqa: BLE001
 # --- My secrets: the learner's own secrets, in the lab's key vault (OpenBao) -----------------
 # The Hub gives this server VAULT_ADDR + VAULT_TOKEN, a token that reaches only secret/<you>/….
 # Values are fetched when asked for, never loaded into os.environ or printed.
-def _vault(method, key="", body=None):
+def _vault(method, key="", body=None, team=False):
     import json, os, urllib.error, urllib.parse, urllib.request
     addr, token, me = os.environ.get("VAULT_ADDR"), os.environ.get("VAULT_TOKEN"), os.environ.get("LAKE_USER")
     if not (addr and token and me):
         raise RuntimeError("no key vault login on this server — restart it "
                            "(File → Hub Control Panel → Stop My Server → Start)")
+    if team:                                   # the team's folder: team_sales → secret/sales_team/
+        cat = os.environ.get("TEAM_CATALOG", "")
+        if not cat.startswith("team_"):
+            raise RuntimeError("you are not in a team on this server — if you just joined one, restart it")
+        me = cat[len("team_"):] + "_team"
     kind = "metadata" if method == "LIST" else "data"
     url = f"{addr}/v1/secret/{kind}/{me}/{urllib.parse.quote(key, safe='')}"
     if method == "LIST":
@@ -57,27 +62,33 @@ def _vault(method, key="", body=None):
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return None
+        if e.code == 403 and team:
+            raise PermissionError("no access to that team's secrets any more — if you moved to another "
+                                  "team, restart your server: File → Hub Control Panel → Stop My Server → Start") from None
         if e.code == 403:
             raise PermissionError("the key vault refused your token (it lasts a week) — restart your "
                                   "server: File → Hub Control Panel → Stop My Server → Start") from None
         raise RuntimeError(f"key vault: HTTP {e.code}") from None
 
 
-def _fields(name):
-    """All fields of one of your secrets, without the page's own bookkeeping (secret, updated)."""
-    body = _vault("GET", name)
+def _fields(name, team=False):
+    """All fields of one of your (or your team's) secrets, without the page's bookkeeping."""
+    body = _vault("GET", name, team=team)
     if body is None:
-        raise KeyError(f"no secret {name!r} — add it on 🔑 My secrets (key_vault_list() lists yours)")
+        where = "the team's" if team else "yours"
+        raise KeyError(f"no secret {name!r} — add it on 🔑 My secrets"
+                       f"{' → Team' if team else ''} (key_vault_list({'team=True' if team else ''}) lists {where})")
     return {k: v for k, v in body["data"]["data"].items() if k not in ("secret", "updated")}
 
 
-def key_vault(name, field=None):
+def key_vault(name, field=None, team=False):
     """One of your secrets from the lab's key vault ("🔑 My secrets"); never printed:
         key = key_vault("WEATHER_API_KEY")       # a secret saved on the page → its value
         pw  = key_vault("db", "password")        # one field of a secret with several
+        tok = key_vault("API_TOKEN", team=True)  # one of your TEAM's secrets (My secrets → Team)
     Without a field: the value (one field: that one; several: all of them as JSON text).
     A missing name or field raises KeyError."""
-    d = _fields(name)
+    d = _fields(name, team)
     if field is not None:
         if field not in d:
             raise KeyError(f"secret {name!r} has no field {field!r} — its fields: {', '.join(sorted(d)) or '—'}")
@@ -90,27 +101,28 @@ def key_vault(name, field=None):
     return json.dumps(d)
 
 
-def key_vault_dict(name):
-    """Every field of one of your secrets as a dict, however many it has:
+def key_vault_dict(name, team=False):
+    """Every field of one of your (team=True: your team's) secrets as a dict:
         db = key_vault_dict("db")                # {"username": "...", "password": "..."}
     A secret saved on the page has one field, value: {"value": "..."}."""
-    return _fields(name)
+    return _fields(name, team)
 
 
-def key_vault_list():
-    """The names of your secrets (never the values)."""
-    body = _vault("LIST")
+def key_vault_list(team=False):
+    """The names of your secrets — team=True: your team's (never the values)."""
+    body = _vault("LIST", team=team)
     return sorted(k for k in (body or {}).get("data", {}).get("keys", []) if not k.endswith("/"))
 
 
-def key_vault_set(name, value, secret=True):
-    """Save a secret from code (same as 🔑 My secrets → Save). secret=False: the page shows it."""
+def key_vault_set(name, value, secret=True, team=False):
+    """Save a secret from code (same as 🔑 My secrets → Save). secret=False: the page shows it.
+    team=True: in your team's folder, for everyone in the team."""
     import re, time
     if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", name):
         raise ValueError("name: letters, digits and _ only, not starting with a digit (max 64)")
     _vault("POST", name, {"value": str(value), "secret": "1" if secret else "0",
-                          "updated": time.strftime("%Y-%m-%d %H:%M", time.gmtime())})
-    print(f"✓ secret {name} saved")
+                          "updated": time.strftime("%Y-%m-%d %H:%M", time.gmtime())}, team=team)
+    print(f"✓ {'team ' if team else ''}secret {name} saved")
 
 
 # the first names (notebooks written before the rename keep working)

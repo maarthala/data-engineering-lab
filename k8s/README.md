@@ -145,7 +145,8 @@ lakehouse, catalogs and bucket use, and
 
 **🧩 Teams** (`/teams.html`): every member is in one team (new members: `general`) and reads and
 writes its lakehouse `team_<team>` and its bucket `team-<team>-lake` (500 MB, `TEAM_QUOTA_MB`;
-My files → Team, Jupyter's `<team>_team/` folder, e.g. `sales_team/` (next to `my_files/`), the RustFS console, `s3a://…` in Spark).
+My files → Team, Jupyter's `<team>_team/` folder, e.g. `sales_team/` (next to `my_files/`), the RustFS console, `s3a://…` in Spark),
+and its key vault folder `secret/<team>_team/` (My secrets → Team, `key_vault(…, team=True)`; vault group `team-<team>`).
 
 - **Create team** — Keycloak group `team-<team>` + its lakehouse; **Delete team** once it's empty
 - Pick a team on the left (filter by name); on the right, **Add members** — search by name, pick

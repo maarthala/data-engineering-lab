@@ -3,7 +3,9 @@ Shared by home-api (the "My secrets" page, Manage members), the JupyterHub spawn
 Airflow (key_vault() in member DAGs). Uses the admin token VAULT_ADMIN_TOKEN (vault-init.sh).
 
 Layout: key/value store `secret/` (KV v2), one folder per member: secret/<name>/<key>, each
-holding {"value", "secret": "1"|"0", "updated"}. Policy member-<name> reaches only that folder.
+holding {"value", "secret": "1"|"0", "updated"}, and one per team: secret/<team>_team/<key>
+(usernames have no "_", so the two never meet). Policy member-<name> reaches the member's folder
+and their team's; signed in to the vault UI, the Keycloak group team-<team> adds the team folder.
 
 member_token(name)       a fresh token for the member's Jupyter (role member, one week); the
                          previous one is revoked, like the Polaris secret at every start
@@ -11,6 +13,8 @@ names / get / fields / put / delete   one member's secrets (home-api, Airflow)
 clear(name)              delete all their secrets (wipe) · forget(name): + policy, token,
                          vault sign-in record (delete)
 import_env_file(name)    move an old "My variables" file (.lab/env.json) into the vault, once
+team_setup / team_forget(team)   a team's vault group (UI sign-in) · its secrets + group go
+set_member_policy(name, team)    after a move: the new team's folder, not the old one (at once)
 Standard library only.
 """
 import json
@@ -55,14 +59,28 @@ def _q(*parts):
     return "/".join(urllib.parse.quote(p, safe="") for p in parts)
 
 
-def _policy(name):
-    return (f'path "{MOUNT}/data/{name}/*" {{ capabilities = ["create", "read", "update", "delete"] }}\n'
-            f'path "{MOUNT}/metadata/{name}/*" {{ capabilities = ["read", "list", "delete"] }}\n')
+def team_folder(team):
+    return f"{team}_team"
 
 
-def member_token(name):
-    """A new one-week token that reaches only secret/<name>/…; the previous one stops working."""
-    _ok(_call("PUT", f"sys/policies/acl/member-{name}", {"policy": _policy(name)})[0], "policy")
+def _policy(name, team=None):
+    out = ""
+    for f in [name] + ([team_folder(team)] if team else []):
+        out += (f'path "{MOUNT}/data/{f}/*" {{ capabilities = ["create", "read", "update", "delete"] }}\n'
+                f'path "{MOUNT}/metadata/{f}/*" {{ capabilities = ["read", "list", "delete"] }}\n')
+    return out
+
+
+def set_member_policy(name, team=None):
+    """The member's tokens reach their folder + their team's — the vault checks the policy on
+    every request, so a move takes effect at once (no new token needed)."""
+    _ok(_call("PUT", f"sys/policies/acl/member-{name}", {"policy": _policy(name, team)})[0], "policy")
+
+
+def member_token(name, team=None):
+    """A new one-week token that reaches secret/<name>/… (and secret/<team>_team/…); the
+    previous one stops working."""
+    set_member_policy(name, team)
     st, old = _call("GET", f"{MOUNT}/data/{TOKENS}/{name}")
     if st == 200:
         _call("POST", "auth/token/revoke-accessor", {"accessor": old["data"]["data"]["accessor"]})
@@ -139,6 +157,38 @@ def forget(name):
         st, ent = _call("POST", "identity/lookup/entity", {"alias_name": name, "alias_mount_accessor": auth["accessor"]})
         if st == 200 and ent:
             _call("DELETE", f"identity/entity/id/{ent['data']['id']}")
+    return n
+
+
+# ---- teams ------------------------------------------------------------------------------
+def _team_policy(team):
+    f = team_folder(team)
+    return (f'path "{MOUNT}/data/{f}/*" {{ capabilities = ["create", "read", "update", "delete"] }}\n'
+            f'path "{MOUNT}/metadata/{f}/*" {{ capabilities = ["create", "read", "update", "list", "delete"] }}\n')
+
+
+def team_setup(team):
+    """Signed in to the vault UI (Keycloak), members of team-<team> also get secret/<team>_team/:
+    policy team-<team> + an external group of that name, matched to the Keycloak group."""
+    g = f"team-{team}"
+    _ok(_call("PUT", f"sys/policies/acl/{g}", {"policy": _team_policy(team)})[0], "team policy")
+    _ok(_call("POST", f"identity/group/name/{g}", {"type": "external", "policies": [g]})[0], "team group")
+    st, auth = _call("GET", "sys/auth/oidc")
+    if st != 200:
+        return False                                   # no UI sign-in: tokens still work
+    st, grp = _call("GET", f"identity/group/name/{g}")
+    _ok(st, "read team group")
+    if not grp["data"].get("alias"):
+        _ok(_call("POST", "identity/group-alias", {"name": g, "mount_accessor": auth["accessor"],
+                                                   "canonical_id": grp["data"]["id"]})[0], "team alias")
+    return True
+
+
+def team_forget(team):
+    """The team is deleted: its secrets, its vault group and policy."""
+    n = clear(team_folder(team))
+    _call("DELETE", f"identity/group/name/team-{team}")
+    _call("DELETE", f"sys/policies/acl/team-{team}")
     return n
 
 

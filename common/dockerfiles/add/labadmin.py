@@ -473,6 +473,7 @@ def create_team(team):
     if st not in (201, 409):
         raise RuntimeError(f"create group {TEAM_GROUP}{team}: HTTP {st} {body!r}")
     out = lh.create_team_lake(team)
+    _vault(labvault.team_setup, team)                     # secret/<team>_team/ in the vault UI
     lh.publish_trino_rules()
     return {"team": team, **out}
 
@@ -498,9 +499,10 @@ def delete_team(team):
         lh._s3("DELETE", bucket).close()
     except urllib.error.HTTPError:
         pass
+    secrets_removed = _vault(labvault.team_forget, team)  # its secrets, vault group, policy
     _kc("DELETE", f"/admin/realms/{REALM}/groups/{g['id']}", token=kc)
     lh.publish_trino_rules()
-    return {"team": team, "dropped": dropped, "bucket": bucket}
+    return {"team": team, "dropped": dropped, "bucket": bucket, "secrets_removed": secrets_removed}
 
 
 def set_team(user, team, kc=None, g=None, publish=True):
@@ -523,6 +525,7 @@ def set_team(user, team, kc=None, g=None, publish=True):
     _, groups = _kc("GET", f"/admin/realms/{REALM}/users/{uid}/groups", token=kc)
     manager = any(x["name"] == "managers" for x in groups or [])
     lh.put_storage_policy(name, admin=manager, team=None if manager else team)   # team bucket files
+    _vault(lambda n: labvault.set_member_policy(n, team), name)                  # team secrets
     if publish:
         lh.publish_trino_rules()
     return {"user": user, "team": team, "from": [x["name"][len(TEAM_GROUP):] for x in old]}
