@@ -56,7 +56,8 @@
       document.getElementById('me-name').textContent = me.user;
       var lake = document.getElementById('me-lake');
       if (me.status === 'ready') {
-        lake.textContent = 'your lakehouse: ' + me.lakehouse + ' ✓ · bucket: ' + me.bucket;
+        lake.textContent = 'your lakehouse: ' + me.lakehouse + ' ✓ · bucket: ' + me.bucket +
+          (me.team ? ' · team: ' + me.team + ' (' + me.team_lakehouse + ')' : '');
         lake.className = 'lake ok';
       } else {
         lake.textContent = 'lakehouse not ready — ' + (me.detail || 'try again shortly');

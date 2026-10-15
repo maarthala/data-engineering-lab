@@ -149,6 +149,12 @@ if _LAKE:
         print("✓ shared = the course's shared lake (read-only) — e.g. shared.gold.daily_sales")
     except Exception as _e:  # noqa: BLE001
         print(f"⚠ shared catalog not set ({_e})")
+    if _os_env.get("TEAM_CATALOG"):       # your team's lakehouse (every member reads and writes)
+        try:
+            use_catalog(_os_env["TEAM_CATALOG"], "team", quiet=True)
+            print(f"✓ team = your team's lakehouse ({_os_env['TEAM_CATALOG']}) — e.g. team.bronze.customers")
+        except Exception as _e:  # noqa: BLE001
+            print(f"⚠ team catalog not set ({_e})")
 
 
 # --- Materialized views for `%%sql` ------------------------------------------------

@@ -31,6 +31,8 @@ the logged-in user; nothing from the browser can point at another bucket.
   POST   /api/admin/{create|password|reset|wipe|delete}  → {"job": id}
   GET    /api/admin/jobs?id=…                            → {"state": running|done|error, "result"|"error"}
   GET    /api/admin/settings · POST {"registration": bool}  self-registration on the sign-in page
+  GET    /api/admin/teams                                the teams, their members, bucket use
+  POST   /api/admin/{team-create|team-delete} {"team"} · /api/admin/move {"user", "team"} → {"job": id}
 
 "My secrets" — the learner's own secrets (API keys, passwords…), kept in the lab's key vault
 (OpenBao, labvault.py) under secret/<name>/. Notebooks read them with key_vault("NAME") with the
@@ -79,6 +81,8 @@ _lock = threading.Lock()
 _jobs = {}                # manager actions: id → {"state", "result" | "error", …}
 _ACTIONS = {"create": labadmin.create, "password": labadmin.set_password,
             "reset": labadmin.reset_lakehouse, "wipe": labadmin.wipe, "delete": labadmin.delete}
+_TEAM_ACTIONS = {"team-create": labadmin.create_team, "team-delete": labadmin.delete_team,
+                 "move": labadmin.set_team}
 
 # "My secrets": in the key vault (labvault.py), one folder per member. Names like variables:
 # letters, digits and _ (the same names the old "My variables" allowed).
@@ -111,6 +115,10 @@ class Handler(BaseHTTPRequestHandler):
         with _lock:
             if name not in _ready:
                 provision(name, manager=self._manager())
+                try:                                 # every member is in a team ("general" at first)
+                    labadmin.ensure_team(self._user())
+                except Exception as e:  # noqa: BLE001 — the own lake works without it
+                    print(f"[home-api] team for {name}: {e}", flush=True)
                 _ready.add(name)
 
     @staticmethod
@@ -308,6 +316,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, job) if job else self._json(404, {"error": "no such job"})
             if method == "GET" and path == "/api/admin/settings":
                 return self._json(200, labadmin.registration())
+            if method == "GET" and path == "/api/admin/teams":
+                return self._json(200, {"teams": labadmin.teams()})
             if method == "POST" and path == "/api/admin/settings":
                 if self.headers.get("X-Lab-Admin") != "1":
                     return self._json(403, {"error": "missing X-Lab-Admin header"})
@@ -317,13 +327,21 @@ class Handler(BaseHTTPRequestHandler):
                 print(f"[home-api] manager {user}: self-registration {'on' if out['registration'] else 'off'}", flush=True)
                 return self._json(200, out)
             action = path.rsplit("/", 1)[-1]
-            if method != "POST" or action not in _ACTIONS:
+            if method != "POST" or action not in {**_ACTIONS, **_TEAM_ACTIONS}:
                 return self._json(404, {"error": "not found"})
             if self.headers.get("X-Lab-Admin") != "1":
                 return self._json(403, {"error": "missing X-Lab-Admin header"})
             length = int(self.headers.get("Content-Length") or 0)
             body = json.loads(self.rfile.read(length) or b"{}") if length else {}
             target = (body.get("user") or "").strip().lower()
+            team = (body.get("team") or "").strip().lower()
+            if action in _TEAM_ACTIONS:
+                args = [target, team] if action == "move" else [team]
+                jid = __import__("secrets").token_hex(8)
+                _jobs[jid] = {"state": "running", "action": action, "user": target or team, "by": user}
+                threading.Thread(target=_run_job, args=(jid, _TEAM_ACTIONS[action], args), daemon=True).start()
+                print(f"[home-api] manager {user}: {action} {' → '.join(a for a in args if a)}", flush=True)
+                return self._json(202, {"job": jid})
             if target == user and action in ("wipe", "delete", "reset"):
                 return self._json(400, {"error": "that's your own account — ask another manager"})
             if action in ("wipe", "delete") and any(
@@ -331,6 +349,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": f"{target} is a manager — remove them from the "
                                                  "managers group in Keycloak first"})
             args = [target] + ([body["password"]] if body.get("password") and action in ("create", "password") else [])
+            if action == "create":
+                args = [target, body.get("password") or None, team or None]
             jid = __import__("secrets").token_hex(8)
             _jobs[jid] = {"state": "running", "action": action, "user": target, "by": user}
             threading.Thread(target=_run_job, args=(jid, _ACTIONS[action], args), daemon=True).start()
@@ -386,6 +406,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             self._ensure(name)
             me["status"] = "ready"
+            me["team"] = lh.team_of(name)
+            me["team_lakehouse"] = me["team"] and lh.team_catalog(me["team"])
         except Exception as e:                       # show it on the page, don't crash
             me["status"], me["detail"] = "error", str(e)
         return self._json(200, me)

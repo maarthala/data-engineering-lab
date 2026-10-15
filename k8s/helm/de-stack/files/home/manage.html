@@ -22,6 +22,7 @@
     button.primary{border:0; font-weight:700; color:#0b1020; background:linear-gradient(135deg,var(--accent),var(--accent2))}
     button.small{padding:3px 9px; font-size:.82rem}
     button.danger{border-color:rgba(255,107,107,.55); color:#ffb3b0}
+    select{font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:5px 8px}
     input[type=text], input[type=password]{font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:6px 9px; outline:none}
     input:focus{border-color:var(--accent)}
     code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--accent2)}
@@ -57,7 +58,7 @@
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=5"></script>
+  <script src="/lab-header.js?v=6"></script>
   <div class="pagebar"><h1>👥 Manage members <span class="dot">·</span> managers only</h1></div>
   <main id="main">
     <div class="placeholder" id="loading">Loading…</div>
@@ -67,7 +68,7 @@
     // Everything goes through /api/admin (home-api, behind the Keycloak login; managers only).
     // Actions run in the background — the page polls until they finish.
     var main = document.getElementById('main');
-    var me = null, busy = false;
+    var me = null, busy = false, teams = [];
 
     function el(tag, attrs, kids) {
       var e = document.createElement(tag);
@@ -155,35 +156,91 @@
     function addCard() {
       var u = el('input', {type: 'text', placeholder: 'username (a-z, 0-9, -)', autocomplete: 'off'});
       var p = el('input', {type: 'password', placeholder: 'password (optional — random)', autocomplete: 'new-password'});
+      var tm = teamSelect(null);
       var b = el('button', {class: 'primary', text: 'Create member'});
       b.addEventListener('click', function () {
         var user = u.value.trim().toLowerCase();
         if (!user) return u.focus();
-        act(b, 'create', {user: user, password: p.value || undefined}, 'Created ' + user, function (r) {
+        act(b, 'create', {user: user, password: p.value || undefined, team: tm.value || undefined}, 'Created ' + user, function (r) {
           u.value = ''; p.value = '';
-          return [['Lakehouse ' + r.lakehouse + ', bucket ' + r.bucket + ', SQLPad user — ready to sign in.'], r.password];
+          return [['Lakehouse ' + r.lakehouse + ', bucket ' + r.bucket + ', SQLPad user, team ' + r.team + ' — ready to sign in.'], r.password];
         });
       });
       return el('div', {class: 'card'}, [
         el('h3', {text: 'Add a member'}),
-        el('div', {class: 'row'}, [u, p, b]),
+        el('div', {class: 'row'}, [u, p, el('span', {class: 'sub', text: 'team'}), tm, b]),
         el('div', {class: 'sub', style: 'margin-top:8px',
           text: 'Creates the lab account with its own lakehouse, bucket and SQLPad user. Members can also register themselves on the sign-in page.'})]);
+    }
+
+    // ---- teams ---------------------------------------------------------------------------
+    function teamSelect(current) {
+      var s = el('select');
+      teams.forEach(function (t) {
+        var o = el('option', {value: t.team, text: t.team});
+        if (t.team === current || (!current && t['default'])) o.selected = true;
+        s.appendChild(o);
+      });
+      return s;
+    }
+
+    function teamsCard() {
+      var body = el('tbody');
+      teams.forEach(function (t) {
+        var acts = el('td', {class: 'acts'});
+        if (!t.members.length && !t['default']) {
+          var d = el('button', {class: 'small danger', text: 'Delete'});
+          d.addEventListener('click', function () {
+            if (d.dataset.armed) return act(d, 'team-delete', {team: t.team}, 'Deleted team ' + t.team, function (r) {
+              return [['Its lakehouse ' + 'team_' + r.team + ' (' + r.dropped + ' table(s)/view(s)) and bucket ' + r.bucket + ' are gone.']];
+            });
+            d.dataset.armed = '1'; d.textContent = 'Delete its tables and files too?';
+          });
+          acts.appendChild(d);
+        }
+        body.appendChild(el('tr', {}, [
+          el('td', {}, [el('b', {text: t.team}), t['default'] ? el('span', {class: 'tag', text: 'default'}) : null]),
+          el('td', {}, [el('code', {text: t.catalog})]),
+          el('td', {class: 'sub', text: t.members.join(', ') || '—'}),
+          el('td', {class: 'r', text: t.bucket_mb == null ? '—' : t.bucket_mb + ' MB'}),
+          acts]));
+      });
+      var n = el('input', {type: 'text', placeholder: 'team name (a-z, 0-9)', autocomplete: 'off'});
+      var b = el('button', {class: 'primary', text: 'Create team'});
+      b.addEventListener('click', function () {
+        var team = n.value.trim().toLowerCase();
+        if (!team) return n.focus();
+        act(b, 'team-create', {team: team}, 'Created team ' + team, function (r) {
+          n.value = '';
+          return [['Lakehouse ' + r.catalog + ' (bronze / silver / gold) and bucket ' + r.bucket +
+                   '. Move members into it with the Team column below.']];
+        });
+      });
+      return el('div', {class: 'card'}, [
+        el('h3', {text: 'Teams (' + teams.length + ')'}),
+        el('div', {class: 'wrap'}, [el('table', {}, [el('thead', {}, [el('tr', {}, [
+          el('th', {text: 'Team'}), el('th', {text: 'Lakehouse'}), el('th', {text: 'Members'}),
+          el('th', {class: 'r', text: 'Bucket'}), el('th', {text: ''})])]), body])]),
+        el('div', {class: 'row', style: 'margin-top:10px'}, [n, b]),
+        el('div', {class: 'sub', style: 'margin-top:8px',
+          text: 'Every member is in one team and reads and writes its lakehouse. New members join the default team. ' +
+                'A member who moves loses the old team\'s lakehouse; what they made there stays with the team. ' +
+                'A team can be deleted once it has no members.'})]);
     }
 
     // run an action from a button; `describe(result)` → [lines, password]
     function act(btn, action, body, title, describe) {
       if (busy) return;
       busy = true;
-      var label = btn.textContent;
-      document.querySelectorAll('main button').forEach(function (x) { x.disabled = true; });
-      btn.textContent = 'Working…';
+      var label = btn.textContent, isButton = btn.tagName === 'BUTTON';
+      document.querySelectorAll('main button, main select').forEach(function (x) { x.disabled = true; });
+      if (isButton) btn.textContent = 'Working…';
       run(action, body).then(function (r) {
         var d = describe(r); show(title, d[0], d[1]);
       }).catch(function (e) {
         show('Could not ' + action + ' ' + (body.user || ''), [e.message], null, true);
       }).then(function () {
-        busy = false; btn.textContent = label; load();
+        busy = false; if (isButton) btn.textContent = label; load();
       });
     }
 
@@ -212,7 +269,7 @@
       if (old) old.remove();
       var input = el('input', {type: 'text', placeholder: 'type ' + l.user + ' to confirm', autocomplete: 'off'});
       var go = el('button', {class: 'danger', text: a.label});
-      var row = el('tr', {class: 'confirm'}, [el('td', {colspan: '6'}, [
+      var row = el('tr', {class: 'confirm'}, [el('td', {colspan: '7'}, [
         el('div', {class: 'sub', style: 'margin-bottom:8px', text: a.label + ' ' + l.user + ': ' + a.warn}),
         el('div', {class: 'row'}, [input, go, el('button', {class: 'small', text: 'Cancel', on: {click: function () { row.remove(); }}})])])]);
       go.addEventListener('click', function () {
@@ -244,7 +301,20 @@
           l.manager ? el('span', {class: 'tag mgr', text: 'manager'}) : null,
           self ? el('span', {class: 'tag', text: 'you'}) : null,
           l.enabled ? null : el('span', {class: 'tag', text: 'disabled'})]);
-        var tr = el('tr', {}, [who,
+        var team = el('td');
+        if (l.team || l.lakehouse) {
+          var sel = teamSelect(l.team);
+          if (!l.team) sel.insertBefore(el('option', {value: '', text: '—', selected: ''}), sel.firstChild);
+          sel.addEventListener('change', function () {
+            if (!sel.value) return;
+            act(sel, 'move', {user: l.user, team: sel.value}, l.user + ' moved to ' + sel.value, function (r) {
+              return [['They now read and write team_' + r.team + (r.from.length ? ' instead of team_' + r.from.join(', team_') : '') +
+                       '. Jupyter picks it up at their next server start.']];
+            });
+          });
+          team.appendChild(sel);
+        } else team.appendChild(el('span', {class: 'muted', text: '—'}));
+        var tr = el('tr', {}, [who, team,
           el('td', {}, [l.lakehouse ? el('code', {text: l.lakehouse}) : el('span', {class: 'muted', text: 'not signed in yet'})]),
           el('td', {class: 'r', text: String(l.catalogs.length)}),
           el('td', {class: 'r', text: l.bucket_mb == null ? '—' : l.bucket_mb + ' MB'}),
@@ -255,23 +325,24 @@
       return el('div', {class: 'card'}, [
         el('h3', {text: 'Lab accounts (' + list.length + ')'}),
         el('div', {class: 'wrap'}, [el('table', {}, [el('thead', {}, [el('tr', {}, [
-          el('th', {text: 'Account'}), el('th', {text: 'Lakehouse'}), el('th', {class: 'r', text: 'Catalogs'}),
+          el('th', {text: 'Account'}), el('th', {text: 'Team'}), el('th', {text: 'Lakehouse'}), el('th', {class: 'r', text: 'Catalogs'}),
           el('th', {class: 'r', text: 'Bucket'}), el('th', {class: 'r', text: 'Since'}), el('th', {text: ''})])]), body])])]);
     }
 
-    var listCard = null;
+    var listCard = null, teamCard = null, newCard = null;
+    function swap(old, fresh) { if (old) main.replaceChild(fresh, old); else main.appendChild(fresh); return fresh; }
     function load() {
-      return api('GET', '/api/admin/members').then(function (j) {
-        me = j.me;
+      return Promise.all([api('GET', '/api/admin/members'), api('GET', '/api/admin/teams')]).then(function (r) {
+        var j = r[0];
+        me = j.me; teams = r[1].teams;
         if (!listCard) {
           main.innerHTML = '';
           main.appendChild(result);
           main.appendChild(settingsCard());
-          main.appendChild(addCard());
         }
-        var fresh = table(j.members);
-        if (listCard) main.replaceChild(fresh, listCard); else main.appendChild(fresh);
-        listCard = fresh;
+        newCard = swap(newCard, addCard());
+        teamCard = swap(teamCard, teamsCard());
+        listCard = swap(listCard, table(j.members));
       }).catch(function (e) {
         if (listCard) return show('Could not refresh the list', [e.message], null, true);
         main.innerHTML = '';

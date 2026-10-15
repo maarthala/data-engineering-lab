@@ -43,6 +43,7 @@ open — Superset, Airflow, SQLPad — keeps its own session until you log out t
 | 🪣 Bucket | `<you>-lake` | your own object storage (RustFS, **100 MB** limit) — your files, notebooks and DAGs |
 | 📓 Jupyter | your own server | your notebooks, with `spark` ready and `iceberg` = your lakehouse |
 | 🧰 SQLPad user | `<you>` | your saved queries |
+| 👥 Team | `general` at first | the team you work in, and its lakehouse `team_<team>` — see [Your team](#your-team) |
 
 The top bar of the landing page shows it: **"your lakehouse: `<you>_lake` ✓ · bucket:
 `<you>-lake`"**, plus **📁 My files**, **🗂️ My catalogs**, **🔑 My secrets** and **Log out**. Below it, the
@@ -138,6 +139,45 @@ hello()
 A DAG that breaks the rule (or has an error) shows up under Airflow's **import errors** with the
 reason — e.g. *"DAG id 'hello' must start with 'ravi_'"*. Everyone can *see* all DAGs; the prefix
 tells you whose is whose.
+
+## Your team
+
+Every member is in **one team**, picked by a manager (new members start in `general`). The team
+has its own lakehouse, **`team_<team>`**, with `bronze` / `silver` / `gold`, and **everyone in the
+team reads and writes it**. Your own lakehouse stays yours; the team's is where you put tables the
+whole team works on. The top bar shows it: *"· team: sales (team_sales)"*.
+
+| Where you run it | Your team's lakehouse is |
+|---|---|
+| **Jupyter / Spark** (`spark.sql`, `%%sql`) | `team.…`, e.g. `team.bronze.customers` |
+| **SQLPad, Superset** | its real name, e.g. `team_sales.bronze.customers` |
+
+Jupyter sets up `team` when your server starts and says so in the first cell's output:
+
+```text
+✓ team = your team's lakehouse (team_sales) — e.g. team.bronze.customers
+```
+
+Make a table there and your teammates see it straight away:
+
+```python
+df.writeTo("team.bronze.customers").createOrReplace()
+spark.sql("SELECT * FROM team.bronze.customers ORDER BY id").show()
+```
+```text
++---+--------+-------+
+| id|    name|country|
++---+--------+-------+
+|  1|     Ada|     UK|
+|  2|Surendra|     FI|
++---+--------+-------+
+```
+
+- **`team`** — like `iceberg` (your lakehouse) and `shared` (the course's lake), a name Jupyter
+  gives a catalog; behind it is `team_<team>` in Polaris.
+- If a manager **moves** you to another team, you lose the old team's lakehouse and get the new
+  one (in Jupyter after your next server start). The tables you made stay with the old team.
+- A team lakehouse isn't shared from **My catalogs**: being in the team is the access.
 
 ## My catalogs — create and share
 
@@ -258,12 +298,15 @@ Broke your lakehouse, or want a clean slate for the next unit? Ask your **platfo
 | **Wipe** | everything: tables, extra catalogs, the shares you gave, your bucket, your Jupyter files, your secrets | your account; you're back to a new member's setup (lakehouse, sample table, starter files) |
 
 The same page lets managers create members, give someone a new password, delete an account, and
-switch **self-registration** on or off (on while a new batch signs up, off otherwise).
+switch **self-registration** on or off (on while a new batch signs up, off otherwise). Its
+**Teams** card creates teams (and deletes empty ones), and the **Team** column of the member list
+moves a member to another team.
 
 ## You can now…
 - Register, sign in once and reach every tool with your lab account
 - Tell your own lakehouse (`iceberg` in Jupyter) from the shared lake (`shared` in Jupyter, `iceberg` in Trino)
 - Keep notebooks and DAGs in `notebooks/` and `dags/`, and name DAGs `<you>_…`
+- Work in your team's lakehouse (`team` in Jupyter, `team_<team>` in SQLPad)
 - Create a catalog and share a namespace or table with another member
 - Keep keys and passwords in **My secrets** (the key vault) and read them with `key_vault()`
 - Know when to ask a manager for a lakehouse reset or a full wipe

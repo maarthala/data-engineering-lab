@@ -13,7 +13,7 @@ token/userinfo on the internal address (as oauth2-proxy does) — no hosts-file 
 import os
 
 import labvault
-from lakehouse import bucket_name, lake_name, provision, reset_secret, storage_key
+from lakehouse import bucket_name, lake_name, provision, reset_secret, storage_key, team_catalog, team_of
 
 env = os.environ
 c = get_config()  # noqa: F821
@@ -139,6 +139,11 @@ async def pre_spawn(spawner):
         "GIT_AUTHOR_NAME": spawner.user.name,
         "GIT_AUTHOR_EMAIL": f"{spawner.user.name}@de.lan",
     })
+    try:                                       # their team's lakehouse → `team` in Spark
+        team = team_of(name)
+        spawner.environment["TEAM_CATALOG"] = team_catalog(team) if team else ""
+    except Exception as e:  # noqa: BLE001 — Jupyter still starts with their own lake
+        spawner.log.warning("team of %s: %s", name, e)
     if labvault.enabled():                     # "My secrets": their own vault folder only
         try:
             labvault.import_env_file(name)     # once: the old My variables file

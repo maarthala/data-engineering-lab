@@ -61,7 +61,7 @@
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=5"></script>
+  <script src="/lab-header.js?v=6"></script>
   <div class="pagebar"><h1>🗂️ My catalogs <span class="dot">·</span> Polaris</h1></div>
   <div class="app">
     <aside>
@@ -116,6 +116,7 @@
       state.data.owned.forEach(function (c) {
         var d = el('div', 'cat'); d.appendChild(el('span', null, '🗂️ ' + c.name));
         if (c.default) d.appendChild(el('span', 'tag', 'main lakehouse'));
+        if (c.team) d.appendChild(el('span', 'tag', 'team lakehouse'));
         d.onclick = function () { open(c.name, 'owned'); }; d.dataset.name = c.name; o.appendChild(d);
       });
       var s = $('shared'); s.innerHTML = '';
@@ -155,6 +156,14 @@
       }
       var info = state.data.owned.filter(function (x) { return x.name === name; })[0];
       var head = el('div', 'card'); head.appendChild(el('h2', null, '🗂️ ' + name));
+      if (info.team) {          // the team's: every member reads and writes it, nothing to share
+        head.appendChild(el('div', 'sub', 'Your team\'s lakehouse — every member of the team reads and writes it (the `team` catalog in your notebooks) · stored in ' + info.location));
+        head.appendChild(polarisLink(name)); m.appendChild(head);
+        var tnb = el('div', 'card'); tnb.appendChild(el('h3', null, 'Use it'));
+        var tp = el('pre'); tp.textContent = '# notebooks: already set up as `team`\nspark.sql("SHOW TABLES IN team.bronze").show()\n\n-- SQLPad: by its name\nSELECT * FROM ' + name + '.bronze.<table>;';
+        tnb.appendChild(tp); m.appendChild(tnb);
+        return;
+      }
       head.appendChild(el('div', 'sub', (info.default ? 'Your main lakehouse (the `iceberg` catalog in your notebooks)' : 'Your catalog') + ' · stored in ' + info.location));
       head.appendChild(polarisLink(name));
       m.appendChild(head);

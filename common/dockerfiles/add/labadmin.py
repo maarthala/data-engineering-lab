@@ -13,6 +13,13 @@ plus the Keycloak admin (KEYCLOAK_ADMIN=user:password) and a JupyterHub service 
                              catalogs deleted, the shares they gave revoked (account kept)
   delete(user)               remove the account and everything it owns
   registration() / set_registration(on)   self-registration on the sign-in page (Keycloak realm)
+
+Teams — every member is in exactly one team (Keycloak group team-<team>); the team's lakehouse
+team_<team> (lakehouse.create_team_lake) is owned by all its members:
+  teams()                    the teams, their members and bucket use
+  create_team(team)          group + lakehouse · delete_team(team): only an empty team
+  set_team(user, team)       move a member (they lose the old team's lake, gain the new one)
+  ensure_team(user)          a member without a team joins DEFAULT_TEAM ("general")
 """
 import json
 import os
@@ -31,6 +38,9 @@ REALM = os.environ.get("KEYCLOAK_REALM", "de-lab")
 HUB_API = os.environ.get("HUB_API_URL", "http://jupyterhub:8081/hub/api")
 AIRFLOW = os.environ.get("AIRFLOW_URL", "http://airflow-apiserver:8080")
 USERNAME = re.compile(r"^[a-z0-9][a-z0-9-]{1,30}$")
+TEAM = re.compile(r"^[a-z][a-z0-9]{1,23}$")
+TEAM_GROUP = "team-"
+DEFAULT_TEAM = os.environ.get("DEFAULT_TEAM", "general")
 _C = "/api/catalog/v1"
 
 
@@ -183,7 +193,10 @@ def _content_token():
 
 
 def _owned_catalogs(name, t):
-    return [c["name"] for c in lh._get(f"{lh._M}/catalogs", t)["catalogs"] if lh._owned(name, c["name"], t)]
+    """The member's own catalogs — not their team's lake (that one is the team's: a reset,
+    wipe or delete of the member never touches it)."""
+    return [c["name"] for c in lh._get(f"{lh._M}/catalogs", t)["catalogs"]
+            if not lh.is_team_catalog(c["name"]) and lh._owned(name, c["name"], t)]
 
 
 def _bucket_mb(bucket):
@@ -225,6 +238,7 @@ def members():
     if gid:
         _, members = _kc("GET", f"/admin/realms/{REALM}/groups/{gid}/members?max=1000", token=kc)
         managers = {m["username"] for m in members or []}
+    team_of = {m: t_["team"] for t_ in teams(kc) for m in t_["members"]}
     out = []
     for u in sorted(users or [], key=lambda u: u["username"]):
         name = lh.lake_name(u["username"])
@@ -239,13 +253,18 @@ def members():
         out.append({"user": u["username"], "manager": u["username"] in managers,
                     "enabled": u.get("enabled", True), "created": u.get("createdTimestamp"),
                     "lakehouse": f"{name}_lake" if f"{name}_lake" in cats else None,
-                    "catalogs": cats, "bucket": lh.bucket_name(name), "bucket_mb": mb})
+                    "catalogs": cats, "bucket": lh.bucket_name(name), "bucket_mb": mb,
+                    "team": team_of.get(u["username"])})
     return out
 
 
-def create(user, password=None):
+def create(user, password=None, team=None):
     _check(user)
+    if user == "team" or user.startswith(TEAM_GROUP):
+        raise AdminError("usernames team and team-… are kept for teams")
     kc, pw = _kc_token(), password or secrets.token_urlsafe(9)
+    if team and not _kc_group(TEAM_GROUP + team, kc):
+        raise AdminError(f"no team {team}")
     if _kc_user(user, kc):
         raise AdminError(f"{user} already exists")
     st, body = _kc("POST", f"/admin/realms/{REALM}/users", {
@@ -255,8 +274,10 @@ def create(user, password=None):
         raise RuntimeError(f"create {user} in Keycloak: HTTP {st} {body!r}")
     name = lh.lake_name(user)
     lh.provision(name)
+    team = set_team(user, team)["team"] if team else ensure_team(user)
     lh.publish_trino_rules()
-    return {"user": user, "password": pw, "lakehouse": f"{name}_lake", "bucket": lh.bucket_name(name)}
+    return {"user": user, "password": pw, "lakehouse": f"{name}_lake", "bucket": lh.bucket_name(name),
+            "team": team}
 
 
 def set_password(user, password=None):
@@ -405,3 +426,109 @@ def _sqlpad_delete(who):
     for u in users or []:
         if u["email"] == who:
             _http("DELETE", f"{lh.SQLPAD}/api/users/{u['id']}", headers=auth)
+
+
+# ---- teams ------------------------------------------------------------------------------
+def _kc_group(group, kc):
+    st, found = _kc("GET", f"/admin/realms/{REALM}/groups?" +
+                    urllib.parse.urlencode({"search": group, "exact": "true"}), token=kc)
+    return next((g for g in found or [] if st == 200 and g["name"] == group), None)
+
+
+def _kc_user_teams(uid, kc):
+    _, groups = _kc("GET", f"/admin/realms/{REALM}/users/{uid}/groups", token=kc)
+    return [g for g in groups or [] if g["name"].startswith(TEAM_GROUP)]
+
+
+def teams(kc=None):
+    kc = kc or _kc_token()
+    _, groups = _kc("GET", f"/admin/realms/{REALM}/groups?" +
+                    urllib.parse.urlencode({"search": TEAM_GROUP, "max": 1000}), token=kc)
+    out = []
+    for g in sorted((g for g in groups or [] if g["name"].startswith(TEAM_GROUP)), key=lambda g: g["name"]):
+        team = g["name"][len(TEAM_GROUP):]
+        _, ms = _kc("GET", f"/admin/realms/{REALM}/groups/{g['id']}/members?max=1000&briefRepresentation=true", token=kc)
+        try:
+            mb = _bucket_mb(lh.team_bucket(team))
+        except Exception:
+            mb = None
+        out.append({"team": team, "members": sorted(m["username"] for m in ms or []),
+                    "catalog": lh.team_catalog(team), "bucket": lh.team_bucket(team), "bucket_mb": mb,
+                    "default": team == DEFAULT_TEAM})
+    return out
+
+
+def create_team(team):
+    if not TEAM.match(team or "") or team == "lake":
+        raise AdminError("team name: 2-24 characters of a-z and 0-9, starting with a letter")
+    kc = _kc_token()
+    st, body = _kc("POST", f"/admin/realms/{REALM}/groups", {"name": TEAM_GROUP + team}, token=kc)
+    if st not in (201, 409):
+        raise RuntimeError(f"create group {TEAM_GROUP}{team}: HTTP {st} {body!r}")
+    out = lh.create_team_lake(team)
+    lh.publish_trino_rules()
+    return {"team": team, **out}
+
+
+def delete_team(team):
+    """Only an empty team (move its members first): its lakehouse, bucket and group go."""
+    kc = _kc_token()
+    g = _kc_group(TEAM_GROUP + (team or ""), kc)
+    if not g:
+        raise AdminError(f"no team {team}")
+    if team == DEFAULT_TEAM:
+        raise AdminError(f"{team} is the default team — new members join it")
+    _, ms = _kc("GET", f"/admin/realms/{REALM}/groups/{g['id']}/members?max=1", token=kc)
+    if ms:
+        raise AdminError(f"{team} still has members — move them to another team first")
+    t, cat, bucket = lh._admin_token(), lh.team_catalog(team), lh.team_bucket(team)
+    dropped = 0
+    if lh._call("GET", f"{lh._M}/catalogs/{cat}", token=t)[0] == 200:
+        dropped = _drop_catalog(cat, t, _content_token())
+    try:
+        lh._s3("HEAD", bucket).close()
+        _empty_prefix(bucket, "")
+        lh._s3("DELETE", bucket).close()
+    except urllib.error.HTTPError:
+        pass
+    _kc("DELETE", f"/admin/realms/{REALM}/groups/{g['id']}", token=kc)
+    lh.publish_trino_rules()
+    return {"team": team, "dropped": dropped, "bucket": bucket}
+
+
+def set_team(user, team):
+    """Move <user> into <team> (out of any other): the old team's lake is no longer theirs,
+    what they made in it stays there."""
+    kc = _kc_token()
+    _check(user, kc)
+    g = _kc_group(TEAM_GROUP + (team or ""), kc)
+    if not g:
+        raise AdminError(f"no team {team}")
+    uid, name = _kc_user(user, kc)["id"], lh.lake_name(user)
+    old = [x for x in _kc_user_teams(uid, kc) if x["id"] != g["id"]]
+    for x in old:
+        _kc("DELETE", f"/admin/realms/{REALM}/users/{uid}/groups/{x['id']}", token=kc)
+        lh.leave_team(name, x["name"][len(TEAM_GROUP):])
+    st, body = _kc("PUT", f"/admin/realms/{REALM}/users/{uid}/groups/{g['id']}", token=kc)
+    if st != 204:
+        raise RuntimeError(f"add {user} to {team}: HTTP {st} {body!r}")
+    lh.join_team(name, team)
+    lh.publish_trino_rules()
+    return {"user": user, "team": team, "from": [x["name"][len(TEAM_GROUP):] for x in old]}
+
+
+def ensure_team(user):
+    """Every member is in one team: one without joins DEFAULT_TEAM (created if missing). Also
+    re-attaches the team's lake (e.g. after the member's Polaris role was recreated)."""
+    kc = _kc_token()
+    u = _kc_user(user, kc)
+    if not u:
+        return None
+    mine = _kc_user_teams(u["id"], kc)
+    if mine:
+        team = mine[0]["name"][len(TEAM_GROUP):]
+        lh.join_team(lh.lake_name(user), team)
+        return team
+    if not _kc_group(TEAM_GROUP + DEFAULT_TEAM, kc):
+        create_team(DEFAULT_TEAM)
+    return set_team(user, DEFAULT_TEAM)["team"]

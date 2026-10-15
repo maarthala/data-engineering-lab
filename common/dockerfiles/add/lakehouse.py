@@ -12,6 +12,9 @@ storage_key(name)   a per-learner object-store key (<user>-files, their own poli
                     "my bucket" drive. Needs the `mc` client (in the Hub image).
 reset_secret(name)  give principal <name> a fresh random client secret; returns it. The Hub
                     calls this on each spawn and hands the secret only to that learner's server.
+Teams: create_team_lake(team) — catalog team_<team> (bronze/silver/gold) in bucket
+                    team-<team>-lake; join_team / leave_team(name, team) — the member owns it
+                    (or no longer); team_of(name). Members change, the tables stay.
 Standard library only.
 """
 import json
@@ -34,6 +37,7 @@ S3_KEY = os.environ.get("AWS_ACCESS_KEY_ID", "admin")
 S3_SECRET = os.environ.get("AWS_SECRET_ACCESS_KEY", "admin123")
 S3_REGION = os.environ.get("AWS_REGION", "us-east-1")
 QUOTA_MB = int(os.environ.get("LEARNER_QUOTA_MB", "100"))      # per-learner bucket, hard limit
+TEAM_QUOTA_MB = int(os.environ.get("TEAM_QUOTA_MB", "500"))    # per-team bucket, hard limit
 SQLPAD = os.environ.get("SQLPAD_URL", "http://sqlpad:3000")
 SQLPAD_ADMIN = os.environ.get("SQLPAD_ADMIN", "admin@de.local:admin1234")
 SQLPAD_SHARED_CONNECTIONS = ("shopflow", "adventureworks")         # OLTP, PostgreSQL login `learner`
@@ -535,7 +539,7 @@ def my_catalogs(name):
         roles = [r["name"] for r in (body or {}).get("roles", [])] if st == 200 else []
         if "owner" in roles:
             owned.append({"name": cat, "location": c["properties"].get("default-base-location"),
-                          "default": cat == f"{name}_lake"})
+                          "default": cat == f"{name}_lake", "team": is_team_catalog(cat)})
         elif any(r.startswith("share_") for r in roles):
             shared.append({"name": cat, "shares": [_describe_share(cat, r, t) for r in roles if r.startswith("share_")]})
     return {"owned": owned, "shared": shared}
@@ -545,6 +549,8 @@ def create_catalog(name, short):
     """New catalog <name>_<short>, stored in the learner's bucket, owned by them."""
     if not _NAME.match(short or "") or short == "lake":
         raise ValueError("catalog name: 1-24 of a-z, 0-9, _ (and not 'lake')")
+    if name == "team":
+        raise ValueError("team_… catalogs are team lakehouses — a manager creates teams")
     t = _admin_token()
     cat = f"{name}_{short}"
     loc = f"s3://{bucket_name(name)}/tables/{cat}"
@@ -597,6 +603,8 @@ def share(name, cat, grantee, access, namespace, table=None):
     grantee = lake_name(grantee or "")
     if grantee == name:
         raise ValueError("that's you")
+    if is_team_catalog(cat):
+        raise ValueError("a team lakehouse is shared with its team — a manager moves members")
     t = _admin_token()
     if not _owned(name, cat, t):
         raise PermissionError("not your catalog")
@@ -647,6 +655,75 @@ def revoke(name, cat, role):
     for p in _get(f"{_M}/catalogs/{cat}/catalog-roles/{role}/principal-roles", t).get("roles", []):
         _ok(_call("DELETE", f"{_M}/principal-roles/{p['name']}/catalog-roles/{cat}/{role}", token=t)[0], "unassign")
     _ok(_call("DELETE", f"{_M}/catalogs/{cat}/catalog-roles/{role}", token=t)[0], "delete share")
+
+
+# ---- Teams: one lakehouse per team, owned by every member of the team -------------------
+# A team's catalog team_<team> holds the same `owner` role a member has on their own lake; that
+# role is attached to each member's principal-role, so Spark, Trino (SQLPad, Superset) and My
+# catalogs treat it like their own. A member who leaves loses the attachment — the catalog,
+# its tables and the bucket belong to the team and stay. (Who is in which team: Keycloak
+# groups team-<team>, see labadmin.py.)
+TEAM_PREFIX = "team_"
+
+
+def is_team_catalog(cat):
+    return cat.startswith(TEAM_PREFIX) and cat != "team_lake"     # (team_lake: a member called team)
+
+
+def team_catalog(team):
+    return TEAM_PREFIX + team
+
+
+def team_bucket(team):
+    """team-<team>-lake (the -lake buckets are what Airflow later reads DAGs from)."""
+    return bucket_name(TEAM_PREFIX + team)
+
+
+def create_team_lake(team):
+    """Bucket team-<team>-lake + catalog team_<team> with bronze/silver/gold (idempotent)."""
+    t, cat, bucket = _admin_token(), team_catalog(team), team_bucket(team)
+    create_bucket(bucket)
+    set_quota(bucket, TEAM_QUOTA_MB)
+    loc = f"s3://{bucket}/tables/{cat}"
+    _ok(_call("POST", f"{_M}/catalogs", {"catalog": {
+        "name": cat, "type": "INTERNAL",
+        "properties": {"default-base-location": loc, "polaris.config.drop-with-purge.enabled": "true"},
+        "storageConfigInfo": storage_config([loc])}}, t)[0], "create team catalog")
+    for ns in NAMESPACES:
+        _ok(_call("POST", f"/api/catalog/v1/{cat}/namespaces", {"namespace": [ns]}, t)[0], f"namespace {ns}")
+        _relocate_namespace(cat, ns, f"{loc}/{ns}", t)
+    _ok(_call("POST", f"{_M}/catalogs/{cat}/catalog-roles", {"catalogRole": {"name": "owner"}}, t)[0], "owner role")
+    _ok(_call("PUT", f"{_M}/catalogs/{cat}/catalog-roles/owner/grants",
+              {"grant": {"type": "catalog", "privilege": "CATALOG_MANAGE_CONTENT"}}, t)[0], "owner grant")
+    trino_catalog(cat, t)
+    return {"catalog": cat, "bucket": bucket}
+
+
+def join_team(name, team):
+    """Member <name> owns team_<team> (read and write, like their own lake)."""
+    t, path = _admin_token(), f"{_M}/principal-roles/{name}/catalog-roles/{team_catalog(team)}"
+    st = _call("PUT", path, {"catalogRole": {"name": "owner"}}, t)[0]
+    if st == 404 and _call("GET", f"{_M}/catalogs/{team_catalog(team)}", token=t)[0] == 404:
+        create_team_lake(team)                       # the group is there, its lake isn't (yet)
+        st = _call("PUT", path, {"catalogRole": {"name": "owner"}}, t)[0]
+    _ok(st, f"join {team}")
+
+
+def leave_team(name, team):
+    """No more access for <name>; what they made stays in the team's lake."""
+    st, _ = _call("DELETE", f"{_M}/principal-roles/{name}/catalog-roles/{team_catalog(team)}/owner",
+                  token=_admin_token())
+    if st not in (204, 404):
+        raise RuntimeError(f"leave {team}: HTTP {st}")
+
+
+def team_of(name):
+    """The team whose lake <name> owns, or None (Polaris, so the Hub needn't ask Keycloak)."""
+    t = _admin_token()
+    for c in _get(f"{_M}/catalogs", t)["catalogs"]:
+        if is_team_catalog(c["name"]) and _owned(name, c["name"], t):
+            return c["name"][len(TEAM_PREFIX):]
+    return None
 
 
 # ---- Trino (→ SQLPad, Superset): one Trino catalog per learner catalog --------------------
