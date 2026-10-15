@@ -143,7 +143,7 @@ lakehouse, catalogs and bucket use, and
   table), starter files and a fresh Jupyter; extra catalogs deleted, the shares they gave revoked
 - **Delete** — the account and everything it owns
 
-**🧩 Teams** (`/teams.html`): every member is in one team (new members: `general`) and reads and
+**🧩 Teams** (`/teams.html`): a new member is in no team (only their own lakehouse); a manager adds them to one, and then they read and
 writes its lakehouse `team_<team>` and its bucket `team-<team>-lake` (500 MB, `TEAM_QUOTA_MB`;
 My files → Team, Jupyter's `<team>_team/` folder, e.g. `sales_team/` (next to `my_files/`), the RustFS console, `s3a://…` in Spark),
 a SQLPad connection per member, `Team <team> (Trino) — <user>` (browses the team catalog),
@@ -154,7 +154,7 @@ and team DAGs: `<team>_team/dags/` → Airflow, `dag_id` `team_<team>_…`, shar
 - Pick a team on the left (filter by name); on the right, **Add members** — search by name, pick
   several, add them at once; a member in another team moves (loses that team's lakehouse, their
   tables stay there)
-- **Members** — filter, tick (or select all shown) and **Remove selected**: back to the default team
+- **Members** — filter, tick (or select all shown) and **Remove selected**: out of the team (they keep their own lakehouse)
 
 **⚙️ Settings** (`/settings.html`):
 

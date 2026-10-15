@@ -42,7 +42,7 @@
         el('h3', {text: 'Self-registration'}),
         el('div', {class: 'row'}, [sw]),
         el('div', {class: 'sub', style: 'margin-top:8px',
-          text: 'Turn it on while a new batch signs up, then off again. While it\'s on, anyone who can reach the sign-in page can create an account. New members start in the default team.'})]);
+          text: 'Turn it on while a new batch signs up, then off again. While it\'s on, anyone who can reach the sign-in page can create an account. New members start in no team (only their own lakehouse) — add them to one on 🧩 Teams.'})]);
     }
 
     admin.api('GET', '/api/admin/settings')

@@ -43,7 +43,7 @@ open — Superset, Airflow, SQLPad — keeps its own session until you log out t
 | 🪣 Bucket | `<you>-lake` | your own object storage (RustFS, **100 MB** limit) — your files, notebooks and DAGs |
 | 📓 Jupyter | your own server | your notebooks, with `spark` ready and `my` = your lakehouse |
 | 🧰 SQLPad user | `<you>` | your saved queries |
-| 👥 Team | `general` at first | the team you work in, and its lakehouse `team_<team>` — see [Your team](#your-team) |
+| 👥 Team | none at first | the team a manager adds you to, and its lakehouse `team_<team>` — see [Your team](#your-team) |
 
 The top bar of the landing page shows it: **"your lakehouse: `<you>_lake` ✓ · bucket:
 `<you>-lake`"**, plus **📁 My files**, **🗂️ My catalogs**, **🔑 My secrets** and **Log out**. Below it, the
@@ -163,7 +163,8 @@ tells you whose is whose.
 
 ## Your team
 
-Every member is in **one team**, picked by a manager (new members start in `general`). The team
+A new member is in **no team** (only their own lakehouse). A manager creates teams and adds
+members; a member is then in **one team**. The team
 has its own lakehouse, **`team_<team>`**, with `bronze` / `silver` / `gold`, and **everyone in the
 team reads and writes it**. Your own lakehouse stays yours; the team's is where you put tables the
 whole team works on. The top bar shows it: *"· team: sales (team_sales)"*.
@@ -387,7 +388,7 @@ token = key_vault("API_TOKEN", team="sales")           # read it — in a DAG: f
 
 - In the vault's own UI the team folder sits next to yours (*Open the key vault* on the Team
   view goes straight there).
-- A team you aren't in is refused: *"you are not in the team 'general' — yours: sales"*. (In a
+- A team you aren't in is refused: *"you are not in the team 'hr' — yours: sales"*. (In a
   team's own DAG, `key_vault("NAME")` reads that team's secrets without `team=`.)
 - If a manager moves you to another team, the old team's secrets stop working for you at once;
   restart your server to reach the new team's.

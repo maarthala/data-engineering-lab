@@ -103,7 +103,7 @@ Open the UI at [http://localhost:8001](http://localhost:8001) (sign in with your
 **a) The Airflow task log** (did the job run correctly?) — click the task → **Logs**:
 
 ```
-lab_spark: you are demouser · my = demouser_lake · your team: team_general · shared = polaris_lake
+lab_spark: you are demouser · my = demouser_lake · shared = polaris_lake
 run_notebook: files/src/notebooks/load_sample_orders.ipynb — 4 code cells
 1000 rows read from s3a://demouser-lake/files/source/shopflow/sample_orders.csv
 bronze.sample_orders replaced

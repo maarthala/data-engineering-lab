@@ -1,11 +1,13 @@
 # Working in a team
 
-Every member is in **one team**. A manager picks it (new members start in `general`). The team has
+A new member is in **no team**: they have their own lakehouse, files and secrets, and that's all.
+A manager creates teams and adds members to them; a member is then in **one team**. The team has
 its own files, lakehouse, secrets and DAGs. **Everyone in the team reads and writes them**, and
 nobody outside the team sees them. Your own workspace stays yours: use the team's for work you
 share.
 
-The top bar shows your team, e.g. *"· team: sales (team_sales)"*. Below, replace `sales` with your
+Once you're in a team, the top bar shows it, e.g. *"· team: sales (team_sales)"*, and the 👥 Team
+views below appear. Below, replace `sales` with your
 team's name.
 
 | What | Yours | Your team's |
@@ -64,8 +66,9 @@ folder of the key vault, **`secret/sales_team/`**.
 
 ## Changing teams
 
-- A manager moves you (**🛠️ Manage → 🧩 Teams**). You lose the old team's files, lakehouse,
-  secrets and DAGs at once, and get the new team's.
+- A manager adds, moves or removes you (**🛠️ Manage → 🧩 Teams**). You lose the old team's
+  files, lakehouse, secrets and DAGs at once, and get the new team's (or, when removed, keep only
+  your own).
 - Restart your Jupyter server (**File → Hub Control Panel → Stop My Server**, then start it) to
   get the new team's folder and catalog.
 - What you made stays with the old team.

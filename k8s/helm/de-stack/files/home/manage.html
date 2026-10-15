@@ -23,20 +23,21 @@
       var u = el('input', {type: 'text', placeholder: 'username (a-z, 0-9, -)', autocomplete: 'off'});
       var p = el('input', {type: 'password', placeholder: 'password (optional — random)', autocomplete: 'new-password'});
       var tm = el('select');
-      teams.forEach(function (t) { tm.appendChild(el('option', t['default'] ? {value: t.team, text: t.team, selected: ''} : {value: t.team, text: t.team})); });
+      tm.appendChild(el('option', {value: '', text: 'no team'}));
+      teams.forEach(function (t) { tm.appendChild(el('option', {value: t.team, text: t.team})); });
       var b = el('button', {class: 'primary', text: 'Create member'});
       b.addEventListener('click', function () {
         var user = u.value.trim().toLowerCase();
         if (!user) return u.focus();
         admin.act(b, 'create', {user: user, password: p.value || undefined, team: tm.value || undefined}, 'Created ' + user, function (r) {
-          return [['Lakehouse ' + r.lakehouse + ', bucket ' + r.bucket + ', SQLPad user, team ' + r.team + ' — ready to sign in.'], r.password];
+          return [['Lakehouse ' + r.lakehouse + ', bucket ' + r.bucket + ', SQLPad user' + (r.team ? ', team ' + r.team : '') + ' — ready to sign in.'], r.password];
         }, load);
       });
       return el('div', {class: 'card'}, [
         el('h3', {text: 'Add a member'}),
         el('div', {class: 'row'}, [u, p, el('span', {class: 'sub', text: 'team'}), tm, b]),
         el('div', {class: 'sub', style: 'margin-top:8px',
-          text: 'Creates the lab account with its own lakehouse, bucket and SQLPad user, in the team you pick. Members can also register themselves on the sign-in page (⚙️ Settings).'})]);
+          text: 'Creates the lab account with its own lakehouse, bucket and SQLPad user, and adds it to the team you pick (or none). Members can also register themselves on the sign-in page (⚙️ Settings).'})]);
     }
 
     // ---- the members table --------------------------------------------------------------
@@ -110,7 +111,7 @@
         el('div', {class: 'wrap'}, [el('table', {}, [el('thead', {}, [el('tr', {}, [
           el('th', {text: 'Account'}), el('th', {text: 'Team'}), el('th', {text: 'Lakehouse'}), el('th', {class: 'r', text: 'Catalogs'}),
           el('th', {class: 'r', text: 'Bucket'}), el('th', {class: 'r', text: 'Since'}), el('th', {text: ''})])]), body])]),
-        el('div', {class: 'sub', style: 'margin-top:8px', text: 'Move a member to another team on 🧩 Teams.'})]);
+        el('div', {class: 'sub', style: 'margin-top:8px', text: 'Add members to a team, move or remove them on 🧩 Teams.'})]);
     }
 
     function load() {

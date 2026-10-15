@@ -56,7 +56,7 @@ integration-level updates (like AdventureWorks or SQLPad) get an entry.
 
 | Date | Release / integration | What it adds | Scope |
 |---|---|---|---|
-| 2026-10-15 | **Teams** | Members work together in teams (one team each, `general` at first; managers create teams and move members on **🛠️ Manage → 🧩 Teams**). Each team shares a lakehouse `team_<team>`, files (My files → Team, Jupyter's `<team>_team/`), secrets (My secrets → Team) and Airflow DAGs; your own lakehouse is now `my` in Jupyter. Course page 0.9 *Working in a team* | local · k8s · course |
+| 2026-10-15 | **Teams** | Members work together in teams (no team at first; managers create teams and add members on **🛠️ Manage → 🧩 Teams**). Each team shares a lakehouse `team_<team>`, files (My files → Team, Jupyter's `<team>_team/`), secrets (My secrets → Team) and Airflow DAGs; your own lakehouse is now `my` in Jupyter. Course page 0.9 *Working in a team* | local · k8s · course |
 | 2026-10-14 | **Key vault (OpenBao)** | A key vault for members' keys and passwords: **🔑 My secrets** (was My variables), read in notebooks and DAGs with `key_vault("NAME")`; the vault's own UI signs in with the lab account. Each member sees only their own folder | both, course |
 | 2026-10-13 | **dbt (on Spark)** | dbt in every member's Jupyter, running on Spark as the member; a starter project in `dbt/`, `lab_dbt()` to run it from Airflow, and a new course unit *Transform with dbt* | both, course |
 | 2026-10-03 | **Manage members (manager console)** | Managers get 👥 **Manage members** on the landing page: create members, new password, reset lakehouse, wipe (back to a new member's setup), delete, and a **self-registration** on/off switch; Jupyter files reset with the member | local · k8s |
