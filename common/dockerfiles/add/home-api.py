@@ -151,24 +151,30 @@ class Handler(BaseHTTPRequestHandler):
                 rows = lh.folder_shares()
                 return self._json(200, {
                     "by_me": [r for r in rows if r["owner"] == name],
-                    "with_me": [dict(r, path=f"s3a://{bucket_name(r['owner'])}/{r['folder']}")
-                                for r in rows if r["grantee"] == name]})
+                    "with_me": [dict(r, lake=f"{r['owner']}_lake", path=f"s3a://{bucket_name(r['owner'])}/{r['folder']}")
+                                for r in rows if r["grantee"] == name and r["folder"] == "files/"]})
             if q.get("space") == "team":
                 team = lh.team_of(name)
                 if not team:
                     return self._json(404, {"error": "you are not in a team yet"})
                 bucket, quota = lh.team_bucket(team), lh.TEAM_QUOTA_MB
-            if q.get("space") == "shared":           # another member's folder, shared with me
+            if q.get("space") == "shared":           # another member's lake, shared with me
                 owner = lake_name(q.get("owner", ""))
                 where = (q.get("prefix") or q.get("key") or "").lstrip("/")
-                share = lh.folder_share_of(name, owner, where.rstrip("/"))
+                share = lh.shared_lake(name, owner, where)
                 if not share:
-                    return self._json(403, {"error": "that folder isn't shared with you"})
+                    return self._json(403, {"error": "that isn't shared with you"})
+                if method == "GET" and path == "/api/files" and not where:   # the lake: files + tables
+                    return self._json(200, {
+                        "bucket": bucket_name(owner), "prefix": "", "team": None, "quota_mb": lh.QUOTA_MB,
+                        "share": share, "is_table": False, "files": [],
+                        "folders": [{"name": "files", "prefix": "files/"},
+                                    {"name": "tables", "prefix": f"tables/{share['lake']}/"}]})
                 if method != "GET" and share["access"] != "write":
                     return self._json(403, {"error": "shared with you read-only"})
                 if method == "DELETE" and path == "/api/files/folder" and \
                         where.rstrip("/") + "/" == share["folder"]:
-                    return self._json(403, {"error": "the shared folder itself stays — its owner deletes it"})
+                    return self._json(403, {"error": "the files folder itself stays — its owner deletes it"})
                 bucket = bucket_name(owner)
             if method == "GET" and path == "/api/files":
                 prefix = (q.get("prefix") or "").lstrip("/")

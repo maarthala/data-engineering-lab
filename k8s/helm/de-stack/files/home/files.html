@@ -184,13 +184,13 @@
     var $ = function (id) { return document.getElementById(id); };
     var URLQ = new URLSearchParams(location.search), SPACE = URLQ.get('space');
     SPACE = SPACE === 'team' || SPACE === 'shared' ? SPACE : '';
-    // 🤝 Shared with me: another member's folder (?space=shared&owner=…&folder=…) — the page is
-    // rooted at that folder; without owner it lists what's shared with you
-    var OWNER = SPACE === 'shared' ? URLQ.get('owner') || '' : '', ROOT = OWNER ? URLQ.get('folder') || '' : '';
+    // 🤝 Shared with me: another member's lake (?space=shared&owner=…) — its files/ and its tables'
+    // folder tables/<owner>_lake/ (shown as "tables"); without owner it lists the lakes shared with you
+    var OWNER = SPACE === 'shared' ? URLQ.get('owner') || '' : '', LAKE = OWNER ? OWNER + '_lake' : '';
+    var TBL = 'tables/' + LAKE + '/';
     function withSpace(params) { params = params || {}; if (SPACE) params.space = SPACE; if (OWNER) params.owner = OWNER; return params; }
     $(SPACE ? 'sp-' + SPACE : 'sp-mine').className = 'on';
-    function inRoot(p) { return p.indexOf(ROOT) === 0 ? p : ROOT; }
-    var state = {prefix: inRoot(decodeURIComponent(location.hash.slice(1) || '')), bucket: '', tables: {}, readonly: false};
+    var state = {prefix: decodeURIComponent(location.hash.slice(1) || ''), bucket: '', tables: {}, readonly: false};
     var nodes = {};   // prefix -> {li, ul, caret, label, loaded, open}
 
     // ---------- helpers ----------
@@ -208,7 +208,8 @@
     }
     function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
     function go(prefix) { location.hash = encodeURIComponent(prefix); }
-    function parentOf(prefix) { var p = prefix.split('/').filter(Boolean).slice(0, -1).join('/'); return p ? p + '/' : ''; }
+    function parentOf(prefix) { var p = prefix.split('/').filter(Boolean).slice(0, -1).join('/'); p = p ? p + '/' : '';
+      return OWNER && p === 'tables/' ? '' : p; }
     // tables/<catalog>/ — one folder per catalog (your lake, extra catalogs like <you>_sales)
     function isCatalog(prefix) { return /^tables\/[^\/]+\/$/.test(prefix); }
     function looksLikeTable(childNames) { return childNames.indexOf('metadata') >= 0; }
@@ -231,7 +232,7 @@
 
     // ---------- tree ----------
     function treeNode(prefix, name) {
-      var li = el('li'), row = el('div', 'node'), caret = el('span', 'caret', '▸'), label = el('span', null, (prefix && prefix !== ROOT ? '📁 ' : SPACE === 'shared' ? '🤝 ' : '🪣 ') + name);
+      var li = el('li'), row = el('div', 'node'), caret = el('span', 'caret', '▸'), label = el('span', null, (prefix ? '📁 ' : SPACE === 'shared' ? '🤝 ' : '🪣 ') + name);
       row.appendChild(caret); row.appendChild(label); li.appendChild(row);
       var ul = el('ul'); ul.style.display = 'none'; li.appendChild(ul);
       var n = nodes[prefix] = {li: li, ul: ul, caret: caret, row: row, label: label, loaded: false, open: false};
@@ -271,7 +272,7 @@
       if (n.open) { n.open = false; n.ul.style.display = 'none'; n.caret.textContent = '▸'; } else expand(prefix);
     }
     function revealPath(prefix) {           // expand the root, every ancestor and the current folder
-      var parts = prefix.slice(ROOT.length).split('/').filter(Boolean), acc = ROOT, chain = [ROOT];
+      var parts = prefix.split('/').filter(Boolean), acc = '', chain = [''];
       parts.forEach(function (p) { acc += p + '/'; chain.push(acc); });
       return chain.reduce(function (pr, p) { return pr.then(function () { return expand(p); }); }, Promise.resolve());
     }
@@ -282,12 +283,14 @@
     // ---------- list ----------
     function crumbs() {
       var c = $('crumbs'); c.innerHTML = '';
-      var root = el('a', null, (ROOT ? '🤝 ' + state.bucket + '/' + ROOT.replace(/\/$/, '') : '🪣 ' + state.bucket));
-      root.href = '#' + encodeURIComponent(ROOT); c.appendChild(root);
-      var acc = ROOT;
-      state.prefix.slice(ROOT.length).split('/').filter(Boolean).forEach(function (part) {
-        acc += part + '/'; c.appendChild(el('span', 'sep', '/'));
-        var a = el('a', null, part); a.href = '#' + encodeURIComponent(acc); c.appendChild(a);
+      var root = el('a', null, OWNER ? '🤝 ' + LAKE : '🪣 ' + state.bucket);
+      root.href = '#'; c.appendChild(root);
+      var acc = '';
+      state.prefix.split('/').filter(Boolean).forEach(function (part) {
+        acc += part + '/';
+        if (OWNER && acc === 'tables/') return;                  // tables/<lake>/ shows as "tables"
+        c.appendChild(el('span', 'sep', '/'));
+        var a = el('a', null, OWNER && acc === TBL ? 'tables' : part); a.href = '#' + encodeURIComponent(acc); c.appendChild(a);
       });
     }
     function cell(node, cls) { var td = el('td', cls); if (node) td.appendChild(node); return td; }
@@ -307,23 +310,27 @@
             tablesAt('team_' + d.team);
           }
           $('example').textContent = 's3a://' + d.bucket + '/files/source/orders.csv';
-          if (d.share) {
-            state.readonly = d.share.access !== 'write';
-            $('space-title').textContent = '🤝 Shared by ' + OWNER;
-            $('who').textContent = OWNER + ' shared this folder with you, ' + (state.readonly ? 'read-only' : 'read + write') + ' (their bucket';
-            $('quota').parentNode.childNodes.forEach(function (n) { if (n.nodeType === 3 && n.textContent.indexOf('(limit') >= 0) n.textContent = ', limit '; });
-            $('example').textContent = 's3a://' + d.bucket + '/' + ROOT + '…';
-            ['mkdir', 'upload'].forEach(function (id) { $(id).hidden = state.readonly; });
+          if (OWNER) {
+            $('space-title').textContent = '🤝 ' + LAKE + ' · shared by ' + OWNER;
+            $('who').textContent = OWNER + ' invited you to their lake: their files ' +
+              (d.share.access === 'write' ? 'read + write' : 'read-only') + ', their tables read-only here (change tables with SQL)';
+            $('quota').parentNode.childNodes.forEach(function (n) { if (n.nodeType === 3 && n.textContent.indexOf('(limit') >= 0) n.textContent = ' (their limit '; });
+            $('example').textContent = 's3a://' + d.bucket + '/files/source/…';
+            tablesAt(LAKE);
           }
-          $('tree').appendChild(treeNode(ROOT, ROOT ? ROOT.split('/').filter(Boolean).pop() : d.bucket));
+          $('tree').appendChild(treeNode('', OWNER ? LAKE : d.bucket));
+        }
+        if (OWNER) {                               // files/ may be writable, the lake root and tables/ never
+          state.readonly = d.share.access !== 'write';
+          ['mkdir', 'upload'].forEach(function (id) { $(id).hidden = state.readonly; });
         }
         if (nodes[state.prefix]) fill(state.prefix, d.folders);
         if (d.is_table) { state.tables[state.prefix] = true; markTable(state.prefix); }
         $('table-banner').style.display = d.is_table ? 'block' : 'none';
-        $('cat-note').style.display = state.prefix === 'tables/' || isCatalog(state.prefix) ? 'block' : 'none';
+        $('cat-note').style.display = !OWNER && (state.prefix === 'tables/' || isCatalog(state.prefix)) ? 'block' : 'none';
         crumbs();
         var rows = $('rows'); rows.innerHTML = '';
-        if (state.prefix && state.prefix !== ROOT) {
+        if (state.prefix) {
           var up = el('a', null, '⬑  ..'); up.href = '#' + encodeURIComponent(parentOf(state.prefix));
           var tr = el('tr'); tr.appendChild(cell(up, 'name')); tr.appendChild(el('td')); tr.appendChild(el('td')); tr.appendChild(el('td')); rows.appendChild(tr);
         }
@@ -497,7 +504,7 @@
     $('refresh').onclick = function () { closeViewer(); if (nodes[state.prefix]) nodes[state.prefix].loaded = false; refresh(); };
     $('upload').onclick = function () { $('picker').click(); };
     $('picker').onchange = function () { uploadFiles(this.files); this.value = ''; };
-    window.addEventListener('hashchange', function () { closeViewer(); state.prefix = inRoot(decodeURIComponent(location.hash.slice(1) || '')); refresh(); });
+    window.addEventListener('hashchange', function () { closeViewer(); state.prefix = decodeURIComponent(location.hash.slice(1) || ''); refresh(); });
     var list = $('list');
     ['dragenter', 'dragover'].forEach(function (ev) { list.addEventListener(ev, function (e) { e.preventDefault(); list.classList.add('dragging'); }); });
     list.addEventListener('dragleave', function (e) { if (e.target === list.querySelector('.drop')) list.classList.remove('dragging'); });
@@ -525,14 +532,14 @@
       $('space-title').textContent = '🤝 Shared with me'; $('bucket').parentNode.querySelectorAll('.dot,.muted-label,.bucket').forEach(function (x) { x.hidden = true; });
       document.querySelector('aside').hidden = true; document.querySelector('.app').style.gridTemplateColumns = '1fr';
       $('table-banner').hidden = true; document.querySelector('.btns').style.display = 'none';
-      $('crumbs').textContent = 'Files of members who invited you to their whole lake (🗂️ My catalogs)';
-      document.querySelector('thead tr').innerHTML = '<th>Folder</th><th>Shared by</th><th>Access</th><th>Spark path</th>';
+      $('crumbs').textContent = 'Lakes other members invited you to — open one for its files and tables';
+      document.querySelector('thead tr').innerHTML = '<th>Lake</th><th>Shared by</th><th>Access</th><th>Files in Spark</th>';
       $('who').parentNode.innerHTML = 'Open a folder to browse it. In Spark, read its files by path, e.g. <code>spark.read.csv("s3a://…/files/source/orders.csv", header=True)</code>.';
       loadShares().then(function () {
         var rows = $('rows'); rows.innerHTML = '';
-        if (!state.withMe.length) { var e = el('tr'), td = el('td', 'empty', 'Nothing shared with you yet — when a member invites you to their whole lake, their files show up here.'); td.colSpan = 4; e.appendChild(td); rows.appendChild(e); return; }
+        if (!state.withMe.length) { var e = el('tr'), td = el('td', 'empty', 'Nothing shared with you yet — when a member invites you to their whole lake, it shows up here.'); td.colSpan = 4; e.appendChild(td); rows.appendChild(e); return; }
         state.withMe.forEach(function (s) {
-          var a = el('a', null, '🤝 ' + s.folder); a.href = '/files.html?' + new URLSearchParams({space: 'shared', owner: s.owner, folder: s.folder}) + '#' + encodeURIComponent(s.folder);
+          var a = el('a', null, '🗂️ ' + s.lake); a.href = '/files.html?' + new URLSearchParams({space: 'shared', owner: s.owner});
           var tr = el('tr'); tr.appendChild(cell(a, 'name')); tr.appendChild(el('td', null, s.owner));
           var t = el('td'); t.appendChild(el('span', 'stag' + (s.access === 'write' ? ' write' : ''), s.access === 'write' ? 'read + write' : 'read')); tr.appendChild(t);
           tr.appendChild(el('td', 'hint', s.path)); rows.appendChild(tr);

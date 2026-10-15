@@ -261,6 +261,24 @@ def folder_share_of(name, owner, key):
     return best
 
 
+def shared_lake(name, owner, key=""):
+    """What <name> reaches at <key> in <owner>'s bucket through a whole-lake invite (which shared
+    their files/ — see share()): files/… with the invite's access, tables/<owner>_lake/… read-only
+    (the tables' own files: change tables with SQL), the bucket root as the lake itself. The
+    share dict ({owner, folder, access, lake}) or None."""
+    lake = f"{owner}_lake"
+    files = next((s for s in folder_shares() if s["grantee"] == name and s["owner"] == owner
+                  and s["folder"] == "files/"), None)
+    if not files:
+        return None
+    k = key.rstrip("/") + "/" if key else ""
+    if k.startswith(f"tables/{lake}/"):
+        return dict(files, folder=f"tables/{lake}/", access="read", lake=lake)
+    if k == "" or k.startswith("files/"):
+        return dict(files, folder="" if k == "" else "files/", access=files["access"] if k else "read", lake=lake)
+    return None
+
+
 def forget_folder_shares(name):
     """A member is deleted: drop the folders they shared and the ones shared with them."""
     rows = folder_shares()
