@@ -94,7 +94,6 @@
       var drop = el('div', {class: 'drop', hidden: ''});
       var chips = el('div', {style: 'margin-top:8px'});
       var go = el('button', {class: 'primary', text: 'Add'});
-      var note = el('div', {class: 'hint', hidden: ''});
       var hits = [], at = 0;
       function teamOf(u) { for (var i = 0; i < people.length; i++) if (people[i].user === u) return people[i].team; }
       function search() {
@@ -124,11 +123,8 @@
           x.addEventListener('click', function () { picked.splice(picked.indexOf(u), 1); paintChips(); });
           chips.appendChild(el('span', {class: 'chip'}, [u + (teamOf(u) ? ' (from ' + teamOf(u) + ')' : ''), x]));
         });
-        var moving = picked.filter(function (u) { return teamOf(u) && teamOf(u) !== t.team; }).length;
         go.textContent = picked.length ? 'Add ' + picked.length + (picked.length === 1 ? ' member' : ' members') : 'Add';
         go.disabled = !picked.length;
-        note.hidden = !moving;
-        note.textContent = moving + ' of them will leave their current team (they lose its lakehouse; their tables there stay).';
       }
       q.addEventListener('input', search);
       q.addEventListener('blur', function () { drop.hidden = true; });
@@ -154,7 +150,7 @@
       paintChips();
       return el('div', {style: 'margin:12px 0 4px'}, [el('h3', {text: 'Add members'}),
         el('div', {class: 'row', style: 'flex-wrap:nowrap; align-items:flex-start'}, [el('div', {class: 'picker'}, [q, drop]), go]),
-        chips, note]);
+        chips]);
     }
 
     // Members: filter, tick, remove the ticked ones (back to the default team)
