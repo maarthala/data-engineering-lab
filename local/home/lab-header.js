@@ -31,7 +31,7 @@
   var here = location.pathname.replace(/\/+$/, '') || '/';
   function link(href, text) {
     var on = (href === '/' ? (here === '/' || here === '/index.html') :
-              href === '/manage.html' ? /^\/(manage|teams|settings)\.html$/.test(here) : here === href);
+              href === '/manage.html' ? /^\/(manage|teams|activity|settings)\.html$/.test(here) : here === href);
     return '<a class="btn' + (on ? ' on' : '') + '" href="' + href + '">' + text + '</a>';
   }
   top.innerHTML =

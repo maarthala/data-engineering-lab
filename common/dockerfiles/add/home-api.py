@@ -35,6 +35,7 @@ from the browser can point at another bucket.
   GET    /api/admin/members                              every lab account + lakehouse + bucket use
   POST   /api/admin/{create|password|reset|wipe|delete}  → {"job": id}
   GET    /api/admin/jobs?id=…                            → {"state": running|done|error, "result"|"error"}
+  GET    /api/admin/activity → {members: [{user, login, jupyter, files, tables, dag, last, …}], login_since}
   GET    /api/admin/settings · POST {"registration": bool, "idle_minutes": n, "quota_mb": n, …}
                                        self-registration on the sign-in page + lakehouse.SETTINGS (any of them)
   GET    /api/admin/teams · /api/admin/people            the teams (members, bucket use) · who is where
@@ -366,6 +367,8 @@ class Handler(BaseHTTPRequestHandler):
                 if job and job["state"] != "running":
                     _jobs.pop(q["id"], None)          # read once (a new password isn't kept around)
                 return self._json(200, job) if job else self._json(404, {"error": "no such job"})
+            if method == "GET" and path == "/api/admin/activity":
+                return self._json(200, labadmin.activity())
             if method == "GET" and path == "/api/admin/settings":
                 return self._json(200, labadmin.settings())
             if method == "GET" and path == "/api/admin/teams":
@@ -537,8 +540,20 @@ def _trino_sync_loop():
         time.sleep(30)
 
 
+def _login_events():
+    """Keycloak keeps sign-ins from now on (📊 Activity); retried while Keycloak is starting."""
+    for _ in range(30):
+        try:
+            labadmin.ensure_login_events()
+            return
+        except Exception as e:  # noqa: BLE001
+            print(f"[home-api] login events: {e}", flush=True)
+            time.sleep(20)
+
+
 if __name__ == "__main__":
     threading.Thread(target=_trino_sync_loop, daemon=True).start()
+    threading.Thread(target=_login_events, daemon=True).start()
     port = int(os.environ.get("PORT", "8000"))
     print(f"[home-api] listening on :{port}, Polaris {POLARIS}", flush=True)
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()

@@ -3,7 +3,7 @@
 // /api/admin (home-api, behind the Keycloak login; managers only). Actions run in the
 // background — run() polls the job until it finishes.
 var admin = (function () {
-  var TABS = [['/manage.html', '👥 Members'], ['/teams.html', '🧩 Teams'], ['/settings.html', '⚙️ Settings']];
+  var TABS = [['/manage.html', '👥 Members'], ['/teams.html', '🧩 Teams'], ['/activity.html', '📊 Activity'], ['/settings.html', '⚙️ Settings']];
   var main, result, busy = false;
 
   function el(tag, attrs, kids) {
@@ -103,5 +103,5 @@ var admin = (function () {
       ? 'This page is for lab managers (Keycloak group “managers”).' : 'Could not load: ' + e.message}));
   }
 
-  return {el: el, api: api, act: act, show: show, page: page, fill: fill, failed: failed};
+  return {el: el, api: api, run: run, act: act, show: show, page: page, fill: fill, failed: failed};
 })();

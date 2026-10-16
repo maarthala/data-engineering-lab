@@ -79,3 +79,7 @@ input.wide{width:100%}
 .limits{display:grid; grid-template-columns:minmax(180px,max-content) 110px minmax(0,1fr); gap:10px 14px; align-items:center}
 .limits input{width:100%}
 @media (max-width:640px){.limits{grid-template-columns:1fr 110px} .limits .sub{grid-column:1 / -1; margin-top:-6px}}
+th.sort{cursor:pointer; user-select:none; white-space:nowrap} th.sort:hover, th.sort.on{color:var(--ink)}
+td.stale{color:var(--gold)}
+.tag.on{border-color:rgba(57,208,196,.55); color:var(--accent2)}
+table.activity td, table.activity th{white-space:nowrap}

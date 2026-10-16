@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity — Epireum's Data Engineering Lab</title>
+  <link rel="stylesheet" href="/admin.css?v=4">
+</head>
+<body>
+  <header id="lab-top"></header>
+  <script src="/lab-header.js?v=9"></script>
+  <main id="main">
+    <div class="placeholder">Loading…</div>
+  </main>
+  <script src="/admin.js?v=2"></script>
+  <script>
+    // 📊 Activity — when each member last used the lab (sign-in, Jupyter, files, tables, DAG runs),
+    // to find and remove members who don't. Read from the tools themselves (labadmin.activity).
+    var el = admin.el;
+    admin.page('📊 Activity');
+    var COLS = [['user', 'Member'], ['last', 'Last active'], ['login', 'Sign-in'], ['jupyter', 'Jupyter'],
+                ['files', 'Files'], ['tables', 'Tables'], ['dag', 'DAG run'], ['bucket_mb', 'Storage'],
+                ['created', 'Created']];
+    var sortKey = 'last', sortUp = true, days = 30, find = '', picked = {};
+    try { days = Number(localStorage.getItem('activity-days') || 30); } catch (e) { /* no storage */ }
+
+    function ago(ms) {
+      if (!ms) return '—';
+      var d = Math.floor((Date.now() - ms) / 86400000);
+      if (d < 1) { var h = Math.floor((Date.now() - ms) / 3600000); return h < 1 ? 'just now' : h + ' h ago'; }
+      return d + ' d ago';
+    }
+    function full(ms) { return ms ? new Date(ms).toLocaleString() : 'never'; }
+    function idle(m) { return days > 0 && (!m.last || Date.now() - m.last > days * 86400000); }
+
+    function load() {
+      admin.api('GET', '/api/admin/activity').then(draw).catch(admin.failed);
+    }
+
+    function draw(r) {
+      var list = r.members.filter(function (m) {
+        return (!find || m.user.indexOf(find) >= 0) && (days === 0 || idle(m));
+      }).sort(function (a, b) {
+        var x = a[sortKey], y = b[sortKey];
+        if (sortKey === 'user') return sortUp ? x.localeCompare(y) : y.localeCompare(x);
+        x = x == null ? -1 : x; y = y == null ? -1 : y;
+        return sortUp ? x - y : y - x;
+      });
+      Object.keys(picked).forEach(function (u) {
+        if (!list.some(function (m) { return m.user === u; })) delete picked[u];
+      });
+
+      var sel = el('select', {'aria-label': 'Show'}, [[0, 'everyone'], [7, 'inactive 7+ days'], [14, 'inactive 14+ days'],
+        [30, 'inactive 30+ days'], [60, 'inactive 60+ days'], [90, 'inactive 90+ days']].map(function (o) {
+          var opt = el('option', {value: o[0], text: o[1]}); if (o[0] === days) opt.selected = true; return opt; }));
+      sel.addEventListener('change', function () {
+        days = Number(sel.value);
+        try { localStorage.setItem('activity-days', days); } catch (e) { /* no storage */ }
+        draw(r);
+      });
+      var search = el('input', {type: 'text', placeholder: 'filter by name', value: find, 'aria-label': 'Filter by name'});
+      search.addEventListener('input', function () { find = search.value.trim().toLowerCase(); draw(r); search.focus(); });
+
+      var removable = list.filter(function (m) { return !m.manager; });
+      var all = el('input', {type: 'checkbox', 'aria-label': 'Select all shown'});
+      all.checked = removable.length > 0 && removable.every(function (m) { return picked[m.user]; });
+      all.addEventListener('change', function () {
+        removable.forEach(function (m) { if (all.checked) picked[m.user] = true; else delete picked[m.user]; });
+        draw(r);
+      });
+      var n = Object.keys(picked).length;
+      var del = el('button', {class: 'danger', text: 'Delete selected (' + n + ')'});
+      if (!n) del.disabled = true;
+      del.addEventListener('click', function () { confirmDelete(Object.keys(picked).sort()); });
+
+      var head = el('tr', {}, [el('th', {}, [all])].concat(COLS.map(function (c) {
+        var th = el('th', {class: 'sort' + (sortKey === c[0] ? ' on' : ''), tabindex: '0',
+                          text: c[1] + (sortKey === c[0] ? (sortUp ? ' ▲' : ' ▼') : '')});
+        function go() { if (sortKey === c[0]) sortUp = !sortUp; else { sortKey = c[0]; sortUp = c[0] === 'user' || c[0] === 'last'; } draw(r); }
+        th.addEventListener('click', go);
+        th.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
+        return th;
+      })));
+      var body = list.map(function (m) {
+        var box = el('input', {type: 'checkbox', 'aria-label': 'Select ' + m.user});
+        if (m.manager) { box.disabled = true; box.title = 'Managers are removed in Keycloak'; }
+        box.checked = !!picked[m.user];
+        box.addEventListener('change', function () { if (box.checked) picked[m.user] = true; else delete picked[m.user]; draw(r); });
+        var who = el('td', {}, [el('b', {text: m.user}),
+          m.manager ? el('span', {class: 'tag mgr', text: 'manager'}) : null,
+          m.team ? el('span', {class: 'tag', text: m.team}) : null,
+          m.enabled ? null : el('span', {class: 'tag', text: 'disabled'}),
+          m.jupyter_running ? el('span', {class: 'tag on', text: 'Jupyter on'}) : null]);
+        function t(k) { return el('td', {class: 'r' + (k === 'last' && idle(m) ? ' stale' : ''), title: full(m[k]), text: ago(m[k])}); }
+        return el('tr', {}, [el('td', {}, [box]), who, t('last'), t('login'), t('jupyter'), t('files'), t('tables'),
+          t('dag'), el('td', {class: 'r', text: m.bucket_mb == null ? '—' : m.bucket_mb + ' MB'}), t('created')]);
+      });
+      var shown = r.members.length === list.length ? list.length + ' members'
+        : list.length + ' of ' + r.members.length + ' members';
+      var stale = days ? ' · ' + r.members.filter(idle).length + ' inactive for ' + days +
+        '+ days (no sign-in, Jupyter, file, table or DAG run since).' : '.';
+      admin.fill([
+        el('div', {class: 'card'}, [
+          el('div', {class: 'row'}, [el('span', {class: 'sub', text: 'Show'}), sel, search, el('span', {style: 'flex:1'}), del]),
+          el('div', {class: 'sub', style: 'margin-top:8px', text: shown + stale})]),
+        el('div', {class: 'card', style: 'margin-top:14px'}, [el('div', {class: 'wrap'}, [el('table', {class: 'activity'}, [
+          el('thead', {}, [head]), el('tbody', {}, body.length ? body : [el('tr', {}, [el('td', {colspan: '10', class: 'sub', text: 'Nobody here.'})])])])])]),
+        el('div', {class: 'sub', style: 'margin-top:10px', text:
+          'Last active = the newest of the columns after it (not Created). Sign-ins are kept ' +
+          (r.login_since ? 'since ' + new Date(r.login_since).toLocaleDateString() + ', ' : '') + 'for 90 days. ' +
+          'Files = newest change in files/ (the starter files count on the first day), Tables = newest table write, ' +
+          'DAG run = newest run of their DAGs. Hover a time for the date. SQLPad and Superset use isn\'t counted.'})]);
+    }
+
+    function confirmDelete(users) {
+      var input = el('input', {type: 'text', placeholder: 'type delete ' + users.length + ' to confirm', autocomplete: 'off'});
+      var go = el('button', {class: 'danger', text: 'Delete ' + users.length + ' member' + (users.length > 1 ? 's' : '')});
+      var cancel = el('button', {text: 'Cancel'});
+      go.disabled = true;
+      input.addEventListener('input', function () { go.disabled = input.value.trim() !== 'delete ' + users.length; });
+      cancel.addEventListener('click', load);
+      go.addEventListener('click', function () {
+        go.disabled = cancel.disabled = input.disabled = true;
+        var done = [], failed = [];
+        users.reduce(function (p, u) {
+          return p.then(function () {
+            go.textContent = 'Deleting ' + u + '… (' + (done.length + failed.length + 1) + '/' + users.length + ')';
+            return admin.run('delete', {user: u}).then(function () { done.push(u); delete picked[u]; },
+                                                      function (e) { failed.push(u + ': ' + e.message); });
+          });
+        }, Promise.resolve()).then(function () {
+          admin.show(failed.length ? 'Deleted ' + done.length + ', ' + failed.length + ' failed' : 'Deleted ' + done.length + ' member(s)',
+            (done.length ? ['Deleted: ' + done.join(', ')] : []).concat(failed), null, failed.length > 0);
+          load();
+        });
+      });
+      admin.fill([el('div', {class: 'card result err'}, [
+        el('h3', {text: 'Delete ' + users.length + ' member' + (users.length > 1 ? 's' : '') + '?'}),
+        el('div', {class: 'sub', text: users.join(', ')}),
+        el('div', {class: 'sub', style: 'margin-top:6px', text: 'Removes each account, its catalogs, tables, bucket and Jupyter files. This cannot be undone.'}),
+        el('div', {class: 'row', style: 'margin-top:10px'}, [input, go, cancel])])]);
+      input.focus();
+    }
+
+    load();
+  </script>
+</body>
+</html>

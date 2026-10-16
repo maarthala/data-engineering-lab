@@ -4,6 +4,9 @@ plus the Keycloak admin (KEYCLOAK_ADMIN=user:password) and a JupyterHub service 
 (HUB_ADMIN_TOKEN) to stop a learner's Jupyter and drop its volume.
 
   members()                  lab accounts, their lakehouse and bucket use
+  activity()                 📊 Activity: when each member last signed in, used Jupyter, changed
+                             files / tables, ran a DAG — to find members who don't use the lab
+  ensure_login_events()      Keycloak keeps sign-ins (LOGIN events, 90 days) for activity()
   create(user, password)     new lab account + lakehouse, bucket, SQLPad user
   set_password(user, pw)     new password (the learner picks their own at the next sign-in)
   reset_lakehouse(user)      drop every table/view in their catalogs (bronze/silver/gold and the
@@ -291,6 +294,139 @@ def members():
                     "catalogs": cats, "bucket": lh.bucket_name(name), "bucket_mb": mb,
                     "team": team_of.get(u["username"])})
     return out
+
+
+# ---- 📊 Activity: the latest sign of use, per member (nothing new is tracked but sign-ins) -----
+LOGIN_DAYS = 90                                       # Keycloak keeps sign-ins this long
+_SINCE_KEY = "login-events-since"                     # in lab-admin: when the sign-ins started
+
+
+def _ms(iso):
+    """'2026-10-16T07:13:17.967Z' → epoch ms (None stays None)."""
+    import datetime
+    if not iso:
+        return None
+    return int(datetime.datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp() * 1000)
+
+
+def ensure_login_events(kc=None):
+    """Turn on Keycloak's sign-in log (LOGIN events only, kept LOGIN_DAYS) once; returns since
+    when it has been on (epoch ms)."""
+    import io
+    kc = kc or _kc_token()
+    try:
+        with lh._s3("GET", "lab-admin", _SINCE_KEY) as r:
+            since = int(r.read())
+    except urllib.error.HTTPError:
+        since = None
+    st, cfg = _kc("GET", f"/admin/realms/{REALM}/events/config", token=kc)
+    if st == 200 and not (cfg.get("eventsEnabled") and "LOGIN" in cfg.get("enabledEventTypes", [])):
+        st, body = _kc("PUT", f"/admin/realms/{REALM}/events/config", {
+            "eventsEnabled": True, "enabledEventTypes": ["LOGIN"], "eventsExpiration": LOGIN_DAYS * 86400,
+            "eventsListeners": cfg.get("eventsListeners") or ["jboss-logging"],
+            "adminEventsEnabled": cfg.get("adminEventsEnabled", False),
+            "adminEventsDetailsEnabled": cfg.get("adminEventsDetailsEnabled", False)}, token=kc)
+        if st != 204:
+            raise RuntimeError(f"Keycloak events: HTTP {st} {body!r}")
+        since = None
+    if since is None:
+        since = int(time.time() * 1000)
+        lh.create_bucket("lab-admin")
+        lh.put_object("lab-admin", _SINCE_KEY, io.BytesIO(str(since).encode()), len(str(since)), "text/plain")
+    return since
+
+
+def _bucket_activity(bucket):
+    """(MB used, newest change under files/, newest under tables/) — epoch ms or None."""
+    import xml.etree.ElementTree as ET
+    total, newest, token = 0, {"files/": None, "tables/": None}, None
+    while True:
+        q = {"list-type": "2"}
+        if token:
+            q["continuation-token"] = token
+        try:
+            with lh._s3("GET", bucket, query=q) as r:
+                root = ET.fromstring(r.read())
+        except urllib.error.HTTPError:
+            return None, None, None                   # no bucket (yet)
+        for c in root.findall(f"{lh._NS}Contents"):
+            total += int(c.findtext(f"{lh._NS}Size") or 0)
+            key, t = c.findtext(f"{lh._NS}Key") or "", _ms(c.findtext(f"{lh._NS}LastModified"))
+            top = key[:key.find("/") + 1]
+            if top in newest and not key.endswith("/") and (newest[top] or 0) < (t or 0):
+                newest[top] = t
+        token = root.findtext(f"{lh._NS}NextContinuationToken")
+        if root.findtext(f"{lh._NS}IsTruncated") != "true":
+            return round(total / 1e6, 1), newest["files/"], newest["tables/"]
+
+
+def activity():
+    """{members: [{user, manager, enabled, team, created, login, jupyter, jupyter_running, files,
+    tables, dag, bucket_mb, last}], login_since} — times in epoch ms (None: never / unknown);
+    `last` = the newest of them (not `created`). Starter files count as a file change on day one."""
+    from concurrent.futures import ThreadPoolExecutor
+    kc = _kc_token()
+    try:
+        since = ensure_login_events(kc)
+    except Exception as e:  # noqa: BLE001 — the rest of the report still comes
+        print(f"[labadmin] login events: {e}", flush=True)
+        since = None
+    people = _people_brief(kc)
+    ids = {p.pop("id"): p["user"] for p in people}
+    rows = {p["user"]: p for p in people}
+    # sign-ins: newest first, so the first one seen per member is their last
+    first = 0
+    while True:
+        st, evs = _kc("GET", f"/admin/realms/{REALM}/events?" + urllib.parse.urlencode(
+            {"type": "LOGIN", "first": first, "max": 1000}), token=kc)
+        if st != 200 or not evs:
+            break
+        for e in evs:
+            u = rows.get(ids.get(e.get("userId")))
+            if u is not None and not u.get("login"):
+                u["login"] = e.get("time")
+        if len(evs) < 1000:
+            break
+        first += 1000
+    st, hub = _hub("GET", "/users?limit=1000")
+    for h in hub or [] if st == 200 else []:
+        u = rows.get(h["name"])
+        if u is not None:
+            u["jupyter"] = _ms(h.get("last_activity"))
+            u["jupyter_running"] = bool(h.get("servers"))
+    h = _airflow_auth()
+    if h:
+        names = sorted((lh.lake_name(n) for n in rows), key=len, reverse=True)
+        by_name = {lh.lake_name(n): n for n in rows}
+        st, runs = _http("GET", f"{AIRFLOW}/api/v2/dags/~/dagRuns?" + urllib.parse.urlencode(
+            {"order_by": "-start_date", "limit": 1000}), headers=h)
+        for r in (runs or {}).get("dag_runs", []) if st == 200 and isinstance(runs, dict) else []:
+            owner = next((n for n in names if r["dag_id"].startswith(n + "_")), None)
+            u = rows.get(by_name.get(owner))
+            if u is not None and not u.get("dag"):
+                u["dag"] = _ms(r.get("start_date") or r.get("logical_date"))
+    with ThreadPoolExecutor(8) as pool:
+        for u, (mb, files, tables) in zip(rows.values(), pool.map(
+                lambda n: _bucket_activity(lh.bucket_name(lh.lake_name(n))), list(rows))):
+            u.update(bucket_mb=mb, files=files, tables=tables)
+    for u in rows.values():
+        u["last"] = max((u.get(k) or 0 for k in ("login", "jupyter", "files", "tables", "dag")), default=0) or None
+    return {"members": sorted(rows.values(), key=lambda u: u["user"]), "login_since": since}
+
+
+def _people_brief(kc):
+    """[{id, user, manager, enabled, created, team}] from Keycloak only (no lakehouse calls)."""
+    _, users = _kc("GET", f"/admin/realms/{REALM}/users?max=1000&briefRepresentation=true", token=kc)
+    _, mgrs = _kc("GET", f"/admin/realms/{REALM}/groups?search=managers", token=kc)
+    gid = next((g["id"] for g in mgrs or [] if g["name"] == "managers"), None)
+    managers = set()
+    if gid:
+        _, ms = _kc("GET", f"/admin/realms/{REALM}/groups/{gid}/members?max=1000", token=kc)
+        managers = {m["username"] for m in ms or []}
+    team_of = {m: t_["team"] for t_ in teams(kc) for m in t_["members"]}
+    return [{"id": u["id"], "user": u["username"], "manager": u["username"] in managers, "enabled": u.get("enabled", True),
+             "created": u.get("createdTimestamp"), "team": team_of.get(u["username"])}
+            for u in users or []]
 
 
 def create(user, password=None, team=None):

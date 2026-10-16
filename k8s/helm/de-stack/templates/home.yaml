@@ -25,6 +25,8 @@ data:
 {{ .Files.Get "files/home/manage.html" | indent 4 }}
   teams.html: |
 {{ .Files.Get "files/home/teams.html" | indent 4 }}
+  activity.html: |
+{{ .Files.Get "files/home/activity.html" | indent 4 }}
   settings.html: |
 {{ .Files.Get "files/home/settings.html" | indent 4 }}
   admin.js: |
@@ -67,6 +69,7 @@ spec:
             - { name: html, mountPath: /usr/share/nginx/html/catalogs.html, subPath: catalogs.html }
             - { name: html, mountPath: /usr/share/nginx/html/manage.html, subPath: manage.html }
             - { name: html, mountPath: /usr/share/nginx/html/teams.html, subPath: teams.html }
+            - { name: html, mountPath: /usr/share/nginx/html/activity.html, subPath: activity.html }
             - { name: html, mountPath: /usr/share/nginx/html/settings.html, subPath: settings.html }
             - { name: html, mountPath: /usr/share/nginx/html/admin.js, subPath: admin.js }
             - { name: html, mountPath: /usr/share/nginx/html/admin.css, subPath: admin.css }

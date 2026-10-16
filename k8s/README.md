@@ -156,6 +156,13 @@ and team DAGs: `<team>_team/dags/` → Airflow, `dag_id` `team_<team>_…`, shar
   tables stay there)
 - **Members** — filter, tick (or select all shown) and **Remove selected**: out of the team (they keep their own lakehouse)
 
+**📊 Activity** (`/activity.html`): one row per member with when they last signed in, used
+Jupyter, changed files (`files/`), wrote a table (`tables/`) and ran a DAG, their storage and
+"last active" (the newest of those). Filter *inactive 7 / 14 / 30 / 60 / 90+ days*, sort by any
+column, tick members and **Delete selected** (type `delete N` to confirm; managers can't be
+ticked). Read from the tools on demand (`labadmin.activity`); only sign-ins are newly kept —
+home-api turns on Keycloak's LOGIN events (90 days) at start. SQLPad / Superset use isn't counted.
+
 **⚙️ Settings** (`/settings.html`):
 
 - **Self-registration** on / off — the Register link on the sign-in page (Keycloak's realm

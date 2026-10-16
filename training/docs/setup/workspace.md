@@ -429,7 +429,9 @@ Broke your lakehouse, or want a clean slate for the next unit? Ask your **platfo
 The same page lets managers create members (in the team they pick), give someone a new password
 and delete an account. **🧩 Teams** lists the teams on the left; pick one to see its members on the right,
 add members (search by name, pick several; one who is in another team moves) or remove them (they
-keep their own lakehouse). It also creates teams and deletes empty ones. **⚙️ Settings** switches **self-registration** on or off (on while a new batch
+keep their own lakehouse). It also creates teams and deletes empty ones. **📊 Activity** shows when each member last
+signed in, used Jupyter, changed files or tables and ran a DAG, so managers can find members who
+no longer use the lab (filter *inactive 30+ days*) and delete them. **⚙️ Settings** switches **self-registration** on or off (on while a new batch
 signs up, off otherwise) and sets the **members' limits**: after how many idle minutes a Jupyter
 server stops, Jupyter memory and CPU per member (from their next server start), and the member and
 team bucket sizes (applied to every bucket at once).
