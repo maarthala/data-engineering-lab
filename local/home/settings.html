@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Settings — Epireum's Data Engineering Lab</title>
-  <link rel="stylesheet" href="/admin.css?v=2">
+  <link rel="stylesheet" href="/admin.css?v=3">
 </head>
 <body>
   <header id="lab-top"></header>
@@ -14,7 +14,8 @@
   </main>
   <script src="/admin.js?v=1"></script>
   <script>
-    // ⚙️ Settings — lab-wide switches. For now: self-registration on the sign-in page.
+    // ⚙️ Settings — lab-wide switches: self-registration on the sign-in page, and members' limits
+    // (Jupyter idle time / memory / CPU, bucket sizes) — no restart: each applies as its note says.
     var el = admin.el;
     admin.page('⚙️ Settings');
 
@@ -45,8 +46,57 @@
           text: 'Turn it on while a new batch signs up, then off again. While it\'s on, anyone who can reach the sign-in page can create an account. New members start in no team (only their own lakehouse) — add them to one on 🧩 Teams.'})]);
     }
 
+    var LIMITS = [
+      ['idle_minutes', 'Jupyter stops when idle after', 'minutes', 1,
+       'A member\'s Jupyter server stops after this long without activity (their files stay). Applies within a minute.'],
+      ['jupyter_mem_gb', 'Jupyter memory', 'GB', 0.5, 'Per member. Applies when their server next starts.'],
+      ['jupyter_cpu', 'Jupyter CPU', 'cores', 0.25, 'Per member. Applies when their server next starts.'],
+      ['quota_mb', 'Member bucket size', 'MB', 10,
+       'Each member\'s files and tables (<user>-lake). Applies to every member at once; a member already above it can only delete until they are under.'],
+      ['team_quota_mb', 'Team bucket size', 'MB', 50, 'Each team\'s bucket (team-<team>-lake). Applies to every team at once.']];
+
+    function limitsCard(r) {
+      var inputs = {}, save = el('button', {class: 'primary', text: 'Save'});
+      var rows = [];
+      LIMITS.forEach(function (l) {
+        var lim = r.limits[l[0]];
+        var inp = el('input', {type: 'number', min: lim[0], max: lim[1], step: l[3], value: r[l[0]],
+                               'aria-label': l[1]});
+        inputs[l[0]] = inp;
+        rows.push(el('label', {text: l[1], for: 'lim-' + l[0]}));
+        inp.id = 'lim-' + l[0];
+        rows.push(el('div', {class: 'row', style: 'flex-wrap:nowrap'}, [inp, el('span', {class: 'sub', text: l[2]})]));
+        rows.push(el('div', {class: 'sub', text: l[4] + ' (' + lim[0] + '–' + lim[1] + ')'}));
+      });
+      save.addEventListener('click', function () {
+        var body = {}, bad = [];
+        LIMITS.forEach(function (l) {
+          var v = Number(inputs[l[0]].value), lim = r.limits[l[0]];
+          if (inputs[l[0]].value === '' || isNaN(v) || v < lim[0] || v > lim[1]) bad.push(l[1] + ': ' + lim[0] + '–' + lim[1]);
+          else if (v !== r[l[0]]) body[l[0]] = v;
+        });
+        if (bad.length) return admin.show('Not saved — out of range', bad, null, true);
+        if (!Object.keys(body).length) return admin.show('Nothing changed', ['Every value is already saved.']);
+        save.disabled = true;
+        admin.api('POST', '/api/admin/settings', body)
+          .then(function (n) {
+            Object.keys(body).forEach(function (k) { r[k] = n[k]; inputs[k].value = n[k]; });
+            admin.show('Saved', Object.keys(body).map(function (k) {
+              var l = LIMITS.filter(function (x) { return x[0] === k; })[0];
+              return l[1] + ': ' + n[k] + ' ' + l[2];
+            }));
+          })
+          .catch(function (e) { admin.show('Could not save the limits', [e.message], null, true); })
+          .then(function () { save.disabled = false; });
+      });
+      return el('div', {class: 'card', style: 'margin-top:14px'}, [
+        el('h3', {text: 'Members\' limits'}),
+        el('div', {class: 'limits'}, rows),
+        el('div', {class: 'row', style: 'margin-top:12px'}, [save])]);
+    }
+
     admin.api('GET', '/api/admin/settings')
-      .then(function (r) { admin.fill([registrationCard(r.registration)]); })
+      .then(function (r) { admin.fill([registrationCard(r.registration), limitsCard(r)]); })
       .catch(admin.failed);
   </script>
 </body>

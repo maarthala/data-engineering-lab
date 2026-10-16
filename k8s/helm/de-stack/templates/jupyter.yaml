@@ -124,6 +124,7 @@ spec:
             - { name: data, mountPath: /srv/jupyterhub/data }
             - { name: lab-code, mountPath: /srv/jupyterhub/lakehouse.py, subPath: lakehouse.py }
             - { name: lab-code, mountPath: /srv/jupyterhub/labvault.py, subPath: labvault.py }
+            - { name: lab-code, mountPath: /srv/jupyterhub/lab_culler.py, subPath: lab_culler.py }
             - { name: lab-code, mountPath: /srv/jupyterhub/jupyterhub_config.py, subPath: jupyterhub_config.py }
             - { name: lab-seed, mountPath: /srv/jupyterhub/seed }
       volumes:

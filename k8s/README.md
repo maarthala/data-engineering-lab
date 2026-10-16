@@ -161,6 +161,12 @@ and team DAGs: `<team>_team/dags/` → Airflow, `dag_id` `team_<team>_…`, shar
 - **Self-registration** on / off — the Register link on the sign-in page (Keycloak's realm
   setting). Turn it on while a new batch signs up, off otherwise; managers can always create
   accounts.
+- **Members' limits**, no restart needed (stored in `lab-admin/settings.json`; until set, the
+  Helm values count: `jupyter.idleTimeout` 15 min, `userMemory`, `userCpu`, `storage.learnerQuotaMB`,
+  team 500 MB):
+  - Jupyter stops when idle after N minutes — applies within a minute (`lab_culler.py` restarts the Hub's culler)
+  - Jupyter memory / CPU per member — from each member's next server start
+  - member / team bucket size — applied to every bucket at once
 
 Destructive actions ask you to type the username. Managers can't wipe/delete themselves or other
 managers. It runs in home-api (`labadmin.py`) with the Keycloak admin login and the JupyterHub

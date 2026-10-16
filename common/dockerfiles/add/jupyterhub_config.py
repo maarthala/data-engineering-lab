@@ -13,7 +13,7 @@ token/userinfo on the internal address (as oauth2-proxy does) — no hosts-file 
 import os
 
 import labvault
-from lakehouse import bucket_name, folder_shares, lake_name, provision, reset_secret, storage_key, team_bucket, team_catalog, team_of
+from lakehouse import bucket_name, folder_shares, lab_settings, lake_name, provision, reset_secret, storage_key, team_bucket, team_catalog, team_of
 
 env = os.environ
 c = get_config()  # noqa: F821
@@ -51,8 +51,9 @@ c.Authenticator.refresh_pre_spawn = True
 SPAWNER = env.get("HUB_SPAWNER", "docker")
 c.JupyterHub.hub_ip = "0.0.0.0"
 c.JupyterHub.hub_connect_ip = env.get("HUB_CONNECT_IP", "jupyterhub")
+# one learner can't take the whole node — the defaults; ⚙️ Settings overrides them at each start (pre_spawn)
 c.Spawner.mem_limit = env.get("SINGLEUSER_MEM", "1G")
-c.Spawner.cpu_limit = float(env.get("SINGLEUSER_CPU", "1"))       # one learner can't take the whole node
+c.Spawner.cpu_limit = float(env.get("SINGLEUSER_CPU", "1"))
 c.Spawner.cmd = ["bash", "/usr/local/bin/jupyter-entrypoint.sh"]
 c.Spawner.default_url = "/lab"
 if SPAWNER == "kubernetes":
@@ -121,6 +122,12 @@ c.Spawner.environment = {k: env[k] for k in PASS if env.get(k)}
 async def pre_spawn(spawner):
     """Learner's own lakehouse + a fresh Polaris secret, handed only to their server."""
     name = lake_name(spawner.user.name)
+    try:                                       # memory / CPU managers set on ⚙️ Settings
+        cfg = lab_settings()
+        spawner.mem_limit = int(cfg["jupyter_mem_gb"] * 1024 ** 3)
+        spawner.cpu_limit = float(cfg["jupyter_cpu"])
+    except Exception as e:  # noqa: BLE001 — the stack's defaults then
+        spawner.log.warning("settings for %s: %s", name, e)
     provision(name, manager=any(g.name == "managers" for g in spawner.user.groups))
     secret = reset_secret(name)
     s3_key, s3_secret = storage_key(name)      # own-bucket-only key: drive, sync, pandas/boto3
@@ -167,9 +174,9 @@ c.Spawner.pre_spawn_hook = pre_spawn
 # ---- housekeeping -------------------------------------------------------------------
 c.JupyterHub.db_url = "sqlite:////srv/jupyterhub/data/jupyterhub.sqlite"
 c.JupyterHub.cookie_secret_file = "/srv/jupyterhub/data/jupyterhub_cookie_secret"
-# stop idle learner servers (frees memory; work is in their volume): after HUB_IDLE_TIMEOUT
-# seconds without activity — an hour on local, 15 min on k8s (values.yaml jupyter.idleTimeout)
-IDLE = int(env.get("HUB_IDLE_TIMEOUT", "3600"))
+# stop idle learner servers (frees memory; work is in their volume): after the minutes managers
+# set on ⚙️ Settings — until then HUB_IDLE_TIMEOUT s: an hour on local, 15 min on k8s
+# (values.yaml jupyter.idleTimeout). lab_culler.py runs the culler and follows the setting.
 c.JupyterHub.load_roles = [{
     "name": "idle-culler",
     "scopes": ["list:users", "read:users:activity", "read:servers", "delete:servers"],
@@ -178,8 +185,10 @@ c.JupyterHub.load_roles = [{
 c.JupyterHub.services = [{
     "name": "idle-culler",
     # localhost: on k8s the hub pod can't reach itself through its own Service address
-    "command": ["python3", "-m", "jupyterhub_idle_culler", f"--timeout={IDLE}", f"--cull-every={min(600, max(60, IDLE // 5))}",
-                "--url=http://localhost:8081/hub/api"],
+    "command": ["python3", "/srv/jupyterhub/lab_culler.py", "--url=http://localhost:8081/hub/api"],
+    # a service gets none of the Hub's env: what lab_culler needs to read the setting
+    "environment": {k: env[k] for k in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_REGION",
+                                        "LAKE_S3_ENDPOINT", "HUB_IDLE_TIMEOUT") if env.get(k)},
 }]
 # the landing page's "Manage members" (home-api): stop a learner's server and delete them
 # from the Hub — their work volume goes with them (wipe / delete)

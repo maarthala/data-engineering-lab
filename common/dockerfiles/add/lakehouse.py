@@ -165,6 +165,83 @@ def put_storage_policy(name, admin=False, team=None):
     return _admin("PUT", "add-canned-policy", {"name": storage_user(name)}, json.dumps(doc).encode())
 
 
+# ---- Lab settings managers change on ⚙️ Settings (besides self-registration, kept in Keycloak) ----
+# One JSON file in the platform bucket; until a manager sets one, the stack's env value counts.
+#   idle_minutes   a member's Jupyter server stops after this long without activity (lab_culler.py)
+#   quota_mb       each member's bucket <user>-lake · team_quota_mb  each team-<team>-lake (hard limits)
+#   jupyter_mem_gb / jupyter_cpu   each member's Jupyter server (from its next start)
+SETTINGS_KEY = "settings.json"
+IDLE_MINUTES = int(os.environ.get("HUB_IDLE_TIMEOUT", "3600")) // 60
+SETTINGS = {           # name: (default, lowest, highest, type)
+    "idle_minutes": (IDLE_MINUTES, 5, 480, int),
+    "quota_mb": (QUOTA_MB, 20, 10240, int),
+    "team_quota_mb": (TEAM_QUOTA_MB, 50, 51200, int),
+    "jupyter_mem_gb": (float(re.sub(r"[^0-9.]", "", os.environ.get("SINGLEUSER_MEM", "1G")) or 1), 0.5, 16, float),
+    "jupyter_cpu": (float(os.environ.get("SINGLEUSER_CPU", "1")), 0.25, 8, float),
+}
+_settings_cache = (0.0, None)
+
+
+def lab_settings():
+    """{name: value} for every SETTINGS entry — the stored values over the defaults (cached 10 s)."""
+    global _settings_cache
+    import time
+    if _settings_cache[1] is not None and time.time() - _settings_cache[0] < 10:
+        return dict(_settings_cache[1])
+    out = {k: d for k, (d, *_) in SETTINGS.items()}
+    try:
+        with _s3("GET", "lab-admin", SETTINGS_KEY) as r:
+            out.update({k: v for k, v in json.loads(r.read()).items() if k in SETTINGS})
+    except urllib.error.HTTPError as e:
+        if e.code != 404:                          # nothing set yet (or no bucket yet)
+            raise
+    _settings_cache = (time.time(), out)
+    return dict(out)
+
+
+def save_lab_settings(**changes):
+    """Check and store changed settings; a new bucket size goes to every bucket at once."""
+    global _settings_cache
+    import io
+    for k, v in changes.items():
+        if k not in SETTINGS:
+            raise ValueError(f"unknown setting {k}")
+        _, lo, hi, kind = SETTINGS[k]
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or (kind is int and v != int(v)) or not lo <= v <= hi:
+            raise ValueError(f"{k} must be {'a whole number' if kind is int else 'a number'} from {lo:g} to {hi:g}")
+        changes[k] = kind(v)
+    rows = lab_settings()
+    rows.update(changes)
+    create_bucket("lab-admin")
+    body = json.dumps(rows, indent=1).encode()
+    put_object("lab-admin", SETTINGS_KEY, io.BytesIO(body), len(body), "application/json")
+    _settings_cache = (0.0, None)
+    if "quota_mb" in changes or "team_quota_mb" in changes:
+        apply_quotas()
+    return rows
+
+
+def member_quota_mb():
+    return lab_settings()["quota_mb"]
+
+
+def team_quota_mb():
+    return lab_settings()["team_quota_mb"]
+
+
+def apply_quotas():
+    """The current bucket sizes on every member (<user>-lake) and team (team-<team>-lake) bucket."""
+    import xml.etree.ElementTree as ET
+    with _s3("GET", "") as r:
+        names = [b.text for b in ET.fromstring(r.read()).iter(f"{_NS}Name")]
+    member, team, done = member_quota_mb(), team_quota_mb(), 0
+    for b in names:
+        if b.endswith("-lake"):
+            set_quota(b, team if b.startswith("team-") else member)
+            done += 1
+    return done
+
+
 # ---- Shared files: a whole-lake invite (share()) also gives read / write on the owner's files/ ----
 # Kept in one JSON file in the platform bucket (members can't reach it); the grantee's storage
 # policy above gets a rule per folder, so their Jupyter, DAG and console keys all see it at once.
@@ -408,8 +485,9 @@ def fill_bucket(bucket, wait=300):
     threading.Thread(target=retry, daemon=True, name=f"fill-{bucket}").start()
 
 
-def set_quota(bucket, mb=QUOTA_MB):
-    """Hard quota: uploads that would exceed it are rejected."""
+def set_quota(bucket, mb=None):
+    """Hard quota: uploads that would exceed it are rejected (default: the member bucket size)."""
+    mb = member_quota_mb() if mb is None else mb
     return _admin("PUT", "set-bucket-quota", {"bucket": bucket},
                   json.dumps({"quota": mb * 1024 * 1024, "quotatype": "hard"}).encode())
 
@@ -954,7 +1032,7 @@ def create_team_lake(team):
     """Bucket team-<team>-lake + catalog team_<team> with bronze/silver/gold (idempotent)."""
     t, cat, bucket = _admin_token(), team_catalog(team), team_bucket(team)
     create_bucket(bucket)
-    set_quota(bucket, TEAM_QUOTA_MB)
+    set_quota(bucket, team_quota_mb())
     make_team_folders(bucket, wait=60)                 # notebooks / dags / dbt / source, like a member's
     loc = f"s3://{bucket}/tables/{cat}"
     _ok(_call("POST", f"{_M}/catalogs", {"catalog": {

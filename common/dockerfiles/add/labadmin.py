@@ -13,6 +13,8 @@ plus the Keycloak admin (KEYCLOAK_ADMIN=user:password) and a JupyterHub service 
                              catalogs deleted, the shares they gave revoked (account kept)
   delete(user)               remove the account and everything it owns
   registration() / set_registration(on)   self-registration on the sign-in page (Keycloak realm)
+  settings() / set_settings(**values)     ⚙️ Settings: the above + lakehouse.SETTINGS (idle minutes,
+                                          bucket sizes, Jupyter memory / CPU)
 
 Teams — a member is in no team (only their own lakehouse) until a manager adds them to one; then
 in exactly one (Keycloak group team-<team>). The team's lakehouse team_<team>
@@ -450,6 +452,19 @@ def set_registration(on):
     if st != 204:
         raise RuntimeError(f"update realm: HTTP {st} {body!r}")
     return registration()
+
+
+def settings():
+    """Everything on ⚙️ Settings: {registration, idle_minutes, quota_mb, team_quota_mb, jupyter_mem_gb,
+    jupyter_cpu, limits: {name: [lowest, highest]}}."""
+    return {**registration(), **lh.lab_settings(),
+            "limits": {k: [lo, hi] for k, (_, lo, hi, _) in lh.SETTINGS.items()}}
+
+
+def set_settings(**values):
+    """Store changed lakehouse.SETTINGS values (ValueError if one is out of range)."""
+    lh.save_lab_settings(**values)
+    return settings()
 
 
 def _sqlpad_delete(who):

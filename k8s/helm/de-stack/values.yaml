@@ -72,7 +72,7 @@ storage:
   mcImage: ghcr.io/maarthala/de-stack/mc:RELEASE.2025-08-13T08-35-41Z   # admin client (works with RustFS)
   storage: 20Gi
   rootUser: admin            # password: secret key storage-root-password
-  learnerQuotaMB: 100        # each learner's bucket <user>-lake (hard limit)
+  learnerQuotaMB: 100        # each member's bucket <user>-lake (hard limit; the default — managers change it on ⚙️ Settings)
 
 # ------------------------------------------------------------------ lakehouse
 # Apache Polaris — Iceberg-native governed catalog (the live governance solution).
@@ -138,6 +138,7 @@ jupyter:
   userMemory: 1G
   userCpu: 1                 # CPU cap per learner pod
   idleTimeout: 900           # seconds without activity before a member's server is stopped
+                             # (memory, CPU and idle time are only the defaults: managers change them on ⚙️ Settings)
   hubStorage: 1Gi
 
 # ------------------------------------------------------------------ UIs

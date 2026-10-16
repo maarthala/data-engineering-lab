@@ -16,6 +16,7 @@ services:
       - ../common/dockerfiles/add/jupyterhub_config.py:/srv/jupyterhub/jupyterhub_config.py:ro
       - ../common/dockerfiles/add/lakehouse.py:/srv/jupyterhub/lakehouse.py:ro
       - ../common/dockerfiles/add/labvault.py:/srv/jupyterhub/labvault.py:ro
+      - ../common/dockerfiles/add/lab_culler.py:/srv/jupyterhub/lab_culler.py:ro
     environment:
       HUB_PUBLIC_URL: http://localhost:8008
       KEYCLOAK_PUBLIC_URL: http://localhost:8180

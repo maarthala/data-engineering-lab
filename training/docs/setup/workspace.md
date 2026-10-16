@@ -134,7 +134,7 @@ folder, delete. The **RustFS console** (Storage tile) shows the same bucket. (It
 your files works in the browser view and My files.)
 
 !!! warning "100 MB per member"
-    Your bucket holds at most **100 MB** — plenty for code and lesson data. If it's full, saving
+    Your bucket holds at most **100 MB** (managers can change it) — plenty for code and lesson data. If it's full, saving
     shows an error ("saved in Jupyter, but NOT in your bucket"); delete files you no longer need.
 
 ## Your own Airflow DAGs
@@ -428,9 +428,11 @@ Broke your lakehouse, or want a clean slate for the next unit? Ask your **platfo
 
 The same page lets managers create members (in the team they pick), give someone a new password
 and delete an account. **🧩 Teams** lists the teams on the left; pick one to see its members on the right,
-add members (search by name, pick several; one who is in another team moves) or remove them (back
-to the default team). It also creates teams and deletes empty ones. **⚙️ Settings** switches **self-registration** on or off (on while a new batch
-signs up, off otherwise).
+add members (search by name, pick several; one who is in another team moves) or remove them (they
+keep their own lakehouse). It also creates teams and deletes empty ones. **⚙️ Settings** switches **self-registration** on or off (on while a new batch
+signs up, off otherwise) and sets the **members' limits**: after how many idle minutes a Jupyter
+server stops, Jupyter memory and CPU per member (from their next server start), and the member and
+team bucket sizes (applied to every bucket at once).
 
 ## You can now…
 - Register, sign in once and reach every tool with your lab account

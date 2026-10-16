@@ -17,7 +17,7 @@ button.primary{border:0; font-weight:700; color:#0b1020; background:linear-gradi
 button.small{padding:3px 9px; font-size:.82rem}
 button.danger{border-color:rgba(255,107,107,.55); color:#ffb3b0}
 select{font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:5px 8px}
-input[type=text], input[type=password]{font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:6px 9px; outline:none}
+input[type=text], input[type=password], input[type=number]{font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:6px 9px; outline:none}
 input:focus{border-color:var(--accent)}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--accent2)}
 .pagebar{padding:10px 28px; border-bottom:1px solid var(--line); background:rgba(20,27,46,.45)}
@@ -76,3 +76,6 @@ input.wide{width:100%}
 .drop div:hover, .drop div.on{background:rgba(109,139,255,.15)}
 .drop .from{color:var(--muted); font-size:.82rem}
 .bar{display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; margin:10px 0 8px}
+.limits{display:grid; grid-template-columns:minmax(180px,max-content) 110px minmax(0,1fr); gap:10px 14px; align-items:center}
+.limits input{width:100%}
+@media (max-width:640px){.limits{grid-template-columns:1fr 110px} .limits .sub{grid-column:1 / -1; margin-top:-6px}}

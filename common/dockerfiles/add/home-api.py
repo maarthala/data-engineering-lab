@@ -35,7 +35,8 @@ from the browser can point at another bucket.
   GET    /api/admin/members                              every lab account + lakehouse + bucket use
   POST   /api/admin/{create|password|reset|wipe|delete}  → {"job": id}
   GET    /api/admin/jobs?id=…                            → {"state": running|done|error, "result"|"error"}
-  GET    /api/admin/settings · POST {"registration": bool}  self-registration on the sign-in page
+  GET    /api/admin/settings · POST {"registration": bool, "idle_minutes": n, "quota_mb": n, …}
+                                       self-registration on the sign-in page + lakehouse.SETTINGS (any of them)
   GET    /api/admin/teams · /api/admin/people            the teams (members, bucket use) · who is where
   POST   /api/admin/{team-create|team-delete} {"team"} · /api/admin/move {"user", "team"}
          /api/admin/team-add {"team", "users": [...]} · /api/admin/team-remove {"users": [...]}  → {"job": id}
@@ -142,7 +143,7 @@ class Handler(BaseHTTPRequestHandler):
         if not user:
             return self._json(401, {"error": "not logged in"})
         name = lake_name(user)
-        bucket, team, quota = bucket_name(name), None, lh.QUOTA_MB
+        bucket, team, quota = bucket_name(name), None, lh.member_quota_mb()
         share = None                                 # space=shared: the folder share in use
         try:
             self._ensure(name)
@@ -157,7 +158,7 @@ class Handler(BaseHTTPRequestHandler):
                 team = lh.team_of(name)
                 if not team:
                     return self._json(404, {"error": "you are not in a team yet"})
-                bucket, quota = lh.team_bucket(team), lh.TEAM_QUOTA_MB
+                bucket, quota = lh.team_bucket(team), lh.team_quota_mb()
             if q.get("space") == "shared":           # another member's lake, shared with me
                 owner = lake_name(q.get("owner", ""))
                 where = (q.get("prefix") or q.get("key") or "").lstrip("/")
@@ -166,7 +167,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(403, {"error": "that isn't shared with you"})
                 if method == "GET" and path == "/api/files" and not where:   # the lake: files + tables
                     return self._json(200, {
-                        "bucket": bucket_name(owner), "prefix": "", "team": None, "quota_mb": lh.QUOTA_MB,
+                        "bucket": bucket_name(owner), "prefix": "", "team": None, "quota_mb": lh.member_quota_mb(),
                         "share": share, "is_table": False, "files": [],
                         "folders": [{"name": "files", "prefix": "files/"},
                                     {"name": "tables", "prefix": f"tables/{share['lake']}/"}]})
@@ -366,7 +367,7 @@ class Handler(BaseHTTPRequestHandler):
                     _jobs.pop(q["id"], None)          # read once (a new password isn't kept around)
                 return self._json(200, job) if job else self._json(404, {"error": "no such job"})
             if method == "GET" and path == "/api/admin/settings":
-                return self._json(200, labadmin.registration())
+                return self._json(200, labadmin.settings())
             if method == "GET" and path == "/api/admin/teams":
                 return self._json(200, {"teams": labadmin.teams()})
             if method == "GET" and path == "/api/admin/people":
@@ -376,9 +377,17 @@ class Handler(BaseHTTPRequestHandler):
                     return self._json(403, {"error": "missing X-Lab-Admin header"})
                 length = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(length) or b"{}") if length else {}
-                out = labadmin.set_registration(bool(body.get("registration")))
-                print(f"[home-api] manager {user}: self-registration {'on' if out['registration'] else 'off'}", flush=True)
-                return self._json(200, out)
+                if "registration" in body:
+                    on = labadmin.set_registration(bool(body["registration"]))["registration"]
+                    print(f"[home-api] manager {user}: self-registration {'on' if on else 'off'}", flush=True)
+                values = {k: v for k, v in body.items() if k in lh.SETTINGS}
+                if values:
+                    try:
+                        labadmin.set_settings(**values)
+                    except ValueError as e:
+                        return self._json(400, {"error": str(e)})
+                    print(f"[home-api] manager {user}: settings {values}", flush=True)
+                return self._json(200, labadmin.settings())
             action = path.rsplit("/", 1)[-1]
             if method != "POST" or action not in {**_ACTIONS, **_TEAM_ACTIONS}:
                 return self._json(404, {"error": "not found"})
@@ -456,7 +465,7 @@ class Handler(BaseHTTPRequestHandler):
               # oauth2-proxy's keycloak provider adds roles as "role:…" — keep real groups only
               "groups": [g for g in (h.get("X-Forwarded-Groups") or "").split(",") if g and not g.startswith("role:")],
               "lakehouse": f"{name}_lake", "bucket": bucket_name(name), "principal": name,
-              "quota_mb": lh.QUOTA_MB,
+              "quota_mb": lh.member_quota_mb(),
               "airflow_port": os.environ.get("AIRFLOW_HOST_PORT", "")}
         try:
             self._ensure(name)

@@ -144,6 +144,10 @@ spec:
           env:
             - { name: POLARIS_URL, value: "http://polaris:8181" }
             - { name: LEARNER_QUOTA_MB, value: {{ .Values.storage.learnerQuotaMB | quote }} }   # each learner's bucket <user>-lake
+            # ⚙️ Settings shows these until a manager changes them (same values as the Hub's)
+            - { name: HUB_IDLE_TIMEOUT, value: {{ .Values.jupyter.idleTimeout | default 900 | quote }} }
+            - { name: SINGLEUSER_MEM, value: {{ .Values.jupyter.userMemory | quote }} }
+            - { name: SINGLEUSER_CPU, value: {{ .Values.jupyter.userCpu | quote }} }
             # platform logins (provisioning): storage root, Polaris root, the Trino principal
             - { name: AWS_ACCESS_KEY_ID, value: {{ .Values.storage.rootUser | quote }} }
             - { name: AWS_SECRET_ACCESS_KEY, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: storage-root-password } } }
