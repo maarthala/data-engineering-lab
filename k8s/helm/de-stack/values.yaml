@@ -137,6 +137,7 @@ jupyter:
   userStorage: 1Gi           # per-learner work volume (PVC claim-<user>)
   userMemory: 1G
   userCpu: 1                 # CPU cap per learner pod
+  idleTimeout: 900           # seconds without activity before a member's server is stopped
   hubStorage: 1Gi
 
 # ------------------------------------------------------------------ UIs

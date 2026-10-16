@@ -167,7 +167,9 @@ c.Spawner.pre_spawn_hook = pre_spawn
 # ---- housekeeping -------------------------------------------------------------------
 c.JupyterHub.db_url = "sqlite:////srv/jupyterhub/data/jupyterhub.sqlite"
 c.JupyterHub.cookie_secret_file = "/srv/jupyterhub/data/jupyterhub_cookie_secret"
-# stop idle learner servers after an hour (frees memory; work is in their volume)
+# stop idle learner servers (frees memory; work is in their volume): after HUB_IDLE_TIMEOUT
+# seconds without activity — an hour on local, 15 min on k8s (values.yaml jupyter.idleTimeout)
+IDLE = int(env.get("HUB_IDLE_TIMEOUT", "3600"))
 c.JupyterHub.load_roles = [{
     "name": "idle-culler",
     "scopes": ["list:users", "read:users:activity", "read:servers", "delete:servers"],
@@ -176,7 +178,7 @@ c.JupyterHub.load_roles = [{
 c.JupyterHub.services = [{
     "name": "idle-culler",
     # localhost: on k8s the hub pod can't reach itself through its own Service address
-    "command": ["python3", "-m", "jupyterhub_idle_culler", "--timeout=3600",
+    "command": ["python3", "-m", "jupyterhub_idle_culler", f"--timeout={IDLE}", f"--cull-every={min(600, max(60, IDLE // 5))}",
                 "--url=http://localhost:8081/hub/api"],
 }]
 # the landing page's "Manage members" (home-api): stop a learner's server and delete them

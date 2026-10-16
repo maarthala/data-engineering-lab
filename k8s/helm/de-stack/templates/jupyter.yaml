@@ -90,6 +90,7 @@ spec:
             - { name: SINGLEUSER_MEM, value: {{ .Values.jupyter.userMemory | quote }} }
             - { name: SINGLEUSER_CPU, value: {{ .Values.jupyter.userCpu | quote }} }
             - { name: SINGLEUSER_STORAGE, value: {{ .Values.jupyter.userStorage | quote }} }
+            - { name: HUB_IDLE_TIMEOUT, value: {{ .Values.jupyter.idleTimeout | default 900 | quote }} }
             - { name: SINGLEUSER_STORAGE_CLASS, value: {{ .Values.global.storageClass }} }
             # passed on to every learner pod
             - { name: SPARK_REMOTE, value: "sc://spark-connect:15002" }
