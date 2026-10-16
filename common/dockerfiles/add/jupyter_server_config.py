@@ -103,20 +103,9 @@ c.JupyterFs.resources = [
         },
     }
 ]
-# Lakes other members shared with them (whole-lake invite → their files/, read or write), one drive
-# each, with the member's own key (its policy carries the share; the storage refuses a read-only write).
-# SHARED_LAKES ("owner:access,…") comes from the Hub at server start: a new invite shows after a restart.
-for _lake in filter(None, os.environ.get("SHARED_LAKES", "").split(",")) if _OWN else ():
-    _owner, _, _access = _lake.partition(":")
-    c.JupyterFs.resources.append({
-        "name": f"{_owner}'s lake ({'read + write' if _access == 'write' else 'read'})",
-        "url": f"s3://{_owner.replace('_', '-')}-lake/files",
-        "type": "fsspec",
-        "auth": "none",
-        "kwargs": dict(c.JupyterFs.resources[0]["kwargs"]),
-    })
 # JupyterHub learners: my_files/{notebooks,dags,dbt} in the normal file browser are mirrored to their
-# own bucket (dags → Airflow), <team>_team/{notebooks,dags,dbt} (e.g. sales_team) to their team's bucket. See lab_sync.py.
+# own bucket (dags → Airflow), <team>_team/{notebooks,dags,dbt} (e.g. sales_team) to their team's bucket,
+# <owner>_lake/ to the files/ of a lake another member shared with them. See lab_sync.py.
 import sys  # noqa: E402
 sys.path.insert(0, "/etc/jupyter")
 import lab_sync  # noqa: E402
