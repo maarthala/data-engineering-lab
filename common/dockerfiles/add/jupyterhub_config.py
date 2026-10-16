@@ -13,7 +13,7 @@ token/userinfo on the internal address (as oauth2-proxy does) — no hosts-file 
 import os
 
 import labvault
-from lakehouse import bucket_name, lake_name, provision, reset_secret, storage_key, team_bucket, team_catalog, team_of
+from lakehouse import bucket_name, folder_shares, lake_name, provision, reset_secret, storage_key, team_bucket, team_catalog, team_of
 
 env = os.environ
 c = get_config()  # noqa: F821
@@ -146,6 +146,12 @@ async def pre_spawn(spawner):
         spawner.environment["TEAM_BUCKET"] = team_bucket(team) if team else ""
     except Exception as e:  # noqa: BLE001 — Jupyter still starts with their own lake
         spawner.log.warning("team of %s: %s", name, e)
+    try:                                       # lakes shared with them (whole-lake invites) → Jupyter drives
+        spawner.environment["SHARED_LAKES"] = ",".join(
+            f"{s['owner']}:{s['access']}" for s in folder_shares()
+            if s["grantee"] == name and s["folder"] == "files/")
+    except Exception as e:  # noqa: BLE001 — Jupyter still starts without them
+        spawner.log.warning("shared lakes of %s: %s", name, e)
     if labvault.enabled():                     # "My secrets": their own vault folder only
         try:
             labvault.import_env_file(name)     # once: the old My variables file

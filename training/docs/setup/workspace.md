@@ -283,7 +283,10 @@ rows: 1
   The whole of your main lake (`<you>_lake`) also shares **your files** (`files/` in your
   bucket), with the same access. **📁 My files → 🤝 Shared with me** lists every lake shared
   with you; open one to browse its **files** and its **tables** folder (the tables' storage,
-  read-only: change tables with SQL). Revoking the lake takes the files back too.
+  read-only: change tables with SQL). In **Jupyter**, each one is also a drive in the left
+  panel, **"<owner>'s lake (read)"** or **(read + write)**, showing their `files/`. Jupyter adds
+  it when your server starts, so after a new invite restart it (**File → Hub Control Panel →
+  Stop My Server → Start**). Revoking the lake takes the files back too.
 - **Open in Polaris Console ↗** opens the catalog in the Console, signed in as you — browse
   it, add namespaces and tables. (The Console's own **Catalogs** list shows `0` for members:
   listing *all* catalogs is admin-only, so open yours from here.)
