@@ -483,8 +483,12 @@ class Handler(BaseHTTPRequestHandler):
 def _run_job(jid, fn, args):
     try:
         result = fn(*args)
+        # whose next visit re-provisions: the member, or every member a team action moved
+        who = next((a for a in args if isinstance(a, list)), None) or [args[0]]
         with _lock:
-            _ready.discard(lh.lake_name(args[0]))     # re-provision on their next visit
+            for u in who:
+                if isinstance(u, str) and u:
+                    _ready.discard(lh.lake_name(u))
         _jobs[jid].update(state="done", result=result)
     except labadmin.AdminError as e:
         _jobs[jid].update(state="error", error=str(e))
