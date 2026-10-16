@@ -72,6 +72,15 @@ platform already knowing *why* things work — not just which buttons to press.
 
     [{count:dbt/why-dbt.md} lessons →](dbt/why-dbt.md)
 
+-   ❄️ **Unit {unit:snowflake/setup.md} · Snowflake (your own trial account)**
+
+    ---
+
+    The same ShopFlow data in a free Snowflake trial — every SnowPro Core topic, practised in
+    Snowflake itself.
+
+    [{count:snowflake/setup.md} lessons →](snowflake/setup.md)
+
 -   🛡️ **Unit {unit:unit6/polaris.md} · Data governance**
 
     ---

@@ -24,8 +24,6 @@ theme:
       accent: indigo
       toggle: { icon: material/weather-sunny, name: Light mode }
   features:
-    - navigation.sections
-    - navigation.expand
     - navigation.top
     - navigation.indexes
     - content.code.copy
@@ -146,6 +144,19 @@ nav:
       - "Docs and lineage": dbt/docs-lineage.md
       - "Run dbt from Airflow": dbt/airflow.md
       - "Challenge: a tested Gold mart in dbt": dbt/challenge.md
+  - "Snowflake (your own trial account)":
+      - "Your Snowflake trial & the ShopFlow data": snowflake/setup.md
+      - "The system views: Snowflake's own management tables": snowflake/system-views.md
+      - "Snowflake SQL basics on ShopFlow": snowflake/sql-basics.md
+      - "Architecture & virtual warehouses": snowflake/warehouses.md
+      - "Micro-partitions, pruning & caching": snowflake/performance.md
+      - "Cloning, Time Travel & table types": snowflake/clone-time-travel.md
+      - "JSON (VARIANT), stages & COPY INTO": snowflake/json-stages.md
+      - "Streams, tasks, SCD2 & dynamic tables": snowflake/pipelines.md
+      - "Roles, grants & data governance": snowflake/security.md
+      - "Cost & monitoring": snowflake/cost.md
+      - "Snowpark — DataFrames in Snowflake": snowflake/snowpark.md
+      - "Clean up & checklist": snowflake/cleanup.md
   - "Data governance (Polaris)":
       - "Governed Iceberg with Apache Polaris": unit6/polaris.md
       - "Create users & assign access (UI)": unit6/polaris-admin.md

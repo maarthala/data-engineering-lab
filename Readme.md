@@ -56,6 +56,7 @@ integration-level updates (like AdventureWorks or SQLPad) get an entry.
 
 | Date | Release / integration | What it adds | Scope |
 |---|---|---|---|
+| 2026-10-16 | **Snowflake course (own trial)** | New course unit practised in a member's own Snowflake trial: a downloadable `shopflow_snowflake_setup.sql` generates the same 12 ShopFlow tables in Snowflake (BRONZE/SILVER/GOLD); 12 lessons cover the SnowPro Core topics — the system views (ACCOUNT_USAGE), warehouses, micro-partitions & caching, cloning & Time Travel, VARIANT & stages, streams/tasks/dynamic tables, RBAC & policies, cost, Snowpark — no lab stack involved | course |
 | 2026-10-15 | **Teams** | Members work together in teams (no team at first; managers create teams and add members on **🛠️ Manage → 🧩 Teams**). Each team shares a lakehouse `team_<team>`, files (My files → Team, Jupyter's `<team>_team/`), secrets (My secrets → Team) and Airflow DAGs; your own lakehouse is now `my` in Jupyter. Course page 0.9 *Working in a team* | local · k8s · course |
 | 2026-10-14 | **Key vault (OpenBao)** | A key vault for members' keys and passwords: **🔑 My secrets** (was My variables), read in notebooks and DAGs with `key_vault("NAME")`; the vault's own UI signs in with the lab account. Each member sees only their own folder | both, course |
 | 2026-10-13 | **dbt (on Spark)** | dbt in every member's Jupyter, running on Spark as the member; a starter project in `dbt/`, `lab_dbt()` to run it from Airflow, and a new course unit *Transform with dbt* | both, course |

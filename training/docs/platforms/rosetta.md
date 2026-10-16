@@ -60,3 +60,8 @@ The **concepts, SQL, Spark code, and governance model transfer directly.** What 
 The takeaway: **you'll arrive at Databricks/Snowflake/Fabric/Azure already fluent in the
 architecture and the work** — the platform course then teaches the managed layer on top, not the
 fundamentals.
+
+!!! tip "Try Snowflake for real"
+    Have (or want) a Snowflake trial account? The [Snowflake unit](../snowflake/setup.md) loads
+    the same ShopFlow data into Snowflake with one SQL file and walks you through every SnowPro
+    Core topic on it.
