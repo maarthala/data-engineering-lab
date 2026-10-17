@@ -22,7 +22,7 @@ grant(){ put "$M/catalogs/polaris_lake/catalog-roles/$1/grants" \
          "{\"grant\":{\"type\":\"namespace\",\"namespace\":[\"$2\"],\"privilege\":\"$3\"}}"; }
 
 echo "catalog:   $(post $M/catalogs '{"catalog":{"name":"polaris_lake","type":"INTERNAL","properties":{"default-base-location":"s3://demo-bucket/warehouse","polaris.config.drop-with-purge.enabled":"true"},"storageConfigInfo":{"storageType":"S3","allowedLocations":["s3://demo-bucket/warehouse"],"endpoint":"http://storage:9000","stsEndpoint":"http://storage:9000","roleArn":"arn:aws:iam::000000000000:role/lab-vending","kmsUnavailable":true,"pathStyleAccess":true,"region":"us-east-1"}}}')"
-echo "namespaces:$(for ns in bronze silver gold; do post $C/polaris_lake/namespaces "{\"namespace\":[\"$ns\"]}"; done)"
+echo "namespaces:$(for ns in bronze silver gold crm marketplace; do post $C/polaris_lake/namespaces "{\"namespace\":[\"$ns\"]}"; done)"
 echo "principals:$(for p in analyst engineer lead; do post $M/principals "{\"principal\":{\"name\":\"$p\"}}"; done)"
 # Pin known client credentials so personas log in cleanly (clientId=secret=name).
 # No IdP needed — principals authenticate with client id/secret (API + Console).

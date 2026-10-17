@@ -45,6 +45,7 @@ TRINO_HOST = os.environ.get("TRINO_HOST", "trino")
 # k8s injects TRINO_PORT=tcp://<ip>:8080 for the `trino` Service — keep only the number
 TRINO_PORT = os.environ.get("TRINO_PORT", "8080").rsplit(":", 1)[-1]
 NAMESPACES = ("bronze", "silver", "gold")
+SOURCE_NAMESPACES = ("crm", "marketplace")    # shared lake only: the Data Vault unit's extra sources
 TRINO = os.environ.get("TRINO_URL", "http://trino:8080")
 TRINO_LOGIN = os.environ.get("TRINO_POLARIS_LOGIN", "trino_lab:trino-lab-secret")   # Trino → learner catalogs
 # Credential vending: Polaris hands engines short-lived keys scoped to one table, minted by the
@@ -711,6 +712,12 @@ def provision(name, manager=False):
             for priv in ("TABLE_LIST", "TABLE_READ_DATA"):
                 _ok(_call("PUT", f"{m}/catalogs/{SHARED}/catalog-roles/learner_reader/grants",
                           {"grant": {"type": "namespace", "namespace": [ns], "privilege": priv}}, t)[0], "reader grant")
+        for ns in SOURCE_NAMESPACES:                # only where the medallion DAG has landed them
+            if _call("GET", f"/api/catalog/v1/{SHARED}/namespaces/{ns}", token=t)[0] == 200:
+                for priv in ("TABLE_LIST", "TABLE_READ_DATA"):
+                    _ok(_call("PUT", f"{m}/catalogs/{SHARED}/catalog-roles/learner_reader/grants",
+                              {"grant": {"type": "namespace", "namespace": [ns], "privilege": priv}}, t)[0],
+                        "reader grant")
         _ok(_call("PUT", f"{m}/principal-roles/{name}/catalog-roles/{SHARED}",
                   {"catalogRole": {"name": "learner_reader"}}, t)[0], "attach reader")
     trino_catalog(cat, t)

@@ -26,6 +26,9 @@ with DAG(
     bronze = BashOperator(task_id="bronze", bash_command=spark_job("ingest_bronze.py"))
     silver = BashOperator(task_id="silver", bash_command=spark_job("build_silver.py"))
     gold   = BashOperator(task_id="gold",   bash_command=spark_job("build_gold.py"))
+    # the CRM + marketplace sources for the Data Vault unit (made from Bronze)
+    sources = BashOperator(task_id="sources", bash_command=spark_job("land_sources.py"))
 
     # the medallion order — this is the whole point of the DAG
     bronze >> silver >> gold
+    bronze >> sources

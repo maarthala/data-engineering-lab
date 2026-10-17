@@ -73,6 +73,16 @@ storage:
   storage: 20Gi
   rootUser: admin            # password: secret key storage-root-password
   learnerQuotaMB: 100        # each member's bucket <user>-lake (hard limit; the default — managers change it on ⚙️ Settings)
+  # Public S3 API over HTTPS for cloud tools (Snowflake s3compat stage, Fabric shortcut):
+  # https://<host>/<bucket> and https://<bucket>.<host> → storage:9000. Needs cert-manager
+  # in the cluster, DNS A <host> + *.<host> → the router, 443 forwarded to the node, and
+  # CNAME _acme-challenge.<host> → the acme-dns fulldomain whose account JSON is in Secret
+  # <acmeDnsSecret> (key acmedns.json). Wildcard certificate from Let's Encrypt (DNS-01).
+  publicS3:
+    enabled: false           # off until external access is wanted (also re-add the DNS records)
+    host: s3.epireum.com
+    email: surendra.marthala@epireum.com   # Let's Encrypt expiry notices
+    acmeDnsSecret: acme-dns-s3
 
 # ------------------------------------------------------------------ lakehouse
 # Apache Polaris — Iceberg-native governed catalog (the live governance solution).

@@ -260,6 +260,32 @@ limit 5;
 - **`refresh_action`** — `INCREMENTAL` (only the changes were processed), `FULL` or
   `NO_DATA`.
 
+!!! note "Why it says FULL — `refresh_mode`"
+    A dynamic table is created with **`refresh_mode = AUTO`** unless you say otherwise: Snowflake
+    picks `INCREMENTAL` when it can refresh the query that way and quietly falls back to `FULL`
+    when the query uses something it can't (this one's `count(distinct …)` over a join is such a
+    case). The choice is made once, at creation. See what it picked, and why:
+
+    ```sql
+    show dynamic tables like 'CHANNEL_REVENUE_DT';
+    select "name", "refresh_mode", "refresh_mode_reason"
+    from table(result_scan(last_query_id()));
+    ```
+
+    To choose yourself, add `refresh_mode` to the `create`:
+
+    ```sql
+    create or replace dynamic table CHANNEL_REVENUE_DT
+        target_lag   = '1 minute'
+        warehouse    = PRACTICE_WH
+        refresh_mode = INCREMENTAL      -- AUTO (default) | INCREMENTAL | FULL
+    as
+    select …;
+    ```
+
+    With `INCREMENTAL`, the `create` **fails** if the query can't be refreshed incrementally, and
+    the error says why — a quick way to learn what's supported.
+
 Stop it refreshing:
 
 ```sql

@@ -58,6 +58,10 @@ spec:
             # Quotas fail closed until the usage scanner has counted a bucket (a new
             # learner's bucket refuses uploads until then). Lab data is tiny: scan every 10s.
             - { name: RUSTFS_SCANNER_CYCLE, value: "10" }
+            {{- if .Values.storage.publicS3.enabled }}
+            # bucket-in-hostname requests (https://<bucket>.<host>/key), as Snowflake sends them
+            - { name: RUSTFS_SERVER_DOMAINS, value: {{ .Values.storage.publicS3.host | quote }} }
+            {{- end }}
             {{- if .Values.keycloak.enabled }}
             # Console SSO. RustFS refuses outbound calls to private hosts unless allowed;
             # discovery goes to the internal Keycloak, tokens carry the PUBLIC issuer.
@@ -113,6 +117,67 @@ spec:
               service:
                 name: storage
                 port: { number: 9001 }
+{{- end }}
+{{- with .Values.storage.publicS3 }}
+{{- if .enabled }}
+---
+# Public S3 API: Let's Encrypt via DNS-01 through acme-dns (no GoDaddy API, no port 80).
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: letsencrypt-s3
+  labels: {{- include "de-stack.labels" $ | nindent 4 }}
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: {{ .email }}
+    privateKeySecretRef: { name: letsencrypt-s3-account }
+    solvers:
+      - dns01:
+          acmeDNS:
+            host: https://auth.acme-dns.io
+            accountSecretRef: { name: {{ .acmeDnsSecret }}, key: acmedns.json }
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: s3-public
+  labels: {{- include "de-stack.labels" $ | nindent 4 }}
+spec:
+  secretName: s3-public-tls
+  dnsNames: [{{ .host | quote }}, {{ printf "*.%s" .host | quote }}]
+  issuerRef: { name: letsencrypt-s3, kind: Issuer }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: storage-s3-public
+  labels: {{- include "de-stack.labels" $ | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"          # S3 uploads of any size
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    # the only ingress open to the internet; every *.<baseHost> UI is limited to the LAN by
+    # the controller-wide whitelist-source-range (nginx-load-balancer-microk8s-conf)
+    nginx.ingress.kubernetes.io/whitelist-source-range: "0.0.0.0/0"
+spec:
+  ingressClassName: {{ $.Values.ingress.className }}
+  tls:
+    - hosts: [{{ .host | quote }}, {{ printf "*.%s" .host | quote }}]
+      secretName: s3-public-tls
+  rules:
+    {{- range list .host (printf "*.%s" .host) }}
+    - host: {{ . | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: storage
+                port: { number: 9000 }
+    {{- end }}
+{{- end }}
 {{- end }}
 ---
 # Seed the shared bucket (parity with the compose storage-init job).

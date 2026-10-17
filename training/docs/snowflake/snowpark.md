@@ -104,8 +104,9 @@ df.head()
     Prefer key-pair or browser login over a password.
 
 !!! info "Learn next"
-    Python **UDFs** and **stored procedures** (your Python, run by Snowflake), **Snowflake
-    Cortex** AI functions in SQL, and the pandas-compatible **Snowpark pandas API**.
+    Python **UDFs** and **stored procedures** (your Python, run by Snowflake) — the
+    [next lesson](functions.md) — then **Snowflake Cortex** AI functions in SQL and the
+    pandas-compatible **Snowpark pandas API**.
 
 ## Check yourself
 1. Where does `category_revenue.group_by(...)` run — in the notebook or in Snowflake?

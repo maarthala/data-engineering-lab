@@ -104,6 +104,7 @@ nav:
       - "Semi-structured data (JSON)": unit2/json.md
       - "Challenge: cohort report": unit2/challenge.md
       - "Challenge: AdventureWorks": unit2/adventureworks-challenge.md
+      - "Join pitfalls": unit2/join-pitfalls.md
   - "Python — Notebook":
       - "Python & notebooks for DE": unit3/python-essentials.md
       - "pandas": unit3/pandas.md
@@ -151,11 +152,13 @@ nav:
       - "Architecture & virtual warehouses": snowflake/warehouses.md
       - "Micro-partitions, pruning & caching": snowflake/performance.md
       - "Cloning, Time Travel & table types": snowflake/clone-time-travel.md
-      - "JSON (VARIANT), stages & COPY INTO": snowflake/json-stages.md
+      - "JSON (VARIANT)": snowflake/json.md
+      - "Stages: upload & load files": snowflake/stages.md
       - "Streams, tasks, SCD2 & dynamic tables": snowflake/pipelines.md
       - "Roles, grants & data governance": snowflake/security.md
       - "Cost & monitoring": snowflake/cost.md
       - "Snowpark — DataFrames in Snowflake": snowflake/snowpark.md
+      - "Functions & procedures": snowflake/functions.md
       - "Clean up & checklist": snowflake/cleanup.md
   - "Data governance (Polaris)":
       - "Governed Iceberg with Apache Polaris": unit6/polaris.md
@@ -173,6 +176,17 @@ nav:
   - "Capstones":
       - "Capstone 1 (easy)": capstones/capstone-1.md
       - "Capstone 2 (medium)": capstones/capstone-2.md
+  - "Data Vault 2.0":
+      - "What is Data Vault 2.0?": datavault/what-is-data-vault.md
+      - "Meet ShopFlow's three sources": datavault/sources.md
+      - "Design the ShopFlow vault": datavault/design.md
+      - "Stage the sources: business keys & hashes": datavault/staging.md
+      - "Load the hubs and links": datavault/hubs-links.md
+      - "Load the satellites": datavault/satellites.md
+      - "Day 2: changes arrive, history builds up": datavault/day-two.md
+      - "Business Vault & information marts": datavault/pit-marts.md
+      - "Automate it & challenge": datavault/automate-challenge.md
   - "Bridge to the platforms":
       - "OSS ⇄ Databricks / Snowflake / Fabric / Azure": platforms/rosetta.md
+      - "Which platform for which job": platforms/choosing.md
       - "Glossary": platforms/glossary.md

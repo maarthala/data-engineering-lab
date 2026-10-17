@@ -41,16 +41,51 @@ starts). A suspended warehouse costs nothing. Two settings keep that automatic:
 - **`auto_resume`** — a query to a suspended warehouse starts it again.
 
 ### Scale up vs scale out
-- **Up** (bigger size) — for **one heavy query** that's slow: more memory, more CPUs.
-- **Out** (more clusters, a **multi-cluster warehouse** *[Enterprise]*) — for **many users at
-  once**: extra clusters of the same size start when queries queue, and stop again later.
+A warehouse is a **cluster** of compute: a set of machines that run your queries. A slow
+warehouse can need one of two very different fixes.
+
+Think of a supermarket checkout:
+
+- **Scale up** = a **faster cashier**. One customer with a huge trolley gets through quicker.
+  A long queue of people with one item each barely moves faster.
+- **Scale out** = **more checkouts open**. The queue disappears, but each customer still takes
+  as long as before.
+
+```mermaid
+flowchart LR
+  subgraph UP["Scale UP — bigger size"]
+    direction TB
+    Q1["1 heavy query"] --> M["Medium cluster<br/>4× the machines of X-Small"]
+  end
+  subgraph OUT["Scale OUT — more clusters"]
+    direction TB
+    U["50 small queries<br/>at the same time"] --> C1["X-Small<br/>cluster 1"]
+    U --> C2["X-Small<br/>cluster 2"]
+    U --> C3["X-Small<br/>cluster 3"]
+  end
+```
+
+| | Scale **up** | Scale **out** |
+|---|---|---|
+| What changes | the **size**: X-Small → Small → Medium … | the **number of clusters** of the same size (multi-cluster warehouse *[Enterprise]*) |
+| Helps when | **one query** is slow: big joins, big sorts, lots of data | **many queries at once** wait for each other |
+| Doesn't help when | many small queries queue — they still share one cluster | one query is slow — it still runs on one cluster of the same size |
+| The sign | the query **spills** to disk (`BYTES_SPILLED_TO_…` in `QUERY_HISTORY`), or scans lots of data | queries **queue** (`QUEUED_OVERLOAD_TIME` in `QUERY_HISTORY`) |
+| How | `alter warehouse … set warehouse_size = 'MEDIUM'` — you change it yourself | `min_cluster_count` / `max_cluster_count` — Snowflake starts and stops clusters itself |
+| Cost | each size up **doubles** the credits per hour | each running cluster costs its size's credits; extra clusters stop when the queue is gone |
+
+Typical cases:
+
+- A nightly job joining every order with every line takes 40 minutes → **scale up**.
+- 50 people open the same dashboard at 9:00, every query is small, but they wait → **scale
+  out**.
 
 ## Lab
 
 ```sql
 use role accountadmin;
 
--- the setup file already made PRACTICE_WH; this one is just to experiment with
+-- you made PRACTICE_WH in setup step 1; this one is just to experiment with
 create warehouse if not exists SCRATCH_WH
     warehouse_size      = 'XSMALL'
     auto_suspend        = 60

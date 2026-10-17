@@ -2,7 +2,7 @@
 
 You already know SQL from the lab. This lesson covers what is **different in Snowflake**: how
 objects are organised, how tables are rebuilt and dropped, where the metadata lives, the
-timestamp types — and the classic join pitfalls, on ShopFlow data. At the end you'll have built
+timestamp types and casting, on ShopFlow data. At the end you'll have built
 a small Silver and Gold layer.
 
 Every SQL file in this part starts with:
@@ -148,59 +148,51 @@ Example output:
 Same Medallion, same SQL as the lab — you built
 [a Gold mart in Spark](../unit4/spark-sql-gold.md) the same way.
 
-### 4 · Pitfall: fan-out joins
-`PAYMENTS` has one row per order. `ORDER_ITEMS` has **several** rows per order. Join both and sum
-the payment — every payment is counted once **per line**:
+### 4 · Casting: `::` and Snowflake's automatic conversion
+The usual join mistakes — fan-out, `count(*)` after a join, `WHERE` on a left join, `NOT IN`
+with `NULL` — are the same in every engine; they're in
+[Join pitfalls](../unit2/join-pitfalls.md). What **is** different in Snowflake is casting.
+
+Snowflake has a short form for `cast(x as type)`: **`x::type`**. And where Trino or Postgres
+refuse to compare text with a number, Snowflake **converts the text automatically**:
 
 ```sql
--- WRONG: payment amount multiplied by the number of lines
-select sum(p.amount) as paid
-from PAYMENTS p
-join ORDER_ITEMS oi on oi.order_id = p.order_id;
+-- works: Snowflake turns '42' into a number for the comparison
+select count(*) from ORDERS where customer_id = '42';
 
--- RIGHT: aggregate first, then join (or don't join at all)
-select sum(amount) as paid from PAYMENTS;
+-- fails as soon as one value isn't a number
+select count(*) from ORDERS where customer_id = 'abc';
 ```
 
-Example: `216552448.08` vs `72240118.05` — the wrong total is **3×** too high (orders have
-2.5 lines on average, and big orders have more lines). The fix is
-always the same: **aggregate to the grain you need first, then join**.
+- The first returns customer 42's orders; Trino would refuse it.
+- The second fails with *Numeric value 'abc' is not recognized* — the automatic conversion
+  breaks at runtime, on the first bad value, maybe months after the query was written.
 
-### 5 · Pitfall: `count(*)` after a join
-After joining orders to their lines, `count(*)` counts **lines**. To count orders, use
-**`count(distinct order_id)`** — as `DAILY_SALES` above does.
+So cast **explicitly**, and for messy data use the `try_` functions, which return `NULL` instead
+of failing:
 
-### 6 · Pitfall: join keys of different types
-Snowflake compares a `VARCHAR` key with a `NUMBER` key by converting the text — and fails as soon
-as one value isn't a number. Cast explicitly so both sides have the same type:
+```sql
+select '42'::int                 as with_colons,       -- 42
+       cast('42' as int)         as with_cast,         -- 42, the same
+       try_to_number('abc')      as bad_value,         -- NULL, no error
+       '2025-01-31'::date        as a_date;            -- 2025-01-31
+```
+
+- **`::int`**, **`::date`**, **`::varchar`** — Snowflake's cast shorthand (you used `::date` in
+  step 2).
+- **`try_to_number(text)`** — like `::number`, but `NULL` for values that aren't numbers.
+  `try_to_date`, `try_to_timestamp` and `try_cast(x as type)` work the same way.
+
+In a join, cast the text side:
 
 ```sql
 select count(*)
 from ORDERS o
 join (select '42' as customer_id) x            -- a text key, like from a CSV
-  on o.customer_id = x.customer_id::int;       -- cast explicitly
+  on o.customer_id = x.customer_id::int;
 ```
 
-### 7 · Pitfall: keep rows with no match
-6,000 customers signed up, but many never ordered. An inner join drops them; a **`left join`**
-keeps them, and **`coalesce(…, 0)`** turns their missing count into 0:
-
-```sql
-select count(*)                                   as customers,
-       count_if(coalesce(o.orders, 0) = 0)        as never_ordered
-from CUSTOMERS c
-left join (select customer_id, count(*) as orders
-           from ORDERS group by customer_id) o
-       on o.customer_id = c.customer_id;
-```
-
-- **`count_if(condition)`** — counts rows where the condition is true (Snowflake's shortcut for
-  `sum(case when … then 1 else 0 end)`).
-
-Example output: `6000 | 3542` — more than half never ordered, because orders are skewed toward a
-few heavy buyers.
-
-### 8 · Drop and undrop
+### 5 · Drop and undrop
 
 ```sql
 drop table SHOPFLOW.GOLD.MONTHLY_SALES;             -- error: it's a view, not a table
@@ -215,7 +207,8 @@ select count(*) from SHOPFLOW.GOLD.DAILY_SALES;
 Run them one at a time and read each error — they're the ones you'll meet in real projects.
 
 ## Check yourself
-1. A dashboard shows payment totals 2–3× too high after someone added a join to `ORDER_ITEMS`.
-   Why? *(Fan-out — each payment repeated per order line. Aggregate first.)*
+1. `where customer_id = '42'` works but `where customer_id = 'abc'` fails. Why?
+   *(Snowflake converts the text to a number automatically — fine for `'42'`, an error for
+   `'abc'`. Cast explicitly, or use `try_to_number`.)*
 2. Which column in `INFORMATION_SCHEMA.TABLES` tells you a table changed recently, even without
    an `updated_at` column? *(`LAST_ALTERED`.)*

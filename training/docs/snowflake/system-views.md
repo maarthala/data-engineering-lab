@@ -40,6 +40,13 @@ All in `SNOWFLAKE.ACCOUNT_USAGE` unless noted. Times are `TIMESTAMP_LTZ`; durati
 **milliseconds**.
 
 ### `QUERY_HISTORY` — every query that ran
+```sql
+select * from snowflake.account_usage.query_history order by start_time desc limit 5;
+```
+
+- **`select *`** — every column; **`order by … desc limit 5`** — only the 5 newest rows,
+  enough for a quick look. Empty or old rows? That's the delay — see the warning above.
+
 **Answers:** Which queries are slow? Who ran what? Why did a query fail? Did it use the cache?
 Is the warehouse too small?
 
@@ -81,9 +88,28 @@ order by start_time desc
 limit 20;
 ```
 
+New here:
+
+- **`where start_time >= dateadd(day, -7, current_timestamp())`** — only rows from the last 7
+  days. **`current_timestamp()`** is now; **`dateadd(day, -7, …)`** moves it 7 days back
+  (`dateadd(<unit>, <amount>, <date>)`; units: `minute`, `hour`, `day`, `month` …).
+- **`total_elapsed_time / 1000 as seconds`** — milliseconds ÷ 1000 = seconds;
+  **`as seconds`** names the result column.
+- **`left(query_text, 80) as query`** — the first 80 characters of the SQL, so long queries
+  fit on one line. `left('select * from orders', 6)` → `select`.
+- **`order by total_elapsed_time desc`** — slowest first (`desc` = biggest first, `asc` the
+  default).
+- **`limit 10`** — keep only the first 10 rows.
+
 **Real-time version:** `table(information_schema.query_history())` — the last 7 days, no delay.
+`query_history()` is a **table function** (it returns rows); **`table(…)`** lets you use it in
+`from` like a table.
 
 ### `WAREHOUSE_METERING_HISTORY` — credits per warehouse per hour
+```sql
+select * from snowflake.account_usage.warehouse_metering_history order by start_time desc limit 5;
+```
+
 **Answers:** What did each warehouse cost? Which one is burning credits at night?
 
 | Column | Contains |
@@ -101,11 +127,19 @@ group by warehouse_name
 order by credits desc;
 ```
 
+- **`sum(credits_used)`** — adds up the credits of all rows in a group.
+- **`group by warehouse_name`** — one result row per warehouse; `sum` adds that warehouse's
+  hours together.
+
 Related: **`WAREHOUSE_LOAD_HISTORY`** (`AVG_RUNNING`, `AVG_QUEUED_LOAD` — busy or queuing?)
 and **`METERING_DAILY_HISTORY`** (`USAGE_DATE`, `SERVICE_TYPE`, `CREDITS_USED`,
 `CREDITS_BILLED` — every service, not only warehouses).
 
 ### `LOGIN_HISTORY` — every login attempt
+```sql
+select * from snowflake.account_usage.login_history order by event_timestamp desc limit 5;
+```
+
 **Answers:** Who logged in, from where, with which tool? Are there failed logins (wrong
 password, attacks)? Who still logs in with a password instead of SSO / key-pair?
 
@@ -126,7 +160,14 @@ where is_success = 'NO'
 order by event_timestamp desc;
 ```
 
+- **`where is_success = 'NO'`** — only failed logins. Text values go in single quotes.
+
 ### `USERS` and `ROLES` — who exists
+```sql
+select * from snowflake.account_usage.users order by created_on desc limit 5;
+select * from snowflake.account_usage.roles order by created_on desc limit 5;
+```
+
 **Answers:** Which users are inactive? Who has no default role? Which roles were created or
 dropped?
 
@@ -149,7 +190,17 @@ where deleted_on is null
        or last_success_login < dateadd(day, -30, current_timestamp()));
 ```
 
+- **`deleted_on is null`** — the user still exists (`is null` = has no value; `= null` never
+  matches, always use `is null` / `is not null`).
+- **`and` / `or` with brackets** — the brackets make the `or` one condition: never logged in,
+  *or* last login more than 30 days ago.
+
 ### `GRANTS_TO_ROLES` and `GRANTS_TO_USERS` — who may do what
+```sql
+select * from snowflake.account_usage.grants_to_roles order by created_on desc limit 5;
+select * from snowflake.account_usage.grants_to_users order by created_on desc limit 5;
+```
+
 **Answers:** Who can read this table? What can this role do? Who has `ACCOUNTADMIN`?
 
 | `GRANTS_TO_ROLES` column | Contains |
@@ -177,9 +228,39 @@ where table_catalog = 'SHOPFLOW' and deleted_on is null
 order by grantee_name, granted_on;
 ```
 
-**Real-time version:** `show grants to role <role>;`, `show grants on table <table>;`.
+- **`order by grantee_name, granted_on`** — sort by the first column, then by the second within
+  it.
+
+**Real-time version:** `show grants to role <role>;`, `show grants on table <table>;` — current,
+no delay. For example:
+
+```sql
+-- what can the ACCOUNTADMIN role do?
+show grants to role accountadmin;
+
+-- who may do what on the ORDERS table?
+show grants on table SHOPFLOW.BRONZE.ORDERS;
+```
+
+- **`show grants to role …`** — every privilege that role has, on every object.
+- **`show grants on table …`** — every role that has a privilege on that one table. Use the full
+  name `database.schema.table`.
+
+Example output of `show grants on table SHOPFLOW.BRONZE.ORDERS`:
+
+| created_on | privilege | granted_on | name | granted_to | grantee_name | grant_option | granted_by |
+|---|---|---|---|---|---|---|---|
+| 2026-10-16 09:12:03 | OWNERSHIP | TABLE | SHOPFLOW.BRONZE.ORDERS | ROLE | ACCOUNTADMIN | true | ACCOUNTADMIN |
+
+Only one row: the setup file ran as `ACCOUNTADMIN`, so that role **owns** the table (owning
+means every privilege), and nobody else has been granted anything yet. In the
+[security lesson](security.md) you grant `SELECT` to other roles — then they show up here too.
 
 ### `ACCESS_HISTORY` — which data each query read and wrote *[Enterprise]*
+```sql
+select * from snowflake.account_usage.access_history order by query_start_time desc limit 5;
+```
+
 **Answers:** Who read the `EMAIL` column last month? Which tables are never used (safe to drop)?
 Which job wrote this table?
 
@@ -191,7 +272,7 @@ Which job wrote this table?
 | `OBJECTS_MODIFIED` | JSON array: tables and columns written |
 
 The arrays are `VARIANT` — read them with `lateral flatten`, which you'll learn in
-[JSON (VARIANT), stages & COPY INTO](json-stages.md):
+[JSON (VARIANT)](json.md):
 
 ```sql
 select distinct ah.user_name, obj.value:objectName::varchar as table_name
@@ -200,7 +281,19 @@ from snowflake.account_usage.access_history ah,
 where ah.query_start_time >= dateadd(day, -7, current_timestamp());
 ```
 
+- **`access_history ah`** — `ah` is a short **alias** for the view; `ah.user_name` = the
+  `user_name` column of `ah`.
+- **`select distinct`** — removes duplicate rows.
+- **`lateral flatten(input => …) obj`** — one row per element of the JSON array, named `obj`.
+- **`obj.value:objectName::varchar`** — `value` is the element, `:objectName` takes a field out
+  of it, `::varchar` turns it into text. All three come back in the JSON lesson.
+
 ### `TABLES` and `COLUMNS` — every table and column
+```sql
+select * from snowflake.account_usage.tables order by created desc limit 5;
+select * from snowflake.account_usage.columns limit 5;
+```
+
 **Answers:** Which tables are big? Which are transient? What changed recently? Which tables
 were dropped and when?
 
@@ -224,6 +317,10 @@ query.
 the next lesson.
 
 ### `TABLE_STORAGE_METRICS` — what a table's storage really costs
+```sql
+select * from snowflake.account_usage.table_storage_metrics limit 5;
+```
+
 **Answers:** Why is storage high when the tables are small? (Old versions in Time Travel and
 Fail-safe, and data kept for clones.)
 
@@ -240,6 +337,10 @@ Related: **`DATABASE_STORAGE_USAGE_HISTORY`** (per database per day) and **`STOR
 (the account total per day: `STORAGE_BYTES`, `STAGE_BYTES`, `FAILSAFE_BYTES`).
 
 ### `COPY_HISTORY` — every file loaded
+```sql
+select * from snowflake.account_usage.copy_history order by last_load_time desc limit 5;
+```
+
 **Answers:** Did last night's files load? How many rows? Which file failed and why?
 
 | Column | Contains |
@@ -256,6 +357,10 @@ Related: **`DATABASE_STORAGE_USAGE_HISTORY`** (per database per day) and **`STOR
 start_time => …))`.
 
 ### `TASK_HISTORY` — every scheduled task run
+```sql
+select * from snowflake.account_usage.task_history order by scheduled_time desc limit 5;
+```
+
 **Answers:** Did the pipeline run? Which runs failed? How long do they take?
 
 | Column | Contains |
@@ -325,6 +430,10 @@ from table(SHOPFLOW.information_schema.query_history(result_limit => 50))
 where query_type like 'INSERT%'
 order by start_time;
 ```
+
+- **`SHOPFLOW.information_schema.query_history(result_limit => 50)`** — the table function of
+  the `SHOPFLOW` database; **`result_limit => 50`** is a **named argument**: at most 50 queries.
+- **`like 'INSERT%'`** — text that starts with `INSERT`; `%` matches any characters.
 
 You'll see the 12 inserts of the setup file — `ORDER_ITEMS` and the derived tables take the
 longest.

@@ -29,17 +29,26 @@ one **X-Small** warehouse that stops itself after 60 seconds idle. The whole Sno
 the course uses a few credits.
 
 ### Snowsight — the web UI
-**Snowsight** is Snowflake's browser UI. You'll use:
+**Snowsight** is Snowflake's browser UI — the website you log into. The name doesn't appear as
+a menu; when a lesson says "in Snowsight", it means this website. You'll use:
 
 - **Projects → Workspaces** (older accounts: **Worksheets**) — a SQL editor. Each file runs
   against the role, warehouse, database and schema picked at the top (or set with `use …`).
 - **Monitoring → Query History** — every query you ran, with its **Query Profile** (the
   execution plan, like the Spark UI or Trino's query page).
-- **Catalog → Database Explorer** (older accounts: **Data → Databases**) — browse databases,
+- **Catalog → Explorer** (some accounts: **Database Explorer**; older accounts: **Data → Databases**) — browse databases,
   schemas and tables.
+
+!!! note "Menu names change"
+    Snowflake updates the web UI often — sometimes while you're using it. A menu may have a
+    new name (e.g. **Catalog → External data** became **Catalog → Connections**), but the page
+    behind it is the same. If a name in a lesson doesn't match, look for the nearest one.
 
 **Run a statement:** put the cursor in it and press **Ctrl/Cmd + Enter**.
 **Run a whole file:** **Ctrl/Cmd + Shift + Enter**.
+**End every statement with `;`** — Snowsight finds where one statement stops by the `;`. If the
+statement above is missing it, the next one fails with *syntax error … unexpected 'show'* (or
+`select`, …) — the two run together as one.
 
 ### Account identifier
 Every account has an identifier `ORGNAME-ACCOUNTNAME`, e.g. `ZEYYXVA-EP36955`. Find yours in
@@ -90,12 +99,43 @@ drop warehouse if exists COMPUTE_WH;
 - **`drop warehouse if exists`** — removes it; `if exists` avoids an error if your account never
   had one. Dropping a warehouse deletes **no data** — it's only compute.
 
-The setup file in the next step creates the course's own warehouse, **`PRACTICE_WH`**, with the
-right settings. Every lesson uses it.
-
 !!! warning "Is your account shared?"
     Only drop `COMPUTE_WH` in your **own** trial account. In an account others use, leave it
-    alone — the setup file just adds `PRACTICE_WH` next to it.
+    alone and just add `PRACTICE_WH` next to it.
+
+Now create the course's own warehouse, **`PRACTICE_WH`**, with the right settings. Every lesson
+uses it:
+
+```sql
+create warehouse if not exists PRACTICE_WH
+    warehouse_size      = 'XSMALL'
+    auto_suspend        = 60
+    auto_resume         = true
+    initially_suspended = true;
+
+use warehouse PRACTICE_WH;
+```
+
+- **`create warehouse if not exists`** — makes a new warehouse; `if not exists` skips it if you
+  already have one with that name (safe to run again).
+- **`warehouse_size = 'XSMALL'`** — the smallest size, 1 credit per hour while running. Each size
+  up doubles the credits.
+- **`auto_suspend = 60`** — stops itself after 60 seconds with no queries, so it stops billing.
+- **`auto_resume = true`** — starts again by itself when the next query arrives.
+- **`initially_suspended = true`** — created stopped; it costs nothing until you run a query.
+- **`use warehouse`** — the queries you run next in this SQL file use `PRACTICE_WH`.
+
+Check it:
+
+```sql
+show warehouses;
+```
+
+Example output:
+
+| name | state | type | size | … | auto_suspend | auto_resume |
+|---|---|---|---|---|---|---|
+| PRACTICE_WH | SUSPENDED | STANDARD | X-Small | … | 60 | true |
 
 ### 2 · Download and run the setup file
 
@@ -104,12 +144,12 @@ right settings. Every lesson uses it.
 1. In the same SQL file (or a new one), replace everything with the whole setup file (or use
    **Import** / drag the file in).
 2. Run all: **Ctrl/Cmd + Shift + Enter**. It finishes in under a minute.
-3. At the top of the editor, the warehouse now shows **`PRACTICE_WH`** — the file switches to it.
+3. At the top of the editor, the warehouse shows **`PRACTICE_WH`** — the file runs on the
+   warehouse you just created.
 
 What the file creates:
 
 ```
-PRACTICE_WH            X-Small warehouse, auto-suspend 60 s
 SHOPFLOW               database
 ├── BRONZE             the 12 ShopFlow source tables (raw copy of the source)
 ├── SILVER             empty — you fill it

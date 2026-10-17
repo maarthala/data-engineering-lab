@@ -6,7 +6,7 @@
 --     BRONZE  the 12 ShopFlow source tables (same columns as the lab's Postgres `shopflow`)
 --     SILVER  empty — you fill it in the lessons
 --     GOLD    empty — you fill it in the lessons
---   warehouse PRACTICE_WH (X-Small, stops itself after 60 s idle)
+--   (runs on warehouse PRACTICE_WH — create it first, lesson step 1)
 --
 -- The rows are GENERATED inside Snowflake (like the lab's seed.sql), so there is nothing to
 -- upload. Same tables, columns, sizes and shape as the lab — not the same random values.
@@ -18,13 +18,8 @@
 
 use role accountadmin;
 
--- The course's warehouse. (Lesson step 1 had you check the trial's default COMPUTE_WH and
--- drop it — this one replaces it: X-Small, stops after 60 s idle, starts on the next query.)
-create warehouse if not exists PRACTICE_WH
-    warehouse_size      = 'XSMALL'
-    auto_suspend        = 60
-    auto_resume         = true
-    initially_suspended = true;
+-- The course's warehouse, created in lesson step 1 (create warehouse PRACTICE_WH ...).
+-- If this line fails with "does not exist", do step 1 first.
 use warehouse PRACTICE_WH;
 
 create or replace database SHOPFLOW;

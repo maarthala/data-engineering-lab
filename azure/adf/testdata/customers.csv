@@ -1,14 +1,14 @@
 id,name,city
-C001,Alice Johnson,London
-C002,bob smith,Manchester
-C003,Carla Diaz,
-C004,David Lee,leeds
-C005,Emma Brown,London
-C006,Frank Miller,
-C007,Grace Kim, Bristol
-C008,Henry Ford,MANCHESTER
-C009,Ivy Nguyen,Leeds
-C010,Jack Wright,York
-C001,Alice Johnson,London
-C005,Emma Brown,London
-C004,David Lee,Leeds
+1,Alice Johnson,London
+2,bob smith,Manchester
+3,Carla Diaz,
+4,David Lee,leeds
+5,Emma Brown,London
+6,Frank Miller,
+7,Grace Kim, Bristol
+8,Henry Ford,MANCHESTER
+9,Ivy Nguyen,Leeds
+0,Jack Wright,York
+1,Alice Johnson,London
+5,Emma Brown,London
+4,David Lee,Leeds

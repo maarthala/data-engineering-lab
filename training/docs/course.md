@@ -113,6 +113,15 @@ platform already knowing *why* things work — not just which buttons to press.
 
     [{count:capstones/capstone-1.md} projects →](capstones/capstone-1.md)
 
+-   🏛️ **Unit {unit:datavault/what-is-data-vault.md} · Data Vault 2.0**
+
+    ---
+
+    Integrate ShopFlow's shop, CRM and marketplace into hubs, links and satellites — business
+    keys, hash keys, insert-only history, PIT tables, business rules and marts on top.
+
+    [{count:datavault/what-is-data-vault.md} lessons →](datavault/what-is-data-vault.md)
+
 -   🌉 **Unit {unit:platforms/rosetta.md} · Bridge to the platforms**
 
     ---

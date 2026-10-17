@@ -2,7 +2,8 @@
 
 This course teaches Data Engineering on an **open-source** stack — deliberately, so you learn the
 *concepts* without a cloud bill. Every concept maps directly to the commercial platforms you'll
-learn next. This page is your dictionary.
+learn next. This page is your dictionary; [Which platform for which job](choosing.md) helps
+you pick one.
 
 ## The big picture
 > You're not learning "toy" tools. You're learning the **same building blocks** the platforms are

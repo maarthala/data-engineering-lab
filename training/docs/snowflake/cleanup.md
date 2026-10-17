@@ -46,11 +46,13 @@ Every SnowPro Core topic, practised on ShopFlow:
 | Storage / compute / services, warehouse sizes, auto-suspend, scale up vs out, multi-cluster | [Architecture & warehouses](warehouses.md) |
 | Micro-partitions, pruning, clustering keys, Query Profile, result / warehouse / metadata cache | [Micro-partitions & caching](performance.md) |
 | Zero-copy cloning, Time Travel, Fail-safe, permanent / transient / temporary tables | [Cloning & Time Travel](clone-time-travel.md) |
-| `VARIANT`, paths, `FLATTEN`, stages, file formats, `COPY INTO`, load history | [JSON & stages](json-stages.md) |
+| `VARIANT`, paths, `FLATTEN`, JSON files, `parse_json` | [JSON (VARIANT)](json.md) |
+| stages (internal, external S3), uploads, what a private bucket needs, file formats, `COPY INTO`, load history | [Stages](stages.md) |
 | Streams, tasks, SCD Type 2, dynamic tables | [Streams, tasks & dynamic tables](pipelines.md) |
 | RBAC, system roles, future grants, masking and row access policies | [Roles & governance](security.md) |
 | `ACCOUNT_USAGE`, query history, storage, resource monitors | [Cost & monitoring](cost.md) |
 | Snowpark DataFrames, Snowflake Notebooks | [Snowpark](snowpark.md) |
+| SQL and Python UDFs, table functions, stored procedures, `session.udf.register`, `usage` grants | [Functions & procedures](functions.md) |
 
 **Next goal:** the **SnowPro Core** certification covers all of these. Snowflake's own
 "Hands-on Essentials" badges and the free *Snowflake documentation → Guides* are good next
