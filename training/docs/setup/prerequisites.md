@@ -166,8 +166,10 @@ To run it on your **own** laptop, you need Docker and the repo.
 
 !!! warning "This stack is memory-hungry"
     You're running ~a dozen services (Spark, Trino, Superset, Airflow, Polaris, Postgres, …).
-    Give Docker at least **8 GB** of RAM — **12–16 GB** is comfortable. On Docker Desktop set this
-    in **Settings → Resources → Memory**. Too little and containers get killed (`exit 137`).
+    Give Docker at least **8 GB** of RAM and **4 CPUs** — **12–16 GB** and **6 CPUs** are
+    comfortable. On Docker Desktop set this in **Settings → Resources** (Memory limit, CPU limit).
+    Too little and containers get killed (`exit 137`). `make up` checks this first: below the
+    minimum it says what's missing and asks before it starts anything.
 
 !!! warning "…and needs disk space"
     Plan for about **25 GB free**: ~2.5 GB of downloads (`make init`) plus ~15–20 GB of Docker
@@ -218,7 +220,7 @@ Everything in the stack, its URL, and how to sign in. (On Kubernetes swap `local
 | Keycloak (logins) | http://localhost:8180/admin | admin console: `admin` / `admin` (realm **de-lab**) |
 | Training course | https://maarthala.github.io/data-engineering-lab/ | — (linked from the landing page) |
 | Jupyter (notebooks) | http://localhost:8008 | your lab account — your **own** Jupyter, and `my` = your own lakehouse |
-| Spark master UI | http://localhost:8002 | — |
+| Spark master UI | http://127.0.0.1:8002 | — |
 | Trino | through SQLPad / Superset (laptop stack: UI http://localhost:8007/ui/, CLI `:8007`) | lab account (via SQLPad / Superset) |
 | SQLPad (SQL workbench) | http://localhost:8003 | lab account (from the landing page you go straight in) |
 | Superset (BI) | http://localhost:8004 | lab account (managers = Admin) |

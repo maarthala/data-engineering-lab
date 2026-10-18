@@ -100,3 +100,6 @@ notes.txt
 # AdventureWorks sample data staged by `make init` (~110 MB, generated — not committed).
 # The init script + Trino catalog ARE committed; only the downloaded CSVs/install.sql aren't.
 local/init_scripts/postgres/adventureworks/
+
+# make up / make status: run log + what the images were built from (tools/up.py)
+local/logs/

@@ -123,7 +123,7 @@ SELECT committed_at, operation FROM my.bronze.sample_orders.snapshots ORDER BY c
 ## Watch the job run on the Spark cluster
 DAG tasks and notebooks run their Spark work on the lab's **standalone Spark cluster**, through one
 long-running **Spark Connect server**. Watch it in the **Spark Master UI** at
-[http://localhost:8002](http://localhost:8002) (k8s: `spark.de.lan`):
+[http://127.0.0.1:8002](http://127.0.0.1:8002) (k8s: `spark.de.lan`):
 
 - The header shows **`Spark Master at spark://spark-master:7077`** and the **Alive Workers**.
 - Under **Running Applications** you'll see **`Spark Connect server`** — every notebook and every

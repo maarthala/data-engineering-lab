@@ -122,7 +122,7 @@ single sign-on, register on the home portal) for every tool; see [0.3](../setup/
 | Jupyter (JupyterHub) | http://localhost:8008 | `jupyter.de.lan` | your lab account (own Jupyter + own lakehouse) |
 | Airflow | http://localhost:8001 | `airflow.de.lan` | lab account (DAGs also from your bucket's `files/src/dags/`) |
 | RustFS console (object store) | http://localhost:9001/rustfs/console/ | `storage.de.lan/rustfs/console/` | lab account (your own bucket) · root `admin` / `admin123` |
-| Spark master UI | http://localhost:8002 | `spark.de.lan` | — |
+| Spark master UI | http://127.0.0.1:8002 | `spark.de.lan` | — |
 | Key vault (OpenBao) | http://localhost:8200 | `vault.de.lan` | lab account (**Sign in with OIDC Provider**; your own folder) |
 
 !!! warning "On a team stack these admin logins are private"
@@ -145,7 +145,7 @@ State survives restarts; only a deliberate teardown wipes it.
   and Superset's home.
 
 On Compose these are named Docker volumes; on k8s they're PersistentVolumeClaims
-(`microk8s-hostpath`). `make down` (Compose) removes volumes — use `stop` to keep data.
+(`microk8s-hostpath`). On Compose, `make down` keeps the volumes; `make clean` deletes them.
 
 ## Compose vs. Kubernetes
 

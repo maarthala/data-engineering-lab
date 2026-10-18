@@ -1,0 +1,52 @@
+# SQLPad Run query
+
+-- select * from member1_lake.bronze.sample_orders limit 10;
+
+-- update  member1_lake.bronze.sample_orders set channel = 'web' where customer_id = 38;
+
+select * from member1_lake.bronze.sample_orders where customer_id = 38 ;
+
+
+# bar graph
+select channel, count(*) as channel_cnt from member1_lake.bronze.sample_orders group by channel;
+
+Visual: Bar- Vertical 
+Bar label: channel
+Bar value: channel_cnt
+Rest empty.
+
+
+# line graph
+SELECT date_trunc('month', order_ts) AS month,
+       channel,
+       count(*)                      AS total_orders
+FROM member1_lake.bronze.sample_orders
+GROUP BY date_trunc('month', order_ts), channel
+ORDER BY month, channel;
+Visual: line
+X : month
+Y : total_orders
+
+Y facet:  Channel 
+
+
+
+
+# drop all bronze, silver, gold
+
+for t in ["bronze.sales", "silver.sales", "silver.sales_rejected",
+          "gold.sales_daily", "gold.top_products"]:
+    spark.sql(f"DROP TABLE IF EXISTS my.{t} PURGE")
+    print("dropped", t)
+
+    
+Superset
+
+Bar CHart
+X-Axis : Category
+
+Metrics: Drag revenue as SUM(revenue) and rename the title to Revenue in metrics 
+
+X-Axis Sort By : Revenue
+Filter: order_date
+

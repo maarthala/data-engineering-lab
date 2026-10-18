@@ -170,7 +170,7 @@ table — read or write — with a teammate. Polaris enforces it on every query
 
 ## Get it running
 
-You need Docker with **8 GB** of memory (12–16 GB is comfortable) and about **25 GB** of disk.
+You need Docker with **8 GB** of memory and **4 CPUs** (12–16 GB and 6 CPUs are comfortable) and about **25 GB** of disk.
 
 ```bash
 git clone https://github.com/maarthala/data-engineering-lab.git
@@ -178,6 +178,7 @@ cd data-engineering-lab/local
 cp .env.example .env
 make init      # first run only: downloads Spark/Iceberg jars
 make up        # builds and starts the whole lab
+make down      # brings it down again, keeping your data (make up to start)
 ```
 
 Then open **<http://localhost:8000>** and sign in as `demouser` / `demouser`. The full walkthrough

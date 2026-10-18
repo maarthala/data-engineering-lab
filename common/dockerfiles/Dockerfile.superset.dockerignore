@@ -1,0 +1,3 @@
+# Build context for Dockerfile.superset (BuildKit reads <Dockerfile>.dockerignore): it uses nothing
+# from tmp/ (the ~2.5 GB of jars from `make init`), so do not send it to the builder.
+tmp/

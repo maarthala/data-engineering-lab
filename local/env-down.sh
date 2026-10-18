@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Stop the stack and remove volumes.
-# The list of compose files lives once in .env (COMPOSE_FILE). Run from repo root.
+# Bring the stack down — keeps volumes (all data) and images. Same as `make down`.
+# The list of compose files lives once in .env (COMPOSE_FILE). Run from local/.
 set -e
-docker compose down -v
+ids=$(docker ps -aq --filter "name=^jupyter-")          # members' Jupyter servers (JupyterHub's)
+[ -n "$ids" ] && docker rm -f $ids >/dev/null
+docker compose down

@@ -20,10 +20,14 @@ an nginx landing page. Postgres also hosts the **AdventureWorks** OLTP sample DB
 ## Run
 ```bash
 cp .env.example .env   # first time: create your env (gitignored); set GIT_TOKEN to enable notebook auto-push
-make init   # first time: download base JARs (into ../common/dockerfiles/tmp)
-make up     # build the compose images + start everything (first build: 15–30 min)
-make polaris-seed   # create the iceberg catalog + personas; re-run after make down/restart
-make ps     # status      make logs S=polaris     make down   # stop + remove volumes
+make init   # first time: download base JARs (into ../common/dockerfiles/tmp) — starts nothing
+make up     # start everything; builds missing images only (first build: 15–30 min)
+make build  # rebuild the images after a Dockerfile change (make up warns), then start
+make polaris-seed   # (re)create the iceberg catalog + personas — make up does it when it's missing
+make ps     # status      make logs S=polaris
+make down   # bring it down (members' Jupyter servers too), KEEPS data + images — make up starts it again
+make clean  # stack down first: delete ALL its data (volumes) — fresh install, images kept (asks first)
+make destroy  # remove containers, volumes, network AND images — a clean plate (asks first)
 ```
 Ports 5432 / 8001 taken by something else? Set `POSTGRES_HOST_PORT` / `AIRFLOW_HOST_PORT` in `.env`.
 
@@ -49,10 +53,11 @@ gate the Pages CI uses) before you push.
 | SQLPad (SQL workbench) | http://localhost:8003 | lab account (local admin admin@de.local / admin1234) |
 | Airflow | http://localhost:8001 (`AIRFLOW_HOST_PORT`) | lab account |
 | Jupyter (JupyterHub) | http://localhost:8008 | your lab account (Keycloak) — own Jupyter + own lakehouse |
-| Spark master UI | http://localhost:8002 | — |
+| Spark master UI | http://127.0.0.1:8002 | — |
 
 ## First steps
-Seed the governed catalog (catalog, bronze/silver/gold namespaces, personas + RBAC):
+`make up` seeds the governed catalog (catalog, bronze/silver/gold namespaces, personas + RBAC)
+when it is missing — first start, after `make clean` / `make destroy`. To run it by hand:
 ```bash
 make polaris-seed      # runs ../common/polaris/seed-polaris.sh against localhost:8185
 ```
@@ -105,7 +110,7 @@ database — handy for richer SQL practice than ShopFlow.
   ```
 
 ⚠️ It only loads on a **fresh Postgres volume** (init scripts run once). If Postgres already
-has a volume, reload with: `make down` (removes volumes) → `make init` → `make up`.
+has a volume, reload with: `make down` → `make clean` (deletes the volumes) → `make init` → `make up`.
 If `ruby` is missing at `make init`, the prep is skipped and the stack still starts — just
 without the `adventureworks` DB.
 

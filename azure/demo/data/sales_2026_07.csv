@@ -1,0 +1,1193 @@
+order_id,order_date,customer_name,city,country,product,category,quantity,unit_price,channel
+106726,2026-07-14,Linnea Schmidt,Berlin,GERMANY,Cinnamon Bun,Bakery,1,3.90,web
+106285,2026-07-02,Emil Johansson,,Germany,Milk Frother,Equipment,1,29.00,app
+106333,2026-07-03,Mikael Larsen,Odense,Denmark,Travel Cup,Merch,2,22.00,store
+107103,2026-07-24,Leo Müller,Helsinki,Finland,Filter Roast 500g,Coffee,1,13.50,store
+106939,2026-07-19,Aino Virtanen,Berlin,Germany,Espresso Beans 1kg,Coffee,1,24.90,store
+107177,2026-07-26,Aino Tamm,Bergen,Norway,Espresso Beans 1kg,Coffee,2,24.90,web
+106488,2026-07-07,Mikael Lindqvist,Bergen,Norway,Single Origin Kenya 250g,Coffee,3,,store
+107361,2026-07-30,Elsa Tamm,Espoo,Finland,Cinnamon Bun,Bakery,1,3.90,app
+106897,2026-07-18,Aino Johansson,Oslo,Norway,Logo Mug,Merch,2,14.00,app
+106270,2026-07-02,Freja Saar,Stockholm,Sweden,Blueberry Muffin,Bakery,1,3.50,web
+106947,2026-07-19,Leo Hansen,,Norway,Cold Brew Pack,Coffee,1,9.90,web
+106858,2026-07-17,Leo Saar,Turku,Finland,Single Origin Kenya 250g,Coffee,4,11.90,app
+106586,2026-07-10,Aino Mäkinen,Tartu,Estonia,Cinnamon Bun,Bakery,1,3.90,web
+107032,2026-07-21,Saga Hansen,Odense,Denmark,Hand Grinder,Equipment,4,49.00,web
+107304,2026-07-29,Hugo Korhonen,Helsinki,Finland,Cold Brew Pack,Coffee,2,9.90,web
+107033,2026-07-22,Eero Virtanen,Odense,Denmark,Cinnamon Bun,Bakery,1,3.90,store
+107190,2026-07-26,Sofia Andersson,Aarhus,Denmark,Espresso Beans 1kg,Coffee,1,24.90,app
+106448,2026-07-06,Noah Virtanen,Odense,Denmark,Filter Roast 500g,Coffee,2,13.50,store
+107028,21/07/2026,Maja Virtanen,Malmö,Sweden,Hand Grinder,Equipment,2,49.00,web
+106410,2026-07-05,Saga Larsen,Oslo,Norway,Cold Brew Pack,Coffee,1,9.90,web
+106472,2026-07-07,Noah Berg,Turku,Finland,Cinnamon Bun,Bakery,1,3.90,app
+106478,2026-07-07,Elsa Schmidt,Berlin,Germany,Green Tea 100g,Tea,1,7.50,web
+106558,2026-07-09,Saga Johansson,Copenhagen,Denmark,Earl Grey 100g,Tea,3,6.90,store
+106747,2026-07-14,Emil Mäkinen,,Norway,Cinnamon Bun,Bakery,1,3.90,web
+106304,2026-07-03,Liam Hansen,Aarhus,Denmark,Green Tea 100g,Tea,2,7.50,web
+107114,2026-07-24,Mikael Lindqvist,,Sweden,Cinnamon Bun,Bakery,1,3.90,app
+106422,2026-07-05,Eero Hansen,,Estonia,Hand Grinder,Equipment,4,49.00,app
+107227,2026-07-27,Hugo Berg,Trondheim,Norway,Cold Brew Pack,Coffee,3,9.90,store
+106625,2026-07-11,Ella Korhonen,Helsinki,Finland,Filter Roast 500g,Coffee,1,13.50,store
+107373,2026-07-31,Ella Andersson,Trondheim,Norway,Espresso Beans 1kg,Coffee,4,24.90,web
+106690,2026-07-13,Oskar Nieminen,Munich,Germany,Earl Grey 100g,Tea,3,6.90,web
+107314,29/07/2026,Alma Lindqvist,Tartu,Estonia,Chai Mix 200g,Tea,3,8.90,app
+107076,2026-07-23,Liam Andersson,Trondheim,Norway,Blueberry Muffin,Bakery,1,3.50,web
+107264,28/07/2026,Linnea Nilsen,Oslo,Norway,Filter Roast 500g,Coffee,2,13.50,store
+106848,2026-07-17,Oskar Müller,Oulu,Finland,Cold Brew Pack,Coffee,1,9.90,app
+107115,2026-07-24,Jonas Johansson,Tallinn,Estonia,Chai Mix 200g,Tea,3,8.90,web
+107153,2026-07-25,Lukas Korhonen,Berlin,Germany,Cold Brew Pack,Coffee,1,9.90,web
+106628,2026-07-11,Linnea Saar,Berlin,Germany,Cinnamon Bun,Bakery,3,3.90,web
+106263,2026-07-01,Eero Tamm,Oulu,Finland,Earl Grey 100g,Tea,1,6.90,app
+106506,2026-07-08,Eero Andersson,Munich,Germany,Filter Roast 500g,Coffee,2,13.50,web
+107268,2026-07-28,Aino Larsen,Munich,Germany,Cold Brew Pack,Coffee,4,9.90,app
+106595,2026-07-11,Mikael Andersson,Espoo,Finland,Espresso Beans 1kg,Coffee,1,24.90,web
+106979,2026-07-20,Emil Andersson,Munich,Germany,Rye Bread,Bakery,2,5.20,web
+106446,2026-07-06,Liam Nieminen,Tartu,Estonia,Blueberry Muffin,Bakery,2,3.50,store
+107219,2026-07-26,Mikael Johansson,Helsinki,Finland,Green Tea 100g,Tea,1,7.50,app
+106996,2026-07-21,Emil Berg,Tampere,Finland,Rye Bread,Bakery,1,5.20,web
+107388,2026-07-31,Oskar Tamm,Turku,Finland,Filter Roast 500g,Coffee,6,13.50,app
+107110,2026-07-24,Lukas Johansson,Tampere,Finland,Cold Brew Pack,Coffee,2,9.90,web
+106814,2026-07-16,Aino Virtanen,Munich,Germany,Decaf Blend 500g,Coffee,3,14.90,web
+106999,2026-07-21,Mikael Johansson,Stockholm,Sweden,Single Origin Kenya 250g,Coffee,1,11.90,web
+106369,2026-07-04,Linnea Nieminen,Malmö,Sweden,Cinnamon Bun,Bakery,2,3.90,store
+106949,2026-07-19,Eero Mäkinen,Espoo,Finland,Cold Brew Pack,Coffee,1,9.90,store
+107188,2026-07-26,Maja Andersson,Malmö,Sweden,Logo Mug,Merch,1,14.00,web
+106961,2026-07-20,Noah Korhonen,Uppsala,Sweden,Pour-over Kit,Equipment ,2,39.00,web
+106613,2026-07-11,Saga Virtanen,Uppsala,Sweden,Cinnamon Bun,Bakery,2,3.90,web
+106413,2026-07-05,Lukas Nilsen,Berlin,Germany,Cinnamon Bun,Bakery,3,3.90,web
+107372,2026-07-31,Saga Johansson,Hamburg,Germany,Tote Bag,Merch,2,12.00,web
+107238,2026-07-27,Linnea Larsen,Bergen,Norway,Rye Bread,Bakery,1,5.20,app
+106516,2026-07-08,Jonas Saar,Espoo,Finland,Blueberry Muffin,Bakery,1,3.50,app
+106412,2026-07-05,Elsa Mäkinen,Uppsala,Sweden,Single Origin Kenya 250g,Coffee,,11.90,app
+106857,17/07/2026,Aino Müller,Berlin,Germany,Cold Brew Pack,Coffee,2,9.90,web
+106718,2026-07-13,Eero Larsen,Tallinn,Estonia,Decaf Blend 500g,Coffee,2,14.90,app
+106958,2026-07-20,Alma Johansson,Uppsala,Sweden,Blueberry Muffin,Bakery,2,3.50,app
+106365,2026-07-04,Emil Tamm,Munich,Germany,Rye Bread,Bakery,2,5.20,app
+106609,2026-07-11,Ida Larsen,Copenhagen,Denmark,Blueberry Muffin,Bakery,2,3.50,web
+106649,2026-07-12,Liam Schmidt,Turku,Finland,Logo Mug,merch,2,14.00,web
+107069,2026-07-22,Eero Tamm,Tampere,Finland,Cold Brew Pack,Coffee,1,9.90,web
+107179,2026-07-26,Ella Müller,Uppsala,Sweden,Espresso Beans 1kg,Coffee,1,24.90,store
+106349,2026-07-04,Oskar Schmidt,Helsinki,Finland,Rye Bread,Bakery,1,5.20,app
+106514,2026-07-08,Oskar Korhonen,Tallinn,Estonia,Espresso Beans 1kg,Coffee,1,24.90,web
+106662,2026-07-12,Elsa Schmidt,Bergen,Norway,Blueberry Muffin,Bakery,1,3.50,app
+106772,2026-07-15,Jonas Larsen,Oulu,Finland,Cold Brew Pack,Coffee,4,9.90,web
+106672,2026-07-12,Eero Berg,Uppsala,Sweden,Decaf Blend 500g,Coffee,2,14.90,store
+107031,2026-07-21,Maja Nilsen,Oulu,Finland,Decaf Blend 500g,Coffee,1,14.90,app
+107099,2026-07-23,Liam Müller,Oulu,Finland,Milk Frother,Equipment,3,29.00,app
+107239,2026-07-27,Emil Hansen,Munich,Germany,Earl Grey 100g,Tea,1,6.90,app
+106679,2026-07-12,Ella Lindqvist,,Finland,Single Origin Kenya 250g,Coffee,1,11.90,store
+106428,2026-07-05,Alma Larsen,Stockholm,Sweden,Cinnamon Bun,Bakery,,3.90,store
+107187,2026-07-26,Saga Schmidt,Turku,Finland,Decaf Blend 500g,Coffee,1,14.90,store
+106829,2026-07-16,Saga Korhonen,Gothenburg,Sweden,Cold Brew Pack,Coffee,3,9.90,app
+107157,25/07/2026,Sofia Nieminen,Helsinki,Finland,Single Origin Kenya 250g,Coffee,3,11.90,web
+106912,2026-07-19,Noah Nieminen,Turku,Finland,Cold Brew Pack,Coffee,1,9.90,web
+107057,2026-07-22,Leo Korhonen,Oslo,Norway,Cinnamon Bun,Bakery,1,3.90,store
+107075,2026-07-23,Elsa Schmidt,Malmö,Sweden,Blueberry Muffin,Bakery,1,3.50,app
+106560,2026-07-09,Oskar Hansen,Trondheim,Norway,Decaf Blend 500g,Coffee,6,14.90,web
+106918,2026-07-19,Saga Berg,Oulu,Finland,Moka Pot,Equipment,1,34.00,web
+107097,2026-07-23,Mikael Johansson,Oslo,Norway,Cold Brew Pack,Coffee,2,9.90,app
+107380,2026-07-31,Saga Johansson,Tallinn,Estonia,Travel Cup,Merch,1,22.00,web
+106867,2026-07-18,Freja Müller,Gothenburg,Sweden,Earl Grey 100g,Tea,1,6.90,app
+106341,2026-07-04,Maja Saar,Berlin,Germany,Blueberry Muffin,Bakery,2,3.50,store
+106396,2026-07-05,Freja Hansen,Malmö,Sweden,Cold Brew Pack,Coffee,3,9.90,web
+107006,2026-07-21,Linnea Lindqvist,Espoo,Finland,Cold Brew Pack,Coffee,1,9.90,web
+107197,2026-07-26,Ida Berg,Trondheim,Norway,Chai Mix 200g,Tea,2,8.90,app
+106873,2026-07-18,Saga Saar,Trondheim,Norway,Tote Bag,Merch,1,12.00,app
+107368,2026-07-31,Jonas Mäkinen,Helsinki,Finland,Rye Bread,Bakery,1,5.20,store
+107279,2026-07-28,Linnea Larsen,Malmö,Sweden,Travel Cup,Merch,1,22.00,app
+107211,2026-07-26,Aino Hansen,Hamburg,Germany,Rye Bread,Bakery,2,5.20,app
+107315,2026-07-29,Eero Schmidt,Bergen,Norway,Espresso Beans 1kg,Coffee,4,24.90,app
+106976,2026-07-20,Aino Andersson,Bergen,Norway,Logo Mug,Merch,1,14.00,web
+107302,29/07/2026,Jonas Saar,Tartu,Estonia,Cold Brew Pack,Coffee,1,9.90,web
+107208,2026-07-26,Liam Berg,Hamburg,Germany,Filter Roast 500g,Coffee,1,13.50,web
+106920,2026-07-19,Elsa Andersson,Turku,Finland,Travel Cup,Merch,1,22.00,web
+107300,2026-07-29,Leo Schmidt,Tampere,Finland,Rye Bread,Bakery,2,5.20,app
+106840,2026-07-17,Eero Tamm,Helsinki,Finland,Rye Bread,Bakery,2,5.20,app
+106845,2026-07-17,Hugo Müller,Odense,Denmark,Green Tea 100g,Tea,6,7.50,app
+107216,2026-07-26,Mikael Saar,Aarhus,Denmark,Cold Brew Pack,Coffee,4,9.90,web
+107058,2026-07-22,Maja Hansen,Turku,Finland,Blueberry Muffin,Bakery,1,3.50,web
+106798,2026-07-16,Mikael Berg,Copenhagen,Denmark,Cold Brew Pack,Coffee,3,9.90,app
+106343,2026-07-04,Aino Saar,Malmö,Sweden,Single Origin Kenya 250g,Coffee,1,11.90,web
+107273,2026-07-28,Ella Schmidt,Malmö,Sweden,Blueberry Muffin,Bakery,1,3.50,web
+106861,2026-07-17,Saga Schmidt,Tartu,Estonia,Espresso Beans 1kg,Coffee,1,24.90,app
+106823,2026-07-16,Hugo Johansson,Helsinki,Finland,Travel Cup,Merch,1,22.00,web
+107249,2026-07-27,Alma Nieminen,Turku,Finland,Cold Brew Pack,Coffee,4,9.90,app
+107194,2026-07-26,Elsa Andersson,Berlin,germany,Travel Cup,Merch,1,22.00,web
+106240,2026-07-01,Lukas Tamm,Turku,Finland,Rye Bread,Bakery,1,5.20,web
+106332,2026-07-03,Ella Saar,Stockholm,Sweden,Espresso Beans 1kg,Coffee,3,24.90,store
+106589,2026-07-10,Hugo Virtanen,Tallinn,Estonia,Cinnamon Bun,Bakery,1,3.90,web
+106450,2026-07-06,Lukas Müller,Gothenburg,Sweden,Cold Brew Pack,Coffee,1,9.90,web
+107109,2026-07-24,Liam Andersson,Gothenburg,Sweden,Filter Roast 500g,Coffee,1,13.50,web
+107265,2026-07-28,Emil Hansen,Oulu,Finland,Chai Mix 200g,Tea,3,8.90,web
+107064,2026-07-22,Hugo Virtanen,Berlin,Germany,Single Origin Kenya 250g,Coffee,1,11.90,web
+106769,2026-07-15,Alma Virtanen,Munich,Germany,Espresso Beans 1kg,Coffee,,24.90,app
+107288,2026-07-28,Aino Andersson,Oulu,Finland,Filter Roast 500g,Coffee,1,13.50,web
+106644,2026-07-12,Jonas Nilsen,Trondheim,Norway,Pour-over Kit,Equipment,,39.00,app
+106561,2026-07-09,Hugo Mäkinen,Munich,Germany,Travel Cup,Merch,4,22.00,web
+106361,2026-07-04,Oskar Mäkinen,Espoo,Finland,Tote Bag,Merch,1,12.00,app
+106970,2026-07-20,Ida Larsen,Stockholm,Sweden,Green Tea 100g,Tea,1,7.50,web
+107050,2026-07-22,Emil Schmidt,Turku,Finland,Rye Bread,Bakery,1,5.20,web
+107131,2026-07-24,Mikael Berg,Berlin,Germany,Cold Brew Pack,Coffee,1,9.90,app
+106661,2026-07-12,Hugo Mäkinen,Stockholm,Sweden,Espresso Beans 1kg,Coffee,2,24.90,store
+106728,2026-07-14,Ida Larsen,Aarhus,Denmark,Tote Bag,Merch,4,12.00,store
+106288,2026-07-02,Leo Mäkinen,Trondheim,Norway,Espresso Beans 1kg,Coffee,1,24.90,web
+107165,2026-07-25,Aino Hansen,Hamburg,Germany,Earl Grey 100g,Tea,1,6.90,web
+106268,2026-07-01,Ida Berg,Gothenburg,Sweden,Green Tea 100g,Tea,1,7.50,web
+106308,2026-07-03,Alma Nilsen,Hamburg,Germany,Logo Mug,Merch ,2,14.00,app
+106941,2026-07-19,Ida Korhonen,Tampere,Finland,Cold Brew Pack,Coffee,1,9.90,web
+106619,2026-07-11,Lukas Mäkinen,Odense,Denmark,Cold Brew Pack,Coffee,1,9.90,store
+107004,2026-07-21,Elsa Müller,Bergen,Norway,Tote Bag,Merch,1,12.00,web
+107036,2026-07-22,Elsa Berg,Turku,Finland,Travel Cup,Merch,6,22.00,web
+106594,2026-07-11,Mikael Lindqvist,Malmö,Sweden,Cold Brew Pack,Coffee,1,9.90,store
+106470,2026-07-07,Aino Lindqvist,Trondheim,Norway,Cold Brew Pack,Coffee,6,9.90,app
+107340,2026-07-30,Saga Nilsen,Malmö,Sweden,Logo Mug,Merch,1,14.00,web
+107155,2026-07-25,Hugo Tamm,Uppsala,Sweden,Logo Mug,Merch,1,14.00,web
+107087,2026-07-23,Freja Andersson,Malmö,Sweden,Chai Mix 200g,Tea,1,8.90,store
+106489,2026-07-07,Ida Johansson,Turku,Finland,Cold Brew Pack,Coffee,3,N/A,store
+106584,2026-07-10,Eero Hansen,Berlin,Germany,Cold Brew Pack,Coffee,1,9.90,app
+107229,2026-07-27,Leo Nilsen,Munich,Germany,Cold Brew Pack,Coffee,1,9.90,web
+107260,2026-07-28,Lukas Lindqvist,Odense,Denmark,Cinnamon Bun,Bakery,1,3.90,web
+107292,2026-07-28,Ella Müller,Malmö,Sweden,Blueberry Muffin,Bakery,6,3.50,store
+107156,2026-07-25,Eero Virtanen,Berlin,Germany,Chai Mix 200g,Tea,3,8.90,web
+106495,2026-07-08,Aino Nieminen,Gothenburg,Sweden,Blueberry Muffin,Bakery,2,3.50,app
+106812,2026-07-16,Ella Müller,Gothenburg,Sweden,Tote Bag,Merch,1,12.00,app
+106440,2026-07-06,Oskar Virtanen,Oulu,Finland,Cinnamon Bun,Bakery,4,3.90,web
+107231,2026-07-27,Oskar Müller,Espoo,FINLAND,Green Tea 100g,Tea,2,7.50,web
+106443,2026-07-06,Linnea Nieminen,Espoo,finland,Decaf Blend 500g,Coffee,2,14.90,store
+107094,2026-07-23,Linnea Mäkinen,Tampere,Finland,Cold Brew Pack,Coffee,1,9.90,store
+106581,2026-07-10,Lukas Hansen,Stockholm,Sweden,Cold Brew Pack,Coffee,2,9.90,web
+106768,2026-07-15,Aino Hansen,Copenhagen,Denmark,Pour-over Kit,Equipment,1,39.00,web
+107383,2026-07-31,Liam Lindqvist,Tartu,Estonia,Filter Roast 500g,Coffee,3,13.50,web
+106722,2026-07-14,Oskar Nilsen,Odense,Denmark,Logo Mug,Merch,1,14.00,store
+106665,2026-07-12,Emil Berg,,Norway,Earl Grey 100g,Tea,1,6.90,app
+106384,2026-07-05,Eero Berg,Munich,Germany,Blueberry Muffin,BAKERY,2,3.50,web
+107295,2026-07-29,Ida Schmidt,Gothenburg,Sweden,Cold Brew Pack,Coffee,2,9.90,app
+107139,2026-07-25,Eero Berg,Malmö,Sweden,Cinnamon Bun,Bakery,1,3.90,web
+106743,2026-07-14,Maja Nilsen,Tartu,Estonia,Cold Brew Pack,Coffee,1,9.90,web
+107119,2026-07-24,Jonas Larsen,Gothenburg,Sweden,Cold Brew Pack,Coffee,1,9.90,web
+106639,2026-07-11,Alma Korhonen,Gothenburg,Sweden,Tote Bag,Merch,1,12.00,app
+106658,2026-07-12,Hugo Larsen,Malmö,  Sweden ,Green Tea 100g,Tea,1,7.50,store
+106640,11/07/2026,Jonas Berg,Uppsala,Sweden,Rye Bread,Bakery,3,5.20,web
+106751,2026-07-14,Mikael Berg,Hamburg,Germany,Cold Brew Pack,Coffee,1,9.90,app
+107296,2026-07-29,Jonas Larsen,Helsinki,Finland,Cold Brew Pack,Coffee,3,9.90,web
+106346,2026-07-04,Saga Mäkinen,Bergen,Norway,Decaf Blend 500g,Coffee,2,14.90,app
+107338,2026-07-30,Elsa Lindqvist,Turku,Finland,Decaf Blend 500g,Coffee,1,14.90,app
+106824,2026-07-16,Liam Tamm,Copenhagen,Denmark,Cinnamon Bun,Bakery,1,3.90,store
+107047,22/07/2026,Emil Tamm,Turku,Finland,Tote Bag,Merch,2,12.00,app
+106946,2026-07-19,Hugo Virtanen,,Denmark,Blueberry Muffin,Bakery,1,3.50,web
+106383,2026-07-05,Linnea Müller,Berlin,Germany,Green Tea 100g,Tea,1,7.50,web
+106269,2026-07-02,Aino Johansson,Oslo,Norway,Cold Brew Pack,Coffee,2,,app
+107042,2026-07-22,Maja Hansen,Berlin,Germany,Travel Cup,Merch,1,22.00,web
+106745,2026-07-14,Alma Schmidt,Tartu,Estonia,Chai Mix 200g,Tea,2,8.90,web
+107224,2026-07-27,Alma Larsen,Oulu,Finland,Filter Roast 500g,Coffee,1,13.50,web
+106253,2026-07-01,Jonas Hansen,Munich,Germany,Espresso Beans 1kg,Coffee,1,24.90,app
+106318,2026-07-03,Lukas Berg,Tallinn,Estonia,Cold Brew Pack,Coffee,1,9.90,app
+107298,2026-07-29,Elsa Nilsen,Hamburg,Germany,Cinnamon Bun,Bakery,4,3.90,store
+106720,13/07/2026,Eero Mäkinen,Hamburg,Germany,Cold Brew Pack,Coffee,1,9.90,app
+106275,2026-07-02,Hugo Mäkinen,,Sweden,Espresso Beans 1kg,Coffee,1,24.90,web
+106708,2026-07-13,Emil Nieminen,Tampere,Finland,Espresso Beans 1kg,Coffee,1,24.90,app
+106647,2026-07-12,Elsa Saar,Munich,Germany,Blueberry Muffin,Bakery,1,3.50,app
+106954,2026-07-20,Alma Nieminen,Tallinn,Estonia,Cinnamon Bun,Bakery,2,3.90,store
+106994,2026-07-21,Ella Virtanen,Munich,Germany,Chai Mix 200g,Tea,1,8.90,app
+107271,2026-07-28,Ida Lindqvist,Gothenburg,Sweden,Cold Brew Pack,Coffee,3,9.90,web
+107108,2026-07-24,Jonas Tamm,Odense,Denmark,Chai Mix 200g,Tea,-2,8.90,web
+106568,10/07/2026,Emil Nilsen,Uppsala,Sweden,Pour-over Kit,Equipment,1,39.00,web
+106276,2026-07-02,Liam Saar,Tampere,Finland,Filter Roast 500g,Coffee,6,13.50,web
+107045,2026-07-22,Saga Mäkinen,Oslo,Norway,Blueberry Muffin,Bakery,3,3.50,app
+106351,2026-07-04,Elsa Hansen,Espoo,Finland,Earl Grey 100g,Tea,3,6.90,app
+107111,2026-07-24,Lukas Johansson,Espoo,Finland,Espresso Beans 1kg,Coffee,1,24.90,web
+107330,30/07/2026,Maja Schmidt,Tartu,Estonia,Decaf Blend 500g,Coffee,2,14.90,app
+106916,2026-07-19,Alma Berg,Munich,Germany,Rye Bread,Bakery,1,5.20,web
+106907,2026-07-18,Emil Mäkinen,Turku,Finland,Travel Cup,Merch,2,22.00,web
+106750,2026-07-14,Lukas Berg,Berlin,Germany,Earl Grey 100g,Tea,1,6.90,web
+106627,2026-07-11,Sofia Saar,Oslo,Norway,Cold Brew Pack,Coffee,2,9.90,app
+107250,2026-07-27,Noah Schmidt,Munich,Germany,Blueberry Muffin,Bakery,6,3.50,app
+106965,2026-07-20,Aino Andersson,Malmö,Sweden,Moka Pot,Equipment,2,34.00,web
+107077,2026-07-23,Lukas Hansen,,Germany,Green Tea 100g,Tea,2,7.50,store
+106820,2026-07-16,Ella Schmidt,Helsinki,Finland,Cold Brew Pack,Coffee,2,9.90,app
+106350,2026-07-04,Lukas Hansen,Trondheim,Norway,Cold Brew Pack,Coffee,1,9.90,web
+106856,2026-07-17,Freja Berg,Trondheim,Norway,Single Origin Kenya 250g,Coffee,1,11.90,web
+106431,2026-07-05,Elsa Andersson,Tampere,Finland,Earl Grey 100g,Tea,1,6.90,web
+106476,2026-07-07,Ida Schmidt,Uppsala,Sweden,Espresso Beans 1kg,Coffee,1,24.90,web
+106464,2026-07-07,Eero Lindqvist,Gothenburg,Sweden,Logo Mug,Merch,1,14.00,app
+106340,2026-07-04,Alma Johansson,Munich,Germany,Cold Brew Pack,Coffee,2,9.90,app
+106685,2026-07-13,Ella Nilsen,Espoo,Finland,Cold Brew Pack,Coffee,2,9.90,store
+106932,2026-07-19,Eero Hansen,Munich,GERMANY,Rye Bread,Bakery,2,5.20,web
+106610,2026-07-11,Jonas Hansen,Tampere,Finland,Cinnamon Bun,Bakery,2,3.90,app
+106442,2026-07-06,Freja Johansson,Odense,Denmark,Blueberry Muffin,Bakery,1,3.50,app
+107090,2026-07-23,Emil Andersson,Tartu,Estonia,Cold Brew Pack,Coffee,1,9.90,web
+107039,2026-07-22,Noah Lindqvist,Berlin,Germany,Earl Grey 100g,Tea,1,6.90,web
+106712,2026-07-13,Mikael Lindqvist,Aarhus,Denmark,Cold Brew Pack,Coffee,2,9.90,store
+106795,2026-07-16,Sofia Müller,Munich,Germany,Logo Mug,Merch,6,14.00,app
+107046,2026-07-22,Eero Saar,Trondheim,Norway,Cold Brew Pack,Coffee,1,9.90,store
+107056,2026-07-22,Linnea Virtanen,Gothenburg,Sweden,Espresso Beans 1kg,Coffee,2,24.90,app
+107101,2026-07-24,Saga Berg,Tallinn,Estonia,Cold Brew Pack,Coffee,1,9.90,web
+107092,2026-07-23,Sofia Saar,Helsinki,Finland,Logo Mug,Merch,1,14.00,store
+106966,2026-07-20,Hugo Andersson,Oulu,Finland,Cinnamon Bun,Bakery,1,3.90,store
+106721,2026-07-13,Mikael Hansen,Turku,Finland,Espresso Beans 1kg,Coffee,1,24.90,store
+,2026-07-19,Maja Schmidt,Trondheim,Norway,Decaf Blend 500g,Coffee,3,14.90,web
+106844,2026-07-17,Hugo Nilsen,Copenhagen,Denmark,Cold Brew Pack,Coffee,1,9.90,store
+107379,2026-07-31,Sofia Virtanen,Espoo,Finland,Cold Brew Pack,Coffee,2,9.90,web
+106331,2026-07-03,Saga Lindqvist,Turku,Finland,Cold Brew Pack,Coffee,3,9.90,web
+106603,2026-07-11,Ella Lindqvist,Oulu,Finland,Espresso Beans 1kg,Coffee,1,24.90,app
+106305,2026-07-03,Emil Mäkinen,Tampere,Finland,Logo Mug,Merch,2,14.00,web
+107193,2026-07-26,Mikael Berg,Malmö,Sweden,Cold Brew Pack,Coffee,1,9.90,app
+107317,2026-07-29,Oskar Larsen,Espoo,Finland,Cold Brew Pack,Coffee,1,9.90,web
+106374,2026-07-04,Maja Saar,Uppsala,Sweden,Blueberry Muffin,Bakery,3,3.50,web
+106803,2026-07-16,Liam Berg,Tallinn,Estonia,Espresso Beans 1kg,Coffee,3,24.90,web
+106683,2026-07-13,Linnea Korhonen,Trondheim,Norway,Earl Grey 100g,Tea,1,6.90,web
+106522,2026-07-08,Jonas Schmidt,Espoo,Finland,Travel Cup,Merch,1,22.00,store
+107007,21/07/2026,Jonas Müller,Oslo,Norway,Blueberry Muffin,Bakery,1,3.50,app
+107382,2026-07-31,Sofia Nieminen,Espoo,Finland,Filter Roast 500g,Coffee,2,13.50,web
+107233,2026-07-27,Sofia Müller,Hamburg,Germany,Blueberry Muffin,Bakery,4,3.50,app
+107113,2026-07-24,Alma Schmidt,Espoo,Finland,Hand Grinder,Equipment,1,49.00,app
+106504,2026-07-08,Ida Schmidt,Munich,Germany,Cinnamon Bun,Bakery,2,3.90,web
+107144,2026-07-25,Jonas Andersson,Oslo,Norway,Cold Brew Pack,Coffee,3,9.90,web
+107025,2026-07-21,Sofia Nieminen,Turku,Finland,Filter Roast 500g,Coffee,1,13.50,web
+106366,2026-07-04,Liam Korhonen,Gothenburg,Sweden,Decaf Blend 500g,Coffee,1,14.90,app
+107163,2026-07-25,Maja Schmidt,Uppsala,Sweden,Cinnamon Bun,Bakery,2,3.90,store
+106394,2026-07-05,Liam Johansson,Helsinki,Finland,Cinnamon Bun,Bakery,2,3.90,app
+107131,2026-07-24,Mikael Berg,Berlin,Germany,Cold Brew Pack,Coffee,1,9.90,app
+107151,2026-07-25,Hugo Lindqvist,Odense,Denmark,Cold Brew Pack,Coffee,1,9.90,web
+106774,2026-07-15,Hugo Saar,Berlin,Germany,Cold Brew Pack,Coffee,2,9.90,web
+106542,2026-07-09,Ida Korhonen,Aarhus,Denmark,Green Tea 100g,Tea,4,7.50,web
+106807,2026-07-16,Hugo Müller,Berlin,Germany,Cold Brew Pack,Coffee,1,9.90,app
+106274,2026-07-02,Jonas Mäkinen,,Estonia,Logo Mug,Merch,2,14.00,web
+107343,2026-07-30,Liam Tamm,Uppsala,Sweden,Rye Bread,Bakery,1,5.20,app
+107320,2026-07-29,Sofia Korhonen,Turku,Finland,Blueberry Muffin,Bakery,1,3.50,web
+106239,2026-07-01,Freja Virtanen,Malmö,Sweden,Rye Bread,Bakery,1,5.20,web
+106783,2026-07-15,Saga Johansson,Odense,Denmark,Rye Bread,Bakery,1,5.20,app
+107145,2026-07-25,Aino Müller,Odense,Denmark,Rye Bread,Bakery ,1,5.20,app
+106451,2026-07-06,Saga Nilsen,Tartu,Estonia,Green Tea 100g,Tea,2,7.50,web
+107329,2026-07-30,Noah Mäkinen,Tartu,Estonia,Travel Cup,Merch,1,22.00,web
+107281,2026-07-28,Ida Nilsen,Oslo,Norway,Green Tea 100g,Tea,1,7.50,web
+106293,2026-07-02,Hugo Korhonen,Hamburg,Germany,Blueberry Muffin,Bakery,2,3.50,app
+107073,2026-07-23,Ida Mäkinen,Turku,Finland,Cinnamon Bun,Bakery,1,3.90,app
+106636,2026-07-11,Lukas Berg,Bergen,Norway,Rye Bread,Bakery,1,5.20,app
+107393,2026-07-31,Lukas Nilsen,,Norway,Cold Brew Pack,Coffee,1,9.90,store
+107297,2026-07-29,Sofia Nieminen,Helsinki,Finland,Tote Bag,Merch,1,12.00,web
+107059,2026-07-22,Leo Berg,Malmö,Sweden,Cold Brew Pack,Coffee,2,9.90,web
+107196,2026-07-26,Oskar Johansson,Gothenburg,Sweden,Cinnamon Bun,Bakery,1,3.90,web
+106597,2026-07-11,Saga Berg,Oulu,Finland,Blueberry Muffin,Bakery,1,3.50,web
+106290,2026-07-02,Alma Andersson,Tartu,Estonia,Filter Roast 500g,Coffee,2,13.50,store
+106963,2026-07-20,Noah Hansen,Hamburg,Germany,Decaf Blend 500g,Coffee,-1,14.90,web
+106900,2026-07-18,Oskar Johansson,Oulu,Finland,Cinnamon Bun,BAKERY,1,3.90,web
+107049,2026-07-22,Mikael Virtanen,Berlin,Germany,Earl Grey 100g,Tea,1,6.90,store
+106355,2026-07-04,Eero Tamm,Tartu,Estonia,Espresso Beans 1kg,Coffee,2,24.90,app
+106678,2026-07-12,Alma Nilsen,Uppsala,Sweden,Cold Brew Pack,Coffee,1,9.90,web
+106948,2026-07-19,Lukas Korhonen,,Finland,Rye Bread,Bakery,1,5.20,app
+106273,2026-07-02,Aino Mäkinen,Espoo,Finland,Green Tea 100g,Tea,3,7.50,web
+106968,2026-07-20,Lukas Johansson,Helsinki,Finland,Moka Pot,Equipment,1,34.00,store
+106367,2026-07-04,Hugo Nieminen,Trondheim,Norway,Cinnamon Bun,bakery,1,3.90,app
+106430,2026-07-05,Saga Johansson,Oulu,Finland,Cold Brew Pack,Coffee,1,9.90,store
+106770,2026-07-15,Ella Lindqvist,Helsinki,Finland,Filter Roast 500g,Coffee,3,13.50,web
+106496,2026-07-08,Liam Johansson,Helsinki,Finland,Milk Frother,Equipment,6,29.00,web
+106605,2026-07-11,Linnea Saar,Stockholm,Sweden,Espresso Beans 1kg,Coffee,2,24.90,app
+106730,2026-07-14,Emil Hansen,Malmö,Sweden,Cinnamon Bun,Bakery,1,3.90,web
+106683,2026-07-13,Linnea Korhonen,Trondheim,Norway,Earl Grey 100g,Tea,1,6.90,web
+106330,2026-07-03,Alma Larsen,Tampere,Finland,Blueberry Muffin,Bakery,1,N/A,web
+106695,2026-07-13,Emil Müller,Uppsala,Sweden,Logo Mug,Merch,1,14.00,web
+106513,2026-07-08,Maja Virtanen,Bergen,Norway,Single Origin Kenya 250g,Coffee,1,11.90,web
+106538,09/07/2026,Aino Schmidt,Espoo,Finland,Filter Roast 500g,Coffee,3,13.50,app
+106773,2026-07-15,Hugo Nieminen,Oulu,Finland,Decaf Blend 500g,Coffee,1,14.90,app
+106883,2026-07-18,Noah Virtanen,Turku,Finland,Earl Grey 100g,Tea,1,6.90,web
+106468,2026-07-07,Sofia Andersson,Copenhagen,Denmark,Filter Roast 500g,Coffee,2,13.50,web
+106713,2026-07-13,Lukas Tamm,Espoo,Finland,Cinnamon Bun,Bakery,3,3.90,web
+106723,2026-07-14,Mikael Korhonen,Tartu,Estonia,Decaf Blend 500g,Coffee,1,14.90,app
+106983,2026-07-20,Oskar Müller,Copenhagen,Denmark,Filter Roast 500g,Coffee,6,13.50,web
+106737,2026-07-14,Leo Johansson,Tampere,Finland,Earl Grey 100g,Tea,1,6.90,web
+106913,2026-07-19,Alma Nilsen,Malmö,Sweden,Green Tea 100g,Tea,1,7.50,app
+106587,2026-07-10,Ella Mäkinen,Stockholm,Sweden,Green Tea 100g,Tea,3,7.50,app
+106981,2026-07-20,Noah Berg,Turku,Finland,Espresso Beans 1kg,Coffee,2,24.90,web
+106921,2026-07-19,Aino Müller,Oulu,Finland,Filter Roast 500g,Coffee,2,13.50,app
+106493,08/07/2026,Liam Tamm,Gothenburg,Sweden,Logo Mug,Merch,1,14.00,web
+106322,2026-07-03,Elsa Nieminen,Tartu,Estonia,Cold Brew Pack,Coffee,3,9.90,app
+106392,2026-07-05,Elsa Berg,Trondheim,Norway,Logo Mug,Merch,3,14.00,web
+106868,2026-07-18,Jonas Mäkinen,Espoo,Finland,Blueberry Muffin,Bakery,2,3.50,app
+106975,2026-07-20,Jonas Schmidt,Munich,Germany,Filter Roast 500g,Coffee,4,13.50,store
+107390,2026-07-31,Sofia Mäkinen,Malmö,Sweden,Cold Brew Pack,Coffee,1,9.90,store
+106956,20/07/2026,Oskar Schmidt,Aarhus,Denmark,Logo Mug,Merch,1,14.00,web
+107178,2026-07-26,Aino Larsen,Hamburg,Germany,Cold Brew Pack,Coffee,1,9.90,web
+106416,2026-07-05,Elsa Andersson,Tampere,Finland,Cold Brew Pack,Coffee,1,9.90,app
+106748,2026-07-14,Ida Lindqvist,Tampere,FINLAND,Espresso Beans 1kg,Coffee,2,24.90,web
+107274,2026-07-28,Hugo Mäkinen,Odense,Denmark,Cold Brew Pack,Coffee,2,9.90,app
+107082,2026-07-23,Saga Lindqvist,Turku,Finland,Earl Grey 100g,Tea,2,6.90,web
+106834,2026-07-17,Oskar Schmidt,Oulu,Finland,Espresso Beans 1kg,Coffee,2,24.90,app
+106919,2026-07-19,Sofia Nilsen,Bergen,Norway,Single Origin Kenya 250g,Coffee,6,11.90,web
+106766,2026-07-15,Linnea Johansson,Helsinki,Finland,Filter Roast 500g,Coffee,1,13.50,web
+107222,2026-07-26,Aino Schmidt,Hamburg,Germany,Decaf Blend 500g,Coffee,6,14.90,web
+106314,2026-07-03,Liam Berg,Gothenburg,Sweden,Cinnamon Bun,Bakery,2,3.90,store
+106704,2026-07-13,Leo Virtanen,Oulu,Finland,Cold Brew Pack,Coffee,1,9.90,app
+106281,2026-07-02,Alma Nilsen,Aarhus,Denmark,Cold Brew Pack,Coffee,1,9.90,store
+106879,2026-07-18,Liam Nilsen,Helsinki,Finland,Cinnamon Bun,Bakery,1,3.90,app
+107039,2026-07-22,Noah Lindqvist,Berlin,Germany,Earl Grey 100g,Tea,1,6.90,web
+107367,2026-07-31,Mikael Müller,Oslo,Norway,Milk Frother,Equipment,,29.00,app
+106457,2026-07-06,Mikael Berg,Bergen,Norway,Cold Brew Pack,Coffee,2,9.90,web
+106985,2026-07-20,Aino Nieminen,Espoo,Finland,Cold Brew Pack,Coffee,1,9.90,app
+106709,2026-07-13,Noah Larsen,Munich,Germany,Decaf Blend 500g,Coffee,1,14.90,store
+106242,2026-07-01,Emil Müller,Odense,Denmark,Cinnamon Bun,Bakery,1,3.90,web
+106260,2026-07-01,Jonas Johansson,Copenhagen,Denmark,Cold Brew Pack,Coffee,1,9.90,web
+106519,2026-07-08,Aino Johansson,Berlin,Germany,Blueberry Muffin,Bakery,2,3.50,web
+106764,2026-07-15,Mikael Müller,Oulu,Finland,Blueberry Muffin,Bakery,1,3.50,app
+106547,2026-07-09,Leo Berg,Helsinki,Finland,Cold Brew Pack,Coffee,2,9.90,web
+106655,2026-07-12,Liam Lindqvist,Oulu,Finland,Cinnamon Bun,Bakery,2,3.90,app
+107317,2026-07-29,Oskar Larsen,Espoo,Finland,Cold Brew Pack,Coffee,1,9.90,web
+107079,2026-07-23,Leo Hansen,Copenhagen,Denmark,Tote Bag,Merch,1,12.00,app
+106536,2026-07-09,Oskar Virtanen,Gothenburg,Sweden,Rye Bread,Bakery,1,5.20,web
+107285,2026-07-28,Oskar Berg,Helsinki,Finland,Cold Brew Pack,Coffee,2,9.90,app
+107391,2026-07-31,Maja Korhonen,Munich,Germany,Logo Mug,Merch,1,14.00,web
+106667,2026-07-12,Freja Berg,Tartu,Estonia,Filter Roast 500g,Coffee,1,13.50,app
+106272,2026-07-02,Alma Larsen,Oulu,Finland,Espresso Beans 1kg,Coffee,2,24.90,app
+106498,2026-07-08,Liam Larsen,Gothenburg,Sweden,Cinnamon Bun,bakery,2,3.90,web
+106481,2026-07-07,Maja Korhonen,,Germany,Logo Mug,Merch,2,14.00,app
+106570,2026-07-10,Alma Berg,Hamburg,GERMANY,Tote Bag,Merch,3,12.00,app
+106702,2026-07-13,Emil Andersson,Aarhus,Denmark,Cold Brew Pack,Coffee,3,9.90,web
+106889,2026-07-18,Alma Korhonen,Oslo,Norway,Cinnamon Bun,Bakery,2,3.90,store
+107121,2026-07-24,Alma Andersson,Oulu,Finland,Blueberry Muffin,Bakery,1,3.50,web
+107283,2026-07-28,Linnea Tamm,Uppsala,Sweden,Earl Grey 100g,Tea,3,6.90,web
+106487,2026-07-07,Oskar Nilsen,Aarhus,Denmark,Green Tea 100g,Tea,3,7.50,web
+106974,2026-07-20,Mikael Virtanen,Helsinki,FINLAND,Cold Brew Pack,Coffee,2,9.90,app
+106733,2026-07-14,Aino Schmidt,Aarhus,Denmark,Green Tea 100g,Tea,1,7.50,web
+107018,2026-07-21,Eero Andersson,Helsinki,Finland,Earl Grey 100g,Tea,1,6.90,web
+106710,2026-07-13,Liam Nilsen,Aarhus,Denmark,Decaf Blend 500g,Coffee,1,14.90,web
+107389,2026-07-31,Leo Korhonen,Tallinn,Estonia,Single Origin Kenya 250g,Coffee,1,11.90,app
+106284,2026-07-02,Hugo Saar,Munich,Germany,Espresso Beans 1kg,Coffee,1,24.90,web
+106599,2026-07-11,Maja Larsen,Tampere,Finland,Hand Grinder,Equipment,2,49.00,web
+106915,2026-07-19,Leo Mäkinen,Munich,Germany,Moka Pot,Equipment,1,34.00,app
+106336,2026-07-03,Eero Hansen,Tampere,Finland,Earl Grey 100g,Tea,1,6.90,web
+106860,2026-07-17,Sofia Nilsen,Tartu,Estonia,Blueberry Muffin,Bakery,1,3.50,app
+107201,2026-07-26,Noah Mäkinen,Oslo,Norway,Blueberry Muffin,Bakery,1,3.50,web
+106611,11/07/2026,Mikael Müller,Berlin,Germany,Cold Brew Pack,Coffee,1,9.90,store
+106780,2026-07-15,Ella Berg,Turku,Finland,Cold Brew Pack,Coffee,1,9.90,app
+106571,2026-07-10,Elsa Larsen,Bergen,Norway,Logo Mug,Merch,4,14.00,web
+106881,2026-07-18,Hugo Korhonen,Stockholm,Sweden,Espresso Beans 1kg,Coffee,2,24.90,app
+107323,2026-07-29,Alma Schmidt,Tallinn,Estonia,Filter Roast 500g,Coffee,1,13.50,web
+107277,2026-07-28,Sofia Hansen,Aarhus,Denmark,Logo Mug,Merch,3,14.00,web
+106458,2026-07-06,Ella Johansson,Stockholm,Sweden,Espresso Beans 1kg,Coffee,1,N/A,app
+106387,2026-07-05,Mikael Johansson,Turku,Finland,Single Origin Kenya 250g,Coffee,2,11.90,web
+106460,2026-07-06,Sofia Müller,Helsinki,Finland,Decaf Blend 500g,Coffee,4,14.90,app
+106995,2026-07-21,Oskar Schmidt,Turku,Finland,Espresso Beans 1kg,COFFEE,2,24.90,web
+106756,2026-07-14,Linnea Müller,Oulu,FINLAND,Cold Brew Pack,Coffee,6,9.90,store
+106835,2026-07-17,Jonas Larsen,Hamburg,Germany,Decaf Blend 500g,COFFEE,2,14.90,web
+107158,2026-07-25,Sofia Lindqvist,Trondheim,Norway,Espresso Beans 1kg,Coffee,1,24.90,web
+106910,2026-07-19,Oskar Müller,Turku,Finland,Blueberry Muffin,Bakery,1,3.50,app
+106925,2026-07-19,Maja Berg,Turku,Finland,Espresso Beans 1kg,Coffee,1,24.90,store
+107051,2026-07-22,Mikael Tamm,Oulu,Finland,Filter Roast 500g,Coffee,1,13.50,store
+106963,2026-07-20,Noah Hansen,Hamburg,Germany,Decaf Blend 500g,Coffee,-1,14.90,web
+106937,2026-07-19,Aino Nieminen,Copenhagen,Denmark,Cold Brew Pack,Coffee,1,9.90,web
+106545,2026-07-09,Maja Tamm,Munich,Germany,Cold Brew Pack,Coffee,1,9.90,store
+106646,2026-07-12,Emil Tamm,Hamburg,Germany,Green Tea 100g,Tea,-1,7.50,store
+106301,2026-07-03,Aino Berg,Aarhus,Denmark,Blueberry Muffin,Bakery,2,3.50,app
+107370,2026-07-31,Alma Nilsen,Tallinn,Estonia,Tote Bag,Merch,2,12.00,store
+107257,2026-07-28,Eero Hansen,Munich,Germany,Cinnamon Bun,Bakery,1,3.90,app
+107312,2026-07-29,Elsa Johansson,Malmö,Sweden,Chai Mix 200g,Tea,1,8.90,store
+106307,2026-07-03,Oskar Müller,Turku,Finland,Cinnamon Bun,Bakery,1,3.90,app
+106838,2026-07-17,Freja Nieminen,Berlin,Germany,Chai Mix 200g,Tea,3,8.90,web
+106531,2026-07-09,Mikael Müller,Uppsala,Sweden,Single Origin Kenya 250g,Coffee,2,11.90,web
+107137,2026-07-25,Mikael Saar,Hamburg,Germany,Decaf Blend 500g,Coffee,1,14.90,app
+107207,2026-07-26,Linnea Schmidt,Turku,Finland,Cinnamon Bun,Bakery,3,3.90,store
+106278,2026-07-02,Mikael Johansson,Malmö,Sweden,Earl Grey 100g,Tea,2,6.90,store
+106533,2026-07-09,Jonas Larsen,Turku,FINLAND,Earl Grey 100g,Tea,3,6.90,app
+107027,2026-07-21,Emil Nilsen,Bergen,Norway,Cinnamon Bun,Bakery,1,3.90,web
+107339,2026-07-30,Lukas Larsen,Tampere,Finland,Rye Bread,Bakery,3,5.20,web
+106977,2026-07-20,Sofia Tamm,Espoo,Finland,Hand Grinder,Equipment,1,49.00,web
+106565,2026-07-10,Hugo Berg,Aarhus,Denmark,Milk Frother,Equipment,2,29.00,web
+106617,2026-07-11,Linnea Müller,Helsinki,Finland,Cold Brew Pack,Coffee,3,9.90,app
+107385,2026-07-31,Lukas Müller,Uppsala,Sweden,Logo Mug,Merch,2,14.00,web
+107341,2026-07-30,Leo Hansen,Trondheim,Norway,Espresso Beans 1kg,Coffee,1,24.90,app
+106793,2026-07-16,Mikael Mäkinen,Hamburg,Germany,Logo Mug,Merch,3,14.00,web
+106540,09/07/2026,Saga Hansen,Helsinki,Finland,Decaf Blend 500g,Coffee,2,14.90,store
+106987,2026-07-20,Maja Nilsen,Stockholm,Sweden,Logo Mug,Merch,1,14.00,web
+106372,2026-07-04,Oskar Hansen,Trondheim,Norway,Cold Brew Pack,Coffee ,2,9.90,store
+107254,2026-07-27,Oskar Andersson,Malmö,Sweden,Cold Brew Pack,Coffee,1,9.90,web
+106656,2026-07-12,Elsa Berg,Espoo,Finland,Travel Cup,Merch,1,22.00,web
+106535,2026-07-09,Sofia Mäkinen,Trondheim,Norway,Chai Mix 200g,Tea,2,8.90,app
+107091,2026-07-23,Liam Saar,Helsinki,Finland,Decaf Blend 500g,Coffee,3,N/A,app
+106583,2026-07-10,Liam Schmidt,Tallinn,Estonia,Cinnamon Bun,Bakery,1,3.90,store
+106663,2026-07-12,Saga Nieminen,Munich,Germany,Cinnamon Bun,Bakery,0,3.90,web
+106906,2026-07-18,Liam Lindqvist,Gothenburg,Sweden,Espresso Beans 1kg,Coffee,2,24.90,web
+106905,2026-07-18,Maja Nieminen,Helsinki,Finland,Cold Brew Pack,Coffee,1,9.90,app
+106810,2026-07-16,Ida Johansson,Tampere,Finland,Espresso Beans 1kg,Coffee,1,24.90,web
+107358,2026-07-30,Liam Larsen,Malmö,Sweden,Filter Roast 500g,Coffee,1,13.50,store
+106852,2026-07-17,Freja Larsen,Munich,Germany,Blueberry Muffin,Bakery,1,3.50,web
+107150,2026-07-25,Lukas Mäkinen,Munich,Germany,Logo Mug,Merch,3,14.00,web
+107241,2026-07-27,Oskar Johansson,Tartu,Estonia,Decaf Blend 500g,Coffee,6,14.90,app
+107133,2026-07-25,Mikael Berg,Turku,Finland,Cold Brew Pack,Coffee,4,9.90,web
+107215,2026-07-26,Ella Saar,Stockholm,Sweden,Cold Brew Pack,Coffee,1,9.90,web
+107100,2026-07-23,Lukas Korhonen,Aarhus,Denmark,Filter Roast 500g,Coffee,1,13.50,web
+106345,2026-07-04,Liam Müller,Hamburg,Germany,Rye Bread,Bakery,1,5.20,store
+107395,2026-07-31,Aino Andersson,Munich,Germany,Espresso Beans 1kg,Coffee,1,24.90,web
+107331,2026-07-30,Ella Korhonen,Trondheim,Norway,Green Tea 100g,Tea,1,7.50,web
+106601,2026-07-11,Freja Saar,Oslo,Norway,Blueberry Muffin,Bakery,2,3.50,web
+107319,2026-07-29,Ella Johansson,Aarhus,Denmark,Single Origin Kenya 250g,Coffee,1,11.90,web
+107142,2026-07-25,Elsa Müller,Turku,Finland,Single Origin Kenya 250g,Coffee,1,11.90,app
+106511,2026-07-08,Mikael Virtanen,Tartu,Estonia,Filter Roast 500g,Coffee,1,13.50,app
+106731,2026-07-14,Noah Andersson,Malmö,Sweden,Single Origin Kenya 250g,Coffee,1,11.90,web
+107369,2026-07-31,Lukas Hansen,Helsinki,Finland,Rye Bread,Bakery,1,5.20,app
+107124,2026-07-24,Linnea Larsen,Hamburg,Germany,Cold Brew Pack,Coffee,1,9.90,web
+107218,2026-07-26,Alma Mäkinen,Berlin,Germany,Chai Mix 200g,Tea,1,8.90,web
+106832,2026-07-17,Emil Berg,Copenhagen,Denmark,Cold Brew Pack,Coffee,1,9.90,app
+107117,24/07/2026,Mikael Larsen,Espoo,Finland,Espresso Beans 1kg,Coffee,1,24.90,web
+106455,2026-07-06,Maja Berg,Oulu,Finland,Logo Mug,Merch,4,14.00,store
+106254,2026-07-01,Noah Tamm,Espoo,Finland,Filter Roast 500g,Coffee,1,13.50,store
+106541,2026-07-09,Emil Tamm,Aarhus,Denmark,Cold Brew Pack,Coffee,1,9.90,web
+106241,2026-07-01,Linnea Müller,Uppsala,Sweden,Cold Brew Pack,Coffee,1,9.90,web
+106596,11/07/2026,Ella Andersson,Helsinki,Finland,Cinnamon Bun,Bakery,1,3.90,web
+106435,2026-07-06,Noah Virtanen,Trondheim,Norway,Cinnamon Bun,Bakery,2,3.90,store
+107013,2026-07-21,Eero Johansson,Oulu,finland,Decaf Blend 500g,Coffee,3,14.90,web
+107346,2026-07-30,Liam Tamm,Tartu,Estonia,Espresso Beans 1kg,Coffee,1,24.90,web
+106509,2026-07-08,Noah Nieminen,Uppsala,Sweden,Filter Roast 500g,Coffee,1,13.50,web
+106255,2026-07-01,Noah Tamm,Gothenburg,Sweden,Rye Bread,Bakery,1,5.20,store
+107374,2026-07-31,Mikael Korhonen,Gothenburg,Sweden,Cinnamon Bun,Bakery,4,3.90,app
+107332,2026-07-30,Lukas Hansen,Tampere,Finland,Espresso Beans 1kg,Coffee,1,24.90,app
+106799,2026-07-16,Leo Virtanen,Oulu,Finland,Filter Roast 500g,Coffee,1,13.50,web
+106291,2026-07-02,Aino Schmidt,Tartu,Estonia,Green Tea 100g,Tea,2,7.50,web
+107266,2026-07-28,Noah Müller,Tampere,Finland,Cold Brew Pack,Coffee,1,9.90,web
+106779,2026-07-15,Hugo Johansson,Munich,Germany,Rye Bread,Bakery,4,5.20,store
+106670,2026-07-12,Saga Nieminen,Helsinki,Finland,Cold Brew Pack,Coffee,2,9.90,web
+106338,2026-07-04,Freja Saar,Tartu,Estonia,Blueberry Muffin,Bakery,1,3.50,store
+106895,2026-07-18,Maja Mäkinen,Tartu,Estonia,Blueberry Muffin,Bakery,3,3.50,web
+107037,2026-07-22,Alma Johansson,Turku,Finland,Cold Brew Pack,Coffee,1,9.90,app
+106564,2026-07-10,Mikael Schmidt,,Germany,Earl Grey 100g,Tea,4,6.90,web
+106827,2026-07-16,Emil Lindqvist,Gothenburg,Sweden,Cold Brew Pack,Coffee,4,9.90,app
+106671,2026-07-12,Ida Müller,Stockholm,Sweden,Cold Brew Pack,Coffee,2,9.90,app
+106320,2026-07-03,Saga Tamm,Trondheim,Norway,Espresso Beans 1kg,Coffee,6,24.90,app
+106755,2026-07-14,Noah Lindqvist,Tartu,Estonia,Espresso Beans 1kg,Coffee,1,24.90,web
+107364,30/07/2026,Aino Nilsen,Espoo,Finland,Milk Frother,Equipment,2,29.00,app
+106716,2026-07-13,Freja Müller,Espoo,Finland,Decaf Blend 500g,Coffee,1,14.90,app
+106763,15/07/2026,Sofia Virtanen,Berlin,Germany,Cold Brew Pack,Coffee,1,9.90,app
+106344,2026-07-04,Maja Lindqvist,Oulu,Finland,Tote Bag,Merch,1,12.00,web
+106461,2026-07-07,Maja Tamm,Copenhagen,Denmark,Cold Brew Pack,Coffee,1,9.90,web
+106417,2026-07-05,Eero Virtanen,Oulu,Finland,Chai Mix 200g,Tea,1,8.90,app
+107310,2026-07-29,Freja Andersson,Copenhagen,Denmark,Espresso Beans 1kg,Coffee,1,24.90,store
+106466,07/07/2026,Jonas Virtanen,Munich,Germany,Espresso Beans 1kg,Coffee,1,24.90,app
+106289,2026-07-02,Linnea Nilsen,Malmö,sweden,Decaf Blend 500g,Coffee,1,14.90,web
+106706,2026-07-13,Lukas Virtanen,Odense,Denmark,Filter Roast 500g,Coffee,1,13.50,web
+107088,2026-07-23,Sofia Berg,Tartu,Estonia,Tote Bag,Merch,2,12.00,store
+106657,2026-07-12,Freja Johansson,,Finland,Filter Roast 500g,Coffee,1,13.50,store
+,2026-07-12,Alma Virtanen,Oulu,Finland,Filter Roast 500g,Coffee,1,13.50,store
+106675,2026-07-12,Lukas Berg,Aarhus,Denmark,Espresso Beans 1kg,Coffee,1,24.90,web
+106569,2026-07-10,Freja Hansen,Munich,Germany,Cold Brew Pack,Coffee,3,9.90,web
+106839,2026-07-17,Liam Lindqvist,Stockholm,Sweden,Cold Brew Pack,Coffee,2,9.90,web
+107048,2026-07-22,Elsa Andersson,Malmö,Sweden,Cold Brew Pack,Coffee,2,9.90,web
+106759,2026-07-14,Liam Nieminen,Espoo,Finland,Filter Roast 500g,Coffee,2,13.50,web
+107125,2026-07-24,Ella Nilsen,Munich,  Germany ,Earl Grey 100g,Tea,3,6.90,web
+107230,2026-07-27,Alma Nilsen,Berlin,Germany,Rye Bread,Bakery,2,5.20,app
+107152,2026-07-25,Mikael Korhonen,Stockholm,Sweden,Cold Brew Pack,Coffee,,9.90,web
+106991,2026-07-20,Ida Korhonen,Berlin,Germany,Cinnamon Bun,Bakery,1,3.90,web
+106871,2026-07-18,Saga Tamm,Helsinki,Finland,Single Origin Kenya 250g,Coffee,2,11.90,store
+107147,2026-07-25,Maja Saar,Turku,Finland,Blueberry Muffin,Bakery,1,3.50,app
+106951,2026-07-19,Ida Johansson,Turku,Finland,Pour-over Kit,Equipment,1,39.00,web
+107160,2026-07-25,Sofia Lindqvist,Hamburg,Germany,Cold Brew Pack,Coffee ,1,9.90,store
+106582,2026-07-10,Emil Saar,Helsinki,FINLAND,Cold Brew Pack,Coffee,1,9.90,web
+106677,2026-07-12,Linnea Korhonen,Malmö,Sweden,Cold Brew Pack,Coffee,,9.90,app
+106454,2026-07-06,Hugo Hansen,Berlin,Germany,Filter Roast 500g,Coffee,1,13.50,store
+106602,2026-07-11,Jonas Nieminen,Espoo,Finland,Blueberry Muffin,Bakery,1,3.50,app
+107140,2026-07-25,Eero Andersson,Malmö,Sweden,Cinnamon Bun,Bakery,2,3.90,app
+107176,25/07/2026,Aino Nieminen,Espoo,Finland,Cold Brew Pack,Coffee,1,9.90,app
+106711,2026-07-13,Maja Andersson,Munich,Germany,Logo Mug,merch,4,14.00,web
+106754,14/07/2026,Ida Schmidt,Turku,Finland,Blueberry Muffin,Bakery,1,3.50,web
+106746,2026-07-14,Ella Lindqvist,Munich,Germany,Espresso Beans 1kg,Coffee,6,24.90,web
+106959,2026-07-20,Jonas Larsen,Oslo,Norway,Filter Roast 500g,Coffee,3,13.50,web
+106813,2026-07-16,Sofia Korhonen,Tampere,Finland,Cinnamon Bun,Bakery,3,3.90,web
+106621,2026-07-11,Noah Saar,Malmö,Sweden,Cinnamon Bun,Bakery,2,3.90,web
+106359,04/07/2026,Mikael Johansson,Munich,Germany,Chai Mix 200g,Tea,1,8.90,app
+106863,2026-07-17,Freja Hansen,Tampere,Finland,Espresso Beans 1kg,Coffee,1,24.90,web
+107192,2026-07-26,Eero Larsen,Bergen,Norway,Cold Brew Pack,Coffee,1,9.90,store
+106486,2026-07-07,Oskar Lindqvist,Helsinki,Finland,Cinnamon Bun,Bakery,1,3.90,store
+107256,2026-07-28,Noah Müller,Hamburg,Germany,Green Tea 100g,Tea,4,7.50,web
+106914,2026-07-19,Ida Mäkinen,Malmö,Sweden,Green Tea 100g,Tea,1,7.50,web
+106358,2026-07-04,Elsa Korhonen,Uppsala,Sweden,Green Tea 100g,Tea,1,7.50,app
+106684,2026-07-13,Jonas Schmidt,,Denmark,Rye Bread,Bakery,2,5.20,web
+106917,2026-07-19,Leo Schmidt,Munich,Germany,Single Origin Kenya 250g,Coffee,2,11.90,app
+106749,2026-07-14,Noah Johansson,Stockholm,Sweden,Filter Roast 500g,Coffee,1,13.50,app
+106808,2026-07-16,Mikael Berg,Espoo,Finland,Tote Bag,Merch,1,12.00,app
+107008,2026-07-21,Oskar Berg,Stockholm,Sweden,Cold Brew Pack,Coffee,2,9.90,app
+106740,2026-07-14,Saga Virtanen,Helsinki,Finland,Filter Roast 500g,Coffee,1,13.50,app
+107386,2026-07-31,Lukas Mäkinen,Hamburg,Germany,Earl Grey 100g,Tea,1,6.90,app
+106555,2026-07-09,Ella Larsen,Turku,Finland,Rye Bread,Bakery,6,5.20,app
+106700,2026-07-13,Lukas Andersson,Tampere,Finland,Filter Roast 500g,Coffee,1,13.50,app
+106934,2026-07-19,Aino Virtanen,Tallinn,Estonia,Moka Pot,Equipment,1,34.00,app
+106872,2026-07-18,Alma Nieminen,Turku,Finland,Cold Brew Pack,Coffee,2,9.90,app
+106669,2026-07-12,Leo Hansen,Espoo,Finland,Filter Roast 500g,Coffee,3,13.50,web
+106686,2026-07-13,Liam Saar,Berlin,Germany,Blueberry Muffin,Bakery,1,3.50,app
+107323,2026-07-29,Alma Schmidt,Tallinn,Estonia,Filter Roast 500g,Coffee,1,13.50,web
+106236,2026-07-01,Jonas Berg,Bergen,Norway,Cinnamon Bun,Bakery,3,3.90,web
+107081,2026-07-23,Emil Saar,Tartu,Estonia,Cinnamon Bun,Bakery,3,3.90,web
+106421,2026-07-05,Linnea Korhonen,Berlin,Germany,Logo Mug,Merch,6,14.00,store
+106744,2026-07-14,Leo Tamm,Uppsala,Sweden,Espresso Beans 1kg,Coffee,3,24.90,web
+106760,2026-07-15,Alma Hansen,Tallinn,Estonia,Moka Pot,Equipment,2,34.00,web
+107232,2026-07-27,Freja Lindqvist,Munich,Germany,Green Tea 100g,Tea,1,7.50,app
+106543,09/07/2026,Ella Nilsen,Tampere,Finland,Travel Cup,Merch,2,22.00,web
+106618,2026-07-11,Linnea Hansen,Munich,Germany,Chai Mix 200g,Tea,2,8.90,web
+106483,2026-07-07,Jonas Andersson,Stockholm,Sweden,Cold Brew Pack,Coffee,1,9.90,store
+106507,2026-07-08,Elsa Saar,Helsinki,Finland,Cold Brew Pack,Coffee,2,9.90,web
+106452,2026-07-06,Lukas Hansen,Trondheim,Norway,Cold Brew Pack,Coffee,1,9.90,store
+106407,2026-07-05,Emil Virtanen,Odense,Denmark,Filter Roast 500g,Coffee,6,13.50,web
+107345,2026-07-30,Linnea Andersson,Stockholm,Sweden,Earl Grey 100g,Tea,4,6.90,store
+107019,2026-07-21,Liam Schmidt,Munich,  Germany ,Filter Roast 500g,Coffee,3,13.50,web
+107005,2026-07-21,Elsa Berg,Espoo,Finland,Green Tea 100g,Tea,1,7.50,web
+107052,2026-07-22,Jonas Saar,Stockholm,Sweden,Espresso Beans 1kg,Coffee,1,24.90,app
+107055,2026-07-22,Saga Nilsen,Hamburg,Germany,Cold Brew Pack,Coffee,2,9.90,store
+107180,2026-07-26,Oskar Saar,Berlin,Germany,Espresso Beans 1kg,Coffee,2,24.90,app
+107135,2026-07-25,Jonas Larsen,Oulu,Finland,Pour-over Kit,Equipment,1,39.00,web
+106525,2026-07-09,Sofia Larsen,Hamburg,Germany,Pour-over Kit,Equipment,2,39.00,web
+106250,2026-07-01,Liam Mäkinen,Malmö,SWEDEN,Blueberry Muffin,Bakery,1,3.50,web
+106841,2026-07-17,Leo Johansson,Tartu,Estonia,Travel Cup,Merch,1,22.00,web
+106337,2026-07-04,Sofia Larsen,Turku,Finland,Cinnamon Bun,Bakery,1,3.90,app
+107357,2026-07-30,Leo Mäkinen,Berlin,Germany,Cold Brew Pack,Coffee,1,9.90,web
+106424,2026-07-05,Emil Korhonen,Uppsala,Sweden,Blueberry Muffin,Bakery,3,3.50,app
+106818,2026-07-16,Eero Mäkinen,Helsinki,Finland,Rye Bread,Bakery,1,5.20,store
+107112,2026-07-24,Alma Johansson,Tampere,Finland,Blueberry Muffin,Bakery,1,3.50,store
+107205,2026-07-26,Freja Korhonen,Gothenburg,Sweden,Filter Roast 500g,Coffee,2,13.50,store
+106971,2026-07-20,Elsa Andersson,Berlin,Germany,Decaf Blend 500g,Coffee,2,14.90,store
+106382,2026-07-05,Linnea Mäkinen,Uppsala,Sweden,Cold Brew Pack,Coffee,1,9.90,web
+106503,2026-07-08,Sofia Nieminen,Oulu,Finland,Single Origin Kenya 250g,Coffee,1,11.90,app
+106691,13/07/2026,Eero Müller,Odense,Denmark,Chai Mix 200g,Tea,1,8.90,store
+106544,2026-07-09,Freja Lindqvist,Turku,Finland,Rye Bread,Bakery,2,5.20,app
+106815,2026-07-16,Freja Saar,Oslo,Norway,Filter Roast 500g,Coffee,2,13.50,app
+106459,2026-07-06,Emil Müller,Malmö,Sweden,Rye Bread,Bakery,2,5.20,web
+107029,2026-07-21,Linnea Johansson,Helsinki,Finland,Cold Brew Pack,Coffee,1,9.90,app
+106653,2026-07-12,Elsa Lindqvist,Copenhagen,Denmark,Blueberry Muffin,Bakery,1,3.50,web
+106415,2026-07-05,Oskar Johansson,Hamburg,Germany,Cold Brew Pack,Coffee,3,9.90,app
+106902,2026-07-18,Sofia Nieminen,,Sweden,Earl Grey 100g,Tea,1,6.90,app
+106440,2026-07-06,Oskar Virtanen,Oulu,Finland,Cinnamon Bun,Bakery,4,3.90,web
+106673,2026-07-12,Lukas Schmidt,Oulu,Finland,Rye Bread,Bakery,3,5.20,app
+106403,2026-07-05,Eero Larsen,Odense,Denmark,Cold Brew Pack,Coffee,6,9.90,store
+106635,2026-07-11,Oskar Hansen,Uppsala,Sweden,Tote Bag,Merch,2,12.00,app
+106972,2026-07-20,Eero Andersson,Malmö,Sweden,Cinnamon Bun,Bakery,1,3.90,store
+106986,2026-07-20,Freja Nieminen,Turku,Finland,Earl Grey 100g,Tea,4,6.90,web
+107225,2026-07-27,Aino Johansson,Berlin,Germany,Espresso Beans 1kg,Coffee,1,24.90,web
+106259,2026-07-01,Ella Nilsen,Espoo,finland,Rye Bread,Bakery,1,5.20,app
+106375,2026-07-04,Aino Saar,Bergen,Norway,Logo Mug,Merch,2,14.00,app
+106742,2026-07-14,Linnea Larsen,Odense,Denmark,Logo Mug,Merch,2,14.00,app
+106515,2026-07-08,Oskar Mäkinen,Stockholm,Sweden,Rye Bread,Bakery,1,5.20,store
+107166,2026-07-25,Liam Korhonen,Turku,Finland,Green Tea 100g,Tea,1,7.50,web
+106641,2026-07-12,Saga Tamm,Hamburg,  Germany ,Cold Brew Pack,Coffee,1,9.90,web
+106505,2026-07-08,Sofia Mäkinen,Tampere,Finland,Espresso Beans 1kg,Coffee,2,24.90,app
+107255,2026-07-27,Jonas Andersson,Espoo,Finland,Filter Roast 500g,Coffee,1,13.50,web
+107209,2026-07-26,Elsa Nilsen,Helsinki,Finland,Cold Brew Pack,Coffee,2,9.90,store
+106463,2026-07-07,Sofia Lindqvist,Helsinki,Finland,Cinnamon Bun,Bakery,3,3.90,web
+106598,2026-07-11,Emil Saar,Bergen,Norway,Decaf Blend 500g,Coffee,2,14.90,app
+106592,10/07/2026,Noah Tamm,Uppsala,Sweden,Tote Bag,Merch,1,12.00,app
+106984,2026-07-20,Ella Tamm,Odense,Denmark,Chai Mix 200g,Tea,1,8.90,app
+106549,2026-07-09,Maja Virtanen,Uppsala,Sweden,Single Origin Kenya 250g,Coffee,1,11.90,app
+106771,2026-07-15,Eero Müller,Helsinki,Finland,Blueberry Muffin,Bakery,1,3.50,store
+106930,2026-07-19,Aino Saar,Bergen,Norway,Espresso Beans 1kg,Coffee,2,24.90,store
+107062,2026-07-22,Oskar Tamm,Berlin,Germany,Filter Roast 500g,Coffee,1,13.50,store
+106353,2026-07-04,Saga Lindqvist,Tartu,Estonia,Filter Roast 500g,Coffee,2,13.50,store
+106306,2026-07-03,Maja Lindqvist,Aarhus,Denmark,Decaf Blend 500g,Coffee,1,14.90,store
+106408,2026-07-05,Aino Nieminen,Bergen,Norway,Green Tea 100g,Tea,1,7.50,app
+106607,2026-07-11,Saga Tamm,Turku,Finland,Cold Brew Pack,Coffee,1,9.90,app
+106552,2026-07-09,Liam Saar,Berlin,Germany,Earl Grey 100g,Tea,1,6.90,web
+107392,2026-07-31,Maja Andersson,Oulu,Finland,Espresso Beans 1kg,Coffee,2,24.90,app
+107251,2026-07-27,Sofia Lindqvist,Uppsala,Sweden,Cold Brew Pack,Coffee,1,9.90,app
+,2026-07-12,Sofia Nieminen,Stockholm,Sweden,Earl Grey 100g,Tea,1,6.90,web
+106849,2026-07-17,Liam Saar,Turku,Finland,Cold Brew Pack,Coffee,1,9.90,app
+107252,2026-07-27,Leo Hansen,Turku,Finland,Cold Brew Pack,Coffee,1,9.90,web
+106381,2026-07-05,Sofia Lindqvist,Turku,Finland,Travel Cup,Merch,1,22.00,web
+106471,2026-07-07,Alma Mäkinen,Tampere,Finland,Cold Brew Pack,Coffee,1,9.90,store
+106608,2026-07-11,Emil Berg,Oulu,Finland,Blueberry Muffin,Bakery,1,3.50,store
+106277,2026-07-02,Noah Andersson,Oulu,Finland,Espresso Beans 1kg,Coffee,3,24.90,web
+107061,22/07/2026,Sofia Nieminen,Copenhagen,Denmark,Rye Bread,Bakery,3,5.20,web
+106794,2026-07-16,Maja Hansen,Oslo,Norway,Green Tea 100g,Tea,1,7.50,app
+107303,2026-07-29,Freja Berg,Gothenburg,Sweden,Filter Roast 500g,Coffee,3,13.50,app
+107363,2026-07-30,Eero Andersson,Espoo,Finland,Blueberry Muffin,Bakery,1,3.50,app
+106997,2026-07-21,Sofia Lindqvist,Bergen,Norway,Filter Roast 500g,Coffee,1,13.50,store
+107321,2026-07-29,Linnea Virtanen,Oulu,Finland,Blueberry Muffin,Bakery,1,3.50,app
+107394,2026-07-31,Maja Mäkinen,Aarhus,Denmark,Filter Roast 500g,Coffee,3,13.50,app
+106969,2026-07-20,Ida Korhonen,Oslo,Norway,Cold Brew Pack,Coffee,1,9.90,app
+107284,2026-07-28,Emil Korhonen,Stockholm,Sweden,Logo Mug,Merch,1,14.00,app
+106833,2026-07-17,Saga Virtanen,Oulu,Finland,Filter Roast 500g,Coffee,1,13.50,store
+106717,2026-07-13,Mikael Müller,Stockholm,Sweden,Single Origin Kenya 250g,Coffee,1,11.90,web
+106990,2026-07-20,Noah Andersson,Helsinki,Finland,Blueberry Muffin,Bakery,1,3.50,web
+107053,2026-07-22,Hugo Hansen,Hamburg,Germany,Cinnamon Bun,Bakery,1,N/A,web
+107146,2026-07-25,Ella Korhonen,Bergen,Norway,Blueberry Muffin,Bakery,2,3.50,web
+107316,2026-07-29,Saga Nilsen,Gothenburg,Sweden,Rye Bread,Bakery,2,5.20,store
+106699,13/07/2026,Alma Hansen,Turku,Finland,Cold Brew Pack,Coffee,4,9.90,app
+106633,2026-07-11,Ella Hansen,Odense,Denmark,Filter Roast 500g,Coffee,2,13.50,app
+107309,2026-07-29,Freja Korhonen,Berlin,Germany,Cinnamon Bun,Bakery,1,3.90,app
+106402,2026-07-05,Lukas Larsen,Turku,Finland,Rye Bread,Bakery,1,5.20,web
+107078,2026-07-23,Jonas Virtanen,Uppsala,Sweden,Decaf Blend 500g,Coffee,1,14.90,app
+106321,2026-07-03,Eero Virtanen,Tartu,Estonia,Cinnamon Bun,Bakery,1,3.90,app
+106579,10/07/2026,Noah Tamm,Tampere,Finland,Espresso Beans 1kg,Coffee,1,24.90,app
+106256,2026-07-01,Ida Nilsen,Uppsala,Sweden,Cinnamon Bun,Bakery,3,3.90,app
+106419,2026-07-05,Mikael Tamm,Helsinki,Finland,Decaf Blend 500g,coffee,1,14.90,web
+106676,12/07/2026,Hugo Berg,Hamburg,Germany,Rye Bread,Bakery,1,5.20,web
+106553,2026-07-09,Lukas Berg,Tartu,Estonia,Filter Roast 500g,COFFEE,2,13.50,web
+106425,2026-07-05,Mikael Johansson,Oulu,FINLAND,Single Origin Kenya 250g,Coffee,2,11.90,store
+106479,2026-07-07,Oskar Mäkinen,Malmö,Sweden,Moka Pot,Equipment,2,34.00,app
+107022,2026-07-21,Hugo Tamm,Munich,Germany,Tote Bag,MERCH,1,12.00,web
+107259,28/07/2026,Lukas Müller,Helsinki,Finland,Cold Brew Pack,Coffee,1,9.90,store
+107280,2026-07-28,Liam Berg,Gothenburg,Sweden,Hand Grinder,Equipment,1,49.00,store
+106257,2026-07-01,Freja Korhonen,Turku,Finland,Blueberry Muffin,Bakery,2,3.50,web
+106386,2026-07-05,Maja Andersson,,Finland,Cold Brew Pack,Coffee,3,9.90,app
+106600,2026-07-11,Eero Berg,Munich,Germany,Cold Brew Pack,Coffee,1,9.90,store
+107293,2026-07-28,Noah Larsen,Trondheim,Norway,Espresso Beans 1kg,Coffee,1,24.90,app
+106761,2026-07-15,Oskar Schmidt,Aarhus,Denmark,Green Tea 100g,Tea,1,7.50,web
+106492,2026-07-08,Elsa Saar,Helsinki,Finland,Decaf Blend 500g,Coffee,1,14.90,web
+106467,2026-07-07,Oskar Berg,Munich,Germany,Blueberry Muffin,Bakery,2,3.50,web
+106313,2026-07-03,Ella Tamm,Trondheim,Norway,Cinnamon Bun,Bakery,2,3.90,app
+106357,2026-07-04,Eero Korhonen,,Estonia,Blueberry Muffin,Bakery,2,3.50,web
+106373,2026-07-04,Eero Tamm,Stockholm,Sweden,Pour-over Kit,Equipment,1,39.00,web
+106734,2026-07-14,Eero Andersson,Helsinki,Finland,Earl Grey 100g,Tea,2,6.90,store
+106554,2026-07-09,Maja Virtanen,Helsinki,Finland,Rye Bread,Bakery,1,5.20,app
+106528,2026-07-09,Eero Tamm,Turku,Finland,Rye Bread,Bakery,4,5.20,store
+106887,2026-07-18,Linnea Tamm,Tampere,FINLAND,Tote Bag,Merch,1,12.00,web
+106390,2026-07-05,Aino Andersson,Espoo,FINLAND,Cinnamon Bun,Bakery,1,3.90,app
+107362,2026-07-30,Noah Lindqvist,Tallinn,Estonia,Filter Roast 500g,Coffee,3,13.50,web
+106447,2026-07-06,Mikael Berg,Oulu,finland,Moka Pot,Equipment,2,34.00,app
+107154,2026-07-25,Liam Andersson,Tallinn,Estonia,Cold Brew Pack,Coffee,2,9.90,app
+106526,2026-07-09,Saga Tamm,Stockholm,Sweden,Cold Brew Pack,Coffee,2,9.90,app
+106439,2026-07-06,Emil Larsen,Bergen,Norway,Green Tea 100g,Tea,1,7.50,store
+106262,2026-07-01,Maja Nieminen,Stockholm,Sweden,Cold Brew Pack,Coffee,2,9.90,web
+106556,2026-07-09,Leo Berg,Helsinki,Finland,Cinnamon Bun,Bakery,1,3.90,store
+107313,2026-07-29,Sofia Tamm,Oslo,Norway,Chai Mix 200g,Tea,1,8.90,app
+107282,2026-07-28,Emil Nilsen,Tartu,Estonia,Earl Grey 100g,Tea,1,6.90,web
+106449,2026-07-06,Hugo Nilsen,Oulu,Finland,Blueberry Muffin,Bakery,3,3.50,web
+107341,2026-07-30,Leo Hansen,Trondheim,Norway,Espresso Beans 1kg,Coffee,1,24.90,app
+106283,2026-07-02,Jonas Larsen,Tampere,Finland,Logo Mug,Merch,1,14.00,app
+106310,2026-07-03,Sofia Nieminen,Espoo,Finland,Tote Bag,Merch,2,12.00,app
+106311,2026-07-03,Maja Hansen,Trondheim,Norway,Blueberry Muffin,Bakery,1,3.50,web
+106896,2026-07-18,Emil Korhonen,Oulu,Finland,Cold Brew Pack,Coffee,1,9.90,app
+106482,2026-07-07,Ida Korhonen,Berlin,Germany,Cold Brew Pack,Coffee,1,9.90,web
+106485,2026-07-07,Liam Larsen,Gothenburg,Sweden,Cinnamon Bun,Bakery,1,3.90,app
+106521,2026-07-08,Ida Saar,Gothenburg,Sweden,Cold Brew Pack,Coffee,6,9.90,web
+107118,2026-07-24,Elsa Berg,Hamburg,Germany,Blueberry Muffin,Bakery,1,3.50,store
+106938,2026-07-19,Jonas Andersson,Tampere,Finland,Earl Grey 100g,Tea,1,6.90,store
+106593,2026-07-11,Saga Johansson,Tampere,Finland,Chai Mix 200g,Tea,1,8.90,web
+107085,2026-07-23,Linnea Berg,Bergen,Norway,Blueberry Muffin,Bakery ,1,3.50,web
+107086,2026-07-23,Emil Tamm,Tartu,Estonia,Cold Brew Pack,Coffee,1,9.90,app
+107129,2026-07-24,Linnea Lindqvist,Odense,Denmark,Cold Brew Pack,Coffee,1,9.90,store
+106752,2026-07-14,Linnea Schmidt,Tampere,Finland,Logo Mug,Merch,3,14.00,web
+107060,2026-07-22,Hugo Hansen,Helsinki,Finland,Filter Roast 500g,Coffee,1,13.50,app
+106248,2026-07-01,Oskar Mäkinen,Hamburg,Germany,Rye Bread,Bakery,1,5.20,store
+106523,2026-07-09,Sofia Schmidt,Stockholm,Sweden,Travel Cup,MERCH,6,22.00,web
+107138,2026-07-25,Oskar Berg,Oulu,Finland,Chai Mix 200g,Tea,1,8.90,store
+107141,2026-07-25,Liam Berg,Oslo,Norway,Filter Roast 500g,Coffee ,1,13.50,app
+106801,2026-07-16,Mikael Lindqvist,Turku,Finland,Cinnamon Bun,Bakery,1,3.90,store
+107361,2026-07-30,Elsa Tamm,Espoo,Finland,Cinnamon Bun,Bakery,1,3.90,app
+106512,2026-07-08,Liam Mäkinen,Helsinki,Finland,Blueberry Muffin,Bakery,3,3.50,app
+107198,2026-07-26,Ida Hansen,Berlin,Germany,Moka Pot,Equipment,2,34.00,web
+107243,2026-07-27,Jonas Berg,Gothenburg,Sweden,Cold Brew Pack,Coffee,1,9.90,web
+106681,2026-07-12,Noah Nieminen,Malmö,  Sweden ,Rye Bread,Bakery,1,5.20,app
+106363,2026-07-04,Oskar Korhonen,Trondheim,Norway,Earl Grey 100g,Tea,1,6.90,app
+106674,2026-07-12,Maja Saar,Uppsala,Sweden,Earl Grey 100g,Tea,1,6.90,store
+107067,22/07/2026,Lukas Andersson,Munich,Germany,Cinnamon Bun,Bakery,1,3.90,app
+106696,2026-07-13,Saga Mäkinen,Berlin,Germany,Rye Bread,Bakery,1,5.20,web
+107105,2026-07-24,Linnea Müller,Oslo,Norway,Cinnamon Bun,Bakery,3,3.90,web
+106327,2026-07-03,Hugo Schmidt,Tampere,Finland,Blueberry Muffin,Bakery,1,3.50,web
+107286,2026-07-28,Freja Saar,Hamburg,Germany,Pour-over Kit,Equipment,1,39.00,store
+106787,2026-07-15,Linnea Tamm,Munich,Germany,Filter Roast 500g,Coffee,1,13.50,app
+107328,2026-07-30,Ida Lindqvist,,Finland,Filter Roast 500g,Coffee,2,13.50,web
+107381,2026-07-31,Emil Berg,Hamburg,Germany,Logo Mug,Merch,1,14.00,app
+106869,2026-07-18,Aino Berg,Gothenburg,Sweden,Logo Mug,Merch,3,14.00,web
+107377,2026-07-31,Aino Korhonen,Stockholm,Sweden,Cinnamon Bun,Bakery,6,3.90,app
+106264,2026-07-01,Maja Nieminen,Espoo,Finland,Espresso Beans 1kg,Coffee,1,24.90,store
+106271,2026-07-02,Maja Nilsen,Berlin,Germany,Espresso Beans 1kg,Coffee,2,24.90,app
+107021,2026-07-21,Sofia Müller,Espoo,Finland,Travel Cup,Merch,1,22.00,web
+106296,2026-07-02,Noah Tamm,Helsinki,Finland,Filter Roast 500g,Coffee,3,13.50,web
+107035,2026-07-22,Linnea Tamm,Tallinn,Estonia,Earl Grey 100g,Tea,4,6.90,web
+106444,2026-07-06,Emil Tamm,Stockholm,Sweden,Espresso Beans 1kg,Coffee,4,24.90,store
+106632,2026-07-11,Lukas Berg,Tartu,Estonia,Hand Grinder,Equipment,1,49.00,store
+107233,2026-07-27,Sofia Müller,Hamburg,Germany,Blueberry Muffin,Bakery,4,3.50,app
+107185,2026-07-26,Sofia Virtanen,Turku,Finland,Cinnamon Bun,Bakery,1,3.90,app
+107074,2026-07-23,Hugo Virtanen,Helsinki,Finland,Filter Roast 500g,Coffee,1,13.50,web
+106418,2026-07-05,Hugo Müller,Stockholm,Sweden,Rye Bread,Bakery,4,5.20,web
+106703,2026-07-13,Alma Saar,Munich,Germany,Blueberry Muffin,Bakery,2,3.50,store
+107120,24/07/2026,Aino Saar,Tampere,Finland,Moka Pot,Equipment,4,34.00,app
+106899,2026-07-18,Aino Hansen,Uppsala,Sweden,Blueberry Muffin,Bakery,4,3.50,web
+107220,2026-07-26,Mikael Hansen,Tampere,Finland,Cold Brew Pack,Coffee,2,9.90,web
+107038,2026-07-22,Linnea Andersson,Stockholm,Sweden,Cinnamon Bun,Bakery,1,3.90,store
+107203,2026-07-26,Mikael Nilsen,Turku,finland,Filter Roast 500g,Coffee,1,13.50,app
+106714,2026-07-13,Sofia Müller,Tartu,Estonia,Blueberry Muffin,Bakery,2,3.50,web
+106790,2026-07-15,Aino Johansson,Espoo,Finland,Cold Brew Pack,Coffee,2,9.90,app
+106726,2026-07-14,Linnea Schmidt,Berlin,GERMANY,Cinnamon Bun,Bakery,1,3.90,web
+106473,2026-07-07,Sofia Berg,Tampere,  Finland ,Rye Bread,Bakery,1,5.20,web
+107258,2026-07-28,Aino Saar,,Finland,Earl Grey 100g,Tea,1,6.90,app
+107092,2026-07-23,Sofia Saar,Helsinki,Finland,Logo Mug,Merch,1,14.00,store
+106958,2026-07-20,Alma Johansson,Uppsala,Sweden,Blueberry Muffin,Bakery,2,3.50,app
+106850,2026-07-17,Ella Nilsen,Munich,Germany,Cinnamon Bun,Bakery,4,3.90,app
+106911,2026-07-19,Emil Nieminen,Malmö,Sweden,Rye Bread,Bakery,6,5.20,app
+106778,2026-07-15,Emil Tamm,Munich,Germany,Rye Bread,Bakery,1,5.20,web
+106465,2026-07-07,Lukas Lindqvist,Malmö,Sweden,Cold Brew Pack,Coffee,3,9.90,web
+106469,2026-07-07,Eero Berg,Berlin,Germany,Hand Grinder,Equipment,1,49.00,store
+107202,2026-07-26,Emil Andersson,Odense,Denmark,Travel Cup,Merch,2,22.00,web
+107396,2026-07-31,Oskar Saar,Oslo,Norway,Cold Brew Pack,Coffee,6,9.90,app
+106360,2026-07-04,Eero Tamm,Tallinn,Estonia,Single Origin Kenya 250g,Coffee,3,11.90,app
+,2026-07-06,Hugo Nieminen,Berlin,Germany,Espresso Beans 1kg,Coffee,1,24.90,app
+106927,2026-07-19,Linnea Andersson,Aarhus,Denmark,Cold Brew Pack,Coffee ,1,9.90,web
+107378,2026-07-31,Alma Lindqvist,Uppsala,Sweden,Espresso Beans 1kg,Coffee,1,24.90,store
+107354,2026-07-30,Linnea Johansson,Hamburg,Germany,Cinnamon Bun,Bakery,1,3.90,web
+106693,2026-07-13,Jonas Nieminen,Munich,Germany,Blueberry Muffin,Bakery,2,3.50,store
+107184,2026-07-26,Maja Lindqvist,Berlin,Germany,Cold Brew Pack,Coffee,1,9.90,app
+107267,2026-07-28,Leo Nilsen,Oulu,Finland,Filter Roast 500g,Coffee,1,13.50,web
+106898,2026-07-18,Liam Larsen,Odense,Denmark,Filter Roast 500g,Coffee,3,13.50,app
+106251,2026-07-01,Lukas Berg,Berlin,Germany,Rye Bread,Bakery,1,5.20,app
+106414,2026-07-05,Maja Saar,Hamburg,Germany,Cinnamon Bun,Bakery,2,3.90,web
+106376,2026-07-04,Maja Nilsen,Tampere,Finland,Blueberry Muffin,Bakery,3,3.50,web
+107262,2026-07-28,Freja Schmidt,Hamburg,Germany,Cold Brew Pack,Coffee,2,9.90,app
+106804,2026-07-16,Linnea Larsen,Gothenburg,Sweden,Espresso Beans 1kg,Coffee,2,24.90,app
+107210,2026-07-26,Freja Korhonen,Bergen,Norway,Espresso Beans 1kg,Coffee,1,24.90,web
+107287,2026-07-28,Jonas Korhonen,Espoo,Finland,Earl Grey 100g,Tea,1,6.90,app
+107136,2026-07-25,Noah Schmidt,Hamburg,Germany,Blueberry Muffin,Bakery,1,3.50,store
+106282,2026-07-02,Alma Müller,Espoo,Finland,Chai Mix 200g,Tea,2,8.90,web
+107186,2026-07-26,Elsa Tamm,Stockholm,Sweden,Cinnamon Bun,Bakery,1,3.90,web
+107143,2026-07-25,Hugo Johansson,Stockholm,Sweden,Chai Mix 200g,Tea,1,8.90,app
+106964,20/07/2026,Alma Korhonen,Trondheim,Norway,Filter Roast 500g,Coffee,1,13.50,web
+106989,2026-07-20,Mikael Mäkinen,Malmö,Sweden,Green Tea 100g,Tea,2,7.50,web
+106404,2026-07-05,Linnea Müller,Bergen,Norway,Cold Brew Pack,Coffee,1,9.90,app
+106811,2026-07-16,Alma Berg,Oulu,Finland,Milk Frother,Equipment,1,29.00,web
+107126,2026-07-24,Elsa Saar,Helsinki,  Finland ,Chai Mix 200g,Tea,1,8.90,app
+106325,2026-07-03,Elsa Larsen,Munich,Germany,Blueberry Muffin,Bakery,1,3.50,web
+107344,2026-07-30,Leo Larsen,Tartu,Estonia,Cinnamon Bun,Bakery,3,3.90,store
+106781,2026-07-15,Saga Nilsen,Helsinki,Finland,Rye Bread,Bakery,3,5.20,web
+106757,2026-07-14,Ida Korhonen,Tampere,Finland,Green Tea 100g,Tea,1,7.50,web
+106866,2026-07-18,Elsa Saar,Odense,Denmark,Earl Grey 100g,Tea,1,6.90,web
+106505,2026-07-08,Sofia Mäkinen,Tampere,Finland,Espresso Beans 1kg,Coffee,2,24.90,app
+107307,29/07/2026,Liam Andersson,Stockholm,Sweden,Cold Brew Pack,Coffee,4,9.90,web
+107200,2026-07-26,Leo Korhonen,Uppsala,Sweden,Filter Roast 500g,Coffee,1,13.50,store
+106797,2026-07-16,Ella Mäkinen,Tampere,Finland,Single Origin Kenya 250g,Coffee,1,11.90,app
+106247,2026-07-01,Hugo Saar,Munich,Germany,Chai Mix 200g,Tea,1,8.90,app
+107001,2026-07-21,Ida Korhonen,Hamburg,Germany,Blueberry Muffin,Bakery,1,3.50,store
+106855,2026-07-17,Alma Korhonen,Tartu,Estonia,Green Tea 100g,Tea,2,7.50,app
+106929,2026-07-19,Emil Larsen,Turku,Finland,Cinnamon Bun,Bakery,1,3.90,web
+106758,2026-07-14,Saga Müller,Odense,Denmark,Green Tea 100g,Tea,1,7.50,web
+107347,2026-07-30,Emil Lindqvist,Tallinn,Estonia,Cold Brew Pack,Coffee,2,9.90,web
+106753,2026-07-14,Freja Larsen,Turku,Finland,Green Tea 100g,Tea,4,7.50,app
+107221,2026-07-26,Linnea Saar,Copenhagen,Denmark,Green Tea 100g,Tea,,7.50,store
+107327,2026-07-29,Elsa Tamm,Copenhagen,Denmark,Cinnamon Bun,Bakery,4,3.90,store
+106405,2026-07-05,Oskar Nilsen,Oslo,Norway,Rye Bread,Bakery,1,5.20,store
+106551,2026-07-09,Elsa Nilsen,Espoo,Finland,Decaf Blend 500g,Coffee,1,14.90,store
+107012,21/07/2026,Hugo Berg,Oslo,Norway,Earl Grey 100g,Tea,1,6.90,app
+107253,2026-07-27,Jonas Andersson,Oulu,  Finland ,Espresso Beans 1kg,Coffee,3,24.90,store
+107333,2026-07-30,Linnea Schmidt,Uppsala,Sweden,Cold Brew Pack,COFFEE,1,9.90,app
+106923,2026-07-19,Sofia Nieminen,Stockholm,Sweden,Milk Frother,Equipment,1,29.00,store
+106395,2026-07-05,Maja Saar,Helsinki,Finland,Earl Grey 100g,Tea,1,6.90,web
+106303,2026-07-03,Ida Nieminen,Bergen,Norway,Chai Mix 200g,Tea,3,8.90,store
+106788,2026-07-15,Lukas Larsen,Tampere,Finland,Cinnamon Bun,Bakery,4,3.90,store
+106354,2026-07-04,Aino Mäkinen,Tampere,Finland,Cinnamon Bun,Bakery,1,3.90,store
+106652,2026-07-12,Leo Larsen,Copenhagen,Denmark,Cold Brew Pack,Coffee,1,9.90,web
+107359,2026-07-30,Liam Lindqvist,Oulu,Finland,Espresso Beans 1kg,Coffee,1,24.90,app
+106537,2026-07-09,Elsa Saar,Aarhus,Denmark,Cold Brew Pack,Coffee,-2,9.90,web
+106637,2026-07-11,Oskar Nilsen,Malmö,Sweden,Cinnamon Bun,Bakery,3,3.90,web
+106453,2026-07-06,Alma Müller,Copenhagen,Denmark,Blueberry Muffin,Bakery,6,3.50,store
+107116,2026-07-24,Noah Lindqvist,Trondheim,Norway,Filter Roast 500g,Coffee,2,13.50,app
+106796,2026-07-16,Linnea Andersson,Oslo,Norway,Filter Roast 500g,Coffee,1,13.50,store
+106317,2026-07-03,Aino Hansen,Tampere,Finland,Espresso Beans 1kg,Coffee,2,24.90,app
+106741,2026-07-14,Ella Berg,Tallinn,Estonia,Decaf Blend 500g,Coffee,1,14.90,web
+106993,2026-07-21,Lukas Tamm,Turku,Finland,Cold Brew Pack,Coffee,1,9.90,store
+107274,2026-07-28,Hugo Mäkinen,Odense,Denmark,Cold Brew Pack,Coffee,2,9.90,app
+106870,2026-07-18,Liam Lindqvist,Odense,Denmark,Espresso Beans 1kg,Coffee,,24.90,web
+107044,2026-07-22,Maja Schmidt,Oslo,Norway,Espresso Beans 1kg,Coffee,1,24.90,web
+107080,2026-07-23,Freja Nilsen,Malmö,Sweden,Cold Brew Pack,Coffee,6,9.90,store
+107168,2026-07-25,Alma Tamm,Helsinki,Finland,Cold Brew Pack,Coffee,6,9.90,app
+106557,2026-07-09,Ella Andersson,Espoo,Finland,Hand Grinder,Equipment,2,49.00,app
+107102,2026-07-24,Noah Mäkinen,Aarhus,Denmark,Hand Grinder,Equipment,1,49.00,web
+106957,2026-07-20,Ella Müller,Bergen,Norway,Tote Bag,Merch,1,12.00,app
+106903,2026-07-18,Leo Mäkinen,Odense,Denmark,Blueberry Muffin,Bakery,4,3.50,app
+,2026-07-28,Freja Schmidt,Stockholm,Sweden,Earl Grey 100g,Tea,1,6.90,web
+106725,2026-07-14,Liam Korhonen,Stockholm,Sweden,Tote Bag,Merch,1,12.00,store
+107350,2026-07-30,Elsa Lindqvist,Malmö,sweden,Cold Brew Pack,Coffee,2,9.90,app
+106573,2026-07-10,Elsa Virtanen,Aarhus,Denmark,Cold Brew Pack,Coffee,3,9.90,store
+107000,2026-07-21,Freja Tamm,Tartu,Estonia,Cinnamon Bun,Bakery,1,3.90,web
+107204,2026-07-26,Oskar Mäkinen,Hamburg,Germany,Green Tea 100g,Tea,6,7.50,app
+106682,2026-07-12,Lukas Schmidt,Berlin,Germany,Cold Brew Pack,Coffee,1,9.90,app
+106680,2026-07-12,Aino Mäkinen,Aarhus,Denmark,Cinnamon Bun,Bakery,3,3.90,web
+106982,2026-07-20,Linnea Müller,Turku,Finland,Blueberry Muffin,Bakery,6,3.50,app
+106826,2026-07-16,Oskar Tamm,Espoo,Finland,Single Origin Kenya 250g,Coffee,1,11.90,web
+106885,2026-07-18,Ida Saar,Oslo,Norway,Earl Grey 100g,Tea,1,6.90,app
+106490,2026-07-07,Linnea Korhonen,Tampere,Finland,Earl Grey 100g,Tea,1,6.90,store
+106639,2026-07-11,Alma Korhonen,Gothenburg,Sweden,Tote Bag,Merch,1,12.00,app
+106950,19/07/2026,Hugo Mäkinen,Malmö,Sweden,Cold Brew Pack,Coffee,1,9.90,app
+106992,2026-07-20,Liam Andersson,Munich,Germany,Logo Mug,Merch,1,14.00,web
+106379,2026-07-04,Linnea Virtanen,Malmö,Sweden,Cold Brew Pack,Coffee,1,9.90,app
+107063,2026-07-22,Sofia Larsen,Uppsala,Sweden,Pour-over Kit,Equipment,2,39.00,app
+106546,2026-07-09,Ella Hansen,Copenhagen,Denmark,Blueberry Muffin,BAKERY,1,3.50,web
+106865,2026-07-18,Freja Müller,Munich,Germany,Cinnamon Bun,Bakery,1,3.90,app
+107030,2026-07-21,Saga Johansson,Turku,Finland,Blueberry Muffin,Bakery,1,3.50,web
+106510,2026-07-08,Alma Mäkinen,Munich,Germany,Moka Pot,Equipment,2,34.00,web
+107226,2026-07-27,Maja Nilsen,Berlin,germany,Cold Brew Pack,Coffee,4,9.90,app
+107095,2026-07-23,Lukas Berg,Bergen,Norway,Milk Frother,Equipment,1,29.00,store
+106664,12/07/2026,Maja Müller,Munich,Germany,Earl Grey 100g,Tea,4,6.90,web
+107357,2026-07-30,Leo Mäkinen,Berlin,Germany,Cold Brew Pack,Coffee,1,9.90,web
+106309,2026-07-03,Eero Schmidt,Tallinn,Estonia,Rye Bread,Bakery,4,5.20,web
+107236,2026-07-27,Linnea Schmidt,Espoo,Finland,Chai Mix 200g,Tea,1,8.90,web
+106261,2026-07-01,Jonas Schmidt,Hamburg,Germany,Blueberry Muffin,Bakery,2,3.50,store
+106326,2026-07-03,Sofia Korhonen,Oslo,Norway,Espresso Beans 1kg,Coffee,1,24.90,store
+106874,2026-07-18,Aino Larsen,Oulu,Finland,Logo Mug,Merch,1,14.00,store
+106654,2026-07-12,Jonas Johansson,Tartu,ESTONIA,Espresso Beans 1kg,Coffee,1,24.90,web
+106620,2026-07-11,Leo Mäkinen,Helsinki,Finland,Cinnamon Bun,Bakery,3,3.90,web
+106694,2026-07-13,Saga Berg,Odense,Denmark,Chai Mix 200g,Tea,1,8.90,web
+107314,29/07/2026,Alma Lindqvist,Tartu,Estonia,Chai Mix 200g,Tea,3,8.90,app
+106437,2026-07-06,Elsa Nilsen,Tallinn,Estonia,Cold Brew Pack,Coffee,3,9.90,app
+106928,2026-07-19,Leo Nilsen,Malmö,Sweden,Cold Brew Pack,Coffee,1,9.90,web
+106624,2026-07-11,Jonas Virtanen,Espoo,Finland,Logo Mug,Merch,1,14.00,web
+107306,2026-07-29,Noah Lindqvist,Turku,Finland,Cinnamon Bun,Bakery,1,3.90,app
+107072,2026-07-23,Oskar Schmidt,Copenhagen,Denmark,Espresso Beans 1kg,Coffee,3,24.90,web
+106312,2026-07-03,Freja Tamm,Oslo,Norway,Earl Grey 100g,Tea,6,6.90,app
+106767,2026-07-15,Alma Larsen,Espoo,Finland,Chai Mix 200g,Tea,1,8.90,web
+106843,2026-07-17,Linnea Nieminen,Munich,Germany,Espresso Beans 1kg,Coffee,6,24.90,store
+107174,2026-07-25,Elsa Saar,Copenhagen,Denmark,Cold Brew Pack,Coffee,6,9.90,web
+106368,2026-07-04,Eero Berg,Turku,Finland,Filter Roast 500g,Coffee,1,13.50,app
+106830,2026-07-17,Mikael Larsen,Stockholm,Sweden,Travel Cup,Merch ,2,22.00,web
+106876,2026-07-18,Ella Larsen,Oslo,Norway,Cold Brew Pack,Coffee,1,9.90,app
+106626,2026-07-11,Maja Johansson,Munich,Germany,Rye Bread,Bakery,1,5.20,store
+107352,2026-07-30,Freja Mäkinen,Odense,Denmark,Green Tea 100g,Tea,1,7.50,app
+107189,2026-07-26,Lukas Larsen,Stockholm,Sweden,Chai Mix 200g,Tea,2,8.90,app
+106935,2026-07-19,Hugo Nieminen,Hamburg,Germany,Earl Grey 100g,Tea,1,6.90,store
+107169,2026-07-25,Liam Korhonen,Helsinki,Finland,Blueberry Muffin,Bakery,1,3.50,store
+107247,2026-07-27,Emil Lindqvist,Espoo,Finland,Green Tea 100g,Tea,2,7.50,web
+106888,2026-07-18,Noah Müller,Malmö,sweden,Cold Brew Pack,Coffee,2,9.90,web
+106370,2026-07-04,Sofia Lindqvist,Munich,Germany,Espresso Beans 1kg,Coffee,1,24.90,store
+106729,2026-07-14,Emil Korhonen,Berlin,Germany,Blueberry Muffin,Bakery,1,3.50,app
+107027,2026-07-21,Emil Nilsen,Bergen,Norway,Cinnamon Bun,Bakery,1,3.90,web
+106922,2026-07-19,Ella Schmidt,Berlin,Germany,Decaf Blend 500g,Coffee,3,14.90,web
+106732,2026-07-14,Mikael Virtanen,Munich,Germany,Cold Brew Pack,Coffee,4,9.90,app
+107217,2026-07-26,Hugo Müller,Stockholm,Sweden,Travel Cup,Merch,1,22.00,store
+107162,2026-07-25,Oskar Tamm,Hamburg,Germany,Milk Frother,Equipment,6,29.00,web
+106574,2026-07-10,Elsa Virtanen,Espoo,Finland,Hand Grinder,Equipment,2,49.00,store
+106933,19/07/2026,Aino Nilsen,Espoo,Finland,Blueberry Muffin,Bakery,3,3.50,web
+107305,2026-07-29,Noah Johansson,Malmö,Sweden,Cold Brew Pack,Coffee,2,9.90,app
+106246,2026-07-01,Alma Müller,Tampere,Finland,Tote Bag,Merch,1,12.00,web
+107043,2026-07-22,Ella Hansen,Tampere,Finland,Decaf Blend 500g,Coffee,1,14.90,store
+106397,2026-07-05,Emil Nieminen,Tampere,Finland,Earl Grey 100g,Tea,2,6.90,store
+106660,2026-07-12,Lukas Andersson,Turku,Finland,Espresso Beans 1kg,Coffee,6,24.90,store
+106973,2026-07-20,Maja Larsen,Oulu,Finland,Espresso Beans 1kg,Coffee,4,24.90,app
+106616,2026-07-11,Saga Larsen,Espoo,Finland,Travel Cup,Merch,1,22.00,store
+106630,2026-07-11,Liam Müller,Copenhagen,Denmark,Filter Roast 500g,Coffee,2,13.50,app
+107042,2026-07-22,Maja Hansen,Berlin,Germany,Travel Cup,Merch,1,22.00,web
+107098,2026-07-23,Oskar Andersson,Odense,Denmark,Cinnamon Bun,Bakery,1,3.90,web
+,2026-07-04,Lukas Nilsen,Espoo,Finland,Cold Brew Pack,Coffee,2,9.90,app
+106309,2026-07-03,Eero Schmidt,Tallinn,Estonia,Rye Bread,Bakery,4,5.20,web
+106352,2026-07-04,Elsa Tamm,Gothenburg,Sweden,Blueberry Muffin,Bakery,1,3.50,app
+106945,2026-07-19,Leo Berg,Trondheim,Norway,Cold Brew Pack,Coffee,3,9.90,store
+107167,2026-07-25,Oskar Schmidt,Tampere,Finland,Espresso Beans 1kg,Coffee,3,24.90,web
+106249,2026-07-01,Noah Korhonen,Gothenburg,Sweden,Logo Mug,Merch,2,14.00,web
+107016,2026-07-21,Jonas Müller,Aarhus,Denmark,Single Origin Kenya 250g,Coffee,1,11.90,store
+107337,2026-07-30,Sofia Andersson,Gothenburg,Sweden,Rye Bread,Bakery,1,5.20,app
+107299,2026-07-29,Lukas Mäkinen,Stockholm,Sweden,Cinnamon Bun,Bakery,1,3.90,store
+106738,2026-07-14,Leo Johansson,Berlin,Germany,Tote Bag,Merch,4,12.00,web
+106701,2026-07-13,Freja Hansen,Berlin,Germany,Rye Bread,Bakery,1,5.20,web
+106378,2026-07-04,Saga Müller,Oslo,Norway,Blueberry Muffin,Bakery,1,3.50,web
+107384,2026-07-31,Ida Andersson,Trondheim,Norway,Milk Frother,Equipment,1,29.00,web
+107023,2026-07-21,Liam Schmidt,Odense,Denmark,Decaf Blend 500g,Coffee,1,14.90,store
+106585,2026-07-10,Sofia Berg,Berlin,Germany,Hand Grinder,Equipment,1,49.00,app
+107308,2026-07-29,Mikael Larsen,Tampere,Finland,Cinnamon Bun,Bakery,2,3.90,web
+106580,2026-07-10,Liam Mäkinen,Trondheim,Norway,Rye Bread,Bakery,1,5.20,app
+106530,2026-07-09,Ella Mäkinen,Tampere,Finland,Moka Pot,Equipment,2,34.00,app
+107351,2026-07-30,Saga Virtanen,Stockholm,Sweden,Filter Roast 500g,Coffee,1,13.50,store
+106606,2026-07-11,Emil Johansson,Turku,Finland,Earl Grey 100g,Tea,2,6.90,web
+106719,2026-07-13,Leo Johansson,Oulu,Finland,Decaf Blend 500g,Coffee,3,14.90,store
+107134,2026-07-25,Ida Virtanen,Bergen,Norway,Rye Bread,Bakery,1,5.20,web
+106279,2026-07-02,Ella Tamm,Turku,Finland,Blueberry Muffin,Bakery,2,3.50,app
+106475,2026-07-07,Leo Tamm,Berlin,Germany,Espresso Beans 1kg,Coffee,1,24.90,app
+107106,2026-07-24,Elsa Johansson,Oulu,Finland,Decaf Blend 500g,Coffee,1,14.90,web
+106423,2026-07-05,Mikael Müller,Oulu,Finland,Filter Roast 500g,Coffee,1,13.50,web
+107059,2026-07-22,Leo Berg,Malmö,Sweden,Cold Brew Pack,Coffee,2,9.90,web
+106429,2026-07-05,Eero Johansson,Hamburg,Germany,Cold Brew Pack,Coffee,1,N/A,app
+107164,2026-07-25,Maja Lindqvist,Espoo,Finland,Cold Brew Pack,Coffee,2,9.90,app
+106411,2026-07-05,Elsa Mäkinen,Tartu,Estonia,Hand Grinder,Equipment,1,49.00,app
+106294,2026-07-02,Noah Nilsen,Copenhagen,Denmark,Rye Bread,Bakery,2,5.20,app
+107009,2026-07-21,Mikael Korhonen,Tallinn,Estonia,Espresso Beans 1kg,Coffee,4,24.90,web
+107107,2026-07-24,Emil Johansson,Odense,Denmark,Cold Brew Pack,Coffee,1,9.90,web
+106575,2026-07-10,Linnea Saar,Uppsala,Sweden,Filter Roast 500g,Coffee,1,13.50,web
+106335,2026-07-03,Emil Larsen,Oslo,Norway,Cold Brew Pack,Coffee,1,9.90,app
+106698,2026-07-13,Hugo Nilsen,,Germany,Cinnamon Bun,Bakery,4,3.90,web
+107257,2026-07-28,Eero Hansen,Munich,Germany,Cinnamon Bun,Bakery,1,3.90,app
+107334,30/07/2026,Liam Nieminen,Tampere,Finland,Espresso Beans 1kg,Coffee,4,24.90,web
+107376,2026-07-31,Lukas Saar,Turku,Finland,Single Origin Kenya 250g,Coffee,1,11.90,web
+106576,2026-07-10,Linnea Nieminen,Turku,Finland,Filter Roast 500g,Coffee,4,13.50,store
+107248,2026-07-27,Linnea Virtanen,Aarhus,Denmark,Espresso Beans 1kg,Coffee,2,24.90,store
+106846,2026-07-17,Eero Johansson,Copenhagen,Denmark,Cinnamon Bun,Bakery,1,3.90,web
+106297,02/07/2026,Liam Nilsen,Munich,Germany,Cold Brew Pack,Coffee,1,9.90,store
+106499,2026-07-08,Maja Nieminen,Gothenburg,Sweden,Blueberry Muffin,Bakery,1,3.50,web
+106298,2026-07-02,Oskar Virtanen,Gothenburg,Sweden,Milk Frother,Equipment,2,29.00,app
+107326,2026-07-29,Ida Tamm,Tallinn,Estonia,Cinnamon Bun,Bakery,1,3.90,web
+106862,2026-07-17,Jonas Lindqvist,Munich,Germany,Logo Mug,Merch,2,14.00,web
+106342,2026-07-04,Freja Schmidt,Oulu,Finland,Travel Cup,merch,1,22.00,web
+107240,2026-07-27,Oskar Lindqvist,Gothenburg,Sweden,Cold Brew Pack,Coffee,1,9.90,app
+106302,2026-07-03,Linnea Tamm,Helsinki,Finland,Pour-over Kit,Equipment,1,39.00,app
+106880,2026-07-18,Noah Nieminen,Copenhagen,Denmark,Travel Cup,Merch,2,22.00,web
+107366,2026-07-31,Freja Schmidt,Espoo,Finland,Decaf Blend 500g,Coffee,1,14.90,app
+106931,2026-07-19,Aino Mäkinen,Stockholm,Sweden,Green Tea 100g,tea,1,7.50,app
+106875,2026-07-18,Oskar Nieminen,Berlin,Germany,Earl Grey 100g,Tea,1,6.90,web
+106909,2026-07-18,Alma Larsen,Copenhagen,Denmark,Filter Roast 500g,Coffee,,13.50,store
+106563,2026-07-10,Alma Hansen,Gothenburg,Sweden,Cinnamon Bun,Bakery,2,3.90,app
+107084,2026-07-23,Oskar Korhonen,Tampere,Finland,Filter Roast 500g,Coffee,1,13.50,app
+106420,2026-07-05,Mikael Korhonen,Tartu,Estonia,Rye Bread,Bakery,3,5.20,store
+106612,2026-07-11,Freja Korhonen,Aarhus,Denmark,Espresso Beans 1kg,Coffee,1,24.90,web
+106578,2026-07-10,Linnea Nieminen,Gothenburg,Sweden,Tote Bag,Merch,1,12.00,app
+107182,2026-07-26,Liam Mäkinen,Espoo,Finland,Green Tea 100g,Tea,1,7.50,web
+107010,2026-07-21,Emil Lindqvist,Oslo,Norway,Blueberry Muffin,Bakery,2,3.50,app
+106986,2026-07-20,Freja Nieminen,Turku,Finland,Earl Grey 100g,Tea,4,6.90,web
+106398,2026-07-05,Lukas Larsen,Malmö,Sweden,Cold Brew Pack,Coffee,3,9.90,web
+107015,2026-07-21,Lukas Müller,Espoo,Finland,Cinnamon Bun,Bakery,2,3.90,web
+106841,2026-07-17,Leo Johansson,Tartu,Estonia,Travel Cup,Merch,1,22.00,web
+106727,2026-07-14,Ida Müller,Oslo,Norway,Cold Brew Pack,Coffee,3,9.90,web
+107040,2026-07-22,Linnea Johansson,Espoo,Finland,Espresso Beans 1kg,Coffee,2,24.90,web
+106642,2026-07-12,Saga Korhonen,Turku,Finland,Cold Brew Pack,Coffee,1,9.90,web
+106634,2026-07-11,Eero Hansen,Trondheim,Norway,Blueberry Muffin,Bakery,1,3.50,web
+106300,2026-07-03,Saga Larsen,Espoo,Finland,Cold Brew Pack,Coffee,2,9.90,web
+106334,2026-07-03,Noah Larsen,Hamburg,Germany,Single Origin Kenya 250g,Coffee,4,11.90,app
+106497,2026-07-08,Maja Johansson,Oulu,Finland,Cinnamon Bun,Bakery,1,3.90,web
+106299,2026-07-03,Jonas Müller,,Sweden,Filter Roast 500g,Coffee,1,13.50,app
+106477,2026-07-07,Hugo Virtanen,Berlin,Germany,Cold Brew Pack,Coffee,1,9.90,app
+106891,2026-07-18,Emil Larsen,Uppsala,Sweden,Filter Roast 500g,Coffee,2,13.50,store
+106527,2026-07-09,Noah Nilsen,Oslo,Norway,Filter Roast 500g,Coffee,1,13.50,web
+106821,2026-07-16,Noah Johansson,Tartu,Estonia,Cold Brew Pack,Coffee,1,9.90,web
+106629,2026-07-11,Alma Lindqvist,Uppsala,Sweden,Cinnamon Bun,Bakery,1,3.90,app
+107387,2026-07-31,Hugo Nieminen,Oulu,Finland,Filter Roast 500g,Coffee,6,13.50,store
+107183,2026-07-26,Leo Berg,Oulu,Finland,Cinnamon Bun,Bakery,2,3.90,app
+106364,2026-07-04,Leo Johansson,Tampere,Finland,Filter Roast 500g,Coffee,1,13.50,web
+106500,2026-07-08,Aino Schmidt,Uppsala,Sweden,Filter Roast 500g,Coffee,3,13.50,store
+106567,2026-07-10,Saga Korhonen,,Finland,Earl Grey 100g,Tea,2,6.90,store
+106884,2026-07-18,Eero Schmidt,Espoo,Finland,Blueberry Muffin,Bakery,1,3.50,web
+106380,2026-07-05,Linnea Hansen,Uppsala,Sweden,Single Origin Kenya 250g,Coffee,2,11.90,web
+107034,2026-07-22,Freja Andersson,Odense,Denmark,Cold Brew Pack,Coffee,1,9.90,web
+107342,2026-07-30,Jonas Hansen,Oulu,Finland,Rye Bread,Bakery,1,5.20,app
+107325,2026-07-29,Leo Berg,,Finland,Cold Brew Pack,Coffee,1,9.90,web
+106762,2026-07-15,Oskar Korhonen,Malmö,Sweden,Rye Bread,Bakery,1,5.20,web
+106648,2026-07-12,Ella Johansson,Gothenburg,Sweden,Rye Bread,Bakery,1,5.20,app
+107301,2026-07-29,Ida Schmidt,Tampere,Finland,Green Tea 100g,Tea,1,7.50,web
+106508,2026-07-08,Mikael Virtanen,Uppsala,Sweden,Blueberry Muffin,Bakery,1,3.50,store
+107148,25/07/2026,Emil Andersson,Hamburg,Germany,Tote Bag,Merch,1,12.00,web
+107278,2026-07-28,Liam Andersson,Helsinki,Finland,Cinnamon Bun,Bakery,1,3.90,web
+107212,2026-07-26,Lukas Johansson,Munich,Germany,Espresso Beans 1kg,Coffee,1,24.90,web
+106765,2026-07-15,Aino Mäkinen,Tartu,Estonia,Cinnamon Bun,Bakery,1,3.90,app
+107175,2026-07-25,Lukas Larsen,Espoo,Finland,Cold Brew Pack,Coffee,1,9.90,store
+107132,2026-07-25,Eero Johansson,Turku,Finland,Earl Grey 100g,Tea,1,6.90,web
+107199,2026-07-26,Emil Nieminen,Espoo,Finland,Espresso Beans 1kg,Coffee,4,24.90,store
+107318,2026-07-29,Lukas Berg,Malmö,Sweden,Cinnamon Bun,Bakery,6,3.90,app
+107066,2026-07-22,Liam Nilsen,Copenhagen,Denmark,Filter Roast 500g,Coffee,1,13.50,app
+107272,2026-07-28,Oskar Schmidt,Copenhagen,Denmark,Cold Brew Pack,Coffee,2,9.90,app
+106266,2026-07-01,Liam Mäkinen,Malmö,Sweden,Cinnamon Bun,Bakery,2,3.90,web
+106559,2026-07-09,Sofia Andersson,Berlin,Germany,Cinnamon Bun,Bakery,1,3.90,store
+106348,2026-07-04,Linnea Johansson,Hamburg,Germany,Cinnamon Bun,Bakery,1,3.90,app
+106539,2026-07-09,Linnea Lindqvist,Helsinki,Finland,Travel Cup,Merch,3,22.00,web
+106623,2026-07-11,Leo Hansen,Aarhus,Denmark,Rye Bread,Bakery,1,5.20,app
+106562,2026-07-10,Alma Müller,Oulu,Finland,Filter Roast 500g,Coffee,1,13.50,store
+107093,2026-07-23,Hugo Nieminen,Stockholm,Sweden,Cinnamon Bun,Bakery,1,3.90,app
+106237,2026-07-01,Oskar Saar,Berlin,  Germany ,Cinnamon Bun,Bakery,2,3.90,web
+106501,2026-07-08,Ella Korhonen,Tampere,Finland,Green Tea 100g,Tea,4,7.50,app
+107311,2026-07-29,Ella Tamm,Uppsala,Sweden,Blueberry Muffin,Bakery,1,3.50,web
+106252,2026-07-01,Hugo Nilsen,Aarhus,Denmark,Single Origin Kenya 250g,Coffee,1,11.90,store
+107161,2026-07-25,Ida Nilsen,Berlin,Germany,Cinnamon Bun,Bakery,1,3.90,app
+107089,2026-07-23,Liam Korhonen,Berlin,Germany,Earl Grey 100g,Tea,1,6.90,app
+106456,2026-07-06,Eero Korhonen,Tampere,Finland,Decaf Blend 500g,Coffee,1,14.90,web
+107242,2026-07-27,Jonas Schmidt,Stockholm,Sweden,Espresso Beans 1kg,Coffee,1,24.90,app
+106816,2026-07-16,Mikael Mäkinen,Helsinki,Finland,Cold Brew Pack,Coffee,1,9.90,web
+106806,2026-07-16,Linnea Virtanen,Gothenburg,Sweden,Tote Bag,Merch,2,12.00,app
+107181,2026-07-26,Aino Mäkinen,Trondheim,Norway,Earl Grey 100g,Tea,1,6.90,web
+106822,2026-07-16,Oskar Korhonen,Munich,Germany,Cinnamon Bun,Bakery,4,3.90,app
+106550,2026-07-09,Elsa Saar,Malmö,Sweden,Cold Brew Pack,Coffee,,9.90,web
+106792,2026-07-16,Eero Nilsen,Berlin,Germany,Cold Brew Pack,Coffee,3,9.90,app
+107336,2026-07-30,Oskar Nilsen,Oulu,Finland,Logo Mug,MERCH,2,14.00,app
+106692,2026-07-13,Aino Müller,Munich,Germany,Espresso Beans 1kg,Coffee,1,24.90,store
+106687,2026-07-13,Elsa Johansson,Stockholm,Sweden,Decaf Blend 500g,Coffee,1,14.90,app
+106323,2026-07-03,Eero Virtanen,Stockholm,Sweden,Blueberry Muffin,Bakery,1,3.50,app
+106988,2026-07-20,Sofia Müller,Aarhus,Denmark,Espresso Beans 1kg,Coffee,1,24.90,web
+106319,2026-07-03,Hugo Larsen,Helsinki,Finland,Blueberry Muffin,Bakery,1,3.50,store
+107206,2026-07-26,Linnea Nilsen,Berlin,Germany,Cold Brew Pack,Coffee,2,9.90,web
+106668,2026-07-12,Freja Virtanen,Oslo,Norway,Espresso Beans 1kg,Coffee,1,24.90,store
+107346,2026-07-30,Liam Tamm,Tartu,Estonia,Espresso Beans 1kg,Coffee,1,24.90,web
+107324,2026-07-29,Emil Tamm,Espoo,Finland,Cold Brew Pack,Coffee,1,9.90,web
+107195,2026-07-26,Ida Mäkinen,Aarhus,Denmark,Cold Brew Pack,Coffee,2,9.90,app
+106388,2026-07-05,Alma Virtanen,Tampere,Finland,Green Tea 100g,Tea,1,7.50,web
+106529,09/07/2026,Linnea Berg,Oslo,Norway,Decaf Blend 500g,Coffee,1,14.90,store
+106953,2026-07-19,Leo Korhonen,Turku,Finland,Cinnamon Bun,Bakery,1,3.90,web
+106828,2026-07-16,Oskar Larsen,Tampere,Finland,Green Tea 100g,Tea,4,7.50,store
+106980,2026-07-20,Oskar Mäkinen,Helsinki,Finland,Espresso Beans 1kg,Coffee,2,24.90,app
+106940,2026-07-19,Sofia Hansen,,Sweden,Single Origin Kenya 250g,Coffee,2,11.90,web
+107003,2026-07-21,Ida Nieminen,Munich,Germany,Moka Pot,Equipment,1,34.00,app
+106591,2026-07-10,Linnea Saar,Bergen,Norway,Blueberry Muffin,Bakery,1,3.50,web
+106462,2026-07-07,Noah Virtanen,Malmö,Sweden,Single Origin Kenya 250g,Coffee,2,11.90,web
+107228,2026-07-27,Liam Tamm,Helsinki,Finland,Filter Roast 500g,Coffee,1,13.50,app
+107246,2026-07-27,Lukas Johansson,Uppsala,Sweden,Cold Brew Pack,Coffee,2,9.90,web
+106904,2026-07-18,Emil Saar,Oulu,Finland,Cold Brew Pack,Coffee,,9.90,web
+106604,2026-07-11,Leo Hansen,Berlin,Germany,Espresso Beans 1kg,Coffee,2,24.90,web
+106864,2026-07-17,Mikael Andersson,Stockholm,Sweden,Green Tea 100g,Tea,2,7.50,web
+107263,2026-07-28,Ella Larsen,Uppsala,Sweden,Filter Roast 500g,Coffee,1,13.50,web
+106280,2026-07-02,Eero Müller,Malmö,Sweden,Single Origin Kenya 250g,Coffee,1,11.90,store
+107335,2026-07-30,Liam Saar,Tallinn,Estonia,Cold Brew Pack,Coffee,1,9.90,store
+,2026-07-12,Liam Saar,Tallinn,Estonia,Cold Brew Pack,Coffee,1,9.90,web
+106267,2026-07-01,Liam Virtanen,Bergen,Norway,Espresso Beans 1kg,Coffee,3,24.90,app
+106566,10/07/2026,Leo Hansen,Hamburg,Germany,Blueberry Muffin,Bakery,3,3.50,app
+106819,2026-07-16,Lukas Korhonen,Tampere,Finland,Chai Mix 200g,Tea,1,8.90,app
+106295,2026-07-02,Saga Korhonen,Berlin,Germany,Pour-over Kit,Equipment,4,39.00,web
+106427,2026-07-05,Eero Saar,Hamburg,Germany,Cold Brew Pack,Coffee,3,9.90,app
+106385,2026-07-05,Noah Andersson,Hamburg,Germany,Decaf Blend 500g,Coffee,1,14.90,store
+106615,2026-07-11,Alma Müller,Oulu,Finland,Blueberry Muffin,Bakery,2,3.50,web
+106292,2026-07-02,Freja Berg,Helsinki,Finland,Espresso Beans 1kg,Coffee,3,24.90,web
+107360,2026-07-30,Leo Mäkinen,,Denmark,Green Tea 100g,Tea,4,7.50,store
+106967,2026-07-20,Saga Andersson,Espoo,Finland,Espresso Beans 1kg,Coffee,1,24.90,app
+106724,2026-07-14,Eero Müller,Malmö,sweden,Cinnamon Bun,Bakery,1,3.90,web
+107348,2026-07-30,Hugo Virtanen,Aarhus,Denmark,Cold Brew Pack,Coffee,1,9.90,app
+107191,2026-07-26,Saga Virtanen,Trondheim,Norway,Tote Bag,Merch,1,12.00,app
+106316,2026-07-03,Maja Saar,Copenhagen,Denmark,Rye Bread,Bakery,1,5.20,web
+106735,2026-07-14,Emil Andersson,Espoo,Finland,Cinnamon Bun,Bakery,1,3.90,store
+107270,2026-07-28,Linnea Schmidt,Uppsala,Sweden,Filter Roast 500g,Coffee,6,13.50,web
+107290,2026-07-28,Maja Nilsen,Hamburg,Germany,Cinnamon Bun,Bakery,1,3.90,app
+106356,2026-07-04,Ella Virtanen,Stockholm,Sweden,Single Origin Kenya 250g,Coffee,1,,app
+107214,2026-07-26,Lukas Andersson,Munich,Germany,Cinnamon Bun,Bakery,1,3.90,app
+106622,2026-07-11,Aino Schmidt,Oslo,Norway,Cinnamon Bun,Bakery,1,3.90,store
+107234,2026-07-27,Maja Korhonen,Gothenburg,Sweden,Cinnamon Bun,Bakery,1,3.90,store
+106588,2026-07-10,Sofia Hansen,Stockholm,Sweden,Earl Grey 100g,Tea,2,6.90,store
+107128,2026-07-24,Mikael Andersson,Munich,GERMANY,Rye Bread,Bakery,1,5.20,store
+106707,2026-07-13,Mikael Virtanen,Tampere,Finland,Espresso Beans 1kg,Coffee,1,24.90,web
+106436,2026-07-06,Lukas Andersson,Hamburg,Germany,Blueberry Muffin,Bakery,1,3.50,app
+106955,2026-07-20,Aino Hansen,Tampere,Finland,Travel Cup,Merch,1,22.00,web
+107213,2026-07-26,Emil Virtanen,Turku,Finland,Logo Mug,Merch,1,14.00,app
+107130,2026-07-24,Eero Nieminen,Espoo,Finland,Green Tea 100g,Tea,2,7.50,app
+106258,01/07/2026,Linnea Larsen,Tartu,Estonia,Rye Bread,Bakery,1,5.20,store
+107017,2026-07-21,Freja Larsen,Uppsala,Sweden,Travel Cup,Merch,1,22.00,web
+106942,2026-07-19,Freja Saar,Oulu,Finland,Cold Brew Pack,Coffee,1,9.90,web
+107375,2026-07-31,Lukas Nilsen,Turku,Finland,Cinnamon Bun,Bakery,2,3.90,web
+106491,08/07/2026,Linnea Virtanen,Gothenburg,Sweden,Cold Brew Pack,Coffee,2,9.90,web
+107276,2026-07-28,Hugo Nieminen,Trondheim,Norway,Cinnamon Bun,Bakery,2,3.90,store
+107269,2026-07-28,Mikael Schmidt,Hamburg,Germany,Filter Roast 500g,Coffee,1,13.50,web
+107024,2026-07-21,Eero Nieminen,Aarhus,Denmark,Cinnamon Bun,Bakery,1,3.90,store
+107083,2026-07-23,Aino Hansen,Bergen,  Norway ,Cold Brew Pack,Coffee,1,9.90,store
+,2026-07-10,Aino Korhonen,Tallinn,Estonia,Espresso Beans 1kg,Coffee,2,24.90,app
+106438,2026-07-06,Jonas Tamm,Malmö,Sweden,Chai Mix 200g,Tea,1,8.90,app
+107397,2026-07-31,Mikael Saar,Helsinki,Finland,Espresso Beans 1kg,Coffee,2,24.90,app
+106853,2026-07-17,Linnea Nieminen,Tallinn,Estonia,Cinnamon Bun,Bakery,1,3.90,app
+106825,2026-07-16,Emil Andersson,Tampere,Finland,Rye Bread,Bakery,1,5.20,web
+106518,2026-07-08,Noah Nilsen,Malmö,Sweden,Cinnamon Bun,Bakery,1,3.90,web
+107353,2026-07-30,Emil Lindqvist,Uppsala,Sweden,Cold Brew Pack,Coffee,1,9.90,web
+107207,2026-07-26,Linnea Schmidt,Turku,Finland,Cinnamon Bun,Bakery,3,3.90,store
+106894,2026-07-18,Eero Virtanen,Copenhagen,Denmark,Logo Mug,Merch,2,14.00,web
+106445,2026-07-06,Ida Tamm,Bergen,Norway,Logo Mug,Merch,3,14.00,app
+106389,2026-07-05,Lukas Hansen,Berlin,Germany,Cold Brew Pack,Coffee,2,9.90,web
+107235,2026-07-27,Oskar Andersson,Munich,Germany,Decaf Blend 500g,Coffee,2,14.90,store
+106837,2026-07-17,Ida Johansson,Helsinki,Finland,Blueberry Muffin,Bakery,2,3.50,app
+106775,2026-07-15,Liam Nieminen,Copenhagen,Denmark,Cold Brew Pack,Coffee,2,9.90,web
+106548,2026-07-09,Ella Nilsen,Trondheim,Norway,Blueberry Muffin,Bakery,3,3.50,web
+107054,2026-07-22,Mikael Tamm,Berlin,Germany,Logo Mug,Merch,1,14.00,app
+107149,2026-07-25,Emil Berg,Uppsala,Sweden,Filter Roast 500g,Coffee,1,13.50,store
+106517,2026-07-08,Emil Mäkinen,Bergen,Norway,Cinnamon Bun,Bakery,3,3.90,app
+106315,03/07/2026,Emil Korhonen,Tampere,Finland,Espresso Beans 1kg,Coffee,4,24.90,app
+106328,2026-07-03,Freja Andersson,Stockholm,Sweden,Cold Brew Pack,Coffee,1,9.90,app
+106324,2026-07-03,Leo Lindqvist,Bergen,Norway,Rye Bread,Bakery,1,5.20,app
+107002,2026-07-21,Ida Andersson,Uppsala,Sweden,Earl Grey 100g,Tea,2,6.90,web
+107371,2026-07-31,Ella Johansson,Oulu,Finland,Decaf Blend 500g,Coffee,6,14.90,store
+106692,2026-07-13,Aino Müller,Munich,Germany,Espresso Beans 1kg,Coffee,1,24.90,store
+106406,2026-07-05,Lukas Korhonen,Gothenburg,Sweden,Pour-over Kit,Equipment,2,39.00,web
+106243,2026-07-01,Oskar Müller,Trondheim,Norway,Moka Pot,Equipment,1,34.00,web
+106789,2026-07-15,Sofia Saar,Odense,Denmark,Cinnamon Bun,Bakery,1,3.90,web
+107291,2026-07-28,Alma Johansson,Aarhus,Denmark,Rye Bread,Bakery,3,5.20,store
+106859,2026-07-17,Leo Berg,,Denmark,Rye Bread,Bakery,1,5.20,web
+106399,2026-07-05,Oskar Korhonen,Malmö,Sweden,Rye Bread,Bakery,2,5.20,store
+106377,2026-07-04,Elsa Schmidt,Gothenburg,Sweden,Blueberry Muffin,Bakery,2,3.50,store
+106893,2026-07-18,Freja Lindqvist,Tallinn,Estonia,Filter Roast 500g,Coffee,2,13.50,web
+106805,2026-07-16,Saga Andersson,Berlin,Germany,Blueberry Muffin,Bakery,2,3.50,web
+106400,2026-07-05,Linnea Berg,Munich,Germany,Espresso Beans 1kg,Coffee,4,24.90,web
+106809,2026-07-16,Linnea Berg,Berlin,Germany,Decaf Blend 500g,Coffee,3,14.90,web
+106802,2026-07-16,Alma Johansson,Oulu,Finland,Espresso Beans 1kg,Coffee ,2,24.90,app
+106524,2026-07-09,Maja Johansson,Uppsala,Sweden,Tote Bag,Merch,6,12.00,web
+106391,2026-07-05,Alma Lindqvist,Bergen,Norway,Cold Brew Pack,Coffee,2,9.90,web
+106494,2026-07-08,Hugo Müller,,Finland,Espresso Beans 1kg,Coffee,2,24.90,store
+106978,2026-07-20,Lukas Lindqvist,Berlin,Germany,Logo Mug,Merch,3,14.00,web
+106409,05/07/2026,Ella Nilsen,Munich,Germany,Milk Frother,Equipment,2,29.00,app
+106836,17/07/2026,Sofia Schmidt,Hamburg,Germany,Cold Brew Pack,Coffee,4,9.90,app
+106534,2026-07-09,Maja Larsen,Berlin,GERMANY,Espresso Beans 1kg,Coffee,1,24.90,app
+107172,25/07/2026,Jonas Müller,Tampere,Finland,Filter Roast 500g,Coffee,3,13.50,web
+107237,2026-07-27,Oskar Nilsen,Turku,Finland,Cinnamon Bun,Bakery,1,3.90,web
+106776,2026-07-15,Elsa Virtanen,Gothenburg,Sweden,Blueberry Muffin,Bakery,2,3.50,web
+106782,2026-07-15,Elsa Larsen,Malmö,Sweden,Green Tea 100g,Tea,1,7.50,web
+106842,2026-07-17,Hugo Lindqvist,Copenhagen,Denmark,Green Tea 100g,Tea,1,7.50,store
+107122,2026-07-24,Alma Larsen,Gothenburg,Sweden,Cinnamon Bun,Bakery,2,3.90,app
+106936,2026-07-19,Linnea Hansen,Tartu,Estonia,Espresso Beans 1kg,Coffee,1,24.90,web
+107041,2026-07-22,Mikael Lindqvist,Tallinn,Estonia,Cold Brew Pack,Coffee,1,9.90,web
+106697,2026-07-13,Ida Larsen,Oslo,Norway,Espresso Beans 1kg,Coffee,4,24.90,web
+106926,2026-07-19,Freja Tamm,Tallinn,Estonia,Espresso Beans 1kg,Coffee,2,24.90,app
+107123,2026-07-24,Eero Lindqvist,Oulu,Finland,Filter Roast 500g,Coffee,4,13.50,app
+106502,2026-07-08,Noah Tamm,Tallinn,Estonia,Travel Cup,Merch,1,22.00,web
+107365,2026-07-30,Oskar Nieminen,Munich,Germany,Filter Roast 500g,Coffee,1,13.50,store
+106739,2026-07-14,Emil Korhonen,Hamburg,Germany,Logo Mug,Merch,2,14.00,web
+106877,2026-07-18,Ida Hansen,Oulu,Finland,Cold Brew Pack,Coffee,2,9.90,app
+106650,2026-07-12,Eero Saar,Bergen,Norway,Filter Roast 500g,Coffee,1,13.50,app
+106886,2026-07-18,Lukas Müller,Espoo,Finland,Filter Roast 500g,Coffee,1,13.50,app
+106286,2026-07-02,Maja Müller,Tampere,Finland,Green Tea 100g,Tea,1,7.50,web
+106426,2026-07-05,Alma Andersson,Munich,Germany,Espresso Beans 1kg,Coffee,1,24.90,store
+106480,2026-07-07,Sofia Lindqvist,,Norway,Blueberry Muffin,Bakery,2,3.50,web
+107223,2026-07-26,Saga Johansson,Berlin,  Germany ,Green Tea 100g,Tea,1,7.50,web
+106329,2026-07-03,Leo Larsen,Hamburg,Germany,Cinnamon Bun,Bakery,2,3.90,app
+106878,2026-07-18,Saga Müller,Tallinn,Estonia,Moka Pot,Equipment,1,34.00,web
+107159,2026-07-25,Aino Mäkinen,Aarhus,Denmark,Chai Mix 200g,Tea,3,8.90,web
+106944,2026-07-19,Lukas Müller,Malmö,Sweden,Tote Bag,Merch,1,12.00,web
+107014,2026-07-21,Saga Larsen,Stockholm,Sweden,Blueberry Muffin,Bakery,3,3.50,web
+106892,2026-07-18,Linnea Virtanen,Espoo,Finland,Espresso Beans 1kg,coffee,1,24.90,app
+106831,2026-07-17,Saga Müller,Tallinn,Estonia,Travel Cup,Merch,1,22.00,web
+107173,2026-07-25,Linnea Virtanen,Tartu,Estonia,Cold Brew Pack,Coffee,1,9.90,store
+107294,2026-07-28,Elsa Saar,Espoo,Finland,Cold Brew Pack,Coffee,1,9.90,web
+107071,2026-07-23,Maja Nieminen,Espoo,Finland,Milk Frother,Equipment,1,29.00,app
+106854,2026-07-17,Aino Berg,Bergen,Norway,Travel Cup,Merch,4,22.00,web
+106238,01/07/2026,Saga Andersson,Stockholm,Sweden,Decaf Blend 500g,Coffee,1,14.90,web
+106882,2026-07-18,Sofia Tamm,Aarhus,Denmark,Rye Bread,Bakery,2,5.20,web
+106943,2026-07-19,Alma Schmidt,Oulu,Finland,Green Tea 100g,Tea,1,7.50,store
+106631,2026-07-11,Liam Hansen,Copenhagen,Denmark,Cinnamon Bun,Bakery,1,3.90,web
+106572,2026-07-10,Mikael Lindqvist,Gothenburg,Sweden,Blueberry Muffin,Bakery,2,3.50,web
+106817,2026-07-16,Saga Schmidt,Tartu,Estonia,Cold Brew Pack,Coffee,1,9.90,store
+107170,2026-07-25,Noah Hansen,Tartu,Estonia,Cinnamon Bun,Bakery,4,3.90,app
+107245,2026-07-27,Alma Nilsen,Bergen,Norway,Blueberry Muffin,Bakery,2,3.50,app
+106791,2026-07-16,Liam Schmidt,Aarhus,Denmark,Cold Brew Pack,Coffee,2,9.90,app
+107275,2026-07-28,Alma Johansson,Tampere,Finland,Espresso Beans 1kg,Coffee,1,24.90,app
+107068,2026-07-22,Mikael Saar,Odense,Denmark,Blueberry Muffin,Bakery,1,3.50,web
+106715,2026-07-13,Liam Andersson,Odense,Denmark,Cold Brew Pack,Coffee,2,9.90,web
+107356,2026-07-30,Sofia Mäkinen,Hamburg,Germany,Cold Brew Pack,Coffee ,1,9.90,web
+106901,2026-07-18,Alma Virtanen,Copenhagen,Denmark,Earl Grey 100g,Tea,1,6.90,app
+106786,2026-07-15,Saga Schmidt,,Finland,Blueberry Muffin,Bakery,2,3.50,store
+106265,2026-07-01,Saga Larsen,Odense,Denmark,Pour-over Kit,Equipment,1,39.00,store
+106432,2026-07-06,Maja Saar,Hamburg,Germany,Green Tea 100g,Tea,2,7.50,app
+106520,2026-07-08,Leo Berg,Tartu,Estonia,Espresso Beans 1kg,Coffee,1,24.90,web
+107011,2026-07-21,Oskar Berg,Tartu,Estonia,Cold Brew Pack,Coffee,1,9.90,web
+106362,2026-07-04,Linnea Korhonen,Espoo,Finland,Decaf Blend 500g,Coffee,1,14.90,web
+106339,2026-07-04,Freja Larsen,Munich,Germany,Espresso Beans 1kg,Coffee,2,24.90,app
+106484,2026-07-07,Leo Nieminen,Berlin,Germany,Earl Grey 100g,Tea,2,6.90,app
+106688,2026-07-13,Ella Korhonen,Hamburg,Germany,Filter Roast 500g,coffee,4,13.50,app
+106890,2026-07-18,Lukas Virtanen,Hamburg,Germany,Single Origin Kenya 250g,Coffee,1,11.90,store
+107065,2026-07-22,Sofia Larsen,Aarhus,Denmark,Decaf Blend 500g,Coffee,2,14.90,app
+106474,2026-07-07,Saga Lindqvist,Stockholm,Sweden,Decaf Blend 500g,Coffee,1,14.90,store
+106393,2026-07-05,Freja Larsen,Turku,Finland,Cold Brew Pack,Coffee,3,9.90,store
+107261,2026-07-28,Ella Nilsen,Oulu,Finland,Hand Grinder,Equipment,2,49.00,store
+106785,2026-07-15,Saga Johansson,Oulu,Finland,Green Tea 100g,Tea,3,7.50,app
+107127,2026-07-24,Ida Tamm,Oulu,Finland,Cold Brew Pack,Coffee,1,9.90,web
+107096,2026-07-23,Freja Virtanen,Trondheim,Norway,Decaf Blend 500g,Coffee,2,14.90,store
+106244,2026-07-01,Jonas Johansson,Tampere,Finland,Blueberry Muffin,Bakery,1,3.50,store
+106784,2026-07-15,Saga Tamm,Gothenburg,Sweden,Rye Bread,Bakery,1,5.20,web
+106705,2026-07-13,Aino Müller,Malmö,Sweden,Green Tea 100g,Tea,4,7.50,app
+106245,2026-07-01,Maja Müller,Odense,Denmark,Logo Mug,Merch,4,14.00,web
+106614,2026-07-11,Noah Virtanen,Trondheim,Norway,Travel Cup,Merch,1,,app
+107020,2026-07-21,Eero Saar,Espoo,Finland,Blueberry Muffin,Bakery,2,3.50,app
+106371,2026-07-04,Elsa Lindqvist,Stockholm,Sweden,Moka Pot,Equipment,1,34.00,web
+107104,2026-07-24,Sofia Nieminen,Uppsala,Sweden,Single Origin Kenya 250g,Coffee,1,11.90,web
+106590,2026-07-10,Sofia Berg,Bergen,Norway,Filter Roast 500g,Coffee,2,13.50,app
+106918,2026-07-19,Saga Berg,Oulu,Finland,Moka Pot,Equipment,1,34.00,web
+107070,2026-07-22,Ella Nieminen,Turku,Finland,Cinnamon Bun,Bakery,2,3.90,web
+106401,2026-07-05,Eero Mäkinen,Helsinki,Finland,Espresso Beans 1kg,Coffee,4,24.90,app
+107322,2026-07-29,Sofia Schmidt,Stockholm,Sweden,Logo Mug,Merch,2,14.00,app
+106287,02/07/2026,Leo Nieminen,Stockholm,Sweden,Cold Brew Pack,Coffee,1,9.90,store
+106998,2026-07-21,Mikael Virtanen,Espoo,Finland,Blueberry Muffin,Bakery,1,3.50,store
+106441,2026-07-06,Leo Mäkinen,Trondheim,  Norway ,Logo Mug,Merch,1,14.00,store
+107349,2026-07-30,Freja Berg,Hamburg,Germany,Cinnamon Bun,Bakery,1,3.90,web
+106962,2026-07-20,Eero Hansen,Berlin,Germany,Green Tea 100g,Tea,1,7.50,store
+106689,2026-07-13,Saga Hansen,Munich,Germany,Decaf Blend 500g,Coffee,2,14.90,store
+106851,2026-07-17,Leo Schmidt,Malmö,Sweden,Cold Brew Pack,Coffee,1,9.90,web
+106666,2026-07-12,Lukas Nilsen,Espoo,Finland,Pour-over Kit,Equipment,1,39.00,app
+106643,2026-07-12,Alma Nieminen,Munich,Germany,Cinnamon Bun,Bakery,1,3.90,web
+106434,2026-07-06,Maja Johansson,Copenhagen,Denmark,Travel Cup,Merch,4,22.00,web
+106847,2026-07-17,Saga Hansen,Berlin,Germany,Espresso Beans 1kg,coffee,1,24.90,store
+106638,2026-07-11,Jonas Lindqvist,Berlin,Germany,Logo Mug,Merch,1,14.00,web
+106327,2026-07-03,Hugo Schmidt,Tampere,Finland,Blueberry Muffin,Bakery,1,3.50,web
+106532,2026-07-09,Jonas Korhonen,Oslo,Norway,Cinnamon Bun,Bakery,1,3.90,app
+106908,2026-07-18,Freja Saar,Oulu,Finland,Cinnamon Bun,Bakery,2,3.90,app
+106960,2026-07-20,Leo Nieminen,Turku,Finland,Blueberry Muffin,Bakery,1,3.50,web
+107244,2026-07-27,Jonas Korhonen,Turku,Finland,Rye Bread,Bakery,4,5.20,web
+106952,2026-07-19,Eero Tamm,Bergen,Norway,Filter Roast 500g,Coffee,4,13.50,app
+107355,2026-07-30,Ella Mäkinen,Oulu,Finland,Cold Brew Pack,Coffee,1,9.90,app
+106736,2026-07-14,Eero Virtanen,Helsinki,Finland,Rye Bread,Bakery,,5.20,store
+106777,2026-07-15,Emil Larsen,Espoo,Finland,Blueberry Muffin,Bakery,1,3.50,store
+107026,2026-07-21,Saga Lindqvist,Gothenburg,Sweden,Green Tea 100g,Tea,2,7.50,web
+107171,2026-07-25,Leo Mäkinen,Bergen,Norway,Cinnamon Bun,Bakery,4,3.90,store
+106800,2026-07-16,Emil Virtanen,Uppsala,Sweden,Espresso Beans 1kg,Coffee,1,24.90,web

@@ -6,17 +6,20 @@
 #
 # Common usage:
 #   make init        # download required JARs/tarballs (first time only)
-#   make up          # build + start the whole stack
+#   make up          # start the whole stack (live view: log left, services right); builds only missing images
+#   make build       # rebuild the images (after changing a Dockerfile, or pulling such changes), then start
+#   make status      # live dashboard: all containers' logs + state/CPU/memory/port per service (q quits)
 #   make ps          # show running services
 #   make logs        # tail logs for all services
-#   make down        # stop the stack and remove volumes
-#   make clean       # remove images built for this stack
+#   make down        # bring the stack down — keeps volumes (all data) and images
+#   make clean       # stack down first: delete all its data (volumes) — fresh install, images kept
+#   make destroy     # remove everything the stack made: containers, volumes, network, images
 
 COMPOSE = docker compose
 
 .DEFAULT_GOAL := help
 
-.PHONY: help init up down restart ps logs config clean docs docs-serve polaris-seed
+.PHONY: help init up build up-plain status down stop restart ps logs config clean destroy docs docs-serve polaris-seed
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -25,13 +28,28 @@ help: ## Show this help
 init: ## Download required JARs/tarballs (first time only)
 	bash init.sh
 
-up: ## Build and start the whole stack
-	$(COMPOSE) up -d --build
+up: ## Start the whole stack (builds only missing images) — live view: log left, each service right
+	@if command -v python3 >/dev/null 2>&1; then python3 tools/up.py $(if $(BUILD),--build); \
+	  else $(COMPOSE) up -d $(if $(BUILD),--build); fi
 
-down: ## Stop the stack and remove volumes
-	$(COMPOSE) down -v
+build: ## Rebuild the images, then start — after changing a Dockerfile (make up warns when one changed)
+	@if command -v python3 >/dev/null 2>&1; then python3 tools/up.py --build; else $(COMPOSE) up -d --build; fi
 
-restart: down up ## Restart the whole stack
+up-plain: ## Start the whole stack, plain docker compose output (BUILD=1: rebuild images first)
+	$(COMPOSE) up -d $(if $(BUILD),--build)
+
+status: ## Live dashboard of the running stack: all logs left; state, CPU, memory, port per service right (q quits)
+	@python3 tools/up.py --watch
+
+down: ## Bring the stack down (members' Jupyter servers too) — keeps all data and images; make up starts it again
+	@if command -v python3 >/dev/null 2>&1; then python3 tools/up.py --stop; else \
+	  ids=$$(docker ps -aq --filter "name=^jupyter-"); \
+	  if [ -n "$$ids" ]; then echo "Removing members' Jupyter servers..."; docker rm -f $$ids >/dev/null; fi; \
+	  $(COMPOSE) down; fi
+
+stop: down ## Same as make down
+
+restart: down up ## make down, then make up — keeps all data
 
 ps: ## Show running services
 	$(COMPOSE) ps
@@ -53,6 +71,9 @@ polaris-seed: ## Provision the governed Polaris catalog + personas/RBAC (the gov
 config: ## Validate the merged compose configuration
 	$(COMPOSE) config -q && echo "compose config OK"
 
-clean: ## Remove images built for this stack
-	bash remove-stack.sh
+clean: ## With the stack down: delete ALL its data (volumes) — a fresh install; images are kept (asks first)
+	@python3 tools/reset.py clean
+
+destroy: ## Remove everything the stack made — containers, volumes, network, images (asks first)
+	@python3 tools/reset.py destroy
 

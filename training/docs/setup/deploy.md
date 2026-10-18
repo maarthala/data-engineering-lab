@@ -13,7 +13,7 @@ learning.
 === "Local (Docker Compose)"
 
     ### Prerequisites
-    - **Docker Desktop** (≥ 8 GB RAM allocated — 12–16 GB is comfortable) and **Git**
+    - **Docker Desktop** (≥ 8 GB RAM and 4 CPUs allocated — 12–16 GB and 6 CPUs are comfortable) and **Git**
       — see [Prerequisites → run the stack yourself](prerequisites.md#3-running-the-stack-yourself-only-if-it-isnt-provided).
 
     ### Steps
@@ -27,25 +27,29 @@ learning.
     make init              # download Spark/Iceberg jars (~2.5 GB) + prepare AdventureWorks
 
     # 3. start it
-    make up                # build the images + start every service
-    make polaris-seed      # create the lakehouse catalog (iceberg) + personas
+    make up                # build the images (first time) + start every service
+                           # (also creates the lakehouse catalog `iceberg` + personas)
+
+    # 4. done for the day
+    make down              # bring it down, keep all data — `make up` starts it again
     ```
 
     !!! warning "Don't skip `cp .env.example .env`"
         Without `.env`, `make up` stops at once with **`no configuration file provided: not
         found`**. The file is gitignored, so each clone needs its own copy.
 
-    !!! warning "`make polaris-seed` is needed for everything in `iceberg`, and again after a reset"
-        It creates the `iceberg` lakehouse catalog. Until it runs, every `iceberg.…` query
-        (Units {unit:unit2/intro.md}–{unit:unit6/polaris.md}) fails with **`Unable to find warehouse polaris_lake`**.
-        Postgres keeps no data volume, so the catalog is lost whenever the Postgres container is
-        recreated: after `make down`, `make restart`, or a `make up` that rebuilds it. **Run
-        `make polaris-seed` again** after any of those, or whenever you see that error. It's safe
-        to re-run.
+    !!! note "`make up` creates the `iceberg` lakehouse catalog when it's missing"
+        Every `iceberg.…` query (Units {unit:unit2/intro.md}–{unit:unit6/polaris.md}) needs it. The
+        catalog lives in Postgres's volume, so `make down` → `make up` keeps it; on the first start
+        and after `make clean` / `make destroy` (which delete it), `make up` runs `make polaris-seed`
+        for you and says so in its summary. If you still see **`Unable to find warehouse
+        polaris_lake`** (e.g. you started with `make up-plain`), run `make polaris-seed` — it's
+        safe to re-run.
 
     !!! note "The first `make up` is slow"
         It builds every image from scratch, which takes **15–30 minutes** depending on your machine
-        and network. Later runs reuse the cache and start in a minute or two.
+        and network. Later runs don't build at all — they start in a minute or two. After changing
+        a Dockerfile, run `make build`.
 
     ### Optional settings in `.env`
     | Setting | When you need it |
@@ -54,8 +58,9 @@ learning.
     | `AIRFLOW_HOST_PORT=8011` | something else already uses port **8001** (then open Airflow at `localhost:8011`) |
     | `GIT_TOKEN=<token>` | you want Jupyter to auto-push saved notebooks to a git repo. Leave it empty and Jupyter works normally, without auto-push |
 
-    If `make up` fails with **`port is already allocated`**, set the matching port above and run
-    `make up` again.
+    If a port is taken, `make up` stops before starting anything and lists each one — what needs
+    it, what holds it, and the fix (for Postgres and Airflow, the `.env` line to add). Free it or set
+    the port above, and run `make up` again.
 
     ### Verify
     ```bash
@@ -67,7 +72,7 @@ learning.
     [setup checklist](prerequisites.md#verify-your-setup).
 
     ### Fill the shared lake (once)
-    `make polaris-seed` creates the shared lake (`polaris_lake`) with **empty** bronze / silver /
+    `make up` (via `make polaris-seed`) creates the shared lake (`polaris_lake`) with **empty** bronze / silver /
     gold namespaces. The ready-made ShopFlow tables the lessons read — `shared.gold.daily_sales`
     in a notebook, `iceberg.gold.daily_sales` in Trino / SQLPad / Superset — are built by an
     Airflow pipeline. Run it once:
@@ -77,26 +82,49 @@ learning.
        **▶ Trigger**.
     3. After about **2–3 minutes** all three tasks are green: Bronze → Silver → Gold.
 
-    Until then those queries answer *table not found*. Re-run it after a reset (`make down`,
-    `make restart`).
+    Until then those queries answer *table not found*. Re-run it after a reset (`make clean`,
+    `make destroy`).
 
     ### Day-to-day
-    | Command | What it does |
-    |---|---|
-    | `make ps` | show running services |
-    | `make logs` (`make logs S=trino`) | tail logs (all, or one service) |
-    | `make docs` | rebuild the course site after editing `training/docs/**` |
-    | `make restart` | `down` then `up`, so it **wipes data** too (then re-run `make polaris-seed` and the `shopflow_medallion` DAG) |
-    | `make down` | **stop the stack and remove volumes** (wipes data) |
-    | `docker compose stop` / `docker compose start` | pause and resume, **keeping** your data and catalog |
-    | `make clean` | remove the images built for this stack |
+    Run them from `local/`. The last column is what matters most:
 
-    !!! warning "`make down` deletes the volumes"
-        It runs `docker compose down -v`, so the object store (RustFS), Postgres, the catalog and the
+    | Command | What it does | Your data |
+    |---|---|---|
+    | `make init` | **first run only**: downloads the Spark/Iceberg jars (~2.5 GB, into `common/dockerfiles/tmp`) and prepares AdventureWorks. Starts nothing | — |
+    | `make up` | first checks Docker's CPUs and memory against the minimum (below it: says what's missing and asks before starting; `LAB_SKIP_CHECKS=1 make up` skips the question) and that every port it needs is free — if one is taken it starts nothing and says by what (another container, or a program and its pid) and how to free or change it; then starts every service; after `make down` it picks up where you left off. It builds an image only when it's missing (first run, after `make destroy`) and warns when a Dockerfile — or a file it copies in — changed since its image was built. Shows a live view — the log on the left, every service's state on the right — then the links to open (`make up-plain`: plain output) | kept |
+    | `make status` | a live dashboard of the running stack, any time — see below | — |
+    | `make build` | rebuilds the images, then starts — after you changed a Dockerfile, or pulled changes that did (`make up` tells you). Almost everything in `common/dockerfiles/add/` is mounted into the containers, so editing those files only needs a restart, not a rebuild | kept |
+    | `make down` | brings everything down — the stack and the members' Jupyter servers — and removes the containers, **not** the volumes or images. Shows each service going running → stopping → removed (`make stop` is the same) | **kept** |
+    | `make restart` | `make down` then `make up` | kept |
+    | `make clean` | with the stack down: deletes **all its data** (every volume) — back to a fresh install. Images stay, so the next `make up` is quick. Lists what goes and asks you to type `yes` | ⚠️ **wiped** |
+    | `make destroy` | removes **everything the stack made** — containers, volumes, network and images (built and pulled) — a clean plate; the next `make up` rebuilds every image. Asks you to type `yes` | ⚠️ **wiped** |
+    | `make ps` | show running services | — |
+    | `make logs` (`make logs S=trino`) | tail logs (all, or one service) | — |
+    | `make docs` | rebuild the course site after editing `training/docs/**` | — |
+
+    **Kept** means members, their lakehouses, tables, buckets, notebooks and DAGs, the catalog
+    (no re-seeding needed) and the shared lake's tables — all of it is in Docker
+    volumes.
+
+    `make status` shows, live:
+
+    - **left** — the logs of **all** containers, each line with its service's name in colour;
+      errors in red, warnings in yellow;
+    - **right** — every service with its state (● running/healthy, ✓ setup job done, ✗ failed,
+      ↻ restarting, ○ stopped), **CPU**, **memory** and **port**, plus the members' Jupyter
+      servers; below it, details of the selected one (status, image, ports, network and disk use);
+    - **top** — total CPU and memory (of what Docker may use), and how many services are ready.
+
+    Keys: **↑ ↓** pick a service · **f** only its logs · **e** errors and warnings only · **a** all
+    logs again · **space** pause the log · **q** quit (the stack keeps running).
+
+    !!! warning "`make clean` and `make destroy` delete all the data"
+        Both delete the stack's volumes, so the object store (RustFS), Postgres, the catalog and the
         **lab accounts** are wiped — registered accounts are gone (`demouser`, `learner2` and `manager`
         come back by themselves), and each member's lakehouse and bucket are recreated, empty, on their next
-        sign-in. Use it
-        for a clean reset; use `docker compose stop` if you only want to pause and keep your data.
+        sign-in. After either: `make up` (it recreates the catalog) and the `shopflow_medallion` DAG again.
+        They only touch this stack — other projects' containers, volumes and images are left alone —
+        and keep the `make init` downloads. To stop for the day, use **`make down`**.
 
 === "Kubernetes"
 
@@ -164,6 +192,6 @@ learning.
   `main` — and the stack's landing page links straight to it, so it's always the current version.
 
 ## You can now…
-- Bring the whole stack up with Docker Compose (`cp .env.example .env`, `make init`, `make up`, `make polaris-seed`, then the `shopflow_medallion` DAG once) or on Kubernetes (Ansible)
+- Bring the whole stack up with Docker Compose (`cp .env.example .env`, `make init`, `make up`, then the `shopflow_medallion` DAG once) or on Kubernetes (Ansible)
 - Verify every service is running and reach the landing page
 - Tear it down / reset cleanly, and know which command wipes data
