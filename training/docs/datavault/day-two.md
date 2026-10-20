@@ -116,7 +116,7 @@ SELECT crm_id, email, first_name, last_name,
             THEN concat('+31 20 555 ', substr(crm_id, 5)) ELSE phone END       AS phone,
        country, segment, consent_email, updated_at,
        TIMESTAMP '2025-01-02 06:00:00' AS load_dts, 'crm.contacts' AS record_source
-FROM shared.crm.contacts
+FROM my.crm.contacts
 UNION ALL
 SELECT 'C-900001', 'customer6002@example.com', 'Noah', 'Fischer', '+44 20 7946 0001',
        'UK', 'B2C', true, TIMESTAMP '2025-01-02 05:00:00',
@@ -136,7 +136,7 @@ SELECT mp_order_ref, buyer_email, buyer_name, buyer_country, ordered_at,
             ELSE order_status END                                             AS order_status,
        currency,
        TIMESTAMP '2025-01-02 06:00:00' AS load_dts, 'marketplace.orders' AS record_source
-FROM shared.marketplace.orders
+FROM my.marketplace.orders
 UNION ALL
 SELECT 'MP-200001', ' Customer6001@Example.com', 'Customer 6001', 'DE',
        TIMESTAMP '2025-01-01 21:15:00', 'PAID', 'EUR',
@@ -147,7 +147,7 @@ SELECT 'MP-200001', ' Customer6001@Example.com', 'Customer 6001', 'DE',
 %%sql
 CREATE OR REPLACE TEMP VIEW src_mkt_order_lines AS
 SELECT *, TIMESTAMP '2025-01-02 06:00:00' AS load_dts, 'marketplace.order_lines' AS record_source
-FROM shared.marketplace.order_lines
+FROM my.marketplace.order_lines
 UNION ALL
 SELECT * FROM VALUES
   ('MP-200001', 'SKU-0005', 1, CAST(21.50 AS decimal(10,2)),
@@ -163,9 +163,9 @@ SELECT * FROM VALUES
 SELECT
   (SELECT count(*) FROM shared.bronze.orders
    WHERE status = 'placed' AND order_id % 3 = 0)                                AS shop_shipped,
-  (SELECT count(*) FROM shared.marketplace.orders
+  (SELECT count(*) FROM my.marketplace.orders
    WHERE order_status = 'DISPATCHED' AND cast(substr(mp_order_ref, 4) AS int) % 4 = 0) AS mkt_delivered,
-  (SELECT count(*) FROM shared.crm.contacts
+  (SELECT count(*) FROM my.crm.contacts
    WHERE cast(substr(crm_id, 3) AS int) % 100 = 0)                              AS crm_new_phones
 ```
 
@@ -253,9 +253,9 @@ FROM my.raw_vault.sat_customer_crm WHERE load_dts = TIMESTAMP '2025-01-02 06:00:
 |---|---|
 | shop | 4 |
 | shop_loyalty | 123 |
-| crm | 56 |
+| crm | 57 |
 
-And because the CRM has its own satellite, 55 new phone numbers didn't touch a single shop
+And because the CRM has its own satellite, 56 new phone numbers didn't touch a single shop
 row. On millions of customers with marketing flags changing daily, that's the difference between
 a vault that grows by megabytes and one that grows by gigabytes.
 
@@ -279,8 +279,8 @@ ORDER BY valid_from
 
 | email | loyalty_tier | marketing_opt_in | valid_from | valid_to |
 |---|---|---|---|---|
-| customer100@example.com | gold | true | 2025-01-01 06:00:00 | 2025-01-02 06:00:00 |
-| customer100@example.com | gold | false | 2025-01-02 06:00:00 | null |
+| customer100@example.com | none | false | 2025-01-01 06:00:00 | 2025-01-02 06:00:00 |
+| customer100@example.com | none | true | 2025-01-02 06:00:00 | null |
 
 ### 8 · The plain join breaks
 Join a customer to two satellites now — customer 100 has two loyalty versions, so you get **two**

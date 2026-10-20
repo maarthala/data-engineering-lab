@@ -1,7 +1,8 @@
 # Meet ShopFlow's three sources
 
-All course long ShopFlow had one source: the **shop** database. Now two more systems join, and
-they're ready in the course lake (`shared`):
+All course long ShopFlow had one source: the **shop** database. Now two more systems join. Their
+data reaches you the way new sources usually arrive in a real company: as **files** someone
+exports for you. You land them in your lakehouse (`my`) first, then explore them:
 
 ```mermaid
 flowchart LR
@@ -9,8 +10,8 @@ flowchart LR
   classDef hub fill:#4f8ef7,stroke:#1d4fb8,color:#fff
 
   SHOP["<b>SOURCE</b><br/>Shop<br/>shared.bronze.*<br/><i>customer_id · product_id · order_id</i>"]:::src
-  CRM["<b>SOURCE</b><br/>CRM<br/>shared.crm.contacts<br/><i>crm_id · e-mail</i>"]:::src
-  MKT["<b>SOURCE</b><br/>Marketplace<br/>shared.marketplace.*<br/><i>MP-… order refs · e-mail · SKU</i>"]:::src
+  CRM["<b>SOURCE</b><br/>CRM<br/>my.crm.contacts<br/><i>crm_id · e-mail</i>"]:::src
+  MKT["<b>SOURCE</b><br/>Marketplace<br/>my.marketplace.*<br/><i>MP-… order refs · e-mail · SKU</i>"]:::src
   C(["the same<br/>customers"]):::hub
   P(["the same<br/>products"]):::hub
   SHOP --> C
@@ -23,77 +24,141 @@ flowchart LR
 | Source | System | Tables | What it knows |
 |---|---|---|---|
 | **Shop** | ShopFlow's own web shop (Postgres) | `shared.bronze.customers`, `products`, `orders`, `order_items` | everything you've used so far |
-| **CRM** | the sales & marketing tool | `shared.crm.contacts` | contacts — most shop customers, plus **leads** who never bought |
-| **Marketplace** | MarketHub, where ShopFlow also sells | `shared.marketplace.orders`, `order_lines` | marketplace orders — some by shop customers, many by people the shop has never seen |
+| **CRM** | the sales & marketing tool | `my.crm.contacts` (from `crm_contacts.csv`) | contacts — most shop customers, plus **leads** who never bought |
+| **Marketplace** | MarketHub, where ShopFlow also sells | `my.marketplace.orders`, `order_lines` (from `marketplace_orders.csv`, `marketplace_order_lines.csv`) | marketplace orders — some by shop customers, many by people the shop has never seen |
 
 Each system was built by different people, for a different job. Before modelling anything, look
 at how they **identify** things — that decides the whole vault.
 
 ## Lab
-Open a notebook and explore with `%%sql`.
 
-### 1 · The CRM
+### 1 · Download the files
+Download the three exports to your computer:
+
+- [`crm_contacts.csv`](../assets/datavault/crm_contacts.csv): 5,628 CRM contacts
+- [`marketplace_orders.csv`](../assets/datavault/marketplace_orders.csv): 8,000 marketplace orders
+- [`marketplace_order_lines.csv`](../assets/datavault/marketplace_order_lines.csv): 16,000 order lines
+
+### 2 · Upload them to your bucket
+On the landing page open **📁 My files** → **files** → **source**, create a folder
+**`datavault`** and upload the three files into it. They're now at
+`s3a://<you>-lake/files/source/datavault/`, e.g.
+`s3a://demouser-lake/files/source/datavault/crm_contacts.csv`.
+
+### 3 · Load them into your lakehouse
+In a notebook (replace `demouser` with your username):
+
+```python
+base = "s3a://demouser-lake/files/source/datavault/"     # your own bucket
+
+sources = {
+    "my.crm.contacts": ("crm_contacts.csv",
+        "crm_id STRING, email STRING, first_name STRING, last_name STRING, phone STRING, "
+        "country STRING, segment STRING, consent_email BOOLEAN, updated_at TIMESTAMP"),
+    "my.marketplace.orders": ("marketplace_orders.csv",
+        "mp_order_ref STRING, buyer_email STRING, buyer_name STRING, buyer_country STRING, "
+        "ordered_at TIMESTAMP, order_status STRING, currency STRING"),
+    "my.marketplace.order_lines": ("marketplace_order_lines.csv",
+        "mp_order_ref STRING, sku STRING, qty INT, item_price DECIMAL(10,2)"),
+}
+
+spark.sql("CREATE NAMESPACE IF NOT EXISTS my.crm")
+spark.sql("CREATE NAMESPACE IF NOT EXISTS my.marketplace")
+
+for table, (file, schema) in sources.items():
+    df = spark.read.option("header", True).schema(schema).csv(base + file)
+    df.writeTo(table).createOrReplace()
+    print(table, spark.table(table).count())
+```
+
+- **`sources = {key: (file, schema), …}`**: a dictionary. Each target table maps to a pair (a
+  *tuple*): the file to read and the columns it has.
+- **`.schema("crm_id STRING, …")`**: the column names and types, written like SQL. With a schema
+  Spark doesn't guess types (as `inferSchema` would): `item_price` stays an exact
+  `DECIMAL(10,2)` and `updated_at` a `TIMESTAMP`. `option("header", True)` still skips row 1.
+- **`for table, (file, schema) in sources.items():`**: loops over the dictionary; each round
+  gets one key and unpacks its pair into `file` and `schema`.
+- **`writeTo(table).createOrReplace()`**: writes the table into `my`, replacing it on a rerun,
+  as in [Upload a file & register it](../unit3/upload-register.md).
+
+Output:
+
+```
+my.crm.contacts 5628
+my.marketplace.orders 8000
+my.marketplace.order_lines 16000
+```
+
+!!! info "Which numbers match yours exactly?"
+    The three files are the same for everyone, so everything counted from them matches the
+    examples exactly. The shop's data is generated when your lab is installed, so results that
+    use the shop's countries, loyalty tiers, prices or order statuses differ a little, as in the
+    rest of the course.
+
+Now explore them with `%%sql`.
+
+### 4 · The CRM
 
 ```sql
 %%sql
-SELECT * FROM shared.crm.contacts ORDER BY crm_id LIMIT 3
+SELECT * FROM my.crm.contacts ORDER BY crm_id LIMIT 3
 ```
 
 Example output:
 
 | crm_id | email | first_name | last_name | phone | country | segment | consent_email | updated_at |
 |---|---|---|---|---|---|---|---|---|
-| C-000001 | customer1@example.com | Tom | Brown | +52533796328 | US | B2C | false | 2024-05-24 01:17:30 |
-| C-000002 | customer2@example.com | Ben | Fischer | +39582737715 | IN | B2C | false | 2024-06-26 14:06:19 |
-| C-000003 | customer3@example.com | Ben | Jones | +44785020285 | IN | B2C | true | 2024-04-16 20:22:53 |
+| C-000001 | customer1@example.com | Daniel | Martin | +54636058503 | US | B2C | false | 2024-08-21 11:01:10 |
+| C-000002 | customer2@example.com | Kira | Silva | +25139840863 | FR | B2C | false | 2024-01-26 15:08:26 |
+| C-000003 | customer3@example.com | Priya | Brown | +21803551108 | AU | B2C | false | 2024-04-23 06:28:27 |
 
 The CRM has its **own id** (`crm_id`) — it has never heard of the shop's `customer_id`. What
 it shares with the shop is the **e-mail address**. And it has its own **names**: the shop
-calls customer 1 `Customer 1`, the CRM calls them `Tom Brown`.
+calls customer 1 `Customer 1`, the CRM calls them `Daniel Martin`.
 
-### 2 · The marketplace
+### 5 · The marketplace
 
 ```sql
 %%sql
-SELECT * FROM shared.marketplace.orders ORDER BY mp_order_ref LIMIT 3
+SELECT * FROM my.marketplace.orders ORDER BY mp_order_ref LIMIT 3
 ```
 
 ```sql
 %%sql
-SELECT * FROM shared.marketplace.order_lines ORDER BY mp_order_ref, sku LIMIT 3
+SELECT * FROM my.marketplace.order_lines ORDER BY mp_order_ref, sku LIMIT 3
 ```
 
 Example output:
 
 | mp_order_ref | buyer_email | buyer_name | buyer_country | ordered_at | order_status | currency |
 |---|---|---|---|---|---|---|
-| MP-100001 | buyer1234@markethub.example | Buyer 1234 | UK | 2024-04-25 05:56:05 | DELIVERED | EUR |
-| MP-100002 | customer3815@example.com | Customer 3815 | US | 2025-01-21 15:07:19 | DELIVERED | USD |
-| MP-100003 | buyer178@markethub.example | Buyer 178 | NL | 2024-10-06 09:04:15 | DELIVERED | EUR |
+| MP-100001 | buyer1234@markethub.example | Buyer 1234 | UK | 2024-04-25 02:56:05 | DELIVERED | EUR |
+| MP-100002 | customer3815@example.com | Customer 3815 | CA | 2025-01-21 13:07:19 | DELIVERED | USD |
+| MP-100003 | buyer178@markethub.example | Buyer 178 | NL | 2024-10-06 06:04:15 | DELIVERED | EUR |
 
 | mp_order_ref | sku | qty | item_price |
 |---|---|---|---|
-| MP-100001 | SKU-0009 | 1 | 132.02 |
-| MP-100001 | SKU-0057 | 1 | 372.92 |
-| MP-100001 | SKU-0161 | 1 | 144.90 |
+| MP-100001 | SKU-0029 | 3 | 138.62 |
+| MP-100001 | SKU-0067 | 2 | 57.57 |
+| MP-100001 | SKU-0191 | 3 | 413.19 |
 
 Three differences from the shop:
 
 - **Orders** are `MP-100001`, not numbers — and they're **different orders** from the shop's.
 - **Customers** are e-mail addresses — some belong to shop customers, many don't.
-- **Products** are **SKUs** (`SKU-0009`). ShopFlow prints the SKU on every label: `SKU-0009`
-  is shop product `9`. The shop's database simply stores only the number.
+- **Products** are **SKUs** (`SKU-0029`). ShopFlow prints the SKU on every label: `SKU-0029`
+  is shop product `29`. The shop's database simply stores only the number.
 - **Status** has its own words: `PAID`, `DISPATCHED`, `DELIVERED`, `REFUNDED`.
 
-### 3 · How much do they overlap?
+### 6 · How much do they overlap?
 
 ```sql
 %%sql
 SELECT
   (SELECT count(*) FROM shared.bronze.customers)                              AS shop_customers,
-  (SELECT count(*) FROM shared.crm.contacts)                                  AS crm_contacts,
-  (SELECT count(DISTINCT buyer_email) FROM shared.marketplace.orders)         AS marketplace_buyers_raw,
-  (SELECT count(DISTINCT lower(trim(buyer_email))) FROM shared.marketplace.orders) AS marketplace_buyers
+  (SELECT count(*) FROM my.crm.contacts)                                  AS crm_contacts,
+  (SELECT count(DISTINCT buyer_email) FROM my.marketplace.orders)         AS marketplace_buyers_raw,
+  (SELECT count(DISTINCT lower(trim(buyer_email))) FROM my.marketplace.orders) AS marketplace_buyers
 ```
 
 - **`lower(trim(…))`** — the same e-mail, however it was typed.
@@ -102,22 +167,22 @@ Example output:
 
 | shop_customers | crm_contacts | marketplace_buyers_raw | marketplace_buyers |
 |---|---|---|---|
-| 6000 | 5577 | 5440 | 5130 |
+| 6000 | 5628 | 5459 | 5106 |
 
 `marketplace_buyers_raw` is **higher** than `marketplace_buyers`: the same buyer typed their
 e-mail differently on different orders.
 
 ```sql
 %%sql
-SELECT buyer_email FROM shared.marketplace.orders
+SELECT buyer_email FROM my.marketplace.orders
 WHERE buyer_email <> lower(trim(buyer_email))
 LIMIT 3
 ```
 
 ```
- CUSTOMER3078@EXAMPLE.COM
- CUSTOMER3748@EXAMPLE.COM
- CUSTOMER1585@EXAMPLE.COM
+ CUSTOMER3076@EXAMPLE.COM
+ CUSTOMER1672@EXAMPLE.COM
+ CUSTOMER5791@EXAMPLE.COM
 ```
 
 Leading spaces and capitals — from people typing by hand. The CRM has the same problem:
@@ -125,17 +190,19 @@ Leading spaces and capitals — from people typing by hand. The CRM has the same
 ```sql
 %%sql
 SELECT count(*) AS upper_case_emails
-FROM shared.crm.contacts
+FROM my.crm.contacts
 WHERE email <> lower(email)
 ```
 
-### 4 · Who is known where?
+Output: `582`.
+
+### 7 · Who is known where?
 
 ```sql
 %%sql
 WITH shop AS (SELECT DISTINCT lower(trim(email)) AS email FROM shared.bronze.customers),
-     crm  AS (SELECT DISTINCT lower(trim(email)) AS email FROM shared.crm.contacts),
-     mkt  AS (SELECT DISTINCT lower(trim(buyer_email)) AS email FROM shared.marketplace.orders),
+     crm  AS (SELECT DISTINCT lower(trim(email)) AS email FROM my.crm.contacts),
+     mkt  AS (SELECT DISTINCT lower(trim(buyer_email)) AS email FROM my.marketplace.orders),
      everyone AS (SELECT email FROM shop UNION SELECT email FROM crm UNION SELECT email FROM mkt)
 SELECT e.email IN (SELECT email FROM shop) AS in_shop,
        e.email IN (SELECT email FROM crm)  AS in_crm,
@@ -152,29 +219,29 @@ Example output:
 
 | in_shop | in_crm | in_marketplace | people |
 |---|---|---|---|
-| true | true | true | 2817 |
-| true | true | false | 2260 |
-| false | false | true | 1813 |
-| true | false | true | 500 |
+| true | true | true | 2839 |
+| true | true | false | 2289 |
+| false | false | true | 1795 |
 | false | true | false | 500 |
-| true | false | false | 423 |
+| true | false | true | 472 |
+| true | false | false | 400 |
 
 Every combination exists. Some people are in all three systems; 500 CRM leads never bought;
 ~1,800 marketplace buyers exist **only** on the marketplace. A star schema built on the shop's
 `customer_id` would lose all of those.
 
-### 5 · Do the sources agree?
+### 8 · Do the sources agree?
 
 ```sql
 %%sql
 SELECT count(*) AS different_country
 FROM shared.bronze.customers s
-JOIN shared.crm.contacts c ON lower(trim(c.email)) = lower(trim(s.email))
+JOIN my.crm.contacts c ON lower(trim(c.email)) = lower(trim(s.email))
 WHERE c.country <> s.country
 ```
 
-Example output: `393` — roughly 1 in 13 shared customers has a **different country** in the CRM
-than in the shop. Which
+Example output: `458`, roughly 1 in 11 customers the two share has a **different country** in
+the CRM than in the shop (yours differs a little: the shop's countries come from your install). Which
 one is right? The vault's answer: **keep both**, with where each came from — and decide later,
 with a rule everyone can see.
 

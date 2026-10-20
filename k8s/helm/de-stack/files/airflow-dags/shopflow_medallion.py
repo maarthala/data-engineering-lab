@@ -28,8 +28,5 @@ with DAG(
     bronze = BashOperator(task_id="bronze", bash_command=job("ingest_bronze.py"))
     silver = BashOperator(task_id="silver", bash_command=job("build_silver.py"))
     gold = BashOperator(task_id="gold", bash_command=job("build_gold.py"))
-    # the CRM + marketplace sources for the Data Vault unit (made from Bronze)
-    sources = BashOperator(task_id="sources", bash_command=job("land_sources.py"))
 
     bronze >> silver >> gold
-    bronze >> sources

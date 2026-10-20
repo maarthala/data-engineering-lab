@@ -8,6 +8,8 @@ historical orders in object storage, and a daily simulator for ongoing activity.
 |---|---|
 | `seed.sql` | ShopFlow OLTP schema (`customers, products, orders, order_items`) + a tiny seed, loaded into Postgres as database `shopflow`. |
 | `load_history.py` | Generates *years* of historical orders and lands them in object storage (S3) as **date-partitioned Parquet** (`s3://shopflow/history/orders/dt=YYYY-MM-DD/…`). The raw Bronze source. |
+| `gcp_files.py` | The Google Cloud unit's downloadable ShopFlow CSV zips (`docs/assets/gcp/`). |
+| `datavault_sources.py` | Made the Data Vault unit's CRM + marketplace files (`docs/assets/datavault/*.csv`) from the shop's Bronze, once (Spark). The files are the fixed source now; rerun only to make new ones and re-verify the unit. |
 | `simulate_day.py` | Generates **one day** of activity — new orders, a few product price changes, and occasionally a **late-arriving** record. Run repeatedly to advance the business. |
 
 ## Usage

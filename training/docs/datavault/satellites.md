@@ -316,8 +316,8 @@ UNION ALL SELECT 'sat_order_line',            count(*) FROM my.raw_vault.sat_ord
 |---|---|
 | sat_customer_shop | 6000 |
 | sat_customer_shop_loyalty | 6000 |
-| sat_customer_crm | 5577 |
-| sat_customer_marketplace | 5130 |
+| sat_customer_crm | 5628 |
+| sat_customer_marketplace | 5106 |
 | sat_product_shop | 200 |
 | sat_product_shop_price | 200 |
 | sat_order_shop | 40000 |
@@ -349,12 +349,13 @@ Example output:
 
 | email | shop_name | shop_country | crm_name | crm_country | marketplace_name | marketplace_country |
 |---|---|---|---|---|---|---|
-| customer3002@example.com | Customer 3002 | US | Kira Silva | FR | Customer 3002 | US |
-| customer3003@example.com | Customer 3003 | FR | Priya Brown | AU | Customer 3003 | FR |
-| customer3010@example.com | Customer 3010 | FR | Daniel Brown | US | null | null |
+| customer2@example.com | Customer 2 | DE | Kira Silva | FR | null | null |
+| customer3@example.com | Customer 3 | DE | Priya Brown | AU | null | null |
+| customer10@example.com | Customer 10 | UK | Daniel Brown | US | null | null |
 
-Three systems, three names for the same person, two countries — all kept, all traceable. Which
-one does a report show? That's a **business rule**, decided in the [Business Vault](pit-marts.md)
+The shop and the CRM give the same person different names and different countries (these three
+never bought on the marketplace, so its columns are `null`) — all kept, all traceable. Which one
+does a report show? That's a **business rule**, decided in the [Business Vault](pit-marts.md)
 — not by whichever load ran last.
 
 ## Check yourself

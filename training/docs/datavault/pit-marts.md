@@ -181,8 +181,8 @@ Example output:
 
 | snapshot_dts | email | name | country | in_shop | in_crm | in_marketplace |
 |---|---|---|---|---|---|---|
-| 2025-01-01 06:00:00 | customer72@example.com | Sofia Kowalski | DE | true | true | false |
-| 2025-01-02 06:00:00 | customer72@example.com | Sofia Kowalski | DE | true | true | false |
+| 2025-01-01 06:00:00 | customer72@example.com | Ravi Jones | IN | true | true | false |
+| 2025-01-02 06:00:00 | customer72@example.com | Ravi Jones | IN | true | true | false |
 
 Customer 72 moved to `NL` **in the shop** — but the dimension still says the CRM's country,
 because the rule trusts the **CRM** first, and the CRM wasn't updated. That's not a bug: it's
@@ -294,7 +294,7 @@ ORDER BY channel_source
 
 ```sql
 %%sql
-SELECT 'MKT' AS channel_source, sum(qty * item_price) AS from_source FROM shared.marketplace.order_lines
+SELECT 'MKT' AS channel_source, sum(qty * item_price) AS from_source FROM my.marketplace.order_lines
 UNION ALL
 SELECT 'SHOP', sum(quantity * unit_price) FROM shared.bronze.order_items
 ```

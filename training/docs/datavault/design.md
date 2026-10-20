@@ -139,7 +139,7 @@ erDiagram
   SAT_CUSTOMER_CRM {
     string customer_hk PK "→ hub_customer"
     timestamp load_dts PK "version"
-    string record_source "shared.crm.contacts"
+    string record_source "crm.contacts"
     string hashdiff "md5 of the attributes"
     string crm_id
     string country
@@ -152,7 +152,7 @@ erDiagram
 | **`<name>_hk`** | all | the **hash key**: `md5` of the business key (hub) or of all its business keys (link) |
 | **business key** | hubs | readable: `email`, `sku`, `bkcc` + `order_no` |
 | **`load_dts`** | all | when **this load** brought the row — the same for every row of one batch |
-| **`record_source`** | all | where the row came from, e.g. `shared.crm.contacts` |
+| **`record_source`** | all | where the row came from, e.g. `crm.contacts` |
 | **`hashdiff`** | satellites | `md5` of **all** the satellite's attribute columns |
 
 A satellite's key is **(hash key, `load_dts`)**: one row per thing **per version**.

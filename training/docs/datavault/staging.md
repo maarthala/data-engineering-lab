@@ -86,21 +86,21 @@ FROM shared.bronze.order_items
 %%sql
 CREATE OR REPLACE TEMP VIEW src_crm_contacts AS
 SELECT *, TIMESTAMP '2025-01-01 06:00:00' AS load_dts, 'crm.contacts' AS record_source
-FROM shared.crm.contacts
+FROM my.crm.contacts
 ```
 
 ```sql
 %%sql
 CREATE OR REPLACE TEMP VIEW src_mkt_orders AS
 SELECT *, TIMESTAMP '2025-01-01 06:00:00' AS load_dts, 'marketplace.orders' AS record_source
-FROM shared.marketplace.orders
+FROM my.marketplace.orders
 ```
 
 ```sql
 %%sql
 CREATE OR REPLACE TEMP VIEW src_mkt_order_lines AS
 SELECT *, TIMESTAMP '2025-01-01 06:00:00' AS load_dts, 'marketplace.order_lines' AS record_source
-FROM shared.marketplace.order_lines
+FROM my.marketplace.order_lines
 ```
 
 - **`TIMESTAMP '…'`** — a timestamp literal.
@@ -306,7 +306,7 @@ UNION ALL SELECT 'mkt_order_lines',  count(*), count(DISTINCT order_product_hk) 
 | stage | rows_ | keys |
 |---|---|---|
 | shop_customers | 6000 | 6000 |
-| crm_contacts | 5577 | 5577 |
+| crm_contacts | 5628 | 5628 |
 | shop_products | 200 | 200 |
 | shop_orders | 40000 | 40000 |
 | shop_order_items | 100000 | 100000 |
@@ -314,7 +314,7 @@ UNION ALL SELECT 'mkt_order_lines',  count(*), count(DISTINCT order_product_hk) 
 | mkt_order_lines | 16000 | 16000 |
 
 `rows_ = keys` everywhere: no business key appears twice within a source table. (The column
-is `rows_` because `rows` is a reserved word.) Your CRM count may differ slightly.
+is `rows_` because `rows` is a reserved word.)
 
 ## Check yourself
 1. Why does shop staging join orders to customers? *(The link needs the customer's **business

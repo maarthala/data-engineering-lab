@@ -154,7 +154,7 @@ Example output:
 | record_source | customers |
 |---|---|
 | shop.customers | 6000 |
-| marketplace.orders | 1813 |
+| marketplace.orders | 1795 |
 | crm.contacts | 500 |
 
 All 6,000 shop customers came from the shop (it has priority). The CRM added its **500 leads**
@@ -236,7 +236,7 @@ UNION ALL SELECT 'lnk_order_product',  count(*) FROM my.raw_vault.lnk_order_prod
 
 | tbl | rows_ |
 |---|---|
-| hub_customer | 8313 |
+| hub_customer | 8295 |
 | hub_product | 203 |
 | hub_order | 48000 |
 | lnk_order_customer | 48000 |
@@ -244,7 +244,8 @@ UNION ALL SELECT 'lnk_order_product',  count(*) FROM my.raw_vault.lnk_order_prod
 
 - **hub_product 203** — the shop's 200 SKUs plus **3 SKUs only the marketplace sells**.
 - **hub_order 48,000** — 40,000 shop + 8,000 marketplace orders, kept apart by the BKCC.
-- **hub_customer** — your number differs a little; it's everyone in at least one system.
+- **hub_customer 8,295**: everyone in at least one system (6,000 shop + 500 CRM leads + 1,795
+  marketplace-only buyers).
 
 Every link must point to hub rows that exist — **orphans** would mean a key was lost:
 
@@ -277,7 +278,8 @@ FROM (
 
 - **`having count(distinct o.bkcc) = 2`** — customers with orders from both systems.
 
-Example output: `1373`.
+Example output: `1361` (yours differs a little: which customers ordered in the shop comes from
+your install).
 
 ## Check yourself
 1. A customer is in the shop **and** the CRM. How many `hub_customer` rows? *(One — same

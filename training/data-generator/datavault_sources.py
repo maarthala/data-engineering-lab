@@ -1,6 +1,11 @@
-"""ShopFlow's other sources — a CRM and a marketplace — landed in the shared lake.
+"""ShopFlow's other sources — a CRM and a marketplace — for the Data Vault unit.
 
-Only the Data Vault unit uses them; every other unit works with the shop (Postgres) alone.
+Made ONCE: its output was exported to docs/assets/datavault/*.csv, the files members download,
+upload to My files and load into `my` (Data Vault → "Meet ShopFlow's three sources"). Those files
+are the source of truth now: Spark's seeded rand() still varies with partitioning, so a rerun
+gives slightly different rows — and every Data Vault example output was verified on the files.
+Rerun only to make new files (then export, re-verify the unit's outputs and replace them).
+
 They're generated from the shop's Bronze tables so the three sources overlap like real ones:
 
   crm.contacts            ~85% of shop customers + 500 leads; keyed by crm_id, e-mail as
@@ -11,12 +16,10 @@ They're generated from the shop's Bronze tables so the three sources overlap lik
   marketplace.order_lines 1–3 lines per order by SKU ('SKU-0005' = shop product 5), plus a
                           few marketplace-only SKUs (SKU-9001…9003)
 
-Fixed random seeds: re-running gives the same rows for the same Bronze.
-
-Run by the shopflow_medallion DAG after bronze, or by hand:
+Run by hand (it writes crm.* and marketplace.* into the catalog you give):
   spark-submit --master spark://spark-master:7077 \
     --conf spark.sql.catalogImplementation=in-memory \
-    land_sources.py --catalog iceberg
+    datavault_sources.py --catalog <catalog>
 """
 import argparse
 import os

@@ -77,9 +77,9 @@ Tables are registered in the **Apache Polaris** catalog service. You work with t
 | `gold` | business marts (aggregated) | `daily_sales`, `top_products`, `customer_ltv` |
 
 !!! note "Two more sources, for later"
-    The course lake also holds `crm` and `marketplace` — ShopFlow's CRM and the marketplace it
-    sells on. Every unit works with the shop alone until [Data Vault 2.0](../datavault/sources.md),
-    where you integrate all three. Ignore them until then.
+    ShopFlow also has a CRM and sells on a marketplace. Every unit works with the shop alone until
+    [Data Vault 2.0](../datavault/sources.md), where you download their exports as files, load them
+    into your lakehouse and integrate all three.
 
 The course lake has all of these from day one; your lakehouse gets them as you work through
 Units {unit:unit4/fundamentals.md}–5. List what's there any time:
