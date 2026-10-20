@@ -163,6 +163,15 @@ nav:
       - "Snowpark — DataFrames in Snowflake": snowflake/snowpark.md
       - "Functions & procedures": snowflake/functions.md
       - "Clean up & checklist": snowflake/cleanup.md
+  - "Google Cloud (your own trial account)":
+      - "Your Google Cloud trial & project": gcp/setup.md
+      - "Cloud Storage: land the ShopFlow files": gcp/storage.md
+      - "BigQuery: Bronze from your files": gcp/bigquery.md
+      - "Dataflow: clean orders into Silver": gcp/dataflow.md
+      - "Notebook: build Gold in BigQuery Studio": gcp/notebook.md
+      - "Composer: orchestrate the pipeline": gcp/composer.md
+      - "A small report in Looker Studio": gcp/report.md
+      - "Cost & clean up": gcp/cleanup.md
   - "Data governance (Polaris)":
       - "Governed Iceberg with Apache Polaris": unit6/polaris.md
       - "Create users & assign access (UI)": unit6/polaris-admin.md

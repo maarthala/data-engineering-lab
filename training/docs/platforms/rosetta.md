@@ -66,3 +66,7 @@ fundamentals.
     Have (or want) a Snowflake trial account? The [Snowflake unit](../snowflake/setup.md) loads
     the same ShopFlow data into Snowflake with one SQL file and walks you through every SnowPro
     Core topic on it.
+
+!!! tip "Try Google Cloud for real"
+    The [Google Cloud unit](../gcp/setup.md) runs ShopFlow end to end in your own free trial:
+    Cloud Storage, BigQuery, Dataflow, a BigQuery Studio notebook, Composer and Looker Studio.

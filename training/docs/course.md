@@ -81,6 +81,15 @@ platform already knowing *why* things work — not just which buttons to press.
 
     [{count:snowflake/setup.md} lessons →](snowflake/setup.md)
 
+-   ☁️ **Unit {unit:gcp/setup.md} · Google Cloud (your own trial account)**
+
+    ---
+
+    ShopFlow end to end on Google Cloud: files in Cloud Storage, Bronze in BigQuery, Silver with
+    Dataflow, Gold in a notebook, Composer to orchestrate and a Looker Studio report.
+
+    [{count:gcp/setup.md} lessons →](gcp/setup.md)
+
 -   🛡️ **Unit {unit:unit6/polaris.md} · Data governance**
 
     ---
