@@ -1139,20 +1139,26 @@ def _trino_principal(t):
     _trino_ready.add("principal")
 
 
-def trino_catalog(cat, t=None):
+def trino_catalog(cat, t=None, stamp=None):
     """Make Polaris catalog `cat` queryable in Trino as `cat` (grant + CREATE CATALOG). The shared
-    lake too: Trino's `iceberg` is it, and `polaris_lake` its real name (read-only for members)."""
+    lake too: Trino's `iceberg` is it, and `polaris_lake` its real name (read-only for members).
+    `stamp` (the catalog's createTimestamp, from the every-minute sync): grant only once per catalog
+    instance — re-granting made Polaris log duplicate-key ERRORs in Postgres every minute."""
     if not re.fullmatch(r"[a-z0-9_]+", cat):
         return
     t = t or _admin_token()
     m, cid = "/api/management/v1", TRINO_LOGIN.split(":", 1)[0]
     try:
         _trino_principal(t)
-        _ok(_call("POST", f"{m}/catalogs/{cat}/catalog-roles", {"catalogRole": {"name": cid}}, t)[0], "trino c-role")
-        _ok(_call("PUT", f"{m}/catalogs/{cat}/catalog-roles/{cid}/grants",
-                  {"grant": {"type": "catalog", "privilege": "CATALOG_MANAGE_CONTENT"}}, t)[0], "trino grant")
-        _ok(_call("PUT", f"{m}/principal-roles/{cid}/catalog-roles/{cat}", {"catalogRole": {"name": cid}}, t)[0],
-            "trino attach")
+        if stamp is None or ("grant", cat, stamp) not in _trino_ready:
+            _ok(_call("POST", f"{m}/catalogs/{cat}/catalog-roles", {"catalogRole": {"name": cid}}, t)[0],
+                "trino c-role")
+            _ok(_call("PUT", f"{m}/catalogs/{cat}/catalog-roles/{cid}/grants",
+                      {"grant": {"type": "catalog", "privilege": "CATALOG_MANAGE_CONTENT"}}, t)[0], "trino grant")
+            _ok(_call("PUT", f"{m}/principal-roles/{cid}/catalog-roles/{cat}", {"catalogRole": {"name": cid}},
+                      t)[0], "trino attach")
+            if stamp is not None:
+                _trino_ready.add(("grant", cat, stamp))
         if [cat] in _trino("SHOW CATALOGS"):
             return
         u = urllib.parse.urlparse(S3_ENDPOINT)
@@ -1192,7 +1198,7 @@ def sync_trino():
     """Re-add every learner catalog to Trino (after a Trino restart they're gone)."""
     t = _admin_token()
     for c in _get(f"/api/management/v1/catalogs", t)["catalogs"]:
-        trino_catalog(c["name"], t)
+        trino_catalog(c["name"], t, c.get("createTimestamp"))
 
 
 # ---- Trino access rules (who may query what) --------------------------------------------
