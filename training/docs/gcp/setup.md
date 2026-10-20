@@ -21,7 +21,7 @@ flowchart LR
 |---|---|---|
 | My files (object storage) | **Cloud Storage** | [Cloud Storage: land the ShopFlow files](storage.md) |
 | Trino / Iceberg tables | **BigQuery** | [BigQuery: Bronze from your files](bigquery.md) |
-| Spark job | **Dataflow** (Apache Beam) | [Dataflow: clean orders into Silver](dataflow.md) |
+| Spark job | **Dataflow** (Apache Beam) | [Apache Beam basics](beam-basics.md), then [Dataflow: clean orders into Silver](dataflow.md) |
 | Jupyter notebook | **BigQuery Studio notebook** (Colab Enterprise) | [Notebook: build Gold](notebook.md) |
 | Airflow | **Cloud Composer** | [Composer: orchestrate the pipeline](composer.md) |
 | Superset | **Looker Studio** | [A small report in Looker Studio](report.md) |

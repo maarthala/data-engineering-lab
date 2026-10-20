@@ -167,6 +167,7 @@ nav:
       - "Your Google Cloud trial & project": gcp/setup.md
       - "Cloud Storage: land the ShopFlow files": gcp/storage.md
       - "BigQuery: Bronze from your files": gcp/bigquery.md
+      - "Apache Beam basics: write and run pipelines": gcp/beam-basics.md
       - "Dataflow: clean orders into Silver": gcp/dataflow.md
       - "Notebook: build Gold in BigQuery Studio": gcp/notebook.md
       - "Composer: orchestrate the pipeline": gcp/composer.md

@@ -61,6 +61,7 @@ card unless you click **Activate full account**.
 | create a project, set a budget alert, use Cloud Shell, enable APIs | [Trial & project](setup.md) |
 | create a bucket, upload files (console and `gcloud storage cp`), lay out a landing zone | [Cloud Storage](storage.md) |
 | create datasets, load CSVs with `bq load`, keep Bronze raw with a `STRING` schema, read query cost | [BigQuery](bigquery.md) |
+| write Beam pipelines (`Create`, `Map`, `Filter`, `FlatMap`, `CombinePerKey`, `GroupByKey`, `DoFn`, file I/O) and run them locally | [Apache Beam basics](beam-basics.md) |
 | write an Apache Beam pipeline, test it on DirectRunner, run it on Dataflow, route bad rows aside, grant a service account roles | [Dataflow](dataflow.md) |
 | use a BigQuery Studio notebook: `%%bigquery`, BigQuery DataFrames, write Gold tables | [Notebook](notebook.md) |
 | read and write a Composer DAG with the Google operators, and build the same DAG in the lab's Airflow | [Composer](composer.md) |

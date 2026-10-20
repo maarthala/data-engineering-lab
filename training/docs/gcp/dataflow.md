@@ -6,7 +6,8 @@
 **Dataflow** is Google's managed service for data-processing jobs. You don't write "Dataflow
 code": you write an **Apache Beam** pipeline (open source, in Python or Java), and Dataflow runs
 it. Dataflow starts the VMs, splits the work across them, retries failed pieces, scales the
-number of VMs and shuts them down when the job ends.
+number of VMs and shuts them down when the job ends. You wrote and ran small Beam pipelines in
+[Apache Beam basics](beam-basics.md); this lesson runs a real one on Dataflow.
 
 In the lab, a Spark job does this work. The ideas map one to one:
 
@@ -107,22 +108,36 @@ echo "granted to $SA"
 
     (`roles/editor` appears only if Google granted it to this account.)
 
-### 2 · Get the pipeline and install Beam
+### 2 · Get the pipeline
+Beam is already installed in `~/beam` from [Apache Beam basics](beam-basics.md). Switch to it
+and download the pipeline:
+
 ```bash
-curl -sLO https://maarthala.github.io/data-engineering-lab/assets/gcp/silver_orders.py
-python3 -m venv ~/beam
 source ~/beam/bin/activate
-pip install -q 'apache-beam[gcp]'
+cd ~
+curl -sLO https://maarthala.github.io/data-engineering-lab/assets/gcp/silver_orders.py
 ```
 
-- **`curl -sLO URL`** downloads a file into the current folder (`-s` quiet, `-L` follow
-  redirects, `-O` keep the file's name). The same file is here:
+- **`source ~/beam/bin/activate`**: your prompt starts with `(beam)`. If it says *No such
+  file or directory*, you skipped the Beam basics lesson: run its
+  [install step](beam-basics.md) first.
+- The same file is here:
   [:material-download: silver_orders.py](../assets/gcp/silver_orders.py){: download="silver_orders.py" }
-- **`python3 -m venv ~/beam`** makes a private Python environment, so Beam's packages don't clash
-  with Cloud Shell's own. **`source ~/beam/bin/activate`** switches to it, and your prompt
-  starts with `(beam)`. After a Cloud Shell restart, run the `source` line again.
-- **`pip install 'apache-beam[gcp]'`** installs Beam with its Google Cloud connectors
-  (`[gcp]`). It takes 2–3 minutes.
+
+!!! info "Where does this command run in a real company?"
+    - **While you develop:** on your own computer or in Cloud Shell, as here. You test on
+      DirectRunner, then send a test run to Dataflow. Your laptop only needs Beam, `gcloud` and
+      a login. It sends the job and waits; the data never goes through it.
+    - **In production: never from someone's laptop.** The job is started by:
+        - an **orchestrator**: Composer/Airflow (as in the [Composer lesson](composer.md)),
+          whose workers have Beam installed and start the job on a schedule;
+        - a **Dataflow Flex Template**: the pipeline is packaged once as a container image (by
+          CI/CD, e.g. Cloud Build), and then anyone or anything starts it from the console, the
+          API or Cloud Scheduler, with no Beam install at all;
+        - for streaming jobs: started once, they run for weeks. A redeploy comes from CI/CD.
+
+    Cloud Shell is the right place to learn: it already has `gcloud`, your login and your
+    project, so there's nothing to set up on your own computer.
 
 ### 3 · Read the pipeline
 Open it with **Open Editor** (Cloud Shell's top bar) or `cat silver_orders.py`. The parts:
