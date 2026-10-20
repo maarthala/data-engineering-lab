@@ -178,8 +178,13 @@ cd data-engineering-lab/local
 cp .env.example .env
 make init      # first run only: downloads Spark/Iceberg jars
 make up        # builds and starts the whole lab
+make status    # live view; turn units (SQL, Notebooks, Spark, Airflow, …) on and off
 make down      # brings it down again, keeping your data (make up to start)
 ```
+
+Short on memory? Start small: with the stack down, `make status` starts just **Core** (sign-in,
+files, catalog), and you switch on only the units you're learning, e.g. Core + SQL for the SQL
+units.
 
 Then open **<http://localhost:8000>** and sign in as `demouser` / `demouser`. The full walkthrough
 — including what to do if something doesn't start — is in [0.2 Bring up the stack](setup/deploy.md).

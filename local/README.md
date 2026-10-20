@@ -10,7 +10,8 @@ an nginx landing page. Postgres also hosts the **AdventureWorks** OLTP sample DB
 (see below).
 
 ## Prerequisites
-- **Docker** + **Docker Compose** v2 (≥ 8 GB RAM for Docker, ~25 GB free disk).
+- **Docker** + **Docker Compose** v2 (≥ 8 GB RAM for Docker, ~25 GB free disk). Less memory: run
+  only the units you need (`make status`: Core + e.g. SQL), the rest stays off.
 - `git`, `make`, `curl`, `unzip`, `ruby` (AdventureWorks prep in `make init`), `python3`
   (`make polaris-seed`). macOS: `xcode-select --install`; Debian/Ubuntu/WSL:
   `sudo apt-get install -y git make curl unzip ruby python3`.
@@ -24,6 +25,7 @@ make init   # first time: download base JARs (into ../common/dockerfiles/tmp) �
 make up     # start everything; builds missing images only (first build: 15–30 min)
 make build  # rebuild the images after a Dockerfile change (make up warns), then start
 make polaris-seed   # (re)create the iceberg catalog + personas — make up does it when it's missing
+make status # live view: logs + units — ↑↓ pick a unit, s on / x off (Core first when it's down)
 make ps     # status      make logs S=polaris
 make down   # bring it down (members' Jupyter servers too), KEEPS data + images — make up starts it again
 make clean  # stack down first: delete ALL its data (volumes) — fresh install, images kept (asks first)

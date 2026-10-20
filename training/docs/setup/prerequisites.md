@@ -171,6 +171,10 @@ To run it on your **own** laptop, you need Docker and the repo.
     Too little and containers get killed (`exit 137`). `make up` checks this first: below the
     minimum it says what's missing and asks before it starts anything.
 
+    **Less memory?** You don't need everything at once. `make status` groups the services in
+    **units** (SQL, Notebooks, Spark, Airflow, Superset, …): start Core plus only what you're
+    learning, and switch the rest off. See [Bring up the stack](deploy.md) → *Units*.
+
 !!! warning "…and needs disk space"
     Plan for about **25 GB free**: ~2.5 GB of downloads (`make init`) plus ~15–20 GB of Docker
     images. On Docker Desktop check **Settings → Resources → Disk usage limit**.
