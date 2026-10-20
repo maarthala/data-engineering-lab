@@ -53,6 +53,8 @@ services:
       AIRFLOW_HOST_PORT: ${AIRFLOW_HOST_PORT:-8001}   # so the home page's Airflow tile follows .env
       # home page: tiles of stopped units (make status) are greyed — tile=host:port it checks
       LAB_SERVICES: jupyter=jupyterhub:8000,spark=spark-master:8080,sqlpad=sqlpad:3000,airflow=airflow-apiserver:8080,superset=superset:8088,governance=polaris-proxy:8189
+      # ⚙️ Settings → Services shows each unit's state (here they're switched in make status)
+      LAB_UNITS: "SQL=trino:8080,sqlpad:3000;Notebooks=jupyterhub:8000;Spark=spark-master:8080,spark-connect:15002;Airflow=airflow-apiserver:8080;Superset=superset:8088;Polaris console=polaris-proxy:8189"
       TRINO_RULES_PATH: /trino-access/rules.json      # Trino's access rules, kept in step with Polaris
       # "Manage members" (managers only): Keycloak admin + a JupyterHub service token
       KEYCLOAK_ADMIN: admin:admin

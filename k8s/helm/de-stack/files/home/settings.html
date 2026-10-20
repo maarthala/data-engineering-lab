@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Settings — Epireum's Data Engineering Lab</title>
-  <link rel="stylesheet" href="/admin.css?v=4">
+  <link rel="stylesheet" href="/admin.css?v=5">
 </head>
 <body>
   <header id="lab-top"></header>
@@ -15,7 +15,8 @@
   <script src="/admin.js?v=2"></script>
   <script>
     // ⚙️ Settings — lab-wide switches: self-registration on the sign-in page, and members' limits
-    // (Jupyter idle time / memory / CPU, bucket sizes) — no restart: each applies as its note says.
+    // (Jupyter idle time / memory / CPU, bucket sizes) — no restart: each applies as its note says —
+    // and Services: which tools run (k8s: switch a unit off to free the server; local: make status).
     var el = admin.el;
     admin.page('⚙️ Settings');
 
@@ -95,8 +96,73 @@
         el('div', {class: 'row', style: 'margin-top:12px'}, [save])]);
     }
 
+    var WORD = {on: '● on', off: '○ off', starting: '◐ starting…', stopping: '◐ stopping…', partly: '◐ partly on'};
+    function servicesCard() {
+      var card = el('div', {class: 'card', style: 'margin-top:14px'}, [el('h3', {text: 'Services'}),
+                                                                      el('div', {class: 'sub', text: 'Loading…'})]);
+      var timer = null;
+      function load() {
+        admin.api('GET', '/api/admin/services').then(paint)
+          .catch(function (e) { card.lastChild.textContent = 'Could not load the services: ' + e.message; });
+      }
+      function change(u, on, sw) {
+        sw.classList.add('busy');
+        admin.api('POST', '/api/admin/services', {unit: u.unit, on: on})
+          .then(function (r) {
+            admin.show(r.changed.join(' + ') + (on ? ' turned on' : ' turned off'),
+                       [on ? 'Starting takes a minute or two; the tiles on the home page light up by themselves.'
+                           : 'Data is kept. Members see the tiles greyed: “Not running. Contact admin.”']);
+            paint(r);
+          })
+          .catch(function (e) { admin.show('Could not change ' + u.unit, [e.message], null, true); sw.classList.remove('busy'); });
+      }
+      function paint(r) {
+        var k8s = r.control === 'k8s', rows = [];
+        rows.push(el('div', {class: 'svc'}, [el('b', {text: 'Core'}),
+          el('span', {class: 'sub', text: 'sign-in, files, catalog, storage'}), el('span', {class: 'state on', text: '● always on'})]));
+        r.units.forEach(function (u) {
+          var on = u.state === 'on' || u.state === 'starting' || u.state === 'partly';
+          var kids = [el('b', {text: u.unit}), el('span', {class: 'sub', text: u.workloads.join(' · ') +
+                       (u.needs.length ? ' — needs ' + u.needs.join(', ') : '')}),
+                      el('span', {class: 'state ' + u.state, text: WORD[u.state] || u.state})];
+          if (k8s) {
+            var sw = el('span', {class: 'switch' + (on ? ' on' : '') + (/ing$/.test(u.state) ? ' busy' : ''), role: 'switch',
+                                 tabindex: '0', 'aria-checked': on ? 'true' : 'false', 'aria-label': u.unit},
+                        [el('span', {class: 'track'}, [el('span', {class: 'knob'})])]);
+            var flip = function () {
+              if (sw.classList.contains('busy')) return;
+              if (!on) return change(u, true, sw);
+              var who = u.unit === 'Notebooks' && r.jupyter_servers.length
+                ? ' ' + r.jupyter_servers.length + ' member(s) have Jupyter open (' + r.jupyter_servers.join(', ') + ') — it stops; their files stay.' : '';
+              var dep = r.units.filter(function (x) { return x.needs.indexOf(u.unit) >= 0 && x.state !== 'off'; })
+                               .map(function (x) { return x.unit; });
+              var ask = el('div', {class: 'row confirm', style: 'margin:6px 0 4px'}, [
+                el('span', {class: 'sub', text: 'Turn off ' + [u.unit].concat(dep).join(' + ') + '?' + who}),
+                el('button', {class: 'small danger', text: 'Turn off', on: {click: function () { ask.remove(); change(u, false, sw); }}}),
+                el('button', {class: 'small', text: 'Cancel', on: {click: function () { ask.remove(); }}})]);
+              row.after(ask);
+            };
+            sw.addEventListener('click', flip);
+            sw.addEventListener('keydown', function (e) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip(); } });
+            kids.push(sw);
+          }
+          var row = el('div', {class: 'svc'}, kids);
+          rows.push(row);
+        });
+        card.innerHTML = '';
+        card.appendChild(el('h3', {text: 'Services'}));
+        card.appendChild(el('div', {class: 'sub', style: 'margin-bottom:10px', text: k8s
+          ? 'Turn off what the class isn\'t using yet, to free the server\'s memory and CPU. Turning a unit off keeps all data; members see its tiles greyed (“Not running. Contact admin.”). A lab update turns every unit back on.'
+          : 'This lab runs on your machine: turn units on and off in the terminal — make status, then ↑ ↓ to a unit, s on, x off. This list shows what runs now.'}));
+        rows.forEach(function (x) { card.appendChild(x); });
+        clearTimeout(timer);
+        if (r.units.some(function (u) { return /ing$/.test(u.state); })) timer = setTimeout(load, 4000);
+      }
+      load();
+      return card;
+    }
     admin.api('GET', '/api/admin/settings')
-      .then(function (r) { admin.fill([registrationCard(r.registration), limitsCard(r)]); })
+      .then(function (r) { admin.fill([registrationCard(r.registration), limitsCard(r), servicesCard()]); })
       .catch(admin.failed);
   </script>
 </body>

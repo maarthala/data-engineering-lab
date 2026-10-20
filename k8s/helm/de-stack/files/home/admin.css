@@ -83,3 +83,11 @@ th.sort{cursor:pointer; user-select:none; white-space:nowrap} th.sort:hover, th.
 td.stale{color:var(--gold)}
 .tag.on{border-color:rgba(57,208,196,.55); color:var(--accent2)}
 table.activity td, table.activity th{white-space:nowrap}
+
+/* ⚙️ Settings → Services */
+.svc{display:grid; grid-template-columns:minmax(120px,170px) 1fr auto auto; align-items:center; gap:4px 14px;
+     padding:8px 0; border-top:1px solid var(--line)}
+.svc .state{font-size:.85rem; white-space:nowrap}
+.svc .state.on{color:var(--accent2)} .svc .state.off{color:var(--muted)}
+.svc .state.starting, .svc .state.stopping, .svc .state.partly{color:#e3b341}
+@media (max-width:600px){ .svc{grid-template-columns:1fr auto} .svc .sub{grid-column:1 / -1} }

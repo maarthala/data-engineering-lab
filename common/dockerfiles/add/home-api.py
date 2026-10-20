@@ -39,6 +39,7 @@ from the browser can point at another bucket.
   GET    /api/admin/settings · POST {"registration": bool, "idle_minutes": n, "quota_mb": n, …}
                                        self-registration on the sign-in page + lakehouse.SETTINGS (any of them)
   GET    /api/admin/teams · /api/admin/people            the teams (members, bucket use) · who is where
+  GET    /api/admin/services · POST {"unit", "on"}       ⚙️ Settings → Services: units' state; k8s: on/off
   POST   /api/admin/{team-create|team-delete} {"team"} · /api/admin/move {"user", "team"}
          /api/admin/team-add {"team", "users": [...]} · /api/admin/team-remove {"users": [...]}  → {"job": id}
 
@@ -409,10 +410,21 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, labadmin.activity())
             if method == "GET" and path == "/api/admin/settings":
                 return self._json(200, labadmin.settings())
+            if method == "GET" and path == "/api/admin/services":
+                return self._json(200, labadmin.services())
             if method == "GET" and path == "/api/admin/teams":
                 return self._json(200, {"teams": labadmin.teams()})
             if method == "GET" and path == "/api/admin/people":
                 return self._json(200, {"people": labadmin.people()})
+            if method == "POST" and path == "/api/admin/services":
+                if self.headers.get("X-Lab-Admin") != "1":
+                    return self._json(403, {"error": "missing X-Lab-Admin header"})
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(length) or b"{}") if length else {}
+                r = labadmin.set_service(str(body.get("unit", "")), bool(body.get("on")))
+                print(f"[home-api] manager {user}: {' + '.join(r['changed'])} "
+                      f"{'on' if body.get('on') else 'off'}", flush=True)
+                return self._json(200, r)
             if method == "POST" and path == "/api/admin/settings":
                 if self.headers.get("X-Lab-Admin") != "1":
                     return self._json(403, {"error": "missing X-Lab-Admin header"})
@@ -461,6 +473,8 @@ class Handler(BaseHTTPRequestHandler):
             threading.Thread(target=_run_job, args=(jid, _ACTIONS[action], args), daemon=True).start()
             print(f"[home-api] manager {user}: {action} {target}", flush=True)
             return self._json(202, {"job": jid})
+        except labadmin.AdminError as e:
+            return self._json(400, {"error": str(e)})
         except ValueError as e:
             return self._json(400, {"error": str(e)})
         except Exception as e:

@@ -174,6 +174,14 @@ home-api turns on Keycloak's LOGIN events (90 days) at start. SQLPad / Superset 
   - Jupyter stops when idle after N minutes — applies within a minute (`lab_culler.py` restarts the Hub's culler)
   - Jupyter memory / CPU per member — from each member's next server start
   - member / team bucket size — applied to every bucket at once
+- **Services** — the tools in units: SQL (trino, sqlpad), Notebooks (jupyterhub), Spark
+  (spark-master/-worker/-connect), Airflow, Superset (needs SQL), Polaris console; Core (sign-in,
+  storage, catalog, home) is always on. A switch per unit scales its Deployments to 0 / 1 —
+  turn off what the class isn't using to free the node. Off keeps all data; off for Notebooks
+  first stops the members' Jupyter servers (the switch names them). Members see the tiles of an
+  off unit greyed: *Not running. Contact admin.* RBAC: Role `home-api-units` (get / patch the
+  `scale` of exactly those Deployments). A chart apply sets `replicas: 1` again, so **a lab update
+  turns every unit back on**.
 
 Destructive actions ask you to type the username. Managers can't wipe/delete themselves or other
 managers. It runs in home-api (`labadmin.py`) with the Keycloak admin login and the JupyterHub

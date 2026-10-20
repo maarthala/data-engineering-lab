@@ -16,6 +16,7 @@ data:
    | replace "http://localhost:8008" (printf "http://jupyter.%s" .Values.ingress.baseHost)
    | replace "http://localhost:8189" (printf "http://polaris-console.%s" .Values.ingress.baseHost)
    | replace "http://localhost:9001" (printf "http://storage.%s" .Values.ingress.baseHost)
+   | replace "start it in make status (s)" "turn it on in Manage → ⚙️ Settings → Services"
    | indent 4 }}
   files.html: |
 {{ .Files.Get "files/home/files.html" | indent 4 }}
@@ -161,6 +162,9 @@ spec:
             - { name: SQLPAD_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: sqlpad-admin-password } } }
             - { name: SQLPAD_ADMIN, value: "{{ .Values.sqlpad.adminEmail }}:$(SQLPAD_ADMIN_PASSWORD)" }   # invites learners to SQLPad
             - { name: TRINO_RULES_CONFIGMAP, value: trino-access }   # Trino's access rules, kept in step with Polaris
+            # ⚙️ Settings → Services: managers turn units off/on (scale to 0/1); stopped tools' tiles grey
+            - { name: LAB_UNITS, value: "SQL=trino,sqlpad;Notebooks=jupyterhub;Spark=spark-master,spark-worker,spark-connect;Airflow=airflow;Superset=superset;Polaris console=polaris-console" }
+            - { name: LAB_SERVICES, value: "jupyter=jupyterhub:8000,spark=spark-master:8080,sqlpad=sqlpad:3000,airflow=airflow-apiserver:8080,superset=superset:8088,governance=polaris-console:8080" }
             # "Manage members" (managers only): Keycloak admin + a JupyterHub service token
             - { name: KEYCLOAK_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: keycloak-admin-password } } }
             - { name: KEYCLOAK_ADMIN, value: "{{ .Values.keycloak.adminUser }}:$(KEYCLOAK_ADMIN_PASSWORD)" }
@@ -280,6 +284,27 @@ rules:
     resources: ["configmaps"]
     resourceNames: ["trino-access"]
     verbs: ["get", "patch"]
+---
+# ⚙️ Settings → Services: scale the units' Deployments to 0 / 1 — these, and nothing else.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: home-api-units
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "deployments/scale"]
+    resourceNames: [trino, sqlpad, jupyterhub, spark-master, spark-worker, spark-connect, airflow, superset, polaris-console]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: home-api-units
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: home-api-units }
+subjects:
+  - { kind: ServiceAccount, name: home-api, namespace: {{ .Release.Namespace }} }
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

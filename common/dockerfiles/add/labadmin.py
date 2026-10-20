@@ -18,6 +18,9 @@ plus the Keycloak admin (KEYCLOAK_ADMIN=user:password) and a JupyterHub service 
   registration() / set_registration(on)   self-registration on the sign-in page (Keycloak realm)
   settings() / set_settings(**values)     ⚙️ Settings: the above + lakehouse.SETTINGS (idle minutes,
                                           bucket sizes, Jupyter memory / CPU)
+  services() / set_service(unit, on)      ⚙️ Settings → Services: the tools in units (SQL, Notebooks,
+                                          Spark, Airflow …) — k8s: a manager turns one off to free the
+                                          node (scale to 0); locally they're switched in make status
 
 Teams — a member is in no team (only their own lakehouse) until a manager adds them to one; then
 in exactly one (Keycloak group team-<team>). The team's lakehouse team_<team>
@@ -33,6 +36,7 @@ import json
 import os
 import re
 import secrets
+import socket
 import time
 import urllib.error
 import urllib.parse
@@ -588,6 +592,77 @@ def set_registration(on):
     if st != 204:
         raise RuntimeError(f"update realm: HTTP {st} {body!r}")
     return registration()
+
+
+# ---- ⚙️ Settings → Services: units on / off ------------------------------------------------
+# LAB_UNITS = "SQL=trino,sqlpad;Notebooks=jupyterhub;…" — k8s: Deployment names; local: host:port
+# to check (Compose services; make status switches them, the page only shows their state).
+UNITS = [(u.strip(), [w for w in ws.split(",") if w]) for u, ws in
+         (x.split("=", 1) for x in os.environ.get("LAB_UNITS", "").split(";") if "=" in x)]
+UNIT_NEEDS = {"Superset": ["SQL"]}             # Superset's data comes through Trino
+ON_K8S = bool(os.environ.get("KUBERNETES_SERVICE_HOST"))
+
+
+def _deploy_path(name):
+    ns = open("/var/run/secrets/kubernetes.io/serviceaccount/namespace").read().strip()
+    return f"/apis/apps/v1/namespaces/{ns}/deployments/{name}"
+
+
+def _workload_state(w):
+    name, _, port = w.partition(":")
+    if ON_K8S:
+        d = lh._k8s("GET", _deploy_path(name))
+        want, ready = d["spec"].get("replicas", 1), (d.get("status") or {}).get("readyReplicas") or 0
+        return ("on" if ready >= want else "starting") if want else ("off" if not ready else "stopping")
+    try:                                            # local: is it listening? (stopped: no DNS name)
+        socket.create_connection((name, int(port or 80)), timeout=1).close()
+        return "on"
+    except OSError:
+        return "off"
+
+
+def _member_servers():
+    try:
+        st, users = _hub("GET", "/users")
+    except OSError:                                 # Notebooks off: no Hub, no servers
+        return []
+    return sorted(u["name"] for u in users or [] if u.get("servers")) if st == 200 else []
+
+
+def services():
+    """⚙️ Settings → Services: {control: "k8s" | "make status", units: [{unit, workloads, state
+    (on · off · starting · stopping · partly), needs}], jupyter_servers: [members with Jupyter open]}."""
+    units = []
+    for unit, ws in UNITS:
+        states = [_workload_state(w) for w in ws]
+        state = (states[0] if len(set(states)) == 1 else "starting" if "starting" in states
+                 else "stopping" if "stopping" in states else "partly")
+        units.append({"unit": unit, "workloads": [w.partition(":")[0] for w in ws], "state": state,
+                      "needs": UNIT_NEEDS.get(unit, [])})
+    return {"control": "k8s" if ON_K8S else "make status", "units": units,
+            "jupyter_servers": _member_servers() if any(u == "Notebooks" for u, _ in UNITS) else []}
+
+
+def set_service(unit, on):
+    """Turn a unit on (with what it needs) or off (with what needs it): scale its Deployments to
+    1 / 0. Off for Notebooks first stops the members' Jupyter servers (their files stay). A chart
+    update (helm template | apply) sets every unit back to on."""
+    if not ON_K8S:
+        raise AdminError("Here the units are switched in the terminal: make status, then s / x")
+    names = dict(UNITS)
+    if unit not in names:
+        raise AdminError(f"no unit {unit!r}")
+    todo = [unit]
+    for u in todo:                                  # on: what it needs · off: what needs it
+        todo += [x for x in (UNIT_NEEDS.get(u, []) if on else
+                             [d for d, needs in UNIT_NEEDS.items() if u in needs]) if x not in todo]
+    if not on and "Notebooks" in todo:
+        for user in _member_servers():
+            _hub("DELETE", f"/users/{user}/server")
+    for u in todo:
+        for w in names[u]:
+            lh._k8s("PATCH", _deploy_path(w.partition(":")[0]) + "/scale", {"spec": {"replicas": 1 if on else 0}})
+    return {**services(), "changed": todo}
 
 
 def settings():

@@ -434,7 +434,12 @@ signed in, used Jupyter, changed files or tables and ran a DAG, so managers can 
 no longer use the lab (filter *inactive 30+ days*) and delete them. **⚙️ Settings** switches **self-registration** on or off (on while a new batch
 signs up, off otherwise) and sets the **members' limits**: after how many idle minutes a Jupyter
 server stops, Jupyter memory and CPU per member (from their next server start), and the member and
-team bucket sizes (applied to every bucket at once).
+team bucket sizes (applied to every bucket at once). Its **Services** list shows which tools run,
+in **units** (SQL, Notebooks, Spark, Airflow, Superset, Polaris console). On the shared server,
+managers switch a unit off to free memory and CPU while the class doesn't need it, and back on
+later. All data is kept, and members see its tiles greyed: *Not running. Contact admin.* On a lab
+running on your own computer the list only shows the state: switch units in the terminal with
+`make status` ([Bring up the stack](deploy.md)).
 
 ## You can now…
 - Register, sign in once and reach every tool with your lab account
