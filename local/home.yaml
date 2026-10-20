@@ -11,12 +11,7 @@ services:
       - ./configs/home/default.conf:/etc/nginx/conf.d/default.conf:ro   # bigger header limit (sign-in cookies)
       # The course is on GitHub Pages (the landing page links there) — not served
       # by the stack, so no training/site mount. Preview locally with `make docs-serve`.
-    depends_on:
-      - airflow-apiserver
-      - superset
-      - trino
-      - jupyter
-      - spark-master
-      - storage
+    # No depends_on: it only serves static pages (configs/home/default.conf has no proxy), and
+    # `make status` starts Core (with nginx) without Airflow, Spark, Trino or Superset.
     networks:
       - sparknet

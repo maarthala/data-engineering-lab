@@ -38,7 +38,7 @@ build: ## Rebuild the images, then start — after changing a Dockerfile (make u
 up-plain: ## Start the whole stack, plain docker compose output (BUILD=1: rebuild images first)
 	$(COMPOSE) up -d $(if $(BUILD),--build)
 
-status: ## Live dashboard of the running stack: all logs left; state, CPU, memory, port per service right (q quits)
+status: ## Live dashboard of the running stack: all logs left; units with state, CPU, memory, port right — s/x start/stop a unit (core stays on), q quits
 	@python3 tools/up.py --watch
 
 down: ## Bring the stack down (members' Jupyter servers too) — keeps all data and images; make up starts it again

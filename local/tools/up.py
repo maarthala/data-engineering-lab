@@ -29,6 +29,7 @@ import time
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))        # local/
 LOG = os.path.join(HERE, "logs", "make-up.log")
 LOG_SHOWN = "local/logs/make-up.log"
+UNIT_LOG = os.path.join(HERE, "logs", "make-status.log")   # make status: starting / stopping units
 BUILD = "--build" in sys.argv or os.environ.get("BUILD") == "1"
 UP = ["docker", "compose", "--progress", "plain", "up", "-d"] + (["--build"] if BUILD else [])
 # What Docker must be given (Docker Desktop: Settings → Resources). Memory in GB as Docker Desktop
@@ -40,13 +41,21 @@ REC_CPUS, REC_MEM_GB = max(6, MIN_CPUS), max(12, MIN_MEM_GB)
 SETTLE_TIMEOUT = 300           # after compose is done: wait this long for health checks
 MEMBERS = "members' Jupyter"   # group of the JupyterHub-started servers (jupyter-<user>, not compose)
 
+# Units: what a member switches on for what they're learning. Core (sign-in, the lakehouse's catalog
+# and storage, secrets) is what every unit needs: stopping it stops the whole stack, like make down.
 GROUPS = [
-    ("Core", ["postgres", "redis", "keycloak", "vault-db", "vault", "vault-init", "oauth2-proxy", "nginx", "home-api"]),
-    ("Lakehouse", ["storage", "storage-init", "polaris-bootstrap", "polaris", "polaris-console", "polaris-proxy", "trino"]),
-    ("Compute", ["spark-master", "spark-worker-1", "spark-connect", "jupyter", "jupyterhub"]),
-    ("Pipelines & BI", ["airflow-init", "airflow-apiserver", "airflow-scheduler", "airflow-dag-processor",
-                        "superset", "sqlpad"]),
+    ("Core", ["postgres", "redis", "keycloak", "vault-db", "vault", "vault-init", "oauth2-proxy", "nginx",
+              "home-api", "storage", "storage-init", "polaris-bootstrap", "polaris"]),
+    ("SQL", ["trino", "sqlpad"]),
+    ("Notebooks", ["jupyterhub", "jupyter"]),           # pandas, SQL, Python: no Spark needed
+    ("Spark", ["spark-master", "spark-worker-1", "spark-connect"]),
+    ("Airflow", ["airflow-init", "airflow-apiserver", "airflow-scheduler", "airflow-dag-processor"]),
+    ("Superset", ["superset"]),
+    ("Polaris console", ["polaris-console", "polaris-proxy"]),
 ]
+LOCKED = {"Core"}
+NEEDS = {"Superset": ["SQL"]}          # starting Superset starts SQL; stopping SQL stops Superset
+USES = {"Notebooks": "Spark", "Airflow": "Spark"}  # only some work needs it: a hint, not started for you
 LINKS = [("Landing page", "oauth2-proxy"), ("Airflow", "airflow-apiserver"), ("Superset", "superset"),
          ("SQLPad", "sqlpad"), ("Keycloak", "keycloak")]
 SPIN = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
@@ -101,6 +110,13 @@ class Stack:
         cfg = json.loads(compose("config", "--format", "json").stdout or "{}").get("services", {})
         self.names = list(cfg) or [s for _, g in GROUPS for s in g]
         self.container = {s.get("container_name", f"local-{n}-1"): n for n, s in cfg.items()}
+        # setup jobs (run once, exit 0): restart "no", or what others wait on to complete
+        self.oneshot = {n for n, s in cfg.items() if s.get("restart") == "no"} | {
+            d for s in cfg.values() for d, c in (s.get("depends_on") or {}).items()
+            if c.get("condition") == "service_completed_successfully"}
+        self.pending = {}                       # status: service → starting/stopping while a unit changes
+        self.busy = None                        # status: the units being started / stopped
+        self.message = None                     # status: (text, when) — shown in the bottom line
         self.state = {n: "waiting" for n in self.names}
         self.ports, self.stats, self.info = {}, {}, {}
         self.members = []                       # jupyter-<user> containers (started by JupyterHub)
@@ -161,7 +177,11 @@ class Stack:
                     continue
                 seen.add(s)
                 st, hl, code = r.get("State"), r.get("Health"), r.get("ExitCode", 0)
-                if st == "running":
+                if s in self.pending:
+                    self.state[s] = self.pending[s]
+                elif st == "exited" and watch and s not in self.oneshot and code in (0, 137, 143):
+                    self.state[s] = "stopped"           # docker compose stop (SIGTERM 143 / SIGKILL 137)
+                elif st == "running":
                     self.state[s] = {"healthy": "healthy", "unhealthy": "unhealthy",
                                      "starting": "health"}.get(hl, "running")
                 elif st == "restarting":
@@ -178,7 +198,7 @@ class Stack:
             if watch:                                   # status: no container at all = stopped
                 for s in self.names:
                     if s not in seen:
-                        self.state[s] = "stopped"
+                        self.state[s] = self.pending.get(s, "stopped")
 
     def poll_stats(self):
         out = subprocess.run(["docker", "stats", "--no-stream", "--format", "json"],
@@ -230,11 +250,12 @@ class View:
         self.c["dim"] = curses.A_DIM
         self.c["bold"] = curses.A_BOLD
         self.tick = 0
-        self.sel = 0              # status: selected row in the service list
-        self.only = None          # status: show only this service's logs
+        self.sel = 0              # status: selected unit (↑ ↓ move between units, not containers)
+        self.only = None          # status: show only this unit's logs
         self.errors = False       # status: only lines that look like errors / warnings
         self.paused = None        # status: frozen copy of the log while paused
-        self.rows = []            # services in the order they're drawn (for ↑ ↓)
+        self.rows = []            # status: the units in the order they're drawn (for ↑ ↓)
+        self.confirm = None       # status: the units x will stop, waiting for y / n
 
     def put(self, y, x, text, attr=0, width=None):
         h, w = self.scr.getmaxyx()
@@ -242,8 +263,8 @@ class View:
             return
         width = min(width or w - x, w - x - (1 if y == h - 1 else 0))
         try:
-            self.scr.addstr(y, x, text[:max(width, 0)], attr)
-        except curses.error:
+            self.scr.addstr(y, x, text[:max(width, 0)].replace("\0", ""), attr)   # logs can hold NUL bytes
+        except (curses.error, ValueError):
             pass
 
     ERR = re.compile(r"\b(error|exception|fatal|failed|traceback|unhealthy|panic)\b|exited \(", re.I)
@@ -260,9 +281,48 @@ class View:
             return self.c["dim"]
         return 0
 
+    def say(self, text):
+        with self.stack.lock:
+            self.stack.message = (text, time.time())
+
+    def unit_key(self, action):
+        """s / x on the selected unit: start / stop it (x on Core: the whole stack, asks first)."""
+        if not self.rows:
+            return
+        unit = self.rows[self.sel]
+        if self.stack.busy:
+            self.say(f"wait: still changing {' + '.join(self.stack.busy)}")
+        elif unit in LOCKED and action == "start" and core_on(self.stack):
+            self.say(f"{unit} is already on")
+        elif unit in LOCKED:                    # every unit needs Core: stopping it = the whole stack
+            with self.stack.lock:
+                up = any(self.stack.state.get(m) in READY | {"health", "starting", "creating"}
+                         for m in self.stack.names if m not in self.stack.oneshot)
+            if up:
+                self.confirm = [t for t, _ in GROUPS]
+            else:
+                self.say("The stack is already stopped")
+        elif action == "start":                 # the stack not running: Core comes first
+            plan = ([] if core_on(self.stack) else sorted(LOCKED)) + unit_plan(unit, "start")
+            threading.Thread(target=run_unit, args=(self.stack, "start", plan), daemon=True).start()
+        else:
+            self.confirm = unit_plan(unit, "stop")
+
     def key(self, k):
-        """status keys: ↑ ↓ pick a service · f its logs only · a all logs · e errors only · space pause."""
-        if k in (curses.KEY_UP, ord("k")):
+        """status keys: ↑ ↓ pick a unit · s on / x off · f its logs only · a all logs · e errors only
+        · space pause."""
+        if self.confirm:
+            units, self.confirm = self.confirm, None
+            if k in (ord("y"), ord("Y")):
+                threading.Thread(target=run_unit, args=(self.stack, "stop", units), daemon=True).start()
+            else:
+                self.say("not stopped")
+            return
+        if k == ord("s"):
+            self.unit_key("start")
+        elif k == ord("x"):
+            self.unit_key("stop")
+        elif k in (curses.KEY_UP, ord("k")):
             self.sel = max(0, self.sel - 1)
         elif k in (curses.KEY_DOWN, ord("j")):
             self.sel = min(len(self.rows) - 1, self.sel + 1)
@@ -282,9 +342,14 @@ class View:
             with s.lock:
                 v = list(s.state.values())
             ready, total = sum(x in ("removed", "stopped") for x in v), len(v)
+        off = 0
+        if self.watch:                          # units switched off aren't "not ready"
+            with s.lock:
+                off = sum(x == "stopped" for x in s.state.values())
+            total -= off
         self.put(0, 1, "Epireum DE Lab", self.c["bold"] | self.c["magenta"])
         self.put(0, 16, f"· {phase}", self.c["bold"])
-        label = f" {ready:>2}/{total} " + ("stopped" if s.mode == "stop" else "ready")
+        label = f" {ready:>2}/{total} " + ("stopped" if s.mode == "stop" else "ready") + (f" · {off} off" if off else "")
         lx = w - len(label) - 1
         if self.watch:
             with s.lock:
@@ -327,7 +392,9 @@ class View:
         rows_free = h - 3 - (4 if self.watch else 0)          # status: room for the detail lines
         order, hidden = None, 0
         settled = READY if s.mode != "stop" else {"removed", "stopped"}
-        if rows_free < sum(len(g) for _, g in groups) + 2 * len(groups) - 1:   # too short: busy ones first
+        if self.watch and rows_free < sum(len(g) for _, g in groups) + 2 * len(groups) - 1:
+            groups = [(t, []) for t, _ in groups if t != MEMBERS]   # too short: just the units
+        elif rows_free < sum(len(g) for _, g in groups) + 2 * len(groups) - 1:   # too short: busy ones first
             flat = sorted([m for _, g in groups for m in g], key=lambda m: state[m] in settled)
             if len(flat) > rows_free:
                 hidden = len(flat) - rows_free + 1
@@ -335,19 +402,43 @@ class View:
             groups = [(None, flat)]
         if metrics:
             self.put(2, w - 27, "  CPU    MEM   PORT", self.c["dim"])
-        y, drawn = 2, []
+        y, drawn, units = 2, [], []
+        unit_names = [t for t, _ in groups if any(t == u for u, _ in GROUPS)]
+        if self.watch and unit_names:
+            self.sel = max(0, min(self.sel, len(unit_names) - 1))
         for title, rows in groups:
             if title:
-                self.put(y, px + 1, title.upper(), self.c["bold"] | self.c["dim"])
+                full = dict(GROUPS).get(title, rows)
+                sel = self.watch and title in unit_names and unit_names.index(title) == self.sel
+                base = curses.A_REVERSE if sel else 0
+                if sel:
+                    self.put(y, px, " " * (pw - 1), base)
+                self.put(y, px + 1, ("▸ " if sel else "") + title.upper(),
+                         base | self.c["bold"] | (0 if sel else self.c["dim"]))
+                title_w = len(title) + (2 if sel else 0)
+                if title in unit_names:
+                    units.append(title)
+                if self.watch and title in LOCKED and not core_on(s):
+                    self.put(y, px + 2 + title_w, "○ off · s start", base | self.c["yellow"] | self.c["bold"])
+                elif self.watch and title in LOCKED:
+                    self.put(y, px + 2 + title_w, "● on · x stops all", base | self.c["yellow"] | self.c["bold"])
+                elif self.watch and title in unit_names:
+                    live = [state[m] for m in full if m in state and m not in s.oneshot]
+                    on = sum(x in READY for x in live)
+                    word, col = (("◐ changing", "yellow") if any(x in ("starting", "stopping") for x in live)
+                                 else ("● on", "green") if on == len(live)
+                                 else ("○ off", "dim") if on == 0 else ("◐ partly on", "yellow"))
+                    self.put(y, px + 2 + title_w, word, base | self.c[col])
+                if self.watch and metrics and title in unit_names:
+                    mem = sum(stats.get(m, {}).get("mem", 0) for m in full)
+                    if mem:
+                        self.put(y, w - 20, f"{human(mem):>6}", base | self.c["dim"])
                 y += 1
             for m in rows:
                 if y >= 2 + rows_free:
                     break
                 sym, col, txt = LOOK[state[m]]
-                sel = self.watch and len(drawn) == self.sel
-                base = curses.A_REVERSE if sel else 0
-                if sel:
-                    self.put(y, px, " " * (pw - 1), base)
+                base = 0                                    # (status selects units, not containers)
                 self.put(y, px + 1, sym or spin, self.c[col] | base | (self.c["bold"] if col != "dim" else 0))
                 name = m[len("jupyter-"):] if m.startswith("jupyter-") else m
                 self.put(y, px + 3, name, base | (self.c["dim"] if state[m] in ("waiting", "stopped") else 0),
@@ -371,20 +462,23 @@ class View:
         if hidden:
             self.put(y, px + 1, f"… {hidden} more, all " + ("stopped" if s.mode == "stop" else "ready"),
                      self.c["dim"])
-        if self.watch and drawn:                   # details of the selected service
-            self.sel = min(self.sel, len(drawn) - 1)
-            m = drawn[self.sel]
+        if self.watch and units:                   # details of the selected unit
+            unit = units[min(self.sel, len(units) - 1)]
+            svcs = [m for m in dict(GROUPS)[unit] if m in state and m not in s.oneshot]
             with s.lock:
-                inf, st, p = s.info.get(m, {}), s.stats.get(m, {}), s.ports.get(m, [])
+                cpu = sum(s.stats.get(m, {}).get("cpu", 0) for m in svcs)
+                mem = sum(s.stats.get(m, {}).get("mem", 0) for m in svcs)
+                ports = sorted({p for m in svcs for p in s.ports.get(m, []) if state.get(m) in READY})
             y = h - 5
             self.put(y, px, "─" * pw, self.c["dim"])
-            self.put(y + 1, px + 1, f"{m}", self.c["bold"])
-            self.put(y + 1, px + 2 + len(m), f"{inf.get('status', '')}", self.c["dim"])
-            self.put(y + 2, px + 1, f"image {inf.get('image', '—')}" +
-                     (f" · ports {', '.join(map(str, p))}" if p else ""), self.c["dim"])
-            if st:
-                self.put(y + 3, px + 1, f"net {st['net']} · disk {st['io']} · {st['pids']} processes", self.c["dim"])
-        return drawn
+            self.put(y + 1, px + 1, unit, self.c["bold"])
+            tag = (("off · s starts it" if not core_on(s) else "x stops the whole stack") if unit in LOCKED
+                   else "s on · x off")
+            self.put(y + 1, w - len(tag) - 1, tag, self.c["yellow"] if unit in LOCKED else self.c["cyan"])
+            self.put(y + 2, px + 1, " · ".join(svcs), self.c["dim"])
+            self.put(y + 3, px + 1, f"CPU {cpu:.1f}% · memory {human(mem)}" +
+                     (f" · ports {', '.join(map(str, ports))}" if ports else ""), self.c["dim"])
+        return units if self.watch else drawn
 
     def logs(self, lw, rows):
         s = self.stack
@@ -395,7 +489,8 @@ class View:
                 self.put(2 + i, 1, line.replace("\t", "  "), self.line_attr(line), lw)
             return
         if self.only:
-            lines = [x for x in lines if x[0] == self.only]
+            mine = set(dict(GROUPS).get(self.only, [self.only]))
+            lines = [x for x in lines if x[0] in mine]
         if self.errors:
             lines = [x for x in lines if self.ERR.search(x[1]) or self.WARN.search(x[1])]
         names = sorted({x[0] for x in lines})
@@ -426,7 +521,35 @@ class View:
         if self.watch:
             what = (f"logs: {self.only}" if self.only else "logs: all") + (" · errors" if self.errors else "") + \
                    (" · PAUSED" if self.paused is not None else "")
-            hint = f"{what}   ↑↓ pick · f its logs · a all · e errors · space pause · q quit"
+            hint = f"{what}   ↑↓ pick a unit · s on · x off · f its logs · a all · e errors · space pause · q quit"
+            with self.stack.lock:
+                msg, busy = self.stack.message, self.stack.busy
+            if self.confirm:
+                n = sum(len(g) for t, g in GROUPS if t in self.confirm)
+                if any(t in LOCKED for t in self.confirm):
+                    self.put(h - 1, 1, f"Stop the WHOLE stack — Core and every unit ({n} services, members' "
+                             "Jupyter servers too; data is kept)? y / n", self.c["red"] | self.c["bold"])
+                else:
+                    self.put(h - 1, 1, f"Stop {' + '.join(self.confirm)} ({n} services; data is kept)? y / n",
+                             self.c["yellow"] | self.c["bold"])
+                scr.refresh()
+                return
+            if busy:
+                hint = f"{spin} changing {' + '.join(busy)} …   " + hint
+            elif not core_on(self.stack) and not (msg and time.time() - msg[1] < 8):
+                with self.stack.lock:
+                    some = any(self.stack.state.get(m) in READY for t, g in GROUPS if t in LOCKED for m in g
+                               if m not in self.stack.oneshot)
+                self.put(h - 1, 1, ("Core is still starting (or partly stopped) — wait, or s to start the rest"
+                                    if some else "The stack isn't running — s starts Core (sign-in, catalog, storage)")
+                         + ", then s on a unit adds it · make up starts everything · q quit",
+                         self.c["yellow"] | self.c["bold"])
+                scr.refresh()
+                return
+            elif msg and time.time() - msg[1] < 8:
+                self.put(h - 1, 1, msg[0], self.c["cyan"] | self.c["bold"])
+                scr.refresh()
+                return
         elif self.stack.mode == "stop":
             hint = "containers and network go · volumes (all your data) stay · make up starts it again"
         else:
@@ -506,6 +629,83 @@ def poll_loop(stack, stop, watch):
         stop.wait(2)
 
 
+def core_on(stack):
+    """Is every always-on service up? (No: the stack isn't running — make status offers to start it.)"""
+    with stack.lock:
+        return all(stack.state.get(m) in READY for t, g in GROUPS if t in LOCKED for m in g
+                   if m in stack.state and m not in stack.oneshot)
+
+
+def unit_of(svc):
+    return next((t for t, g in GROUPS if svc in g), None)
+
+
+def unit_plan(unit, action):
+    """The units a start or stop touches: start brings what the unit needs, stop what needs it."""
+    if action == "start":
+        todo, out = [unit], []
+        while todo:
+            u = todo.pop()
+            if u not in out:
+                out.append(u)
+                todo += NEEDS.get(u, [])
+        return [u for u in reversed(out) if u not in LOCKED]
+    out = [unit]
+    for u in out:
+        out += [d for d, needs in NEEDS.items() if u in needs and d not in out]
+    return out
+
+
+def run_unit(stack, action, units):
+    """status s / x: docker compose up -d / stop for every service of the units (data stays)."""
+    svcs = [s for t, g in GROUPS if t in units for s in g if s in stack.names]
+    tag = "make status"
+    with stack.lock:
+        stack.busy = units
+        stack.pending = {s: "starting" if action == "start" else "stopping" for s in svcs}
+        stack.lines.append((tag, f"{action} {' + '.join(units)}: {' '.join(svcs)}"))
+    if action == "stop" and "Notebooks" in units:
+        for m in list(stack.members):           # members' servers need the Hub — their files stay
+            subprocess.run(["docker", "rm", "-f", m], capture_output=True)
+            with stack.lock:
+                stack.lines.append((tag, f"removed {m} (a member's Jupyter server — files stay in its volume)"))
+    cmd = ["up", "-d"] if action == "start" else ["stop"]
+    # its own session, output to a file: quitting make status (or it crashing) mustn't kill compose
+    # halfway — `up -d` waits for health checks, and services after them would stay "Created"
+    os.makedirs(os.path.dirname(UNIT_LOG), exist_ok=True)
+    with open(UNIT_LOG, "a") as out:
+        out.write(f"\n== {time.strftime('%H:%M:%S')} {action} {' + '.join(units)} ==\n")
+        out.flush()
+        start = out.tell()
+        p = subprocess.Popen(["docker", "compose", "--progress", "plain", *cmd, *svcs], cwd=HERE,
+                             stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
+    with open(UNIT_LOG, errors="replace") as f:
+        f.seek(start)
+        while True:
+            done = p.poll() is not None
+            for line in f.readlines():
+                with stack.lock:
+                    stack.lines.append((tag, line.rstrip("\n")))
+            if done:
+                break
+            time.sleep(0.3)
+    rc = p.returncode
+    if rc == 0 and action == "start" and "Core" in units:     # as make up: a fresh install has no shared lake
+        line = ensure_shared_lake()
+        if line:
+            with stack.lock:
+                stack.lines.append((tag, line))
+    with stack.lock:
+        stack.pending, stack.busy = {}, None
+        done = "started" if action == "start" else "stopped"
+        extra = [USES[u] for u in units if u in USES and USES[u] not in units] if action == "start" else []
+        hint = f" · Spark code (SparkSession, lab_spark) also needs the {extra[0]} unit: s on it" \
+            if extra and any(stack.state.get(m) not in READY for t, g in GROUPS if t == extra[0] for m in g) else ""
+        what = "The whole stack" if action == "stop" and any(u in LOCKED for u in units) else " + ".join(units)
+        stack.message = (f"{what} {done}{hint}" if rc == 0 else
+                         f"docker compose {cmd[-1]} failed (exit {rc}) — see the log, f to filter", time.time())
+
+
 def ui(scr, stack, watch):
     view, stop = View(scr, stack, watch), threading.Event()
     if stack.mode == "stop":
@@ -538,7 +738,7 @@ def ui(scr, stack, watch):
             view.draw(phase)
             k = scr.getch()
             while k != -1:
-                if k in (ord("q"), ord("Q")) and (watch or stack.compose_rc is not None):
+                if k in (ord("q"), ord("Q")) and (watch or stack.compose_rc is not None) and not view.confirm:
                     return "quit"
                 if watch:
                     view.key(k)
@@ -886,6 +1086,11 @@ def main():
     stack.checks = checks
     for line in checks:
         stack.lines.append(line)
+    if watch:
+        try:
+            stack.poll(watch=True)          # the first frame shows what runs (not all "waiting")
+        except Exception:  # noqa: BLE001 — Docker not answering: the loop keeps trying
+            pass
     if stopping:
         stack.poll(watch=True)              # what runs now (no container = already stopped)
         for name in subprocess.run(["docker", "ps", "-a", "--format", "{{.Names}}", "--filter", "name=^jupyter-"],
@@ -894,10 +1099,15 @@ def main():
     try:
         how = curses.wrapper(ui, stack, watch)
     except KeyboardInterrupt:
-        if watch:
-            return
-        print("\nInterrupted (Ctrl-C) — `make status` shows what is running now.")
-        sys.exit(130)
+        how = "quit"
+        if not watch:
+            print("\nInterrupted (Ctrl-C) — `make status` shows what is running now.")
+            sys.exit(130)
+    if watch:
+        if stack.busy:
+            print(f"Still {' + '.join(stack.busy)}: it carries on in the background (log: local/logs/make-status.log)"
+                  " — make status shows it.")
+        return
     if stopping:
         sys.exit(summary_stop(stack, how))
     if not watch:

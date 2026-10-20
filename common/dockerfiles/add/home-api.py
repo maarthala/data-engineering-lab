@@ -50,12 +50,17 @@ Changes need the X-Lab-Request header (a plain cross-site form can't send it).
   POST   /api/env  {"name", "value"?, "secret"}          add / change (no value = keep it)
   DELETE /api/env?name=…                                 remove
 
+Which tools are up (local: units can be stopped in make status — the home page greys their tiles):
+  GET    /api/services                                   {"jupyter": true, "sqlpad": false, …} — from
+         LAB_SERVICES (tile=host:port,…); not set (k8s) → {} and every tile stays as it is
+
 Only reachable through oauth2-proxy (it is not published), so the identity headers can
 be trusted. Standard library only.
 """
 import json
 import os
 import re
+import socket
 import threading
 import time
 import urllib.error
@@ -68,6 +73,31 @@ import labvault
 from lakehouse import POLARIS, bucket_name, lake_name, provision
 
 MAX_UPLOAD = int(os.environ.get("MAX_UPLOAD_MB", "512")) * 1024 * 1024
+SERVICES = dict(x.split("=", 1) for x in os.environ.get("LAB_SERVICES", "").split(",") if "=" in x)
+_up = {"at": 0, "state": {}}
+
+
+def services_up():
+    """tile → is its service listening? A stopped container has no DNS name, a starting one refuses
+    the connection: both are "off". Checked at most every 5 s, all at once."""
+    if time.time() - _up["at"] < 5:
+        return _up["state"]
+    state = {}
+
+    def check(tile, hostport):
+        host, port = hostport.rsplit(":", 1)
+        try:
+            socket.create_connection((host, int(port)), timeout=1).close()
+            state[tile] = True
+        except OSError:
+            state[tile] = False
+    threads = [threading.Thread(target=check, args=kv) for kv in SERVICES.items()]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    _up.update(at=time.time(), state=state)
+    return state
 
 
 class _Body:
@@ -85,6 +115,7 @@ class _Body:
         return chunk
 
 _ready = set()            # learners already provisioned since start (skip the API calls)
+_sql_ready = set()        # … and their SQL part (SQLPad, Trino) — retried while the SQL unit was off
 _lock = threading.Lock()
 _jobs = {}                # manager actions: id → {"state", "result" | "error", …}
 _ACTIONS = {"create": labadmin.create, "password": labadmin.set_password,
@@ -123,12 +154,19 @@ class Handler(BaseHTTPRequestHandler):
     def _ensure(self, name):
         with _lock:
             if name not in _ready:
-                provision(name, manager=self._manager())
+                if provision(name, manager=self._manager()):
+                    _sql_ready.add(name)
                 try:                                 # their team's lake, if a manager put them in one
                     labadmin.ensure_team(self._user())
                 except Exception as e:  # noqa: BLE001 — the own lake works without it
                     print(f"[home-api] team for {name}: {e}", flush=True)
                 _ready.add(name)
+            elif name not in _sql_ready:             # SQL unit started since: catch up quietly
+                try:
+                    lh.provision_sql(name, manager=self._manager())
+                    _sql_ready.add(name)
+                except Exception:  # noqa: BLE001 — still off: the next page load tries again
+                    pass
 
     @staticmethod
     def _clean(key):
@@ -457,6 +495,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin("GET")
         if self.path.startswith("/api/env"):
             return self._env("GET")
+        if self.path == "/api/services":
+            if not self._user():
+                return self._json(401, {"error": "not logged in"})
+            return self._json(200, services_up())
         if self.path != "/api/me":
             return self._json(404, {"error": "not found"})
         user = self._user()

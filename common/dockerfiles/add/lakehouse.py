@@ -667,7 +667,8 @@ def invite_sqlpad(name, admin=False):
 
 def provision(name, manager=False):
     """Create (or confirm) the learner's bucket, storage policy, lakehouse + Polaris identity,
-    and their SQLPad account."""
+    and their SQLPad account. The SQL part (SQLPad, Trino) is skipped while the SQL unit is
+    stopped (make status): returns False then, and provision_sql() catches up later."""
     bucket = bucket_name(name)
     create_bucket(bucket)
     set_quota(bucket)
@@ -677,11 +678,6 @@ def provision(name, manager=False):
     except RuntimeError:
         team = None
     put_storage_policy(name, admin=manager, team=team)
-    invite_sqlpad(name, admin=manager)
-    try:
-        sqlpad_team_connection(name, team_of(name))      # (managers too: browse their team)
-    except Exception as e:  # noqa: BLE001 — SQLPad down: the next provision call
-        print(f"[lakehouse] sqlpad team connection {name}: {e}", flush=True)
     t = _admin_token()
     m, cat = "/api/management/v1", f"{name}_lake"
     loc = f"s3://{bucket}/tables/{cat}"
@@ -720,7 +716,25 @@ def provision(name, manager=False):
                         "reader grant")
         _ok(_call("PUT", f"{m}/principal-roles/{name}/catalog-roles/{SHARED}",
                   {"catalogRole": {"name": "learner_reader"}}, t)[0], "attach reader")
-    trino_catalog(cat, t)
+    try:
+        provision_sql(name, manager)
+        return True
+    except Exception as e:  # noqa: BLE001 — SQL unit stopped / starting: the lakehouse works without it
+        print(f"[lakehouse] SQL part for {name} skipped (Trino/SQLPad not up): {e}", flush=True)
+        return False
+
+
+def provision_sql(name, manager=False):
+    """The learner's SQLPad account and their lakehouse in Trino (+ the sample table). Needs the
+    SQL unit — raises while Trino or SQLPad is down."""
+    _trino("SELECT 1")
+    invite_sqlpad(name, admin=manager)
+    try:
+        sqlpad_team_connection(name, team_of(name))      # (managers too: browse their team)
+    except Exception as e:  # noqa: BLE001 — SQLPad down: the next provision call
+        print(f"[lakehouse] sqlpad team connection {name}: {e}", flush=True)
+    cat = f"{name}_lake"
+    trino_catalog(cat)
     sample_table(cat)
 
 
@@ -1196,6 +1210,10 @@ def sample_table(cat):
 
 def sync_trino():
     """Re-add every learner catalog to Trino (after a Trino restart they're gone)."""
+    try:
+        _trino("SELECT 1")
+    except OSError:                             # Trino stopped (make status: SQL unit off) — quietly
+        return                                  # wait; it's re-added once Trino is back
     t = _admin_token()
     for c in _get(f"/api/management/v1/catalogs", t)["catalogs"]:
         trino_catalog(c["name"], t, c.get("createTimestamp"))

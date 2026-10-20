@@ -111,12 +111,36 @@ learning.
     - **left** — the logs of **all** containers, each line with its service's name in colour;
       errors in red, warnings in yellow;
     - **right** — every service with its state (● running/healthy, ✓ setup job done, ✗ failed,
-      ↻ restarting, ○ stopped), **CPU**, **memory** and **port**, plus the members' Jupyter
-      servers; below it, details of the selected one (status, image, ports, network and disk use);
-    - **top** — total CPU and memory (of what Docker may use), and how many services are ready.
+      ↻ restarting, ○ stopped), **CPU**, **memory** and **port**, grouped in **units** (below),
+      plus the members' Jupyter servers; below it, details of the selected unit;
+    - **top** — total CPU and memory (of what Docker may use), how many services are ready, and
+      how many are switched off.
 
-    Keys: **↑ ↓** pick a service · **f** only its logs · **e** errors and warnings only · **a** all
-    logs again · **space** pause the log · **q** quit (the stack keeps running).
+    Keys: **↑ ↓** pick a **unit** · **s** turn it on · **x** turn it off (asks y / n) · **f** only
+    its logs · **e** errors and warnings only · **a** all logs again · **space** pause the log ·
+    **q** quit (the stack keeps running). Below the list: the selected unit's services, CPU,
+    memory and ports.
+
+    **Units: run only what you're learning.** On a laptop with little memory, stop the units you
+    don't need. Each unit's header says ● on, ○ off or ◐ partly on, and how much memory it uses.
+
+    | Unit | Services | Needed for |
+    |---|---|---|
+    | **Core** | postgres, redis, keycloak, vault, oauth2-proxy, nginx, home-api, storage, polaris | signing in, your files, the catalog — every unit needs it, so **x** on Core stops the **whole stack** (it asks first, in red) |
+    | **SQL** | trino, sqlpad | SQL in SQLPad, and Superset's data |
+    | **Notebooks** | jupyterhub, jupyter | Jupyter: pandas, SQL and Python practice (stopping it also removes the members' Jupyter servers; their files stay) |
+    | **Spark** | spark-master, spark-worker-1, spark-connect | Spark code — in a notebook (`SparkSession`) or in a DAG (`lab_spark()`) |
+    | **Airflow** | airflow-* | DAGs (they come from your bucket, so Notebooks can stay off; DAGs using Spark need **Spark**) |
+    | **Superset** | superset | dashboards (starting it also starts **SQL**; stopping SQL also stops it) |
+    | **Polaris console** | polaris-console, polaris-proxy | the catalog's web UI |
+
+    Stopping a unit keeps all its data (`docker compose stop`). The next `make up` starts every
+    unit again.
+
+    **Start small:** with the stack down, `make status` shows **Core ○ off · s start**. Press
+    **s** to start just Core, then **s** on the units you need. Pressing **s** on a unit while Core
+    is off starts Core with it. For a SQL-only session that's Core + SQL; for pandas, Core + Notebooks; for a Spark
+    pipeline in Airflow, Core + Airflow + Spark.
 
     !!! warning "`make clean` and `make destroy` delete all the data"
         Both delete the stack's volumes, so the object store (RustFS), Postgres, the catalog and the

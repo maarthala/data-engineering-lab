@@ -51,6 +51,8 @@ services:
       POLARIS_URL: http://polaris:8181
       LEARNER_QUOTA_MB: "100"      # each learner's bucket <user>-lake (hard limit)
       AIRFLOW_HOST_PORT: ${AIRFLOW_HOST_PORT:-8001}   # so the home page's Airflow tile follows .env
+      # home page: tiles of stopped units (make status) are greyed — tile=host:port it checks
+      LAB_SERVICES: jupyter=jupyterhub:8000,spark=spark-master:8080,sqlpad=sqlpad:3000,airflow=airflow-apiserver:8080,superset=superset:8088,governance=polaris-proxy:8189
       TRINO_RULES_PATH: /trino-access/rules.json      # Trino's access rules, kept in step with Polaris
       # "Manage members" (managers only): Keycloak admin + a JupyterHub service token
       KEYCLOAK_ADMIN: admin:admin
@@ -66,8 +68,13 @@ services:
       - ../common/dockerfiles/add/home-api.py:/app/app.py:ro
       - ../common/dockerfiles/add/labadmin.py:/app/labadmin.py:ro
       - ../common/dockerfiles/add/labvault.py:/app/labvault.py:ro
-    depends_on:
-      - polaris
+    depends_on:                      # it provisions in all three: wait for them (a stopped one has no DNS name)
+      polaris:
+        condition: service_started
+      storage:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - sparknet

@@ -67,6 +67,10 @@
       background:rgba(57,208,196,.1); border:1px solid rgba(57,208,196,.25);
       padding:2px 8px; border-radius:6px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
     .card.mine{border-style:dashed}
+    /* a stopped unit (make status): grey, not clickable */
+    .card.off{filter:grayscale(1); opacity:.45; pointer-events:none; cursor:default; box-shadow:none}
+    .card .offnote{display:none}
+    .card.off .offnote{display:block; margin-top:6px; font-size:.78rem; color:var(--muted)}
 
     footer{padding:14px 28px; border-top:1px solid var(--line); color:var(--muted); font-size:.86rem;
       display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap}
@@ -97,15 +101,15 @@
     <div class="board">
       <section class="col">
         <h4>Build &amp; explore</h4>
-        <a class="card" href="http://localhost:8008" target="_blank">
+        <a class="card" data-svc="jupyter" href="http://localhost:8008" target="_blank">
           <div class="ico">📓</div>
           <div><h3>Notebook</h3><p><b>Jupyter</b> — your own notebooks: Python, pandas &amp; Spark (Spark Connect). <code>my</code> = your lakehouse.</p></div>
         </a>
-        <a class="card" href="http://127.0.0.1:8002" target="_blank">
+        <a class="card" data-svc="spark" href="http://127.0.0.1:8002" target="_blank">
           <div class="ico">⚡</div>
           <div><h3>Compute</h3><p><b>Spark</b> — cluster master UI: jobs, workers, executors.</p></div>
         </a>
-        <a class="card" href="http://localhost:8003/auth/oidc" target="_blank">
+        <a class="card" data-svc="sqlpad" href="http://localhost:8003/auth/oidc" target="_blank">
           <div class="ico">🧰</div>
           <div><h3>SQL workbench</h3><p><b>SQLPad</b> — SQL on your lakehouse via Trino, incl. INSERT/UPDATE/DDL (your own connection); query the Postgres sources read-only.</p></div>
         </a>
@@ -113,7 +117,7 @@
 
       <section class="col">
         <h4>Pipelines</h4>
-        <a class="card" id="airflow-tile" href="http://localhost:8001" target="_blank">
+        <a class="card" data-svc="airflow" id="airflow-tile" href="http://localhost:8001" target="_blank">
           <div class="ico">🌬️</div>
           <div><h3>Orchestration</h3><p><b>Airflow</b> — schedule the Bronze→Silver→Gold pipeline. Your own DAGs come from your bucket's <code>dags/</code>.</p></div>
         </a>
@@ -121,7 +125,7 @@
 
       <section class="col">
         <h4>Visualize</h4>
-        <a class="card" href="http://localhost:8004" target="_blank">
+        <a class="card" data-svc="superset" href="http://localhost:8004" target="_blank">
           <div class="ico">📊</div>
           <div><h3>BI</h3><p><b>Superset</b> — dashboards &amp; SQL Lab over the Gold layer.</p></div>
         </a>
@@ -139,7 +143,7 @@
         </a>
         <!-- managers only (Polaris admin view of every catalog); members open their own catalogs
              in the Console from My catalogs — the Console can't list catalogs for them -->
-        <a class="card" id="gov-tile" href="http://localhost:8189/?sso=1" target="_blank" hidden>
+        <a class="card" data-svc="governance" id="gov-tile" href="http://localhost:8189/?sso=1" target="_blank" hidden>
           <div class="ico">🗂️</div>
           <div><h3>Governance</h3><p><b>Polaris Console</b> — every catalog, principal, role &amp; grant (managers).</p></div>
         </a>
@@ -161,9 +165,40 @@
   </footer>
 
   <script>
+    // Local: units stopped in `make status` → their tiles grey and unclickable; rechecked every 10 s,
+    // so a tile lights up once its unit is started. (k8s: /api/services is {} → nothing changes.)
+    // Members are told to ask; a local manager is the admin, so they're told how to start it.
+    var manager = false;
+    function offNotes() {
+      document.querySelectorAll('.card .offnote').forEach(function (n) {
+        n.textContent = manager ? 'Not running — start it in make status (s)' : 'Not running. Contact admin.';
+      });
+    }
+    (function () {
+      function check() {
+        fetch('/api/services').then(function (r) { return r.ok ? r.json() : {}; }).then(function (up) {
+          document.querySelectorAll('.card[data-svc]').forEach(function (a) {
+            var off = up[a.dataset.svc] === false;
+            a.classList.toggle('off', off);
+            if (off) { a.setAttribute('aria-disabled', 'true'); a.tabIndex = -1; }
+            else { a.removeAttribute('aria-disabled'); a.removeAttribute('tabindex'); }
+            if (!a.querySelector('.offnote')) {
+              var n = document.createElement('span');
+              n.className = 'offnote';
+              a.querySelector('div:last-child').appendChild(n);
+            }
+          });
+          offNotes();
+        }).catch(function () {});
+      }
+      check();
+      setInterval(check, 10000);
+    })();
     // Local: Airflow's host port is configurable (AIRFLOW_HOST_PORT in .env) — /api/me says which.
     document.addEventListener('lab:me', function (e) {
-      document.getElementById('gov-tile').hidden = (e.detail.groups || []).indexOf('managers') < 0;
+      manager = (e.detail.groups || []).indexOf('managers') >= 0;
+      document.getElementById('gov-tile').hidden = !manager;
+      offNotes();
       if (!/(^|\.)de\.lan$/.test(location.hostname) && e.detail.airflow_port) {
         document.getElementById('airflow-tile').href = 'http://localhost:' + e.detail.airflow_port;
       }
