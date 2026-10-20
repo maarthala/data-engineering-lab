@@ -61,6 +61,9 @@ plugins:
 extra_css:
   - stylesheets/extra.css
 
+extra_javascript:
+  - javascripts/discord.js
+
 extra:
   generator: false          # remove the "Made with Material for MkDocs" footer notice
   analytics:                # Google Analytics 4 — Material injects gtag.js and tracks page views + site search

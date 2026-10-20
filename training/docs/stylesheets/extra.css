@@ -36,3 +36,42 @@
   position: absolute;
   inset: 0;
 }
+
+/* Header: "Get help on Discord" button at the extreme right (javascripts/discord.js) */
+.md-header__discord {
+  flex-shrink: 0;
+  margin: 0 .4rem 0 .6rem;
+  padding: .3rem .7rem;
+  border-radius: 1rem;
+  background: #5865f2;
+  color: #fff !important;
+  font-size: .7rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background .15s ease;
+}
+.md-header__discord:hover { background: #4752c4; }
+@media screen and (max-width: 44.9375em) {
+  .md-header__discord-label { display: none; }   /* phones: icon only */
+}
+
+/* Right sidebar: "Need help?" Discord box under the Table of contents (javascripts/discord.js) */
+.md-toc__discord {
+  margin: 1.2rem .6rem 1rem .8rem;
+  padding: .7rem .8rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-left: 4px solid #5865f2;
+  border-radius: .3rem;
+  font-size: .68rem;
+  line-height: 1.45;
+}
+.md-toc__discord p { margin: .35rem 0 .6rem; color: var(--md-default-fg-color--light); }
+.md-toc__discord-btn {
+  display: inline-block;
+  padding: .25rem .7rem;
+  border-radius: 1rem;
+  background: #5865f2;
+  color: #fff !important;
+  font-weight: 700;
+}
+.md-toc__discord-btn:hover { background: #4752c4; }
