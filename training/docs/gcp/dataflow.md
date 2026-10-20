@@ -27,6 +27,132 @@ Beam handles **batch** (a fixed set of files, like here) and **streaming** (endl
 from Pub/Sub) with the same transforms. This lesson is batch. A batch job stops by itself when the
 input is done.
 
+### Dataflow vs Spark: who decides the machines
+This is where Dataflow differs most from the Spark jobs in the lab. In Spark **you** choose the
+compute, and the work is divided into **partitions** you can see and tune. In Dataflow **the
+service** chooses the compute and divides the work itself, **while the job runs**.
+
+**Spark (lab):** the cluster is sized before any job and shared by everyone:
+
+```mermaid
+flowchart LR
+  C["Spark cluster, sized up front<br/>N workers · cores · memory"] --> J1["your job"]
+  C --> J2["other members' jobs"]
+  C -.-> R["keeps running (and costing)<br/>after the jobs end"]
+```
+
+**Dataflow:** each job gets its own VMs, and their number changes while it runs:
+
+```mermaid
+flowchart LR
+  S["you submit<br/>the job"] --> A["Dataflow starts<br/>a few VMs"] --> M{"work left vs.<br/>progress"}
+  M -- "a lot left" --> U["add VMs<br/>(up to the max)"] --> M
+  M -- "workers idle" --> D["remove VMs"] --> M
+  M -- "input done" --> E["all VMs deleted"]
+```
+
+How Dataflow picks the number of VMs for a batch job:
+
+1. **It starts small:** a few workers, with a small default machine type unless you pick one.
+2. **It estimates the work:** how big the input is, and how fast each worker is getting through
+   its share. An uncompressed CSV can be split into byte ranges that different workers read in
+   parallel.
+3. **It scales during the job:** if the remaining work would take long, it adds VMs. When workers
+   run out of work near the end, it removes them.
+4. **It stops at a ceiling:** whichever is lower of `--max_num_workers` and your project's CPU
+   **quota** in that region. Free-trial projects have small quotas.
+
+For ShopFlow's 2.5 MB of orders that means **1 VM**: less than one worker's comfortable load.
+Most of the 5–8 minutes is starting that VM.
+
+| | Spark | Dataflow |
+|---|---|---|
+| Who sizes the compute | you or the platform: workers, executor cores and memory | the service; you may set a ceiling |
+| When | before the job (cluster / session start) | during the job, from the work left |
+| Scaling | *dynamic allocation* adds **executors** inside the cluster; adding **VMs** is a separate cluster autoscaler (Dataproc, Databricks) | adds and removes **VMs** itself |
+| When idle | the cluster runs (and costs) until stopped; the lab's Spark is always up and shared | VMs exist only during the job |
+| What you tune | `spark.executor.instances`, `executor.cores`, `executor.memory`, dynamic-allocation min/max | usually nothing; optionally the options below |
+
+Options you can add to the `python silver_orders.py …` command:
+
+| Option | Effect |
+|---|---|
+| `--max_num_workers=5` | the most VMs it may use: a budget guard |
+| `--num_workers=3` | how many to start with |
+| `--autoscaling_algorithm=NONE` | no autoscaling: always exactly `--num_workers` |
+| `--worker_machine_type=e2-standard-2` | a bigger or smaller VM per worker |
+
+### Partitions (Spark) vs bundles (Beam)
+Both split the data so many machines can work at once. They differ in **who controls it** and
+**when it can change**.
+
+**Spark:** the partitions are fixed when a stage starts, so the slowest one sets the pace:
+
+```mermaid
+flowchart LR
+  F1["file"] --> P1["partition 1 → task"]
+  F1 --> P2["partition 2 → task"]
+  F1 --> P3["partition 3 → task<br/>(big, slow)"]
+  P1 --> W1["stage ends when the<br/>slowest task ends"]
+  P2 --> W1
+  P3 --> W1
+```
+
+**Dataflow:** work is split again while it runs, so idle workers help the slow one:
+
+```mermaid
+flowchart LR
+  F2["file"] --> B1["worker 1"]
+  F2 --> B2["worker 2"]
+  B2 -- "slow: its unfinished<br/>part is split off" --> B3["worker 3<br/>(was idle)"]
+```
+
+**Spark** shows you the partitions:
+
+- **On read**, a file is cut into partitions of about 128 MB (`spark.sql.files.maxPartitionBytes`).
+  One partition is one **task** on one core.
+- **After a shuffle** (`groupBy`, `join`, `distinct`), the data is spread over
+  `spark.sql.shuffle.partitions` partitions (200 by default). **AQE** (adaptive query execution)
+  can merge tiny ones and split skewed ones.
+- **You change the count** with `repartition(n)` (a shuffle) or `coalesce(n)` (merge, no
+  shuffle).
+- Once a stage starts, its tasks are fixed: **one slow partition holds the whole stage back**.
+
+**Beam/Dataflow** hides them:
+
+- The runner cuts a PCollection into **bundles** and picks their size. Your code never sees a
+  bundle: it handles **one element at a time** (`Map`, `DoFn.process`).
+- **Dynamic work rebalancing:** if a worker falls behind, Dataflow **splits its unfinished work
+  while it runs** and hands part to an idle worker. Spark can't split a running task.
+- **Fusion:** `Read → Map → Filter` steps are merged to run together on one worker, like Spark's
+  narrow transformations in one stage.
+- **Shuffle** happens only at grouping steps (`GroupByKey`, `CombinePerKey`, `Distinct`). Dataflow
+  runs it in a separate **shuffle service**, not on the worker VMs.
+
+The closest equivalents:
+
+| Spark | Beam | Note |
+|---|---|---|
+| `repartition(n)` | `beam.Reshuffle()` | spreads elements over the workers again (and breaks fusion), with no count to choose |
+| `coalesce(1)` before writing | `WriteToText(…, num_shards=1)` | the number of output files only |
+| `spark.sql.shuffle.partitions` | none | Dataflow decides |
+| `df.rdd.getNumPartitions()` | none | not visible |
+| filter into several DataFrames | `beam.Partition(fn, n)` | splits into **n PCollections by your rule**: a logical split, *not* a physical partition, despite the name |
+| AQE skew handling | dynamic rebalancing | neither can split **one huge key**; Dataflow logs a "hot key" warning |
+
+What helps either one go parallel: **many files, or big uncompressed ones**. A single `.gz` file
+can't be split, so one worker (or one task) reads all of it.
+
+!!! note "Not the same as table partitioning"
+    "Partition" also means how a **table** is stored: Iceberg partitions in the lab, or a
+    BigQuery **partitioned table** with one partition per `order_date`. That's about **skipping
+    data when reading**. The partitions and bundles above are about **dividing work while a job
+    runs**.
+
+**In short:** with Spark you think about cluster size and partition counts. With Dataflow you write
+element-by-element steps and set a budget ceiling, and the service decides the machines and
+splits the work, even mid-job. That's easier, but there are fewer knobs when you do want to tune.
+
 ### The plan for ShopFlow orders
 ```mermaid
 flowchart LR
@@ -258,12 +384,61 @@ python silver_orders.py \
 - **`--job_name`**: lower-case letters, digits and `-`. It's the name in the console.
 
 The command waits until the job ends, which takes **5–8 minutes**: most of that is starting the
-VMs. While it runs: Console → **Dataflow** → **Jobs** → `silver-orders`.
+VMs. Watch it in the console meanwhile.
 
-- The **job graph** shows your named steps: *Read CSV → Drop duplicate lines → Clean → Write
-  Silver / Write rejected*. Click a step to see how many elements went in and out.
-- **Job metrics** shows the workers: usually 1 VM for this little data.
-- **Logs** (bottom panel) is where Python errors show up if a step fails.
+**The quickest way in:** near the start, the command prints a line like
+
+```
+INFO:apache_beam.runners.dataflow.internal.apiclient:To access the Dataflow monitoring console, please navigate to https://console.cloud.google.com/dataflow/jobs/us-central1/2026-10-20_04_12_31-123456789?project=shopflow-de-4821
+```
+
+Click that link (Cloud Shell makes it clickable) and the job's page opens.
+
+**Or from the menu:** Console → **Dataflow** → **Jobs**. Each job is one row:
+
+| Column | What you'll see |
+|---|---|
+| **Name** | `silver-orders` |
+| **Type** | Batch |
+| **Status** | *Starting* → *Running* → *Succeeded* (or *Failed*) |
+| **Start time / Elapsed** | when it started, how long it's taken |
+| **Region** | `us-central1` |
+
+Click the name to open the job. Its tabs:
+
+- **Job graph**: your named steps as boxes: *Read CSV → Drop duplicate lines → Clean → Write
+  Silver / Write rejected*. While it runs, each box shows its status; click one to see
+  **elements added** (how many went in and out). After the job, *Clean* shows 39,900 to the
+  main output and 100 to `rejected`.
+- **Execution details**: the stages Dataflow made after **fusion** (several of your steps run
+  as one stage) and how long each took.
+- **Job metrics**: charts over time. **Autoscaling** shows the number of workers: you'll see it
+  stay at **1**, as explained above. **Throughput** shows elements per second per step.
+- **Cost**: an estimate of what the job cost (a few cents).
+- The **job info** panel on the right: the **Job ID**, the region, the Beam SDK version and the
+  **pipeline options** you passed (`--input`, `--output_table`, …).
+- **Logs** (the panel at the bottom; click **Show** if it's closed): **Job logs** are Dataflow's
+  own messages (starting workers, autoscaling, finishing). **Worker logs** contain your Python
+  errors and `print` output from the VMs. When a job fails, its cause is here, usually near
+  the end.
+
+**The worker VMs themselves:** while the job runs, Console → **Compute Engine** → **VM
+instances** lists a VM named like `silver-orders-10200412-xxxx-harness-xxxx`. Dataflow created it
+and deletes it when the job ends; don't stop or delete it yourself.
+
+**From Cloud Shell** (in a second tab, since the first one is busy):
+
+```bash
+gcloud dataflow jobs list --region=$REGION --limit=5
+```
+
+- **`gcloud dataflow jobs list`** lists the region's jobs, newest first, with their ID, name,
+  type, state and start time. **`--limit=5`** shows only the newest five.
+
+```
+JOB_ID                                   NAME           TYPE   CREATION_TIME        STATE    REGION
+2026-10-20_04_12_31-123456789            silver-orders  Batch  2026-10-20 11:12:32  Running  us-central1
+```
 
 When it shows **Succeeded**, `select count(*) from shopflow_silver.orders` is still **39,900**.
 `WRITE_TRUNCATE` replaced the rows; it didn't add them a second time.

@@ -257,14 +257,35 @@ with beam.Pipeline() as p:
 - **`sorted(ids)`**: the grouped values come in no particular order, so sort them for a stable
   printout.
 
+The pipeline has **two separate branches**, and each prints its own lines. Nothing is merged:
+the revenue branch and the groups branch only share the input, `orders`.
+
+```mermaid
+flowchart LR
+  O["Orders"] --> A["Channel, amount"] --> B["Sum per channel"] --> C["Print revenue"]
+  O --> D["Channel, id"] --> E["Group per channel"] --> F["Sorted ids"] --> G["Print groups"]
+```
+
+Output of the **revenue** branch (`Print revenue`):
+
 ```
 ('app', 78.0)
 ('marketplace', 15.0)
 ('web', 200.0)
+```
+
+Output of the **groups** branch (`Print groups`):
+
+```
 ('marketplace', [4])
 ('web', [1, 3])
 ('app', [2, 5])
 ```
+
+On your screen they appear as one list of six lines, because both branches print to the same
+terminal. The branches run **in parallel**, so the lines can come out mixed, e.g. a group line
+between two revenue lines. You can tell them apart by shape: a number (`78.0`) is a revenue
+line, a list (`[2, 5]`) is a group line.
 
 !!! tip "Prefer `CombinePerKey` to `GroupByKey` + sum"
     `CombinePerKey(sum)` adds up **inside each worker first** and only sends the small partial
@@ -414,6 +435,38 @@ RuntimeError: A transform with label "Print good" already exists in the pipeline
 ```
 
 Every step needs its **own name**. When this error appears, look for a name you copied and pasted.
+
+## Learn more: where Beam's methods live
+`beam.Map`, `beam.Distinct` and the rest are short names. Each one lives in a **module** of the
+`apache_beam` package, and each module's reference page lists every method with its arguments
+and examples:
+
+| Module | What's in it | Examples you met, and more to try |
+|---|---|---|
+| [`apache_beam.transforms.core`](https://beam.apache.org/releases/pydoc/current/apache_beam.transforms.core.html) | the building blocks | `Create`, `Map`, `MapTuple`, `FlatMap`, `Filter`, `ParDo`, `DoFn`, `GroupByKey`, `CombinePerKey`; also `Flatten` (merge PCollections into one), `Partition` (split one into several) |
+| [`apache_beam.transforms.combiners`](https://beam.apache.org/releases/pydoc/current/apache_beam.transforms.combiners.html) | ready-made aggregations | `Count.PerElement`; also `Count.Globally`, `Count.PerKey`, `Mean.PerKey`, `Top.Largest`, `Top.PerKey`, `Sample`, `ToList`, `Latest` |
+| [`apache_beam.transforms.util`](https://beam.apache.org/releases/pydoc/current/apache_beam.transforms.util.html) | handy helpers | `Distinct`; also `Keys`, `Values`, `KvSwap`, `WithKeys`, `Reshuffle` |
+| [`apache_beam.io`](https://beam.apache.org/releases/pydoc/current/apache_beam.io.textio.html) | reading and writing | `ReadFromText`, `WriteToText`; also `ReadFromCsv`, `ReadFromJson`, `ReadFromParquet` / `WriteToParquet`, `ReadFromAvro`, `ReadFromBigQuery` / `WriteToBigQuery` |
+| [`apache_beam.transforms.window`](https://beam.apache.org/releases/pydoc/current/apache_beam.transforms.window.html) | time windows for streaming | `FixedWindows`, `SlidingWindows`, `Sessions` |
+
+From Python itself: `help(beam.combiners.Top)` prints the same documentation in Cloud Shell, and
+`beam.Map.__module__` tells you which module a name comes from.
+
+Guides and places to practise:
+
+- [**Python transform catalog**](https://beam.apache.org/documentation/transforms/python/overview/)
+  lists every built-in transform, each with a short runnable example. **Start here** when you
+  look for "is there a step that does X?".
+- [**Beam programming guide**](https://beam.apache.org/documentation/programming-guide/) is the
+  full explanation of pipelines, PCollections, transforms, windows and triggers.
+- [**I/O connectors**](https://beam.apache.org/documentation/io/connectors/) lists every source
+  and sink: files, BigQuery, Pub/Sub, Kafka, JDBC databases, …
+- [**Beam DataFrames**](https://beam.apache.org/documentation/dsls/dataframes/overview/) lets you
+  write pandas-style code that runs as a Beam pipeline.
+- [**Tour of Beam**](https://tour.beam.apache.org/) and [**Beam Playground**](https://play.beam.apache.org/)
+  let you learn and run Beam in the browser, with nothing to install.
+- [**Dataflow documentation**](https://cloud.google.com/dataflow/docs/overview) covers running
+  Beam on Google Cloud: options, monitoring, templates and cost.
 
 ## Check yourself
 1. In `with beam.Pipeline() as p:`, when does the data actually move? *(When the `with` block

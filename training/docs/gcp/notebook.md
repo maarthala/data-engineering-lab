@@ -93,16 +93,22 @@ Check it:
 
 ```python
 %%bigquery
-select count(*) as rows, sum(orders) as orders, round(sum(revenue), 2) as revenue,
+select count(*) as row_count, sum(orders) as orders, round(sum(revenue), 2) as revenue,
        min(order_date) as first_day, max(order_date) as last_day
 from shopflow_gold.daily_sales
 ```
 
-| | rows | orders | revenue | first_day | last_day |
+| | row_count | orders | revenue | first_day | last_day |
 |---|---|---|---|---|---|
 | 0 | 2919 | 28005 | 53550514.93 | 2024-06-01 | 2026-05-31 |
 
 28,005 orders: exactly the delivered count in Silver.
+
+!!! warning "Reserved words can't be column names"
+    `rows`, `range`, `groups`, `partition`, `window` and a few dozen others are **reserved
+    keywords** in BigQuery SQL. `select count(*) as rows` fails with *Syntax error: Unexpected
+    keyword ROWS*. Pick another name (`row_count`), or put the name in backticks:
+    `` as `rows` ``. Trino and Spark have similar lists, but they're not the same.
 
 ### 4 · Gold with Python: `top_products`
 In a new cell:

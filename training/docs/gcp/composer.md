@@ -175,7 +175,38 @@ REGION = "us-central1"                 # the region you use everywhere
 ```
 
 - **`gcloud composer environments storage dags import`** copies the DAG into the environment's
-  `dags/` folder. Airflow picks it up within a minute or two.
+  `dags/` folder.
+
+!!! info "How long until the DAG shows in the Airflow UI?"
+    Usually **1–5 minutes**. Two things happen first:
+
+    1. **Sync:** Composer copies the bucket's `dags/` folder to Airflow's machines (seconds to
+       a minute).
+    2. **Scan and parse:** Airflow looks for **new** files in the folder every few minutes
+       (`dag_dir_list_interval`, 5 minutes by default), then parses the file. A **changed**
+       file that Airflow already knows is re-parsed sooner, typically within a minute.
+
+    Refresh the **DAGs** page. A new DAG appears **paused** (the toggle is off): that's Airflow's
+    default, so a new DAG never starts by surprise.
+
+    **Still not there after ~5 minutes?** Check that the file arrived, and whether Airflow could
+    read it:
+
+    ```bash
+    gcloud composer environments storage dags list \
+        --environment=shopflow-airflow --location=$REGION
+    gcloud composer environments run shopflow-airflow --location=$REGION \
+        dags list-import-errors
+    ```
+
+    - **`storage dags list`** lists the files in the environment's `dags/` folder; you should
+      see `dags/shopflow_dag.py`.
+    - **`environments run … dags list-import-errors`** runs the Airflow command
+      `airflow dags list-import-errors` inside the environment: it prints each DAG file that
+      failed to load, with the Python error (a typo, a wrong import). *No data found* means
+      there are no errors.
+
+    The UI also shows such errors as a red **Broken DAG** banner at the top of the DAGs page.
 
 ### 4 · Run it
 Console → **Composer** → `shopflow-airflow` → **Open Airflow UI**. Find `shopflow_gcp`, switch it
