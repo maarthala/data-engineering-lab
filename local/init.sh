@@ -30,7 +30,8 @@ URLS=(
 complete() {
   case "$1" in
     *.tgz) gzip -t "$1" 2>/dev/null ;;
-    *.jar) python3 -c 'import sys, zipfile; sys.exit(zipfile.ZipFile(sys.argv[1]).testzip() is not None)' "$1" 2>/dev/null ;;
+    # a jar's index sits at its very end, so a cut-off jar doesn't open — instant, unlike testing every entry
+    *.jar) python3 -c 'import sys, zipfile; zipfile.ZipFile(sys.argv[1])' "$1" 2>/dev/null ;;
     *)     [ -s "$1" ] ;;
   esac
 }
