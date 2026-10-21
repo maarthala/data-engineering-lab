@@ -80,11 +80,12 @@ nav:
   - "Help & community": help.md
   - "Getting started":
       - "Prerequisites & setup": setup/prerequisites.md
-      - "Bring up the stack": setup/deploy.md
-      - "+ First run: the mandatory make commands": setup/first-run.md
-      - "+ make status: how to use it": setup/make-status.md
-      - "+ Full stack: make up": setup/full-stack.md
-      - "+ General information": setup/general.md
+      - "Bring up the stack":          # a lesson with sub-pages: the nav expands / collapses
+          - "Bring up the stack": setup/deploy/index.md
+          - "First run: the mandatory make commands": setup/deploy/first-run.md
+          - "make status: how to use it": setup/deploy/make-status.md
+          - "Full stack: make up": setup/deploy/full-stack.md
+          - "General information": setup/deploy/general.md
       - "Your lab account & workspace": setup/workspace.md
       - "+ Personas & roles (governance demos)": setup/personas.md
       - "The ShopFlow scenario": scenario.md

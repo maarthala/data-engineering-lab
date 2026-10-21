@@ -187,7 +187,7 @@ files, catalog), and you switch on only the units you're learning, e.g. Core + S
 units.
 
 Then open **<http://localhost:8000>** and sign in as `demouser` / `demouser`. The full walkthrough
-— including what to do if something doesn't start — is in [0.2 Bring up the stack](setup/deploy.md).
+— including what to do if something doesn't start — is in [0.2 Bring up the stack](setup/deploy/index.md).
 
 ## Stuck? Get help on Discord
 

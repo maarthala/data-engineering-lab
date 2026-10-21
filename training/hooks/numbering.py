@@ -5,6 +5,8 @@ the nav, page headings and references. Nothing in the pages carries a hard-coded
 
   nav            a section is a unit (0, 1, 2 …), a page in it a lesson (4.1, 4.2 …).
                  A label starting with "+ " is a sub-lesson of the lesson above it (4.2.1).
+                 A lesson can also be a group: its first page is the lesson (4.2, an index.md),
+                 the others its sub-lessons (4.2.1 …), and the nav expands / collapses it.
                  Top-level pages (Home, Course overview, Help) get no number.
   page heading   the first "# Title" of a lesson becomes "# 4.2 Title".
   links          [4.3](../unit4/transform-silver.md), [Unit 4](../unit4/fundamentals.md):
@@ -58,6 +60,17 @@ def on_config(config):
                 lessons.append(child)
                 continue
             (title, path), = child.items()
+            if isinstance(path, list):                  # a lesson with its sub-lessons in a group
+                lesson, group = lesson + 1, []
+                for sub, page in enumerate(path):
+                    (t, p), = page.items()
+                    number = f"{unit}.{lesson}" + (f".{sub}" if sub else "")
+                    _num[p], _unit[p] = number, str(unit)
+                    paths.append(p)
+                    group.append({f"{number} {t}": p})
+                lessons.append({f"{unit}.{lesson} {title}": group})
+                sub = 0
+                continue
             if title.startswith(SUB):
                 if not lesson:
                     log.warning("numbering: sub-lesson '%s' has no lesson above it", title)

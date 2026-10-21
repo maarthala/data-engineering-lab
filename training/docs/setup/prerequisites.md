@@ -190,7 +190,7 @@ for your queries.
 
 !!! tip "Once, before the SQL lessons: Airflow + Spark"
     The ready-made ShopFlow tables the lessons read are built by an Airflow pipeline that runs
-    Spark. Switch on **Airflow + Spark** once, run it (see [Fill the shared lake](general.md#fill-the-shared-lake-once)), then switch them off again.
+    Spark. Switch on **Airflow + Spark** once, run it (see [Fill the shared lake](deploy/general.md#fill-the-shared-lake-once)), then switch them off again.
 
 ### Full stack
 
@@ -206,9 +206,9 @@ under load. Give Docker **12–16 GB** and **6 CPUs**. **8 GB** and **4 CPUs** i
     `make init` uses it to prepare the **AdventureWorks** sample database (lesson {lesson:unit2/adventureworks-challenge.md}). Without
     ruby that step is skipped with a warning, and everything else still works.
 
-With Docker and Git installed, follow **[Bring up the stack](deploy.md)** for the exact `make`
-commands: [`make status`](make-status.md) for the incremental way, [`make up`](full-stack.md) for
-the full stack (Docker Compose), or the [Ansible steps](general.md#on-kubernetes) (Kubernetes).
+With Docker and Git installed, follow **[Bring up the stack](deploy/index.md)** for the exact `make`
+commands: [`make status`](deploy/make-status.md) for the incremental way, [`make up`](deploy/full-stack.md) for
+the full stack (Docker Compose), or the [Ansible steps](deploy/general.md#on-kubernetes) (Kubernetes).
 
 ---
 
@@ -233,7 +233,7 @@ Run through this checklist once — if all three pass, you're ready for Unit {un
     ```
 
     If the last one fails with `Unable to find warehouse polaris_lake`, run `make polaris-seed`
-    (see [Bring up the stack](deploy.md)).
+    (see [Bring up the stack](deploy/index.md)).
 
 ---
 

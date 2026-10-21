@@ -10,7 +10,7 @@ commands listed under `init:`. That's why every `make` command runs from the `lo
 ## What you need
 
 **Docker Desktop** and **Git** (see
-[Prerequisites → run the stack yourself](prerequisites.md#3-running-the-stack-yourself-only-if-it-isnt-provided)).
+[Prerequisites → run the stack yourself](../prerequisites.md#3-running-the-stack-yourself-only-if-it-isnt-provided)).
 Memory for Docker: **6–10 GB** if you run only what you're learning, **12–16 GB** for the full
 stack.
 

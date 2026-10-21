@@ -10,7 +10,7 @@ make ps                       # the services you started should be "running"/"he
 Open the landing page at **<http://localhost:8000>** and sign in as **`demouser` / `demouser`** —
 the default lab account every course example is written for (or **Register** your own, or use
 `manager` / `manager`). Every tool tiles off it. Then run the
-[setup checklist](prerequisites.md#verify-your-setup).
+[setup checklist](../prerequisites.md#verify-your-setup).
 
 ## Fill the shared lake (once)
 Starting Core (`make up`, or **s** on Core in `make status`) creates the shared lake (`polaris_lake`) with **empty** bronze / silver /
@@ -114,9 +114,9 @@ kubectl delete namespace de-stack
 
 ## After it's up
 - **Register your lab account** on the landing page — see
-  [0.3 Your lab account & workspace](workspace.md) for what you get and where things are.
+  [0.3 Your lab account & workspace](../workspace.md) for what you get and where things are.
 - For the governance lessons, sign in to the Polaris Console as one of the
-  [personas](personas.md) (`analyst` / `engineer` / `lead`).
+  [personas](../personas.md) (`analyst` / `engineer` / `lead`).
 - The training course is published on **GitHub Pages**
   (<https://maarthala.github.io/data-engineering-lab/>), auto-deployed on every push to
   `main` — and the stack's landing page links straight to it, so it's always the current version.

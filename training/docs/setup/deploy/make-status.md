@@ -6,7 +6,7 @@ running.
 
 The services are grouped in **units**. **Core** is always needed; you add only the units the
 lesson needs. That way a laptop with 8 GB for Docker runs the course comfortably, one part at a
-time ([memory per part of the course](prerequisites.md#incremental-core-what-youre-learning-recommended)).
+time ([memory per part of the course](../prerequisites.md#incremental-core-what-youre-learning-recommended)).
 
 ## Your first session
 
