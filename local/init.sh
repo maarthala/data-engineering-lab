@@ -25,18 +25,39 @@ URLS=(
 )
 
 
+# A file is complete only if it unpacks: a cut-off download (slow line, Ctrl-C) must not be
+# "already exists, skipping" next time — the image build then fails with "unexpected end of file".
+complete() {
+  case "$1" in
+    *.tgz) gzip -t "$1" 2>/dev/null ;;
+    *.jar) python3 -c 'import sys, zipfile; sys.exit(zipfile.ZipFile(sys.argv[1]).testzip() is not None)' "$1" 2>/dev/null ;;
+    *)     [ -s "$1" ] ;;
+  esac
+}
+
 echo "Downloading files to $TARGET_DIR ..."
 
 for url in "${URLS[@]}"; do
   filename=$(basename "$url")
   filepath="$TARGET_DIR/$filename"
 
-  if [ -f "$filepath" ]; then
+  if [ -f "$filepath" ] && complete "$filepath"; then
     echo "✅ $filename already exists, skipping."
-  else
-    echo "⬇️  Downloading $filename ..."
-    curl --max-time 300 -L --progress-bar -o "$filepath" "$url"
+    continue
   fi
+  [ -f "$filepath" ] && echo "⚠️  $filename is incomplete (an earlier download was cut off) — downloading it again." \
+    && mv "$filepath" "$filepath.part"
+  echo "⬇️  Downloading $filename ..."
+  # no total time limit (Spark is ~570 MB): give up only when stalled under 1 KB/s for a minute;
+  # -C - resumes the .part file, and it becomes the real name only once it's complete
+  curl -fL --retry 5 --retry-delay 3 -C - --speed-limit 1024 --speed-time 60 --progress-bar \
+    -o "$filepath.part" "$url"
+  if ! complete "$filepath.part"; then
+    rm -f "$filepath.part"
+    echo "❌ $filename downloaded but is damaged — run 'make init' again." >&2
+    exit 1
+  fi
+  mv "$filepath.part" "$filepath"
 done
 
 echo "🎉 All downloads complete. Files saved in $TARGET_DIR"
