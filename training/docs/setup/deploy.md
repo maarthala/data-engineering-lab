@@ -13,8 +13,9 @@ learning.
 === "Local (Docker Compose)"
 
     ### Prerequisites
-    - **Docker Desktop** (≥ 8 GB RAM and 4 CPUs allocated — 12–16 GB and 6 CPUs are comfortable) and **Git**
-      — see [Prerequisites → run the stack yourself](prerequisites.md#3-running-the-stack-yourself-only-if-it-isnt-provided).
+    - **Docker Desktop** and **Git**. Memory: **6–10 GB** for Docker if you run only what you're
+      learning, **12–16 GB** for the full stack — see
+      [Prerequisites → run the stack yourself](prerequisites.md#3-running-the-stack-yourself-only-if-it-isnt-provided).
 
     ### Steps
     ```bash
@@ -26,30 +27,42 @@ learning.
     cp .env.example .env   # REQUIRED: .env tells Docker Compose which services make up the stack
     make init              # download Spark/Iceberg jars (~2.5 GB) + prepare AdventureWorks
 
-    # 3. start it
-    make up                # build the images (first time) + start every service
-                           # (also creates the lakehouse catalog `iceberg` + personas)
+    # 3. start it: pick one
+    make status            # incremental (recommended): Core + only the units you're learning
+    make up                # full stack: every service at once (12–16 GB for Docker)
 
     # 4. done for the day
     make down              # bring it down, keep all data — `make up` starts it again
     ```
 
+    !!! tip "Start with `make status`, not `make up`"
+        `make up` starts **every** service, about 9 GB before you run anything. On a laptop that
+        gives Docker less than 12 GB, everything gets slow and containers are killed. Instead, run
+        **`make status`**: with the stack down it shows **Core ○ off · s start**. Press **s** to
+        start Core, then **↓** to the units the lesson needs (SQL, Notebooks, …) and **s** again.
+        **q** quits the screen; the services keep running. See [Units](#units) below and the
+        [memory per part of the course](prerequisites.md#incremental-core-what-youre-learning-recommended).
+
+        Use **`make up`** when your machine has the memory and you want everything at once.
+
     !!! warning "Don't skip `cp .env.example .env`"
         Without `.env`, `make up` stops at once with **`no configuration file provided: not
         found`**. The file is gitignored, so each clone needs its own copy.
 
-    !!! note "`make up` creates the `iceberg` lakehouse catalog when it's missing"
-        Every `iceberg.…` query (Units {unit:unit2/intro.md}–{unit:unit6/polaris.md}) needs it. The
+    !!! note "Starting Core creates the `iceberg` lakehouse catalog when it's missing"
+        Both `make up` and **s** on Core in `make status` do this. Every `iceberg.…` query (Units {unit:unit2/intro.md}–{unit:unit6/polaris.md}) needs it. The
         catalog lives in Postgres's volume, so `make down` → `make up` keeps it; on the first start
         and after `make clean` / `make destroy` (which delete it), `make up` runs `make polaris-seed`
         for you and says so in its summary. If you still see **`Unable to find warehouse
         polaris_lake`** (e.g. you started with `make up-plain`), run `make polaris-seed` — it's
         safe to re-run.
 
-    !!! note "The first `make up` is slow"
-        It builds every image from scratch, which takes **15–30 minutes** depending on your machine
-        and network. Later runs don't build at all — they start in a minute or two. After changing
-        a Dockerfile, run `make build`.
+    !!! note "The first start is slow"
+        The first time, the images are built from scratch: **15–30 minutes** for the whole stack
+        with `make up`, depending on your machine and network. With `make status` each unit builds
+        its own images the first time you switch it on, so the wait is spread out. Later starts
+        don't build at all; they take a minute or two. After changing a Dockerfile, run
+        `make build`.
 
     ### Optional settings in `.env`
     | Setting | When you need it |
@@ -77,13 +90,14 @@ learning.
     in a notebook, `iceberg.gold.daily_sales` in Trino / SQLPad / Superset — are built by an
     Airflow pipeline. Run it once:
 
-    1. Open **Airflow** (landing page → Orchestration), signed in as `manager`.
+    1. With `make status`: switch on **Airflow** and **Spark** (the pipeline runs Spark jobs).
+       Open **Airflow** (landing page → Orchestration), signed in as `manager`.
     2. Find **`shopflow_medallion`**, switch it **on** (new DAGs start paused) and press
        **▶ Trigger**.
     3. After about **2–3 minutes** all three tasks are green: Bronze → Silver → Gold.
 
-    Until then those queries answer *table not found*. Re-run it after a reset (`make clean`,
-    `make destroy`).
+    Until then those queries answer *table not found*. The tables stay, so you can switch Airflow
+    and Spark off again afterwards. Re-run it after a reset (`make clean`, `make destroy`).
 
     ### Day-to-day
     Run them from `local/`. The last column is what matters most:
@@ -121,7 +135,9 @@ learning.
     **q** quit (the stack keeps running). Below the list: the selected unit's services, CPU,
     memory and ports.
 
-    **Units: run only what you're learning.** On a laptop with little memory, stop the units you
+    ### Units
+
+    **Run only what you're learning.** On a laptop with little memory, stop the units you
     don't need. Each unit's header says ● on, ○ off or ◐ partly on, and how much memory it uses.
 
     | Unit | Services | Needed for |
@@ -140,7 +156,8 @@ learning.
     **Start small:** with the stack down, `make status` shows **Core ○ off · s start**. Press
     **s** to start just Core, then **s** on the units you need. Pressing **s** on a unit while Core
     is off starts Core with it. For a SQL-only session that's Core + SQL; for pandas, Core + Notebooks; for a Spark
-    pipeline in Airflow, Core + Airflow + Spark.
+    pipeline in Airflow, Core + Airflow + Spark. [Prerequisites](prerequisites.md#incremental-core-what-youre-learning-recommended)
+    lists the units and memory for each part of the course.
 
     !!! warning "`make clean` and `make destroy` delete all the data"
         Both delete the stack's volumes, so the object store (RustFS), Postgres, the catalog and the
@@ -216,6 +233,6 @@ learning.
   `main` — and the stack's landing page links straight to it, so it's always the current version.
 
 ## You can now…
-- Bring the whole stack up with Docker Compose (`cp .env.example .env`, `make init`, `make up`, then the `shopflow_medallion` DAG once) or on Kubernetes (Ansible)
+- Bring the stack up with Docker Compose (`cp .env.example .env`, `make init`, then `make status` for only the units you're learning or `make up` for everything, then the `shopflow_medallion` DAG once) or on Kubernetes (Ansible)
 - Verify every service is running and reach the landing page
 - Tear it down / reset cleanly, and know which command wipes data

@@ -164,18 +164,42 @@ To run it on your **own** laptop, you need Docker and the repo.
         sudo apt-get install -y git make curl unzip ruby python3
         ```
 
-!!! warning "This stack is memory-hungry"
-    You're running ~a dozen services (Spark, Trino, Superset, Airflow, Polaris, Postgres, …).
-    Give Docker at least **8 GB** of RAM and **4 CPUs** — **12–16 GB** and **6 CPUs** are
-    comfortable. On Docker Desktop set this in **Settings → Resources** (Memory limit, CPU limit).
-    Too little and containers get killed (`exit 137`). `make up` checks this first: below the
-    minimum it says what's missing and asks before it starts anything.
+How much memory Docker needs depends on how much of the stack you run at once. You set it on
+Docker Desktop in **Settings → Resources** (Memory limit, CPU limit). With too little,
+containers get killed (`exit 137`).
 
-    **Less memory?** You don't need everything at once. `make status` groups the services in
-    **units** (SQL, Notebooks, Spark, Airflow, Superset, …): start Core plus only what you're
-    learning, and switch the rest off. See [Bring up the stack](deploy.md) → *Units*.
+### Incremental: Core + what you're learning (recommended)
 
-!!! warning "…and needs disk space"
+You don't need every service at once. `make status` groups them in **units**: **Core** (sign-in,
+your files, the catalog) is always on, and you switch on only the units the part of the course
+you're on needs. **4 CPUs** are enough.
+
+| You're learning | Units to switch on (with Core) | They use about | Give Docker |
+|---|---|---|---|
+| Foundations | none (reading) | — | — |
+| SQL on big data | SQL | 4 GB | **6 GB** |
+| Python — Notebook | Notebooks | 3.5 GB | **6 GB** |
+| Spark, dbt, Data Vault | Notebooks + Spark | 5 GB, ~7.5 GB while a job runs | **8 GB** |
+| Orchestration (Airflow) | Airflow + Spark | 5.5 GB, ~8 GB while a job runs | **10 GB** |
+| Data governance (Polaris) | SQL + Notebooks + Polaris console | 5 GB | **8 GB** |
+| Business intelligence (Superset) | Superset (starts SQL with it) | 4 GB | **6 GB** |
+
+*They use about* is what the units measured on a laptop, Core's ~2 GB included. A notebook adds up
+to 1 GB for each member signed in to Jupyter. *Give Docker* leaves room for Docker itself and
+for your queries.
+
+!!! tip "Once, before the SQL lessons: Airflow + Spark"
+    The ready-made ShopFlow tables the lessons read are built by an Airflow pipeline that runs
+    Spark. Switch on **Airflow + Spark** once, run it (see [Bring up the stack](deploy.md) → *Fill
+    the shared lake*), then switch them off again.
+
+### Full stack
+
+Every service at once (`make up`): it uses about **9 GB** with nothing running and **11–12 GB**
+under load. Give Docker **12–16 GB** and **6 CPUs**. **8 GB** and **4 CPUs** is the bare minimum:
+`make up` checks this first, and below it says what's missing and asks before it starts anything.
+
+!!! warning "Disk space"
     Plan for about **25 GB free**: ~2.5 GB of downloads (`make init`) plus ~15–20 GB of Docker
     images. On Docker Desktop check **Settings → Resources → Disk usage limit**.
 
@@ -184,7 +208,8 @@ To run it on your **own** laptop, you need Docker and the repo.
     ruby that step is skipped with a warning, and everything else still works.
 
 With Docker and Git installed, follow **[Bring up the stack](deploy.md)** for the exact `make`
-commands (Docker Compose) or the Ansible steps (Kubernetes).
+commands: `make status` for the incremental way, `make up` for the full stack (Docker Compose),
+or the Ansible steps (Kubernetes).
 
 ---
 
