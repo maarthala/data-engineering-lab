@@ -80,6 +80,13 @@ If `make up` says an image changed since it was built, run `make build`. Your da
 To check, home-api asks GitHub for the repo's tags at most once an hour. Offline, nothing is
 shown. To switch the check off, add `LAB_UPDATE_CHECK=0` to `local/.env`.
 
+!!! note "For the lab's maintainers: `make release`"
+    A release is made with `make release` in `local/`: it tags the next version and pushes the tag.
+    The default is the next **patch** (`v1.0.0` → `v1.0.1`, fixes); `BUMP=minor` makes the next
+    **minor** (→ `v1.1.0`, new features) and `BUMP=major` the next **major** (→ `v2.0.0`, needs a
+    reset). It refuses with uncommitted changes or when `main` differs from GitHub's, lists the
+    commits since the last release and asks y / N before tagging.
+
 ## After it's up
 - **Register your lab account** on the landing page — see
   [0.3 Your lab account & workspace](../workspace.md) for what you get and where things are.

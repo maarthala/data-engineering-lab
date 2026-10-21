@@ -22,7 +22,7 @@ export LAB_VERSION := $(shell git describe --tags --abbrev=0 --match 'v[0-9]*' 2
 
 .DEFAULT_GOAL := help
 
-.PHONY: help init up build up-plain status down stop restart ps logs config clean destroy docs docs-serve polaris-seed
+.PHONY: help init up build up-plain status down stop restart ps logs config clean destroy docs docs-serve polaris-seed release
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -59,6 +59,9 @@ ps: ## Show running services
 
 logs: ## Tail logs for all services (use `make logs S=kafka` for one)
 	$(COMPOSE) logs -f $(S)
+
+release: ## Maintainers: tag the next release (BUMP=patch|minor|major, default patch) and push the tag
+	@python3 tools/release.py $(BUMP)
 
 docs: ## Validate the course (mkdocs build --strict — same gate as the GitHub Pages CI)
 	docker run --rm -v "$(CURDIR)/../training":/docs squidfunk/mkdocs-material:9 build --strict
