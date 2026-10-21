@@ -56,6 +56,30 @@ volumes.
     They only touch this stack — other projects' containers, volumes and images are left alone —
     and keep the `make init` downloads. To stop for the day, use **`make down`**.
 
+## Updating the lab
+
+New versions of the lab are published as **releases**: git tags named like `v1.4.0`. When a
+newer release is out, the lab tells whoever runs it:
+
+- **the home page**, signed in as a manager: a banner *A newer release of the lab is out*, with
+  a link to what's new. **Hide** hides it in this browser until the next release. Members never
+  see it.
+- **the terminal**: `make up` (at the end) and `make status` (in the log) print
+  `⚠ newer release v1.4.0 (you're on v1.3.0) — git pull, then make up`.
+
+To update, from the repo:
+
+```bash
+git pull          # get the new release
+cd local
+make up           # restarts what changed (or switch units on in make status)
+```
+
+If `make up` says an image changed since it was built, run `make build`. Your data stays.
+
+To check, home-api asks GitHub for the repo's tags at most once an hour. Offline, nothing is
+shown. To switch the check off, add `LAB_UPDATE_CHECK=0` to `local/.env`.
+
 ## After it's up
 - **Register your lab account** on the landing page — see
   [0.3 Your lab account & workspace](../workspace.md) for what you get and where things are.

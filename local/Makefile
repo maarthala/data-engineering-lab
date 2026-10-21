@@ -16,6 +16,9 @@
 #   make destroy     # remove everything the stack made: containers, volumes, network, images
 
 COMPOSE = docker compose
+# the release this checkout is on (its latest vX.Y.Z tag) — home-api compares it with GitHub and
+# shows managers a "newer release" banner
+export LAB_VERSION := $(shell git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null)
 
 .DEFAULT_GOAL := help
 

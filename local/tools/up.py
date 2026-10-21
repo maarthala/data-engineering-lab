@@ -988,6 +988,36 @@ def ensure_shared_lake():
     return "✓ shared lake (polaris_lake) was missing — created it (make polaris-seed)"
 
 
+def newer_release():
+    """"⚠ newer release …" when GitHub has a vX.Y.Z tag above this checkout's, else None. Fetches the
+    tags (10 s at most; offline → None). LAB_UPDATE_CHECK=0 in .env turns it off."""
+    try:
+        with open(os.path.join(HERE, ".env")) as f:
+            if re.search(r"^LAB_UPDATE_CHECK=0\s*$", f.read(), re.M):
+                return None
+    except OSError:
+        pass
+    git = ["git", "-C", HERE]
+    try:
+        subprocess.run(git + ["fetch", "--tags", "--quiet", "origin"], capture_output=True, timeout=10)
+        tags = subprocess.run(git + ["tag", "-l", "v[0-9]*"], capture_output=True, text=True, timeout=5).stdout.split()
+        mine = subprocess.run(git + ["describe", "--tags", "--abbrev=0", "--match", "v[0-9]*"],
+                              capture_output=True, text=True, timeout=5).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+    def ver(t):
+        m = re.fullmatch(r"v(\d+)\.(\d+)(?:\.(\d+))?", t)
+        return m and (int(m[1]), int(m[2]), int(m[3] or 0))
+    tags = [t for t in tags if ver(t)]
+    if not tags:
+        return None
+    latest = max(tags, key=ver)
+    if mine and ver(mine) and ver(mine) >= ver(latest):
+        return None
+    return f"⚠ newer release {latest} (you're on {mine or 'an older version'}) — git pull, then make up"
+
+
 def summary(stack, how):
     G, Y, R, D, B, X = "\033[32m", "\033[33m", "\033[31m", "\033[2m", "\033[1m", "\033[0m"
     stack.poll()
@@ -1087,6 +1117,12 @@ def main():
     for line in checks:
         stack.lines.append(line)
     if watch:
+        def release_hint():                 # in the background: git fetch can take a few seconds
+            line = newer_release()
+            if line:
+                with stack.lock:
+                    stack.lines.append(("make status", line))
+        threading.Thread(target=release_hint, daemon=True).start()
         try:
             stack.poll(watch=True)          # the first frame shows what runs (not all "waiting")
         except Exception:  # noqa: BLE001 — Docker not answering: the loop keeps trying
@@ -1120,6 +1156,9 @@ def main():
         if how != "failed":
             print("Checking the shared lake in Polaris...", flush=True)
             line = ensure_shared_lake()
+            if line:
+                stack.checks.append(line)
+            line = newer_release()
             if line:
                 stack.checks.append(line)
         sys.exit(summary(stack, how))

@@ -10,6 +10,10 @@
 secrets:
   name: de-stack-secrets
 
+# The lab release deployed (its vX.Y.Z git tag). deploy.yml sets it with git describe; home-api
+# compares it with GitHub and shows managers a "newer release" banner. Empty = unknown.
+labVersion: ""
+
 global:
   # Registry holding our custom images (push with helm/de-stack/push-images.sh).
   imageRegistry: ghcr.io/maarthala/de-stack

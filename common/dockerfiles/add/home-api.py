@@ -55,6 +55,11 @@ Which tools are up (local: units can be stopped in make status — the home page
   GET    /api/services                                   {"jupyter": true, "sqlpad": false, …} — from
          LAB_SERVICES (tile=host:port,…); not set (k8s) → {} and every tile stays as it is
 
+Is a newer release out? (managers only — they run the lab; members get {"update": false})
+  GET    /api/version                                    {"update", "current", "latest", "url"} — current
+         from LAB_VERSION (the release tag, set by the Makefile / the k8s deploy), latest = the highest
+         vX.Y.Z tag of LAB_UPDATE_REPO on GitHub, asked at most once an hour. LAB_UPDATE_CHECK=0: off
+
 Only reachable through oauth2-proxy (it is not published), so the identity headers can
 be trusted. Standard library only.
 """
@@ -66,6 +71,7 @@ import threading
 import time
 import urllib.error
 import urllib.parse
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import labadmin
@@ -76,6 +82,41 @@ from lakehouse import POLARIS, bucket_name, lake_name, provision
 MAX_UPLOAD = int(os.environ.get("MAX_UPLOAD_MB", "512")) * 1024 * 1024
 SERVICES = dict(x.split("=", 1) for x in os.environ.get("LAB_SERVICES", "").split(",") if "=" in x)
 _up = {"at": 0, "state": {}}
+VERSION = os.environ.get("LAB_VERSION", "")
+UPDATE_REPO = os.environ.get("LAB_UPDATE_REPO", "maarthala/data-engineering-lab")
+_latest = {"at": 0, "tag": None}
+
+
+def _semver(tag):
+    """"v1.4" / "v1.4.2" → (1, 4, 0) / (1, 4, 2); anything else → None."""
+    m = re.fullmatch(r"v?(\d+)\.(\d+)(?:\.(\d+))?", tag or "")
+    return m and (int(m[1]), int(m[2]), int(m[3] or 0))
+
+
+def latest_release():
+    """The highest vX.Y.Z tag on GitHub — asked at most once an hour (also after a failure, so an
+    offline laptop doesn't retry on every page load). No token: 60 requests an hour per IP."""
+    if time.time() - _latest["at"] < 3600:
+        return _latest["tag"]
+    _latest["at"] = time.time()
+    try:
+        req = urllib.request.Request(f"https://api.github.com/repos/{UPDATE_REPO}/tags?per_page=100",
+                                     headers={"Accept": "application/vnd.github+json"})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            tags = [t["name"] for t in json.load(r) if _semver(t["name"])]
+        _latest["tag"] = max(tags, key=_semver) if tags else None
+    except Exception as e:  # noqa: BLE001 — offline, rate-limited: no banner
+        print(f"[home-api] update check: {e}", flush=True)
+    return _latest["tag"]
+
+
+def update_info():
+    if os.environ.get("LAB_UPDATE_CHECK", "1") == "0":
+        return {"update": False}
+    latest = latest_release()
+    newer = bool(latest) and (_semver(VERSION) or (0, 0, 0)) < _semver(latest)
+    return {"update": newer, "current": VERSION or None, "latest": latest,
+            "url": f"https://github.com/{UPDATE_REPO}/releases/tag/{latest}" if latest else None}
 
 
 def services_up():
@@ -509,6 +550,10 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin("GET")
         if self.path.startswith("/api/env"):
             return self._env("GET")
+        if self.path == "/api/version":
+            if not self._user():
+                return self._json(401, {"error": "not logged in"})
+            return self._json(200, update_info() if self._manager() else {"update": False})
         if self.path == "/api/services":
             if not self._user():
                 return self._json(401, {"error": "not logged in"})

@@ -2,6 +2,7 @@
 - name: "Wave '{{ wave.name }}' — render + apply {{ wave.templates | join(', ') }}"
   ansible.builtin.shell: >
     helm template {{ helm_release }} {{ chart_dir }}
+    --set-string labVersion="$(git -C {{ repo_root }} describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null)"
     {% if global_image_registry is defined %}--set global.imageRegistry={{ global_image_registry }} {% endif %}
     {% for t in wave.templates %}-s templates/{{ t }} {% endfor %}
     | kubectl -n {{ namespace }} apply -f -

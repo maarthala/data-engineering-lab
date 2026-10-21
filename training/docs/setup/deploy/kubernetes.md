@@ -62,6 +62,13 @@ While a unit is off, its tile on the home page is grey: members see *Not running
     Deploying again (`deploy.yml` or `helm template … | kubectl apply`) sets every service back
     to 1 replica. Switch the units you don't need off again afterwards.
 
+## Updating the lab
+
+Managers get the same *newer release* banner on the home page as on a laptop
+([Updating the lab](general.md#updating-the-lab)). To update: `git pull`, then run
+`deploy.yml` again. It tells home-api which release is deployed (`git describe`), so the banner
+goes away.
+
 ## Teardown
 ```bash
 helm template de-stack k8s/helm/de-stack | kubectl -n de-stack delete -f - || true

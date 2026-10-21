@@ -80,6 +80,13 @@
     @media (max-width:720px){
       .board{grid-template-columns:1fr} main,footer{padding-left:16px; padding-right:16px}
     }
+    /* managers only: a newer release of the lab is on GitHub */
+    .update{display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:0 0 18px;
+      padding:12px 18px; border:1px solid var(--accent); border-radius:12px; background:rgba(109,139,255,.12)}
+    .update[hidden]{display:none}
+    .update a{color:var(--accent); font-weight:600}
+    .update button{margin-left:auto; background:none; border:1px solid var(--line); border-radius:8px;
+      color:var(--muted); padding:4px 10px; cursor:pointer}
   </style>
 </head>
 <body>
@@ -87,6 +94,12 @@
   <script src="/lab-header.js?v=9"></script>
 
   <main>
+    <div class="update" id="update" hidden role="status">
+      <span>⬆️ <b>A newer release of the lab is out: <span id="update-latest"></span></b>
+        (this one: <span id="update-current"></span>). <span id="update-how"></span>
+        <a id="update-link" href="#" target="_blank" rel="noopener">What's new</a></span>
+      <button type="button" id="update-hide">Hide</button>
+    </div>
     <a class="hero" href="https://maarthala.github.io/data-engineering-lab/" target="_blank" rel="noopener">
       <div class="hero-left">
         <div class="ico">🎓</div>
@@ -194,11 +207,34 @@
       check();
       setInterval(check, 10000);
     })();
+    // Managers: is a newer release (vX.Y.Z tag) on GitHub? Hide remembers the release in this browser.
+    function updateBanner() {
+      fetch('/api/version').then(function (r) { return r.ok ? r.json() : {}; }).then(function (v) {
+        if (!v.update) return;
+        var hidden = null;
+        try { hidden = localStorage.getItem('lab-update-hidden'); } catch (e) {}
+        if (hidden === v.latest) return;
+        var k8s = /(^|\.)de\.lan$/.test(location.hostname);
+        document.getElementById('update-latest').textContent = v.latest;
+        document.getElementById('update-current').textContent = v.current || 'an older version';
+        document.getElementById('update-how').innerHTML = k8s
+          ? 'Update the cluster: <code>git pull</code>, then deploy again (course: Kubernetes setup).'
+          : 'Update: <code>git pull</code> in the repo, then <code>make up</code> in <code>local/</code>.';
+        document.getElementById('update-link').href = v.url;
+        var box = document.getElementById('update');
+        box.hidden = false;
+        document.getElementById('update-hide').onclick = function () {
+          box.hidden = true;
+          try { localStorage.setItem('lab-update-hidden', v.latest); } catch (e) {}
+        };
+      }).catch(function () {});
+    }
     // Local: Airflow's host port is configurable (AIRFLOW_HOST_PORT in .env) — /api/me says which.
     document.addEventListener('lab:me', function (e) {
       manager = (e.detail.groups || []).indexOf('managers') >= 0;
       document.getElementById('gov-tile').hidden = !manager;
       offNotes();
+      if (manager) updateBanner();
       if (!/(^|\.)de\.lan$/.test(location.hostname) && e.detail.airflow_port) {
         document.getElementById('airflow-tile').href = 'http://localhost:' + e.detail.airflow_port;
       }
