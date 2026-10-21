@@ -158,7 +158,7 @@ On Compose these are named Docker volumes; on k8s they're PersistentVolumeClaims
 | Config | compose files + `configs/` | Helm chart `de-stack` (values + templates) |
 | Postgres | a stack container | in-cluster Postgres |
 
-Pick the tab that matches your setup on the [deploy page](../setup/deploy.md) — the
+Pick your setup on the [deploy page](../setup/deploy.md) — the
 lakehouse, the catalog, and the lessons are identical either way.
 
 ## What's intentionally *not* running

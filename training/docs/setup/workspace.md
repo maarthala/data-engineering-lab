@@ -85,7 +85,7 @@ SELECT * FROM shared.gold.daily_sales LIMIT 10   -- the course's ready-made Gold
 ```
 
 (*Table not found*? The shared lake hasn't been filled yet — whoever runs the stack starts the
-`shopflow_medallion` DAG once, see [0.2](deploy.md#fill-the-shared-lake-once).)
+`shopflow_medallion` DAG once, see [0.2](general.md#fill-the-shared-lake-once).)
 
 So in Jupyter, the Unit {unit:unit4/fundamentals.md} lessons build `my.bronze/silver/gold` **in your own lakehouse** —
 nobody else's tables get in your way, and you can't break theirs.
@@ -439,7 +439,7 @@ in **units** (SQL, Notebooks, Spark, Airflow, Superset, Polaris console). On the
 managers switch a unit off to free memory and CPU while the class doesn't need it, and back on
 later. All data is kept, and members see its tiles greyed: *Not running. Contact admin.* On a lab
 running on your own computer the list only shows the state: switch units in the terminal with
-`make status` ([Bring up the stack](deploy.md)).
+`make status` ([make status](make-status.md)).
 
 ## You can now…
 - Register, sign in once and reach every tool with your lab account

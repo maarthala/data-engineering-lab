@@ -190,8 +190,7 @@ for your queries.
 
 !!! tip "Once, before the SQL lessons: Airflow + Spark"
     The ready-made ShopFlow tables the lessons read are built by an Airflow pipeline that runs
-    Spark. Switch on **Airflow + Spark** once, run it (see [Bring up the stack](deploy.md) → *Fill
-    the shared lake*), then switch them off again.
+    Spark. Switch on **Airflow + Spark** once, run it (see [Fill the shared lake](general.md#fill-the-shared-lake-once)), then switch them off again.
 
 ### Full stack
 
@@ -208,8 +207,8 @@ under load. Give Docker **12–16 GB** and **6 CPUs**. **8 GB** and **4 CPUs** i
     ruby that step is skipped with a warning, and everything else still works.
 
 With Docker and Git installed, follow **[Bring up the stack](deploy.md)** for the exact `make`
-commands: `make status` for the incremental way, `make up` for the full stack (Docker Compose),
-or the Ansible steps (Kubernetes).
+commands: [`make status`](make-status.md) for the incremental way, [`make up`](full-stack.md) for
+the full stack (Docker Compose), or the [Ansible steps](general.md#on-kubernetes) (Kubernetes).
 
 ---
 
