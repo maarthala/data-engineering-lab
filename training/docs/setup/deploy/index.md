@@ -26,7 +26,7 @@ learning.
 
 ## On Kubernetes
 
-An operator task: see [General information → On Kubernetes](general.md#on-kubernetes).
+An operator task: see [0.2.5 Kubernetes setup](kubernetes.md).
 
 ## You can now…
 - Bring the stack up with Docker Compose (`cp .env.example .env`, `make init`, then `make status` for only the units you're learning or `make up` for everything, then the `shopflow_medallion` DAG once) or on Kubernetes (Ansible)

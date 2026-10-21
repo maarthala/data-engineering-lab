@@ -208,7 +208,7 @@ under load. Give Docker **12–16 GB** and **6 CPUs**. **8 GB** and **4 CPUs** i
 
 With Docker and Git installed, follow **[Bring up the stack](deploy/index.md)** for the exact `make`
 commands: [`make status`](deploy/make-status.md) for the incremental way, [`make up`](deploy/full-stack.md) for
-the full stack (Docker Compose), or the [Ansible steps](deploy/general.md#on-kubernetes) (Kubernetes).
+the full stack (Docker Compose), or the [Ansible steps](deploy/kubernetes.md) (Kubernetes).
 
 ---
 

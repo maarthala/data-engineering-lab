@@ -86,6 +86,7 @@ nav:
           - "make status: how to use it": setup/deploy/make-status.md
           - "Full stack: make up": setup/deploy/full-stack.md
           - "General information": setup/deploy/general.md
+          - "Kubernetes setup": setup/deploy/kubernetes.md
       - "Your lab account & workspace": setup/workspace.md
       - "+ Personas & roles (governance demos)": setup/personas.md
       - "The ShopFlow scenario": scenario.md
