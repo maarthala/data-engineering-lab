@@ -169,7 +169,7 @@
   </main>
 
   <footer>
-    <span>© Epireum — Data Engineering Lab</span>
+    <span>© Epireum — Data Engineering Lab <span id="lab-version" title="The lab's release"></span></span>
     <span>
       🎓 <a href="https://maarthala.github.io/data-engineering-lab/" target="_blank" rel="noopener">Data Engineering course</a>
       &nbsp;·&nbsp;
@@ -207,6 +207,10 @@
       check();
       setInterval(check, 10000);
     })();
+    // Everyone: the release this lab runs, in the footer (helps when reporting a problem).
+    fetch('/api/version').then(function (r) { return r.ok ? r.json() : {}; }).then(function (v) {
+      if (v.current) document.getElementById('lab-version').textContent = '· ' + v.current;
+    }).catch(function () {});
     // Managers: is a newer release (vX.Y.Z tag) on GitHub? Hide remembers the release in this browser.
     function updateBanner() {
       fetch('/api/version').then(function (r) { return r.ok ? r.json() : {}; }).then(function (v) {

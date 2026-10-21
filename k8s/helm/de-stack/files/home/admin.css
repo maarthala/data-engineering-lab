@@ -88,6 +88,7 @@ table.activity td, table.activity th{white-space:nowrap}
 .svc{display:grid; grid-template-columns:minmax(120px,170px) 1fr auto auto; align-items:center; gap:4px 14px;
      padding:8px 0; border-top:1px solid var(--line)}
 .svc .state{font-size:.85rem; white-space:nowrap}
+.svc a{color:var(--accent); font-weight:600; font-size:.88rem; white-space:nowrap}
 .svc .state.on{color:var(--accent2)} .svc .state.off{color:var(--muted)}
 .svc .state.starting, .svc .state.stopping, .svc .state.partly{color:#e3b341}
 @media (max-width:600px){ .svc{grid-template-columns:1fr auto} .svc .sub{grid-column:1 / -1} }

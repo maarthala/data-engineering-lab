@@ -55,8 +55,9 @@ Which tools are up (local: units can be stopped in make status — the home page
   GET    /api/services                                   {"jupyter": true, "sqlpad": false, …} — from
          LAB_SERVICES (tile=host:port,…); not set (k8s) → {} and every tile stays as it is
 
-Is a newer release out? (managers only — they run the lab; members get {"update": false})
-  GET    /api/version                                    {"update", "current", "latest", "url"} — current
+Which release runs, and is a newer one out? (the check is for managers — they run the lab; members
+get {"update": false, "current"} for the home page footer)
+  GET    /api/version                                    {"update", "current", "latest", "url", "check"} — current
          from LAB_VERSION (the release tag, set by the Makefile / the k8s deploy), latest = the highest
          vX.Y.Z tag of LAB_UPDATE_REPO on GitHub, asked at most once an hour. LAB_UPDATE_CHECK=0: off
 
@@ -112,10 +113,10 @@ def latest_release():
 
 def update_info():
     if os.environ.get("LAB_UPDATE_CHECK", "1") == "0":
-        return {"update": False}
+        return {"update": False, "current": VERSION or None, "check": False}
     latest = latest_release()
     newer = bool(latest) and (_semver(VERSION) or (0, 0, 0)) < _semver(latest)
-    return {"update": newer, "current": VERSION or None, "latest": latest,
+    return {"update": newer, "current": VERSION or None, "latest": latest, "check": True,
             "url": f"https://github.com/{UPDATE_REPO}/releases/tag/{latest}" if latest else None}
 
 
@@ -553,7 +554,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/version":
             if not self._user():
                 return self._json(401, {"error": "not logged in"})
-            return self._json(200, update_info() if self._manager() else {"update": False})
+            return self._json(200, update_info() if self._manager() else {"update": False, "current": VERSION or None})
         if self.path == "/api/services":
             if not self._user():
                 return self._json(401, {"error": "not logged in"})

@@ -67,6 +67,10 @@ newer release is out, the lab tells whoever runs it:
 - **the terminal**: `make up` (at the end) and `make status` (in the log) print
   `⚠ newer release v1.4.0 (you're on v1.3.0) — git pull, then make up`.
 
+Which release runs is shown in two places: **Manage → ⚙️ Settings → Lab version** (with *✓ up
+to date* or *v1.4.0 available*), and at the bottom of the home page for everyone (handy when you
+report a problem).
+
 To update, from the repo:
 
 ```bash

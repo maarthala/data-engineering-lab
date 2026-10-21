@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Settings — Epireum's Data Engineering Lab</title>
-  <link rel="stylesheet" href="/admin.css?v=5">
+  <link rel="stylesheet" href="/admin.css?v=6">
 </head>
 <body>
   <header id="lab-top"></header>
@@ -16,7 +16,8 @@
   <script>
     // ⚙️ Settings — lab-wide switches: self-registration on the sign-in page, and members' limits
     // (Jupyter idle time / memory / CPU, bucket sizes) — no restart: each applies as its note says —
-    // and Services: which tools run (k8s: switch a unit off to free the server; local: make status).
+    // and Services: which tools run (k8s: switch a unit off to free the server; local: make status) —
+    // and Lab version: the release this lab runs, and whether a newer one is on GitHub.
     var el = admin.el;
     admin.page('⚙️ Settings');
 
@@ -161,8 +162,29 @@
       load();
       return card;
     }
+    function versionCard() {
+      var card = el('div', {class: 'card', style: 'margin-top:14px'}, [el('h3', {text: 'Lab version'}),
+                                                                      el('div', {class: 'sub', text: 'Loading…'})]);
+      admin.api('GET', '/api/version').then(function (v) {
+        var k8s = /(^|\.)de\.lan$/.test(location.hostname), state, note;
+        if (!v.check) { state = el('span', {class: 'state off', text: 'not checked'});
+          note = 'Checking GitHub for newer releases is off (LAB_UPDATE_CHECK=0).'; }
+        else if (v.update) { state = el('span', {class: 'state partly', text: v.latest + ' available'});
+          note = k8s ? 'Update the cluster: git pull, then deploy again.' : 'Update: git pull in the repo, then make up in local/.'; }
+        else if (v.latest) { state = el('span', {class: 'state on', text: '✓ up to date'});
+          note = 'Checked against GitHub at most once an hour.'; }
+        else { state = el('span', {class: 'state off', text: 'couldn\'t check'});
+          note = 'GitHub couldn\'t be reached; it\'s tried again within the hour.'; }
+        var kids = [el('b', {text: v.current || 'unknown'}), el('span', {class: 'sub', text: note}), state];
+        if (v.url) kids.push(el('a', {href: v.url, target: '_blank', rel: 'noopener', text: 'What\'s new'}));
+        card.innerHTML = '';
+        card.appendChild(el('h3', {text: 'Lab version'}));
+        card.appendChild(el('div', {class: 'svc'}, kids));
+      }).catch(function (e) { card.lastChild.textContent = 'Could not check the version: ' + e.message; });
+      return card;
+    }
     admin.api('GET', '/api/admin/settings')
-      .then(function (r) { admin.fill([registrationCard(r.registration), limitsCard(r), servicesCard()]); })
+      .then(function (r) { admin.fill([registrationCard(r.registration), limitsCard(r), servicesCard(), versionCard()]); })
       .catch(admin.failed);
   </script>
 </body>
