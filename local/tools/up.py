@@ -392,8 +392,14 @@ class View:
         rows_free = h - 3 - (4 if self.watch else 0)          # status: room for the detail lines
         order, hidden = None, 0
         settled = READY if s.mode != "stop" else {"removed", "stopped"}
+        folded = False
         if self.watch and rows_free < sum(len(g) for _, g in groups) + 2 * len(groups) - 1:
-            groups = [(t, []) for t, _ in groups if t != MEMBERS]   # too short: just the units
+            # too short: the units, with only the selected one's containers (↑↓ opens the next)
+            groups = [(t, g) for t, g in groups if t != MEMBERS]
+            names = [t for t, _ in groups if any(t == u for u, _ in GROUPS)]
+            pick = names[max(0, min(self.sel, len(names) - 1))] if names else None
+            groups = [(t, g if t == pick else []) for t, g in groups]
+            folded = "tight" if sum(len(g) for _, g in groups) + 2 * len(groups) > rows_free else True
         elif rows_free < sum(len(g) for _, g in groups) + 2 * len(groups) - 1:   # too short: busy ones first
             flat = sorted([m for _, g in groups for m in g], key=lambda m: state[m] in settled)
             if len(flat) > rows_free:
@@ -457,11 +463,14 @@ class View:
                     self.put(y, w - len(tail) - 1, tail, self.c[col] | base)
                 drawn.append(m)
                 y += 1
-            if title:
+            if title and folded != "tight":       # tight: no blank line between units
                 y += 1
         if hidden:
             self.put(y, px + 1, f"… {hidden} more, all " + ("stopped" if s.mode == "stop" else "ready"),
                      self.c["dim"])
+        if folded and y < 2 + rows_free:
+            self.put(y, px + 1, "↑↓ opens a unit · taller window: all", self.c["dim"],
+                     pw - 2)
         if self.watch and units:                   # details of the selected unit
             unit = units[min(self.sel, len(units) - 1)]
             svcs = [m for m in dict(GROUPS)[unit] if m in state and m not in s.oneshot]
