@@ -103,3 +103,8 @@ local/init_scripts/postgres/adventureworks/
 
 # make up / make status: run log + what the images were built from (tools/up.py)
 local/logs/
+
+# dbt: run logs, compiled output and installed packages (regenerated on every dbt run)
+**/dbt/**/logs/
+**/dbt/**/target/
+**/dbt/**/dbt_packages/
