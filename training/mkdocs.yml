@@ -170,15 +170,38 @@ nav:
       - "Functions & procedures": snowflake/functions.md
       - "Clean up & checklist": snowflake/cleanup.md
   - "Google Cloud (your own trial account)":
-      - "Your Google Cloud trial & project": gcp/setup.md
-      - "Cloud Storage: land the ShopFlow files": gcp/storage.md
-      - "BigQuery: Bronze from your files": gcp/bigquery.md
-      - "Apache Beam basics: write and run pipelines": gcp/beam-basics.md
-      - "Dataflow: clean orders into Silver": gcp/dataflow.md
-      - "Notebook: build Gold in BigQuery Studio": gcp/notebook.md
-      - "Composer: orchestrate the pipeline": gcp/composer.md
-      - "A small report in Looker Studio": gcp/report.md
-      - "Cost & clean up": gcp/cleanup.md
+      - "GCP & BigQuery knowledge":
+          - "GCP & BigQuery knowledge": gcp/knowledge/index.md
+          - "BigQuery from the inside": gcp/knowledge/bigquery.md
+          - "Data warehouse modelling": gcp/knowledge/dwh-modelling.md
+          - "Pub/Sub and Dataflow": gcp/knowledge/pubsub-dataflow.md
+          - "Datastream and CDC": gcp/knowledge/datastream-cdc.md
+          - "Cloud Composer and Airflow": gcp/knowledge/composer-airflow.md
+          - "Dataform and dbt": gcp/knowledge/dataform-dbt.md
+          - "GCP platform, IAM and Terraform": gcp/knowledge/platform-iam-terraform.md
+          - "Looker and the semantic layer": gcp/knowledge/looker-semantic-layer.md
+          - "Migration and EDW modernization": gcp/knowledge/migration-modernization.md
+      - "Practical implementation: ShopFlow on GCP":
+          - "Practical implementation: ShopFlow on GCP": gcp/hands-on.md
+          - "Your Google Cloud trial & project": gcp/setup.md
+          - "Cloud Storage: land the ShopFlow files": gcp/storage.md
+          - "BigQuery: Bronze from your files": gcp/bigquery.md
+          - "Apache Beam basics: write and run pipelines": gcp/beam-basics.md
+          - "Dataflow: clean orders into Silver": gcp/dataflow.md
+          - "Notebook: build Gold in BigQuery Studio": gcp/notebook.md
+          - "Composer: orchestrate the pipeline": gcp/composer.md
+          - "A small report in Looker Studio": gcp/report.md
+          - "Cost & clean up": gcp/cleanup.md
+      - "Deep dives":
+          - "Deep dives": gcp/deep-dives/index.md
+          - "BigQuery": gcp/deep-dives/bigquery.md
+          - "Data warehouse modelling": gcp/deep-dives/dwh-modelling.md
+          - "Streaming and CDC": gcp/deep-dives/streaming-cdc.md
+          - "Composer, Airflow and Dataform": gcp/deep-dives/composer-airflow-dataform.md
+          - "Platform, IAM and Terraform": gcp/deep-dives/platform-iam-terraform.md
+          - "Migration and modernization": gcp/deep-dives/migration-modernization.md
+          - "Looker and the semantic layer": gcp/deep-dives/looker-semantic-layer.md
+          - "Engineering practices": gcp/deep-dives/engineering-practices.md
   - "Data governance (Polaris)":
       - "Governed Iceberg with Apache Polaris": unit6/polaris.md
       - "Create users & assign access (UI)": unit6/polaris-admin.md

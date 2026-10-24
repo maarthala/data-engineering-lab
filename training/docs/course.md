@@ -85,10 +85,11 @@ platform already knowing *why* things work — not just which buttons to press.
 
     ---
 
-    ShopFlow end to end on Google Cloud: files in Cloud Storage, Bronze in BigQuery, Silver with
-    Dataflow, Gold in a notebook, Composer to orchestrate and a Looker Studio report.
+    How BigQuery, Dataflow, Datastream, Composer, Dataform, IAM, Terraform and Looker work inside;
+    then ShopFlow end to end on Google Cloud (Cloud Storage, BigQuery, Dataflow, a notebook,
+    Composer and a Looker Studio report); then short deep dives for review.
 
-    [{count:gcp/setup.md} lessons →](gcp/setup.md)
+    [{count:gcp/setup.md} lessons →](gcp/knowledge/index.md)
 
 -   🛡️ **Unit {unit:unit6/polaris.md} · Data governance**
 
