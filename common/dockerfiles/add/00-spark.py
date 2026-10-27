@@ -18,9 +18,24 @@ _S3 = {k: v for k, v in {
     "fs.s3a.secret.key": _os_env.get("LAKE_S3_SECRET") or _os_env.get("AWS_SECRET_ACCESS_KEY"),
 }.items() if v}
 
+def _spark_connect_up(timeout=2):
+    """Is Spark Connect answering? A refused connection makes getOrCreate() retry for minutes,
+    and the kernel only answers the notebook once this script is done (Spark unit switched off)."""
+    import socket
+    from urllib.parse import urlparse
+    url = urlparse(_os_env.get("SPARK_REMOTE", "sc://localhost:15002").replace("sc://", "http://", 1))
+    try:
+        socket.create_connection((url.hostname, url.port or 15002), timeout=timeout).close()
+        return True
+    except OSError:
+        return False
+
+
 try:
     from pyspark.sql import SparkSession
 
+    if not _spark_connect_up():
+        raise ConnectionError("Spark Connect isn't running — is the Spark unit switched on?")
     spark = SparkSession.builder.getOrCreate()
     # point `iceberg` at the learner's own lakehouse BEFORE the catalog is first used
     for _k, _v in {**_LAKE, **_S3}.items():
@@ -28,7 +43,8 @@ try:
     print(f"✓ `spark` ready via Spark Connect (Spark {spark.version})")
 except Exception as _e:  # noqa: BLE001
     print(f"⚠ `spark` not created ({_e}).")
-    print("  Start it once spark-connect is up: spark = SparkSession.builder.getOrCreate()")
+    # a restart runs this script again: the session then comes with YOUR lakehouse and catalogs
+    print("  Once Spark is on, restart the kernel (Kernel → Restart Kernel) to get it.")
 
 
 # --- My secrets: the learner's own secrets, in the lab's key vault (OpenBao) -----------------
@@ -182,7 +198,7 @@ def use_catalog(catalog, alias=None, quiet=False):
 # name — you may be in more than one team — it goes by its real name, team_<team>, as do all
 # three (the names SQLPad and Superset use, so the same query runs in both). Only under
 # JupyterHub; elsewhere `iceberg` IS the shared lake.
-if _LAKE:
+if _LAKE and "spark" in globals():       # Spark off: the catalogs come with the session, later
     try:
         use_catalog(_os_env["LAKE_WAREHOUSE"], "my", quiet=True)
         use_catalog(_os_env.get("SHARED_CATALOG", "polaris_lake"), "shared", quiet=True)
