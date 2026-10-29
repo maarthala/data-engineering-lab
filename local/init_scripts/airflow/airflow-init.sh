@@ -81,6 +81,13 @@ if [[ -z "${AIRFLOW_UID}" ]]; then
 import psycopg2
 c = psycopg2.connect(host="postgres", dbname="postgres", user="postgres", password="postgres")
 c.autocommit = True
-c.cursor().execute(open("/init_scripts/airflow_parser_role.sql").read())
+# same as init_scripts/postgres/05_airflow_parser_role.sql (fresh databases)
+c.cursor().execute("""
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'airflow_parser') THEN
+    CREATE ROLE airflow_parser LOGIN PASSWORD 'airflow_parser' NOSUPERUSER NOCREATEDB NOCREATEROLE;
+  END IF;
+END $$;
+GRANT CONNECT ON DATABASE airflow TO airflow_parser;""")
 print("  airflow_parser ready")
 PY

@@ -21,7 +21,6 @@ services:
     volumes:
       - ./code:/code
       - ./init_scripts/postgres:/docker-entrypoint-initdb.d
-      - ./init_scripts/airflow/airflow_parser_role.sql:/docker-entrypoint-initdb.d/05_airflow_parser_role.sql:ro
       # Named, so the data survives `docker compose down` (an anonymous volume is left
       # behind and the next container starts empty — Polaris, Airflow, Keycloak … all reset).
       - postgres-data:/var/lib/postgresql
