@@ -25,7 +25,8 @@
     .palette button{width:34px; padding:4px 0; font-size:.8rem}
     .palette button.done{background:rgba(57,208,196,.22); border-color:rgba(57,208,196,.5)}
     .palette button.cur{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent)}
-    .palette button.ok{background:rgba(57,208,196,.22)} .palette button.bad{background:rgba(255,107,107,.18)}
+    .palette button.ok{background:var(--ok-bg); border-color:#b7e1c4; color:var(--ok-ink)} .palette button.bad{background:var(--bad-bg); border-color:#f1b5b0; color:var(--bad-ink)}
+    .palette button.none{background:var(--panel2); color:var(--muted)}
     .big{font-size:2.2rem; font-weight:800}
     .dom{display:grid; grid-template-columns:minmax(0,1fr) 160px 70px; gap:10px; align-items:center; padding:6px 0; border-top:1px solid var(--line); font-size:.9rem}
     .meter{height:8px; background:var(--panel2); border-radius:999px; overflow:hidden} .meter i{display:block; height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2))}
@@ -207,12 +208,12 @@
     function showReview(r) {
       history.replaceState(null, '', '#attempt=' + r.id);
       main.innerHTML = '';
-      var wrongOnly = false, box = el('div');
+      var box = el('div'), pal = el('div', {class: 'palette'});
+      var cur = r.questions.findIndex(function (q) { return !q.right; });   // start at the first wrong one
+      if (cur < 0) cur = 0;
       var back = el('button', {text: '← All exams'}); back.addEventListener('click', function () { list(); });
       var again = el('button', {class: 'primary', text: 'New attempt'});
       again.addEventListener('click', function () { api('POST', '/api/exams/start', {exam: r.exam.id}).then(take).catch(function (e) { alertCard(e.message); }); });
-      var toggle = el('button', {text: 'Show only wrong'});
-      toggle.addEventListener('click', function () { wrongOnly = !wrongOnly; toggle.textContent = wrongOnly ? 'Show all' : 'Show only wrong'; paint(); });
       main.appendChild(el('div', {class: 'card'}, [
         el('div', {class: 'bar'}, [el('div', {}, [el('b', {text: r.exam.name}), el('div', {class: 'sub', text: when(r.finished_at) + ' · ' + r.minutes + ' min'})]),
           el('div', {class: 'row'}, [back, again])]),
@@ -225,14 +226,26 @@
           return el('div', {class: 'dom'}, [el('span', {text: (d.domain !== '-' ? d.domain + ' · ' : '') + d.name}),
             el('div', {class: 'meter'}, [el('i', {style: 'width:' + p + '%'})]), el('span', {class: 'muted', text: d.correct + '/' + d.total})]);
         }))]));
-      main.appendChild(el('div', {class: 'row'}, [toggle]));
+      var wrong = r.questions.filter(function (q) { return !q.right; }).length;
+      main.appendChild(el('div', {class: 'card'}, [el('div', {class: 'bar'}, [el('h3', {style: 'margin:0', text: 'Questions — click one to see it'}),
+        el('span', {class: 'sub', text: (r.questions.length - wrong) + ' right · ' + wrong + ' wrong or not answered'})]), pal]));
       main.appendChild(box);
       function paint() {
-        box.innerHTML = '';
+        pal.innerHTML = '';
         r.questions.forEach(function (q, n) {
-          if (wrongOnly && q.right) return;
-          box.appendChild(el('div', {class: 'card', style: 'margin-bottom:12px'}, [
-            el('div', {class: 'bar'}, [el('b', {text: 'Question ' + (n + 1)}), el('span', {class: q.right ? 'pass' : 'fail', text: q.right ? '✓ right' : (q.picked.length ? '✗ wrong' : '✗ not answered')})]),
+          var b = el('button', {class: (q.right ? 'ok' : q.picked.length ? 'bad' : 'none') + (n === cur ? ' cur' : ''), text: String(n + 1),
+                                title: q.right ? 'right' : q.picked.length ? 'wrong' : 'not answered'});
+          b.addEventListener('click', function () { cur = n; paint(); });
+          pal.appendChild(b);
+        });
+        var q = r.questions[cur];
+        var prev = el('button', {text: '← Previous'}); prev.disabled = cur === 0;
+        prev.addEventListener('click', function () { cur--; paint(); });
+        var next = el('button', {text: 'Next →'}); next.disabled = cur === r.questions.length - 1;
+        next.addEventListener('click', function () { cur++; paint(); });
+        box.innerHTML = '';
+        box.appendChild(el('div', {class: 'card'}, [
+            el('div', {class: 'bar'}, [el('b', {text: 'Question ' + (cur + 1) + ' of ' + r.questions.length}), el('span', {class: q.right ? 'pass' : 'fail', text: q.right ? '✓ right' : (q.picked.length ? '✗ wrong' : '✗ not answered')})]),
             el('div', {class: 'q', text: q.question}),
             el('div', {}, q.options.map(function (o) {
               var good = q.answer.indexOf(o.key) >= 0, mine = q.picked.indexOf(o.key) >= 0;
@@ -240,9 +253,8 @@
                 el('span', {class: 'muted', style: 'margin-left:auto; white-space:nowrap', text: (mine ? 'your answer' : '') + (good ? (mine ? ' · ' : '') + 'correct' : '')})]);
             })),
             q.explanation || refs(q).length ? el('div', {class: 'expl', html: md(q.explanation) + (refs(q).length ? '<p>' +
-              refs(q).map(function (x) { return '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.title || x.url) + '</a>'; }).join(' · ') + '</p>' : '')}) : null]));
-        });
-        if (!box.children.length) box.appendChild(el('div', {class: 'placeholder', text: 'All answers right 🎉'}));
+              refs(q).map(function (x) { return '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.title || x.url) + '</a>'; }).join(' · ') + '</p>' : '')}) : null,
+            el('div', {class: 'nav'}, [prev, next])]));
       }
       paint();
       window.scrollTo({top: 0});
