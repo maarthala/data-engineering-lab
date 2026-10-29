@@ -15,7 +15,7 @@ time ([memory per part of the course](../prerequisites.md#incremental-core-what-
    are built first (several minutes), and the lakehouse catalog `iceberg` is created.
 3. Press **↓** to the unit the lesson needs, e.g. **SQL**, and press **s**. Pressing **s** on a
    unit while Core is off starts Core with it.
-4. When the unit's header shows **● on**, open <http://localhost:8000> and sign in.
+4. When the unit's header shows **● on**, open <http://lab.localhost:8000> and sign in.
 5. Press **q** to leave the screen. Everything you started keeps running.
 
 Next time, run `make status` again: it shows what's on. Moving to another part of the course,

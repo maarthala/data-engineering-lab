@@ -4,8 +4,6 @@ services:
     image: trinodb/trino:483
     restart: always
     container_name: trino
-    ports:
-      - "8007:8080"
     volumes:
       - ./configs/trino:/etc/trino
     healthcheck:

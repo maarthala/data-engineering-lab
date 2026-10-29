@@ -10,7 +10,7 @@ That language is **Python** — the lingua franca of data engineering — and yo
 ### Why notebooks?
 A **Jupyter notebook** runs code in **cells** you execute one at a time, seeing the output
 immediately below each. That tight feedback loop is perfect for exploring data. Open Jupyter at
-[http://localhost:8008](http://localhost:8008) (sign in with your lab account — you get your own Jupyter) and make a new notebook.
+[http://jupyter.lab.localhost:8000](http://jupyter.lab.localhost:8000) (sign in with your lab account — you get your own Jupyter) and make a new notebook.
 
 - **Shift+Enter** runs a cell.
 - The result of the **last expression** in a cell is printed automatically.

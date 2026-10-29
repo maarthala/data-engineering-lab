@@ -7,7 +7,7 @@ shared lake, and the day-to-day commands. On a cluster, see [Kubernetes setup](k
 ```bash
 make ps                       # the services you started should be "running"/"healthy"
 ```
-Open the landing page at **<http://localhost:8000>** and sign in as **`demouser` / `demouser`** —
+Open the landing page at **<http://lab.localhost:8000>** and sign in as **`demouser` / `demouser`** —
 the default lab account every course example is written for (or **Register** your own, or use
 `manager` / `manager`). Every tool tiles off it. Then run the
 [setup checklist](../prerequisites.md#verify-your-setup).

@@ -186,7 +186,7 @@ Short on memory? Start small: with the stack down, `make status` starts just **C
 files, catalog), and you switch on only the units you're learning, e.g. Core + SQL for the SQL
 units.
 
-Then open **<http://localhost:8000>** and sign in as `demouser` / `demouser`. The full walkthrough
+Then open **<http://lab.localhost:8000>** and sign in as `demouser` / `demouser`. The full walkthrough
 — including what to do if something doesn't start — is in [0.2 Bring up the stack](setup/deploy/index.md).
 
 ## Stuck? Get help on Discord

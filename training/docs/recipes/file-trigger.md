@@ -36,7 +36,7 @@ at RustFS instead of AWS. (Inside the stack RustFS is reached at `http://storage
 
 ### 1 · Drop the DAG in the dags folder
 Just like every DAG in [Unit 5](../unit5/basics.md), this is one Python file in your **`my_files/dags/`**
-folder. Create it in Jupyter's file browser (<http://localhost:8008>) as
+folder. Create it in Jupyter's file browser (<http://jupyter.lab.localhost:8000>) as
 **`my_files/dags/ingest_on_file_arrival.py`**.
 
 Read the whole thing first — it's a two-task pipeline, a sensor that waits then a task that runs —
@@ -127,7 +127,7 @@ with DAG(dag_id="demouser_ingest_on_file_arrival",     # own account? your usern
 
 ### 2 · Watch it wait, then make the file arrive
 DAGs are rescanned every ~30 s, so give `demouser_ingest_on_file_arrival` a moment to appear in the DAGs list,
-then toggle it **on**. In the Airflow UI (<http://localhost:8001>, sign in with your lab account):
+then toggle it **on**. In the Airflow UI (<http://airflow.lab.localhost:8000>, sign in with your lab account):
 
 1. Open **Grid** for `demouser_ingest_on_file_arrival`. The **wait_for_file** square goes **yellow** — it's
    running (in `reschedule` mode it'll flip between running and "up for reschedule" between pokes).

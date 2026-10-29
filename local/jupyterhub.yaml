@@ -7,8 +7,6 @@ services:
       context: ../common/dockerfiles
       dockerfile: Dockerfile.jupyterhub
     container_name: jupyterhub
-    ports:
-      - "8008:8000"          # same URL learners used before: http://localhost:8008
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - jupyterhub-data:/srv/jupyterhub/data
@@ -18,9 +16,9 @@ services:
       - ../common/dockerfiles/add/labvault.py:/srv/jupyterhub/labvault.py:ro
       - ../common/dockerfiles/add/lab_culler.py:/srv/jupyterhub/lab_culler.py:ro
     environment:
-      HUB_PUBLIC_URL: http://localhost:8008
-      PORTAL_ORIGIN: http://localhost:8000     # the portal shows Jupyter inside its page (frame-ancestors)
-      KEYCLOAK_PUBLIC_URL: http://localhost:8180
+      HUB_PUBLIC_URL: http://jupyter.lab.localhost:8000
+      PORTAL_ORIGIN: http://lab.localhost:8000     # the portal shows Jupyter inside its page (frame-ancestors)
+      KEYCLOAK_PUBLIC_URL: http://auth.lab.localhost:8000
       KEYCLOAK_INTERNAL_URL: http://keycloak:8080
       OAUTH_CLIENT_SECRET: jupyterhub-secret
       # encrypts the stored Keycloak tokens (auth_state) — lets the Hub re-check the login

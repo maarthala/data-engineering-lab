@@ -5,9 +5,6 @@ services:
   polaris:
     image: apache/polaris:1.8.0
     container_name: polaris
-    ports:
-      - "8185:8181"   # catalog + management REST API (host :8185)
-      - "8186:8182"   # health / metrics
     environment:
       # Object-storage static credentials (no STS — enabled by ALLOW_INSECURE_STORAGE_TYPES).
       AWS_REGION: us-east-1
@@ -83,7 +80,7 @@ services:
 
   # Polaris Console — the web UI (built from apache/polaris-tools; no official
   # image yet). The VITE_* API URL is baked at build time to the browser-reachable
-  # Polaris port (localhost:8185). Browse at http://localhost:8188.
+  # Polaris port (polaris.lab.localhost:8000). Browse at http://localhost:8188.
   polaris-console:
     # upstream console + lab SSO tweaks (silent sign-in, auto-start, label) — see the Dockerfile
     build:
@@ -95,16 +92,16 @@ services:
     environment:
       # Read at container start to generate /config.js (window.APP_CONFIG).
       # API is same-origin via the proxy (:8189); auth = Polaris client id/secret.
-      VITE_POLARIS_API_URL: http://localhost:8189
+      VITE_POLARIS_API_URL: http://polaris-console.lab.localhost:8000
       VITE_POLARIS_REALM: POLARIS
       VITE_POLARIS_PRINCIPAL_SCOPE: PRINCIPAL_ROLE:ALL
-      VITE_OAUTH_TOKEN_URL: http://localhost:8189/api/catalog/v1/oauth/tokens
+      VITE_OAUTH_TOKEN_URL: http://polaris-console.lab.localhost:8000/api/catalog/v1/oauth/tokens
       VITE_POLARIS_REALM_HEADER_NAME: Polaris-Realm
       # "Sign in with OIDC" = the lab account (Keycloak). The browser does the login + PKCE
       # code exchange itself, so these are the PUBLIC Keycloak URLs.
-      VITE_OIDC_ISSUER_URL: http://localhost:8180/realms/de-lab
+      VITE_OIDC_ISSUER_URL: http://auth.lab.localhost:8000/realms/de-lab
       VITE_OIDC_CLIENT_ID: polaris-ui
-      VITE_OIDC_REDIRECT_URI: http://localhost:8189/auth/callback
+      VITE_OIDC_REDIRECT_URI: http://polaris-console.lab.localhost:8000/auth/callback
       VITE_OIDC_SCOPE: openid profile
       # No VITE_OIDC_* → the Console shows the Client ID/Secret login (no IdP).
     depends_on:
@@ -114,12 +111,10 @@ services:
 
   # Same-origin front: serves the Console at / and proxies the API at /api/, so
   # the browser makes only same-origin calls (works around Polaris's fixed CORS).
-  # Access the UI at http://localhost:8189.
+  # Access the UI at http://polaris-console.lab.localhost:8000.
   polaris-proxy:
     image: nginx:1.31.5-alpine
     container_name: polaris-proxy
-    ports:
-      - "8189:8189"
     volumes:
       - ./configs/polaris/nginx-proxy.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:

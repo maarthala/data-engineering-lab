@@ -82,13 +82,13 @@ running the pipeline on a schedule so it stays current.
 | # | Tool | Its job in the flow | Local URL | Login |
 |---|---|---|---|---|
 | ① | **Postgres** | The live application database — a data *source* | (internal) | — |
-| ① / ② | **RustFS** | S3-compatible object storage: raw history *and* the lakehouse tables (in-stack endpoint `http://storage:9000`) | http://localhost:9001/rustfs/console/ | your lab account (you see your own `<username>-lake` bucket) |
-| ② | **Spark** | Ingests sources and builds Bronze→Silver→Gold | http://127.0.0.1:8002 | — |
-| ②/③ | **Apache Polaris** | Iceberg REST catalog `iceberg` (warehouse `polaris_lake`) + per-user access (RBAC) | http://localhost:8189 | your lab account · admin `root` / `s3cr3t` at `/login?local=1` |
-| ④ | **Trino** | Distributed SQL engine over the lakehouse | via SQLPad / Superset (laptop UI: http://localhost:8007/ui/) | your lab account (passed on by SQLPad / Superset) |
-| ④ | **Superset** | BI dashboards on the Gold layer | http://localhost:8004 | your lab account |
-| ④ | **Jupyter** | Notebooks (Spark) for exploration & labs | http://localhost:8008 | your lab account |
-| — | **Airflow** | Orchestrates the whole pipeline on a schedule | http://localhost:8001 | your lab account |
+| ① / ② | **RustFS** | S3-compatible object storage: raw history *and* the lakehouse tables (in-stack endpoint `http://storage:9000`) | http://storage.lab.localhost:8000/rustfs/console/ | your lab account (you see your own `<username>-lake` bucket) |
+| ② | **Spark** | Ingests sources and builds Bronze→Silver→Gold | http://spark.lab.localhost:8000 | — |
+| ②/③ | **Apache Polaris** | Iceberg REST catalog `iceberg` (warehouse `polaris_lake`) + per-user access (RBAC) | http://polaris-console.lab.localhost:8000 | your lab account · admin `root` / `s3cr3t` at `/login?local=1` |
+| ④ | **Trino** | Distributed SQL engine over the lakehouse | via SQLPad / Superset (laptop UI: http://trino.lab.localhost:8000/ui/) | your lab account (passed on by SQLPad / Superset) |
+| ④ | **Superset** | BI dashboards on the Gold layer | http://superset.lab.localhost:8000 | your lab account |
+| ④ | **Jupyter** | Notebooks (Spark) for exploration & labs | http://jupyter.lab.localhost:8000 | your lab account |
+| — | **Airflow** | Orchestrates the whole pipeline on a schedule | http://airflow.lab.localhost:8000 | your lab account |
 
 *(On Kubernetes the URLs are `http://<tool>.de.lan` instead of `localhost` — the roles
 are identical.)*

@@ -1,7 +1,7 @@
 # Front door: Keycloak (logins + self-registration) → oauth2-proxy (guards the landing
 # page) → home-api (who am I + provisions the learner's own lakehouse on first login).
 #
-# Hostnames: the browser reaches Keycloak at http://localhost:8180, containers at
+# Hostnames: the browser reaches Keycloak at http://auth.lab.localhost:8000, containers at
 # http://keycloak:8080. Keycloak issues tokens for the PUBLIC address (KC_HOSTNAME) and
 # answers back-channel calls on the internal one (BACKCHANNEL_DYNAMIC); oauth2-proxy
 # skips discovery and is told both — so no hosts-file entries and no hostAlias tricks.
@@ -15,14 +15,12 @@ services:
       KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: keycloak
-      KC_HOSTNAME: http://localhost:8180
+      KC_HOSTNAME: http://auth.lab.localhost:8000
       KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
       KC_HTTP_ENABLED: "true"
       KC_HEALTH_ENABLED: "true"
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
-    ports:
-      - "8180:8080"
     volumes:
       # realm de-lab: registration on, groups learners (default) / managers,
       # client de-lab-home, user manager/manager. Imported only if absent.
@@ -50,7 +48,6 @@ services:
     environment:
       POLARIS_URL: http://polaris:8181
       LEARNER_QUOTA_MB: "100"      # each learner's bucket <user>-lake (hard limit)
-      AIRFLOW_HOST_PORT: ${AIRFLOW_HOST_PORT:-8001}   # so the home page's Airflow tile follows .env
       # home page: tiles of stopped units (make status) are greyed — tile=host:port it checks
       LAB_SERVICES: jupyter=jupyterhub:8000,spark=spark-master:8080,sqlpad=sqlpad:3000,airflow=airflow-apiserver:8080,superset=superset:8088,governance=polaris-proxy:8189
       # ⚙️ Settings → Services shows each unit's state (here they're switched in make status)
@@ -68,6 +65,8 @@ services:
       VAULT_ADMIN_TOKEN: ${VAULT_ADMIN_TOKEN:-lab-vault-admin-local-token}
       # "📝 Mock exams" — the portal's own database (portal-db makes it)
       PORTAL_DB_URL: postgresql://portal:portal@postgres:5432/portal
+      # the realm file's sign-in addresses → the live Keycloak at start (it imports the file only once)
+      LAB_REALM_FILE: /app/de-lab-realm.json
     volumes:
       - ./configs/trino/access:/trino-access
       # lab code mounted over the image's copies (as on Kubernetes) — edits need only a restart
@@ -77,6 +76,7 @@ services:
       - ../common/dockerfiles/add/labvault.py:/app/labvault.py:ro
       - ../common/dockerfiles/add/labexams.py:/app/labexams.py:ro
       - ../common/dockerfiles/add/exam_demo.json:/app/exam_demo.json:ro
+      - ../common/keycloak/de-lab-realm.json:/app/de-lab-realm.json:ro
     depends_on:                      # it provisions in all three: wait for them (a stopped one has no DNS name)
       portal-db:
         condition: service_completed_successfully
@@ -114,11 +114,26 @@ services:
     networks:
       - sparknet
 
+  # The only open port: every web app by name — http://lab.localhost:8000 (the portal) and
+  # http://<app>.lab.localhost:8000 (configs/gateway/nginx.conf), like the k8s ingress with *.de.lan.
+  # The aliases let the containers reach the apps — and Keycloak — at the same addresses.
+  gateway:
+    image: nginx:1.31.5-alpine
+    container_name: gateway
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./configs/gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+    networks:
+      sparknet:
+        aliases: [lab.localhost, auth.lab.localhost, jupyter.lab.localhost, airflow.lab.localhost,
+                  superset.lab.localhost, sqlpad.lab.localhost, spark.lab.localhost, storage.lab.localhost,
+                  polaris-console.lab.localhost, polaris.lab.localhost, vault.lab.localhost, trino.lab.localhost]
+
   oauth2-proxy:
     image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.4
     container_name: oauth2-proxy
-    ports:
-      - "8000:4180"          # the landing page — now behind a Keycloak login
     environment:
       OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
       OAUTH2_PROXY_PROVIDER: keycloak-oidc
@@ -126,12 +141,12 @@ services:
       OAUTH2_PROXY_CLIENT_SECRET: de-lab-home-secret
       OAUTH2_PROXY_CODE_CHALLENGE_METHOD: S256
       # browser-facing issuer/login; container-facing token + keys
-      OAUTH2_PROXY_OIDC_ISSUER_URL: http://localhost:8180/realms/de-lab
+      OAUTH2_PROXY_OIDC_ISSUER_URL: http://auth.lab.localhost:8000/realms/de-lab
       OAUTH2_PROXY_SKIP_OIDC_DISCOVERY: "true"
-      OAUTH2_PROXY_LOGIN_URL: http://localhost:8180/realms/de-lab/protocol/openid-connect/auth
+      OAUTH2_PROXY_LOGIN_URL: http://auth.lab.localhost:8000/realms/de-lab/protocol/openid-connect/auth
       OAUTH2_PROXY_REDEEM_URL: http://keycloak:8080/realms/de-lab/protocol/openid-connect/token
       OAUTH2_PROXY_OIDC_JWKS_URL: http://keycloak:8080/realms/de-lab/protocol/openid-connect/certs
-      OAUTH2_PROXY_REDIRECT_URL: http://localhost:8000/oauth2/callback
+      OAUTH2_PROXY_REDIRECT_URL: http://lab.localhost:8000/oauth2/callback
       OAUTH2_PROXY_UPSTREAMS: http://home:80/,http://home-api:8000/api/
       OAUTH2_PROXY_PASS_USER_HEADERS: "true"
       OAUTH2_PROXY_EMAIL_DOMAINS: "*"
@@ -156,7 +171,7 @@ services:
       OAUTH2_PROXY_COOKIE_REFRESH: 1m
       OAUTH2_PROXY_COOKIE_EXPIRE: 12h
       # where "Log out" lands after oauth2-proxy clears its cookie (Keycloak ends the SSO session)
-      OAUTH2_PROXY_WHITELIST_DOMAINS: localhost:8180
+      OAUTH2_PROXY_WHITELIST_DOMAINS: auth.lab.localhost:8000
     depends_on:
       keycloak:
         condition: service_healthy

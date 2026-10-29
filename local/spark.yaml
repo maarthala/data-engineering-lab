@@ -23,9 +23,6 @@ services:
     <<: *spark-common
     hostname: spark-master
     container_name: spark-master
-    ports:
-      - "7077:7077"
-      - "8002:8080"
     entrypoint: ["/bin/bash", "-c", "/opt/spark/sbin/start-master.sh  --host spark-master && tail -f /dev/null"]
 
 
@@ -47,8 +44,6 @@ services:
     depends_on:
       - spark-master
       - spark-worker-1
-    ports:
-      - "15002:15002"
     # cap cores so notebook (Connect) work leaves room for Airflow spark-submit jobs
     # on the shared standalone cluster (otherwise one app grabs all cores).
     # Runs in the FOREGROUND (SPARK_NO_DAEMONIZE): if the server dies — e.g. killed when Docker

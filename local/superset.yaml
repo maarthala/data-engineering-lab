@@ -6,8 +6,6 @@ services:
       dockerfile: Dockerfile.superset
     container_name: superset
     restart: always
-    ports:
-      - "8004:8088"
     environment:
       - SUPERSET_SECRET_KEY=your_secret_key
       - DATABASE_URL=postgresql+psycopg2://superset:superset@postgres:5432/superset

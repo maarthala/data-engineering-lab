@@ -33,7 +33,7 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "redirectUris": [
-        "http://localhost:8000/oauth2/callback",
+        "http://lab.localhost:8000/oauth2/callback",
         "http://de.lan/oauth2/callback"
       ],
       "webOrigins": [
@@ -41,7 +41,7 @@
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:8000/*##http://de.lan/*"
+        "post.logout.redirect.uris": "http://lab.localhost:8000/*##http://de.lan/*"
       },
       "protocolMappers": [
         {
@@ -76,7 +76,7 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "redirectUris": [
-        "http://localhost:8008/hub/oauth_callback",
+        "http://jupyter.lab.localhost:8000/hub/oauth_callback",
         "http://jupyter.de.lan/hub/oauth_callback"
       ],
       "webOrigins": [
@@ -105,7 +105,7 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "redirectUris": [
-        "http://localhost:9001/*",
+        "http://storage.lab.localhost:8000/*",
         "http://storage.de.lan/*"
       ],
       "webOrigins": [
@@ -135,11 +135,11 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "redirectUris": [
-        "http://localhost:8003/auth/oidc/callback",
+        "http://sqlpad.lab.localhost:8000/auth/oidc/callback",
         "http://sqlpad.de.lan/auth/oidc/callback"
       ],
       "attributes": {
-        "post.logout.redirect.uris": "http://localhost:8003/*##http://sqlpad.de.lan/*"
+        "post.logout.redirect.uris": "http://sqlpad.lab.localhost:8000/*##http://sqlpad.de.lan/*"
       },
       "webOrigins": [
         "+"
@@ -183,11 +183,11 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "redirectUris": [
-        "http://localhost:8189/*",
+        "http://polaris-console.lab.localhost:8000/*",
         "http://polaris-console.de.lan/*"
       ],
       "webOrigins": [
-        "http://localhost:8189",
+        "http://polaris-console.lab.localhost:8000",
         "http://polaris-console.de.lan"
       ],
       "attributes": {
@@ -230,11 +230,11 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "redirectUris": [
-        "http://localhost:8004/oauth-authorized/keycloak",
+        "http://superset.lab.localhost:8000/oauth-authorized/keycloak",
         "http://superset.de.lan/oauth-authorized/keycloak"
       ],
       "attributes": {
-        "post.logout.redirect.uris": "http://localhost:8004/*##http://superset.de.lan/*"
+        "post.logout.redirect.uris": "http://superset.lab.localhost:8000/*##http://superset.de.lan/*"
       },
       "webOrigins": [
         "+"
@@ -262,12 +262,12 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "redirectUris": [
-        "http://localhost:8011/auth/oauth-authorized/keycloak",
-        "http://localhost:8001/auth/oauth-authorized/keycloak",
+        "http://airflow.lab.localhost:8000/auth/oauth-authorized/keycloak",
+        "http://airflow.lab.localhost:8000/auth/oauth-authorized/keycloak",
         "http://airflow.de.lan/auth/oauth-authorized/keycloak"
       ],
       "attributes": {
-        "post.logout.redirect.uris": "http://localhost:8011/*##http://localhost:8001/*##http://airflow.de.lan/*"
+        "post.logout.redirect.uris": "http://airflow.lab.localhost:8000/*##http://airflow.de.lan/*"
       },
       "webOrigins": [
         "+"
@@ -295,7 +295,7 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "redirectUris": [
-        "http://localhost:8200/ui/vault/auth/oidc/oidc/callback",
+        "http://vault.lab.localhost:8000/ui/vault/auth/oidc/oidc/callback",
         "http://localhost:8250/oidc/callback",
         "http://vault.de.lan/ui/vault/auth/oidc/oidc/callback"
       ],

@@ -41,7 +41,7 @@ Any recent Chrome, Edge, Firefox, or Safari. That's the entire requirement for S
 Jupyter, the Polaris Console, RustFS, and this course site. Bookmark the landing page — it links to
 everything:
 
-- **Local (Docker):** [http://localhost:8000](http://localhost:8000)
+- **Local (Docker):** [http://lab.localhost:8000](http://lab.localhost:8000)
 - **Kubernetes:** `http://de.lan`
 
 ---
@@ -56,7 +56,7 @@ accepts queries only from SQLPad and Superset, because they tell it who you are.
 connect with:
 
 ```bash
-trino --server http://localhost:8007 --user demouser
+trino --server http://trino.lab.localhost:8000 --user demouser
 ```
 
 You'll get a `trino>` prompt — type SQL, end each statement with `;`, quit with `quit;`.
@@ -91,7 +91,7 @@ You'll get a `trino>` prompt — type SQL, end each statement with `;`, quit wit
     3. Run it (from the folder you downloaded it to):
 
     ```powershell
-    java -jar trino-cli-*-executable.jar --server http://localhost:8007
+    java -jar trino-cli-*-executable.jar --server http://trino.lab.localhost:8000
     ```
 
     !!! tip "Prefer a GUI on Windows?"
@@ -110,7 +110,7 @@ You'll get a `trino>` prompt — type SQL, end each statement with `;`, quit wit
     # download the self-contained client and make it runnable
     curl -Lo trino https://repo1.maven.org/maven2/io/trino/trino-cli/latest/trino-cli-latest-executable.jar
     chmod +x trino
-    ./trino --server http://localhost:8007
+    ./trino --server http://trino.lab.localhost:8000
     ```
 
     (Move `trino` somewhere on your `PATH`, e.g. `/usr/local/bin`, to call it from anywhere.)
@@ -216,7 +216,7 @@ the full stack (Docker Compose), or the [Ansible steps](deploy/kubernetes.md) (K
 
 Run through this checklist once — if all three pass, you're ready for Unit {unit:unit1/what-is-de.md}.
 
-1. **Sign in to the landing page** — open [http://localhost:8000](http://localhost:8000). You're sent
+1. **Sign in to the landing page** — open [http://lab.localhost:8000](http://lab.localhost:8000). You're sent
    to the **DE Learning Lab** login page: sign in as **`demouser` / `demouser`** (the default account
    the course examples use), **Register** your own, or use `manager` / `manager`. After signing in you see the lab's tools in four columns and,
    on **📁 My files**, **"bucket <name>-lake · lakehouse <name>_lake"** — your own private
@@ -244,17 +244,17 @@ Everything in the stack, its URL, and how to sign in. (On Kubernetes swap `local
 
 | Service | Local URL | Login |
 |---|---|---|
-| Landing page | [http://localhost:8000](http://localhost:8000) | **`demouser` / `demouser`** (default — the examples use it), `learner2` / `learner2` (a second user, for sharing in {lesson:unit6/polaris.md}), your own (**Register**), or `manager` / `manager` |
-| Keycloak (logins) | http://localhost:8180/admin | admin console: `admin` / `admin` (realm **de-lab**) |
+| Landing page | [http://lab.localhost:8000](http://lab.localhost:8000) | **`demouser` / `demouser`** (default — the examples use it), `learner2` / `learner2` (a second user, for sharing in {lesson:unit6/polaris.md}), your own (**Register**), or `manager` / `manager` |
+| Keycloak (logins) | http://auth.lab.localhost:8000/admin | admin console: `admin` / `admin` (realm **de-lab**) |
 | Training course | https://maarthala.github.io/data-engineering-lab/ | — (linked from the landing page) |
-| Jupyter (notebooks) | http://localhost:8008 | your lab account — your **own** Jupyter, and `my` = your own lakehouse |
-| Spark master UI | http://127.0.0.1:8002 | — |
-| Trino | through SQLPad / Superset (laptop stack: UI http://localhost:8007/ui/, CLI `:8007`) | lab account (via SQLPad / Superset) |
-| SQLPad (SQL workbench) | http://localhost:8003 | lab account (from the landing page you go straight in) |
-| Superset (BI) | http://localhost:8004 | lab account (managers = Admin) |
-| Airflow | http://localhost:8001 (or the `AIRFLOW_HOST_PORT` you set) | lab account (managers = Admin) |
-| Polaris Console (governance) | http://localhost:8189 | lab account · Client ID/Secret form at `/login?local=1` (admin `root` / `s3cr3t`, [personas](personas.md)) |
-| RustFS console (S3) | http://localhost:9001/rustfs/console/ | lab account — you see **your own bucket** `<name>-lake` · root `admin` / `admin123` |
+| Jupyter (notebooks) | http://jupyter.lab.localhost:8000 | your lab account — your **own** Jupyter, and `my` = your own lakehouse |
+| Spark master UI | http://spark.lab.localhost:8000 | — |
+| Trino | through SQLPad / Superset (laptop stack: UI http://trino.lab.localhost:8000/ui/, CLI `:8007`) | lab account (via SQLPad / Superset) |
+| SQLPad (SQL workbench) | http://sqlpad.lab.localhost:8000 | lab account (from the landing page you go straight in) |
+| Superset (BI) | http://superset.lab.localhost:8000 | lab account (managers = Admin) |
+| Airflow | http://airflow.lab.localhost:8000 (or the `AIRFLOW_HOST_PORT` you set) | lab account (managers = Admin) |
+| Polaris Console (governance) | http://polaris-console.lab.localhost:8000 | lab account · Client ID/Secret form at `/login?local=1` (admin `root` / `s3cr3t`, [personas](personas.md)) |
+| RustFS console (S3) | http://storage.lab.localhost:8000/rustfs/console/ | lab account — you see **your own bucket** `<name>-lake` · root `admin` / `admin123` |
 | My files · My catalogs | links at the top of the landing page | your bucket's files; create catalogs & share them ([details](workspace.md)) |
 
 !!! warning "On a team stack these admin logins are private"

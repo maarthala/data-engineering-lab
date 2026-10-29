@@ -112,18 +112,18 @@ single sign-on, register on the home portal) for every tool; see [0.3](../setup/
 
 | Tool | Compose URL | k8s host | Login |
 |---|---|---|---|
-| Home portal | http://localhost:8000 | `de.lan` | lab account (Register / sign in) · My files · My catalogs |
-| Keycloak (accounts) | http://localhost:8180 | `auth.de.lan` | admin console `admin` / `admin` |
-| Polaris Console | http://localhost:8189 | `polaris-console.de.lan` | lab account · `/login?local=1`: `root` / `s3cr3t` or a persona |
-| Polaris API | http://localhost:8185 | `polaris.de.lan` | client id/secret |
-| Trino | http://localhost:8007/ui/ (laptop only) | — (internal; use SQLPad / Superset) | lab account, via SQLPad / Superset |
-| Superset | http://localhost:8004 | `superset.de.lan` | lab account |
-| SQLPad | http://localhost:8003 | `sqlpad.de.lan` | lab account |
-| Jupyter (JupyterHub) | http://localhost:8008 | `jupyter.de.lan` | your lab account (own Jupyter + own lakehouse) |
-| Airflow | http://localhost:8001 | `airflow.de.lan` | lab account (DAGs also from your bucket's `files/src/dags/`) |
-| RustFS console (object store) | http://localhost:9001/rustfs/console/ | `storage.de.lan/rustfs/console/` | lab account (your own bucket) · root `admin` / `admin123` |
-| Spark master UI | http://127.0.0.1:8002 | `spark.de.lan` | — |
-| Key vault (OpenBao) | http://localhost:8200 | `vault.de.lan` | lab account (**Sign in with OIDC Provider**; your own folder) |
+| Home portal | http://lab.localhost:8000 | `de.lan` | lab account (Register / sign in) · My files · My catalogs |
+| Keycloak (accounts) | http://auth.lab.localhost:8000 | `auth.de.lan` | admin console `admin` / `admin` |
+| Polaris Console | http://polaris-console.lab.localhost:8000 | `polaris-console.de.lan` | lab account · `/login?local=1`: `root` / `s3cr3t` or a persona |
+| Polaris API | http://polaris.lab.localhost:8000 | `polaris.de.lan` | client id/secret |
+| Trino | http://trino.lab.localhost:8000/ui/ (laptop only) | — (internal; use SQLPad / Superset) | lab account, via SQLPad / Superset |
+| Superset | http://superset.lab.localhost:8000 | `superset.de.lan` | lab account |
+| SQLPad | http://sqlpad.lab.localhost:8000 | `sqlpad.de.lan` | lab account |
+| Jupyter (JupyterHub) | http://jupyter.lab.localhost:8000 | `jupyter.de.lan` | your lab account (own Jupyter + own lakehouse) |
+| Airflow | http://airflow.lab.localhost:8000 | `airflow.de.lan` | lab account (DAGs also from your bucket's `files/src/dags/`) |
+| RustFS console (object store) | http://storage.lab.localhost:8000/rustfs/console/ | `storage.de.lan/rustfs/console/` | lab account (your own bucket) · root `admin` / `admin123` |
+| Spark master UI | http://spark.lab.localhost:8000 | `spark.de.lan` | — |
+| Key vault (OpenBao) | http://vault.lab.localhost:8000 | `vault.de.lan` | lab account (**Sign in with OIDC Provider**; your own folder) |
 
 !!! warning "On a team stack these admin logins are private"
     The admin passwords above are the defaults of **your own laptop stack**, where you are the admin.

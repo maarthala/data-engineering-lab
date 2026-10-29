@@ -62,7 +62,7 @@ answer.
     different names.
 
 ## Lab
-Open Superset from the landing page, or at [http://localhost:8004](http://localhost:8004) (k8s:
+Open Superset from the landing page, or at [http://superset.lab.localhost:8000](http://superset.lab.localhost:8000) (k8s:
 `superset.de.lan`). Signed in to the lab, you go straight in.
 
 !!! note "Build your Gold first"

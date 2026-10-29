@@ -6,7 +6,7 @@ bucket and your own Jupyter. This page shows what you get and where to find it.
 
 ## Your lab account
 
-Open the landing page — [http://localhost:8000](http://localhost:8000) locally, `http://de.lan` on
+Open the landing page — [http://lab.localhost:8000](http://lab.localhost:8000) locally, `http://de.lan` on
 Kubernetes. You land on the **Epireum's Data Engineering Lab** sign-in page:
 
 - **On your own laptop (local stack):** sign in as **`demouser` / `demouser`** — the default lab
@@ -349,7 +349,7 @@ def fetch():
 ### In the key vault's own UI
 
 The bottom of **🔑 My secrets** has **Open the key vault ↗**: the vault's own web UI (OpenBao), at
-[http://localhost:8200](http://localhost:8200) locally, `http://vault.de.lan` on the lab cluster.
+[http://vault.lab.localhost:8000](http://vault.lab.localhost:8000) locally, `http://vault.de.lan` on the lab cluster.
 Click **Sign in with OIDC Provider** and you're in with your lab account (the same Keycloak login),
 straight in **your folder** `secret/<you>/`: one entry per secret, the same ones the page shows.
 

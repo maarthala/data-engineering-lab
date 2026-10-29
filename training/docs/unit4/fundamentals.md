@@ -54,7 +54,7 @@ too many tiny partitions = overhead. You'll rarely tune this early, but being ab
 many partitions a DataFrame has (the lab shows how) helps you reason about performance later.
 
 ## Lab
-Connect to Spark from **Jupyter** at [http://localhost:8008](http://localhost:8008) (sign in with
+Connect to Spark from **Jupyter** at [http://jupyter.lab.localhost:8000](http://jupyter.lab.localhost:8000) (sign in with
 your lab account). The notebook is a lightweight **Spark Connect** client: it's pre-wired to the
 cluster's Connect server (`sc://spark-connect:15002`), and the **`my`** lakehouse catalog is
 already configured — pointing at **your own** lakehouse (`demouser_lake`), so the tables you build in

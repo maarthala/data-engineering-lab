@@ -15,7 +15,7 @@ your own lakehouse — visible to your notebooks (SQL and Spark) and the Polaris
 ## Lab
 
 ### 1 · Upload the file to the lake (RustFS)
-Open the **RustFS console** at <http://localhost:9001/rustfs/console/> (sign in with your lab account):
+Open the **RustFS console** at <http://storage.lab.localhost:8000/rustfs/console/> (sign in with your lab account):
 
 1. Go to your own bucket, **`<username>-lake`** — the only one members see in the console
    (managers also see the shared **`demo-bucket`**).

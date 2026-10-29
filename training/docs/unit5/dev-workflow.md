@@ -26,7 +26,7 @@ flowchart LR
 ## The six steps
 
 ### 1 · Prototype the logic in a notebook
-Open Jupyter ([http://localhost:8008](http://localhost:8008)) and write the transformation
+Open Jupyter ([http://jupyter.lab.localhost:8000](http://jupyter.lab.localhost:8000)) and write the transformation
 **interactively** — run a cell, see the result, adjust. `spark` is already there, signed in as you
 (`my` = your lakehouse). This is the fastest feedback loop for getting the *data logic* right —
 exactly what you did in [Unit 4](../unit4/read-bronze.md). Your `my_files/notebooks/` folder already has a
@@ -93,7 +93,7 @@ the Airflow UI.
     `my_files/dags/` folder, plus history and review.
 
 ### 5 · Run it in Airflow
-Open the UI at [http://localhost:8001](http://localhost:8001) (sign in with your lab account):
+Open the UI at [http://airflow.lab.localhost:8000](http://airflow.lab.localhost:8000) (sign in with your lab account):
 
 1. Find **`demouser_load_sample_orders`** → toggle it **on** (unpause).
 2. Click **▶ Trigger**.
@@ -123,7 +123,7 @@ SELECT committed_at, operation FROM my.bronze.sample_orders.snapshots ORDER BY c
 ## Watch the job run on the Spark cluster
 DAG tasks and notebooks run their Spark work on the lab's **standalone Spark cluster**, through one
 long-running **Spark Connect server**. Watch it in the **Spark Master UI** at
-[http://127.0.0.1:8002](http://127.0.0.1:8002) (k8s: `spark.de.lan`):
+[http://spark.lab.localhost:8000](http://spark.lab.localhost:8000) (k8s: `spark.de.lan`):
 
 - The header shows **`Spark Master at spark://spark-master:7077`** and the **Alive Workers**.
 - Under **Running Applications** you'll see **`Spark Connect server`** — every notebook and every

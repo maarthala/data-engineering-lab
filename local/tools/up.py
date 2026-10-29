@@ -56,8 +56,9 @@ GROUPS = [
 LOCKED = {"Core"}
 NEEDS = {"Superset": ["SQL"]}          # starting Superset starts SQL; stopping SQL stops Superset
 USES = {"Notebooks": "Spark", "Airflow": "Spark"}  # only some work needs it: a hint, not started for you
-LINKS = [("Landing page", "oauth2-proxy"), ("Airflow", "airflow-apiserver"), ("Superset", "superset"),
-         ("SQLPad", "sqlpad"), ("Keycloak", "keycloak")]
+# one open port (the gateway): the portal and every app by name — tools open inside the portal
+LINKS = [("Landing page", "oauth2-proxy", "http://lab.localhost:8000/"),
+         ("Keycloak", "keycloak", "http://auth.lab.localhost:8000/admin/")]
 SPIN = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 LOG_COLOURS = ["cyan", "magenta", "blue", "yellow", "green"]
 
@@ -963,7 +964,7 @@ def ensure_shared_lake():
     import base64
     import urllib.parse
     import urllib.request
-    base = os.environ.get("POLARIS_URL", "http://localhost:8185")
+    base = os.environ.get("POLARIS_URL", "http://polaris.lab.localhost:8000")
     cred = os.environ.get("POLARIS_ROOT_CREDENTIAL", "root:s3cr3t")
     for _ in range(12):                                  # Polaris may still be finishing its start
         try:
@@ -1056,9 +1057,8 @@ def summary(stack, how):
         print(f"  {D}Changed a Dockerfile (or pulled changes)? make build rebuilds the images.{X}")
     if how != "failed":
         print()
-        for label, svc in LINKS:
-            if svc in stack.ports:
-                print(f"  {label:<13} {B}http://localhost:{stack.ports[svc][0]}/{X}")
+        for label, svc, url in LINKS:
+            print(f"  {label:<13} {B}{url}{X}")
         print(f"\n  {D}Sign in as demouser / demouser · live status: make status · bring down: make down{X}")
     print(f"  {D}Full log: {LOG_SHOWN}{X}\n")
     return 1 if how == "failed" or failed else 0

@@ -3,7 +3,7 @@ services:
   # Object storage — S3-compatible, reached by every client as http://storage:9000 with the
   # root keys admin / admin123. The implementation is RustFS (Apache-2.0); the generic service
   # name means it can be swapped for another S3 store (or AWS S3) without touching clients.
-  # Console: http://localhost:9001/rustfs/console/ — "Login with Epireum lab account"
+  # Console: http://storage.lab.localhost:8000/rustfs/console/ — "Login with Epireum lab account"
   # (Keycloak, client `storage`; the username is the `policy` claim → each learner's own
   # policy = only <username>-lake, created by home-api/JupyterHub with a hard quota).
   storage:
@@ -25,19 +25,16 @@ services:
       RUSTFS_OUTBOUND_ALLOW_ORIGINS: http://keycloak:8080
       RUSTFS_IDENTITY_OPENID_ENABLE: "on"
       RUSTFS_IDENTITY_OPENID_CONFIG_URL: http://keycloak:8080/realms/de-lab/.well-known/openid-configuration
-      RUSTFS_IDENTITY_OPENID_ISSUER: http://localhost:8180/realms/de-lab
+      RUSTFS_IDENTITY_OPENID_ISSUER: http://auth.lab.localhost:8000/realms/de-lab
       RUSTFS_IDENTITY_OPENID_CLIENT_ID: storage
       RUSTFS_IDENTITY_OPENID_CLIENT_SECRET: storage-secret
       RUSTFS_IDENTITY_OPENID_CLAIM_NAME: policy
       RUSTFS_IDENTITY_OPENID_SCOPES: openid,profile
       RUSTFS_IDENTITY_OPENID_DISPLAY_NAME: Epireum lab account
-      RUSTFS_BROWSER_REDIRECT_URL: http://localhost:9001
+      RUSTFS_BROWSER_REDIRECT_URL: http://storage.lab.localhost:8000
       # Quotas fail closed until the usage scanner has counted a bucket, so a brand-new
       # learner bucket refuses uploads until the first scan. Lab data is tiny: scan every 10s.
       RUSTFS_SCANNER_CYCLE: "10"
-    ports:
-      - "9002:9000"   # S3 API  (9000 is taken by ClickHouse on the host)
-      - "9001:9001"   # Web console (/rustfs/console/)
     volumes:
       - storage-data:/data
     healthcheck:

@@ -8,8 +8,6 @@ services:
     image: sqlpad/sqlpad:7.5.7
     container_name: sqlpad
     restart: always
-    ports:
-      - "8003:3000"
     environment:
       SQLPAD_ADMIN: "admin@de.local"
       SQLPAD_ADMIN_PASSWORD: "admin1234"
@@ -18,7 +16,7 @@ services:
       # username as the user id (no email needed); learners are pre-created ("invited") by
       # home-api / JupyterHub on first lab login, so SQLPad lets them in; managers (realm
       # role admin → `roles` claim) are SQLPad admins. The admin above still logs in locally.
-      PUBLIC_URL: http://localhost:8003
+      PUBLIC_URL: http://sqlpad.lab.localhost:8000
       SQLPAD_OIDC_ISSUER: http://keycloak:8080/realms/de-lab
       SQLPAD_OIDC_CLIENT_ID: sqlpad
       SQLPAD_OIDC_CLIENT_SECRET: sqlpad-secret

@@ -43,30 +43,30 @@ gate the Pages CI uses) before you push.
 ## Access
 | Service | URL | Login |
 |---|---|---|
-| Landing page | http://localhost:8000 | your **lab account** — Register, or `manager` / `manager`; one login for every tool below |
+| Landing page | http://lab.localhost:8000 | your **lab account** — Register, or `manager` / `manager`; one login for every tool below |
 | Training course | https://maarthala.github.io/data-engineering-lab/ | — (linked from the landing page) |
-| Keycloak (accounts) | http://localhost:8180/admin | admin / admin (realm `de-lab`) |
-| RustFS console (S3) | http://localhost:9001/rustfs/console/ | lab account (own bucket) · root admin / admin123 |
-| Polaris Console | http://localhost:8189 | lab account · `/login?local=1`: personas analyst/engineer/lead (id = secret = name), admin root/s3cr3t |
-| Polaris API | http://localhost:8185 | OAuth2 client credentials (realm `POLARIS`) |
-| Key vault (OpenBao) | http://localhost:8200 | **Sign in with OIDC Provider** = lab account (members: own folder; managers: all) · token `lab-vault-admin-local-token` = the lab's admin |
-| Trino | http://localhost:8007/ui/ | any username, no password |
-| Superset | http://localhost:8004 | lab account |
-| SQLPad (SQL workbench) | http://localhost:8003 | lab account (local admin admin@de.local / admin1234) |
-| Airflow | http://localhost:8001 (`AIRFLOW_HOST_PORT`) | lab account |
-| Jupyter (JupyterHub) | http://localhost:8008 | your lab account (Keycloak) — own Jupyter + own lakehouse |
-| Spark master UI | http://127.0.0.1:8002 | — |
+| Keycloak (accounts) | http://auth.lab.localhost:8000/admin | admin / admin (realm `de-lab`) |
+| RustFS console (S3) | http://storage.lab.localhost:8000/rustfs/console/ | lab account (own bucket) · root admin / admin123 |
+| Polaris Console | http://polaris-console.lab.localhost:8000 | lab account · `/login?local=1`: personas analyst/engineer/lead (id = secret = name), admin root/s3cr3t |
+| Polaris API | http://polaris.lab.localhost:8000 | OAuth2 client credentials (realm `POLARIS`) |
+| Key vault (OpenBao) | http://vault.lab.localhost:8000 | **Sign in with OIDC Provider** = lab account (members: own folder; managers: all) · token `lab-vault-admin-local-token` = the lab's admin |
+| Trino | http://trino.lab.localhost:8000/ui/ | any username, no password |
+| Superset | http://superset.lab.localhost:8000 | lab account |
+| SQLPad (SQL workbench) | http://sqlpad.lab.localhost:8000 | lab account (local admin admin@de.local / admin1234) |
+| Airflow | http://airflow.lab.localhost:8000 (`AIRFLOW_HOST_PORT`) | lab account |
+| Jupyter (JupyterHub) | http://jupyter.lab.localhost:8000 | your lab account (Keycloak) — own Jupyter + own lakehouse |
+| Spark master UI | http://spark.lab.localhost:8000 | — |
 
 ## First steps
 `make up` seeds the governed catalog (catalog, bronze/silver/gold namespaces, personas + RBAC)
 when it is missing — first start, after `make clean` / `make destroy`. To run it by hand:
 ```bash
-make polaris-seed      # runs ../common/polaris/seed-polaris.sh against localhost:8185
+make polaris-seed      # runs ../common/polaris/seed-polaris.sh against polaris.lab.localhost:8000
 ```
 Then:
-- **Register your lab account** at http://localhost:8000 — it signs you in to every tool and
+- **Register your lab account** at http://lab.localhost:8000 — it signs you in to every tool and
   creates your own lakehouse, bucket and Jupyter (course page 0.3).
-- **Personas** (governance lessons): Polaris Console http://localhost:8189/login?local=1
+- **Personas** (governance lessons): Polaris Console http://polaris-console.lab.localhost:8000/login?local=1
   (`analyst`/`analyst`, `engineer`/`engineer`, `lead`/`lead`; admin `root`/`s3cr3t`).
 - **Query the lake** with Trino (`iceberg` catalog) or Superset SQL Lab.
 - **Governed Spark** — in Jupyter, `iceberg` is your own lakehouse and `shared` the course lake
@@ -119,9 +119,9 @@ without the `adventureworks` DB.
 ## Query tools — which to use for what
 Two complementary tools (plus a desktop option):
 
-- **Superset** (http://localhost:8004, `admin`/`admin`) — **BI / analytics**: dashboards and
+- **Superset** (http://superset.lab.localhost:8000, `admin`/`admin`) — **BI / analytics**: dashboards and
   charts over the **Gold** layer. Read-only by design.
-- **SQLPad** (http://localhost:8003, `admin@de.local`/`admin1234`) — **SQL workbench**: run
+- **SQLPad** (http://sqlpad.lab.localhost:8000, `admin@de.local`/`admin1234`) — **SQL workbench**: run
   *any* SQL, including `INSERT`/`UPDATE`/`DELETE`/`MERGE`/DDL, against **both** the OLTP source
   (Postgres) and the OLAP lakehouse (Trino/Iceberg). This is the tool for the write/DDL
   lessons. Three connections come pre-wired: **ShopFlow — OLTP**, **AdventureWorks — OLTP**,

@@ -50,7 +50,7 @@ sees everything. You'll build these exact grants as the Polaris admin in
 
 Sign in with the persona's **Client ID + Secret** wherever the stack asks *who you are*:
 
-- **Polaris Console** — open <http://localhost:8189/login?local=1> (k8s:
+- **Polaris Console** — open <http://polaris-console.lab.localhost:8000/login?local=1> (k8s:
   `http://polaris-console.de.lan/login?local=1` — the `?local=1` shows the Client ID / Secret form
   instead of signing you in with your lab account), enter the **Client ID** and **Client Secret**
   (on your laptop: e.g. `analyst` / `analyst`; on a team stack, ask your platform manager), and sign in. The catalog tree you see is scoped to that persona's

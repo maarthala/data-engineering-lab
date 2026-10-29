@@ -74,8 +74,6 @@ services:
       <<: *airflow-common
       command: api-server
       container_name: airflow-apiserver
-      ports:
-        - "${AIRFLOW_HOST_PORT:-8001}:8080"   # override in .env if 8001 is taken
       healthcheck:
         test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/version"]
         interval: 30s

@@ -58,7 +58,7 @@ kinds of bucket:
 
 **Reach it:** `spark.read.csv("s3a://demouser-lake/files/source/…")` in a notebook, **📁 My files**
 on the landing page (browse, preview, upload), or the **RustFS console**
-(<http://localhost:9001/rustfs/console/>, sign in with your lab account — you see only your own
+(<http://storage.lab.localhost:8000/rustfs/console/>, sign in with your lab account — you see only your own
 bucket).
 
 ## 3. Catalogs — governed lakehouse tables

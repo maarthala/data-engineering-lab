@@ -4,10 +4,9 @@
 // the learner's lakehouse on first call; pages that need the same data listen for the "lab:me" event.
 // Tools open inside the portal (/tool.html#<tool>); window.LAB_TOOLS has their addresses.
 (function () {
+  // every app sits next to the portal by name: <app>.lab.localhost:8000 (local) · <app>.de.lan (k8s)
   var host = location.hostname, k8s = /(^|\.)de\.lan$/.test(host);
-  function url(sub, localPort, path) {
-    return (k8s ? 'http://' + sub + '.' + host : 'http://' + (sub === 'spark' ? '127.0.0.1' : 'localhost') + ':' + localPort) + (path || '');
-  }
+  function url(sub, unusedPort, path) { return 'http://' + sub + '.' + location.host + (path || ''); }
   var TOOLS = window.LAB_TOOLS = {
     jupyter:    {name: 'Notebooks', what: 'Jupyter', svc: 'jupyter', url: url('jupyter', 8008)},
     sqlpad:     {name: 'SQL editor', what: 'SQLPad', svc: 'sqlpad', url: url('sqlpad', 8003, '/auth/oidc')},
@@ -88,7 +87,7 @@
     '<a class="out" id="me-out" href="#">Log out</a></div>';
   document.getElementById('lab-menu').addEventListener('click', function () { document.body.classList.toggle('nav-open'); });
 
-  var auth = k8s ? 'http://auth.' + host : 'http://localhost:8180';
+  var auth = 'http://auth.' + location.host;
   // Log out = clear oauth2-proxy's cookie, then end the Keycloak SSO session.
   var kcOut = auth + '/realms/de-lab/protocol/openid-connect/logout?client_id=de-lab-home' +
               '&post_logout_redirect_uri=' + encodeURIComponent(location.origin + '/');
@@ -105,7 +104,6 @@
         lake.textContent = 'lakehouse not ready — ' + (me.detail || 'try again shortly');
         lake.hidden = false;
       }
-      if (!k8s && me.airflow_port) TOOLS.airflow.url = 'http://localhost:' + me.airflow_port;
       var mgr = (me.groups || []).indexOf('managers') >= 0;
       document.getElementById('lab-nav-manage').hidden = !mgr;
       nav.querySelectorAll('[data-mgr]').forEach(function (a) { a.hidden = !mgr; });

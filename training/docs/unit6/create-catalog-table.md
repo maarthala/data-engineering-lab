@@ -33,7 +33,7 @@ to see it in the Console.
     listing *all* catalogs is admin-only. Open yours from My catalogs.)
 
 **As the admin — in the Console** (the platform manager, or your own laptop stack): open
-<http://localhost:8189/login?local=1> (k8s: `http://polaris-console.de.lan/login?local=1` — the
+<http://polaris-console.lab.localhost:8000/login?local=1> (k8s: `http://polaris-console.de.lan/login?local=1` — the
 `?local=1` shows the **Client ID / Secret** form instead of signing you in with your lab account), sign in as `root` / `s3cr3t` (laptop stack; on a team stack this is the platform manager's job), then **Catalogs → Create catalog**:
 
 - **Name:** `learn`
@@ -92,7 +92,7 @@ You can also create the namespace/table visually in the **Console** (Catalog →
 table with data.
 
 **Watch it land in your bucket** (📁 **My files**, or the RustFS console
-<http://localhost:9001/rustfs/console/>): after `CREATE TABLE` you'll see
+<http://storage.lab.localhost:8000/rustfs/console/>): after `CREATE TABLE` you'll see
 `tables/demouser_lake/demo/sales/metadata/00000-….metadata.json` in `demouser-lake`; after `INSERT`, a
 `data/*.parquet` plus manifest/snapshot files appear.
 

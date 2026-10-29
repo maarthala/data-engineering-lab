@@ -62,7 +62,7 @@ The stack is already running (see the [architecture](../unit0/architecture.md)).
 Trino SQL in this course in your browser, signed in with your lab account. Trino always knows
 who you are, so you see your own lakehouse and the shared data, and nobody else's.
 
-**A. SQLPad: your main SQL workbench (reads *and* writes).** Open it at `http://localhost:8003`
+**A. SQLPad: your main SQL workbench (reads *and* writes).** Open it at `http://sqlpad.lab.localhost:8000`
 (local) / `sqlpad.de.lan` (k8s), sign in with your lab account, and pick the connection
 **Lakehouse (Trino) — demouser** (your own username). It reaches every Trino catalog you're allowed
 to use: `shopflow`, `adventureworks`, the shared `iceberg` lake and your own `demouser_lake`. The
@@ -74,7 +74,7 @@ The left sidebar shows only your own lake (`<username>_lake`). `shopflow` and `a
 listed there, but you can still query them by full name, e.g. `shopflow.public.orders`. Run
 `SHOW CATALOGS;` to see everything you can reach.
 
-**B. Superset SQL Lab: read-only, nice for charts.** Open Superset at `http://localhost:8004`
+**B. Superset SQL Lab: read-only, nice for charts.** Open Superset at `http://superset.lab.localhost:8000`
 (local) or `superset.de.lan` (k8s), go to **SQL → SQL Lab**, and pick the **shopflow** database
 with the **public** schema. Skip the `USE` line, because in SQL Lab you choose the schema from the
 dropdown instead. SQL Lab only runs `SELECT`, so use SQLPad for any lesson that creates or changes
@@ -83,7 +83,7 @@ data (`CREATE`/`INSERT`/`UPDATE`/`MERGE`/DDL).
 !!! note "What about the Trino CLI?"
     On the team stack, Trino only accepts queries from SQLPad and Superset, because they tell it
     who you are. If you run the stack **on your own laptop**, you can also use the `trino` CLI
-    (`trino --server http://localhost:8007`; see [Prerequisites](../setup/prerequisites.md#2-the-trino-cli-optional)).
+    (`trino --server http://trino.lab.localhost:8000`; see [Prerequisites](../setup/prerequisites.md#2-the-trino-cli-optional)).
 
 !!! note "SQLPad hides *empty* schemas"
     SQLPad's left schema sidebar only lists schemas that contain at least one **table** — so a
@@ -92,7 +92,7 @@ data (`CREATE`/`INSERT`/`UPDATE`/`MERGE`/DDL).
     can always query a schema by its full name (`demouser_lake.sandbox.…`) even if the sidebar hasn't
     caught up — the sidebar is just for browsing.
 
-!!! note "The `http://localhost:8007/ui/` page is *monitoring*, not a query editor"
+!!! note "The `http://trino.lab.localhost:8000/ui/` page is *monitoring*, not a query editor"
     On the laptop stack, that web UI shows running and finished queries with their stats. It's
     handy for watching the engine work, but you write SQL in SQLPad or Superset, not there.
 

@@ -793,7 +793,21 @@ def _login_events():
             time.sleep(20)
 
 
+def _sync_realm():
+    """LAB_REALM_FILE (local): the realm file's sign-in addresses onto the live Keycloak, once at start."""
+    for _ in range(40):
+        try:
+            changed = labadmin.sync_client_urls()
+            if changed:
+                print(f"[home-api] sign-in addresses updated in Keycloak: {', '.join(changed)}", flush=True)
+            return
+        except Exception as e:  # noqa: BLE001 — Keycloak still starting
+            print(f"[home-api] realm sync: {e} — retrying", flush=True)
+            time.sleep(15)
+
+
 if __name__ == "__main__":
+    threading.Thread(target=_sync_realm, daemon=True).start()
     threading.Thread(target=_trino_sync_loop, daemon=True).start()
     threading.Thread(target=_login_events, daemon=True).start()
     port = int(os.environ.get("PORT", "8000"))

@@ -35,7 +35,7 @@ analyst (principal) ─► analyst_role ─► sales_reader (catalog-role) ─�
 
 ## Do it — grant analyst read-only on `demo.sales` (Console)
 
-Sign in to the Console as `root` / `s3cr3t` (your laptop stack — on a team stack, the platform manager) at <http://localhost:8189/login?local=1> (k8s: `http://polaris-console.de.lan/login?local=1` — the
+Sign in to the Console as `root` / `s3cr3t` (your laptop stack — on a team stack, the platform manager) at <http://polaris-console.lab.localhost:8000/login?local=1> (k8s: `http://polaris-console.de.lan/login?local=1` — the
 `?local=1` shows the **Client ID / Secret** form instead of signing you in with your lab account).
 
 !!! tip "Members: the same grant, without the admin"

@@ -16,8 +16,6 @@ services:
       interval: 10s
       retries: 5
       start_period: 60s
-    ports:
-      - "${POSTGRES_HOST_PORT:-5432}:5432"   # override in .env if 5432 is taken
     volumes:
       - ./code:/code
       - ./init_scripts/postgres:/docker-entrypoint-initdb.d

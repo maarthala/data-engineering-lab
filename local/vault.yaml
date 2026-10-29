@@ -2,7 +2,7 @@
 # Every member's secrets ("🔑 My secrets", key_vault() in notebooks and DAGs) live here,
 # encrypted, in the stack's Postgres (database vault) — no volume of its own. It unlocks
 # itself at every start with BAO_UNSEAL_KEY; vault-init.sh sets it up the first time.
-# UI: http://localhost:8200 — members "Sign in with the lab account" (method OIDC, Keycloak) and
+# UI: http://vault.lab.localhost:8000 — members "Sign in with the lab account" (method OIDC, Keycloak) and
 # see only their own folder; the token VAULT_ADMIN_TOKEN is the lab's own admin.
 x-vault-env: &vault-env
   # lab only — on k8s both are random, in the de-stack-secrets Secret
@@ -34,17 +34,9 @@ services:
   vault:
     image: openbao/openbao:2.6.4
     container_name: vault
-    # "Sign in with the lab account": the vault fetches Keycloak's discovery from the PUBLIC
-    # issuer (localhost:8180) and checks it matches — inside this container that address is
-    # forwarded to Keycloak (busybox nc), then the server starts
-    command:
-      - sh
-      - -c
-      - |
-        nc -lk -s 127.0.0.1 -p 8180 -e nc keycloak 8080 &
-        exec bao server -config=/bao/config/lab.hcl
-    ports:
-      - "8200:8200"
+    # "Sign in with the lab account": the vault fetches Keycloak's discovery from the PUBLIC issuer
+    # (auth.lab.localhost:8000) — inside the network that name is the gateway, which passes it on
+    command: ["bao", "server", "-config=/bao/config/lab.hcl"]
     environment:
       BAO_PG_CONNECTION_URL: postgres://vault:vault@postgres:5432/vault?sslmode=disable
       # 64 hex characters; changing it later locks the vault (its data is encrypted with it)
@@ -74,9 +66,9 @@ services:
       <<: *vault-env
       BAO_ADDR: http://vault:8200
       # UI sign-in with the lab account (Keycloak realm de-lab, client vault)
-      VAULT_OIDC_ISSUER: http://localhost:8180/realms/de-lab
+      VAULT_OIDC_ISSUER: http://auth.lab.localhost:8000/realms/de-lab
       VAULT_OIDC_CLIENT_SECRET: vault-secret
-      VAULT_OIDC_REDIRECTS: http://localhost:8200/ui/vault/auth/oidc/oidc/callback,http://localhost:8250/oidc/callback
+      VAULT_OIDC_REDIRECTS: http://vault.lab.localhost:8000/ui/vault/auth/oidc/oidc/callback,http://localhost:8250/oidc/callback
     volumes:
       - ../common/dockerfiles/add/vault-init.sh:/vault-init.sh:ro
     restart: "no"

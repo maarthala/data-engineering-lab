@@ -186,7 +186,7 @@ Once the DAG passes locally, deploy it:
 ShopFlow's Airflow is already running on your stack (see the
 [architecture](../unit0/architecture.md)).
 
-- Local: <http://localhost:8001> (sign in with your lab account)
+- Local: <http://airflow.lab.localhost:8000> (sign in with your lab account)
 - On k8s: <http://airflow.de.lan>
 
 Take the tour:
@@ -199,7 +199,7 @@ Take the tour:
 - The **▶ Trigger** button runs a DAG on demand.
 
 ### 2. Write your first DAG
-Open Jupyter (<http://localhost:8008>), and in the file browser open the **`my_files/dags/`** folder →
+Open Jupyter (<http://jupyter.lab.localhost:8000>), and in the file browser open the **`my_files/dags/`** folder →
 right-click → **New File** → name it `hello_shopflow.py`:
 
 This one file is a complete pipeline. It's short on purpose — two trivial tasks that just print

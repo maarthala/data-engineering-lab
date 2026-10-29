@@ -90,6 +90,35 @@ def _kc_token():
     return body["access_token"]
 
 
+def sync_client_urls(path=os.environ.get("LAB_REALM_FILE", "")):
+    """The realm file's sign-in addresses (redirect URIs, web origins, logout URLs, root/base URL) onto
+    the live realm's clients — Keycloak imports the file only on a fresh database, so an address
+    change (e.g. the local stack moving behind one port) reaches an existing stack this way.
+    Returns the clients changed."""
+    if not path or not os.path.exists(path):
+        return []
+    with open(path) as f:
+        want = {c["clientId"]: c for c in json.load(f).get("clients", [])}
+    kc, changed = _kc_token(), []
+    st, have = _kc("GET", f"/admin/realms/{REALM}/clients", token=kc)
+    for c in have or []:
+        w = want.get(c["clientId"])
+        if not w:
+            continue
+        new = dict(c)
+        for k in ("redirectUris", "webOrigins", "rootUrl", "baseUrl", "adminUrl"):
+            if k in w:
+                new[k] = w[k]
+        attrs = dict(c.get("attributes") or {})
+        if "post.logout.redirect.uris" in (w.get("attributes") or {}):
+            attrs["post.logout.redirect.uris"] = w["attributes"]["post.logout.redirect.uris"]
+        new["attributes"] = attrs
+        if new != c:
+            _kc("PUT", f"/admin/realms/{REALM}/clients/{c['id']}", new, token=kc)
+            changed.append(c["clientId"])
+    return changed
+
+
 def _kc_user(user, t):
     st, body = _kc("GET", f"/admin/realms/{REALM}/users?" +
                    urllib.parse.urlencode({"username": user, "exact": "true"}), token=t)
