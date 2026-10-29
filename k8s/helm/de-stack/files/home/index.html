@@ -9,7 +9,8 @@
   <style>
     body{display:flex; flex-direction:column; min-height:100vh}
     main{flex:1; width:100%; padding:22px 28px 28px; display:flex; flex-direction:column; gap:18px}
-    .welcome{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap}
+    .welcome{display:flex; align-items:center; gap:12px; flex-wrap:wrap}
+    .welcome .cta{margin-left:auto}
     .welcome h1{margin:0; font-size:1.5rem; letter-spacing:-.01em} .welcome p{margin:0; color:var(--muted)}
     .grid2{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; align-items:start}
     @media (max-width:1100px){ .grid2{grid-template-columns:1fr} }
@@ -51,7 +52,8 @@
         <a id="update-link" href="#" target="_blank" rel="noopener">What's new</a></span>
       <button type="button" id="update-hide">Hide</button>
     </div>
-    <div class="welcome"><h1>Welcome<span id="hi"></span></h1><p id="teamline">Your data engineering workspace.</p></div>
+    <div class="welcome"><h1>Welcome<span id="hi"></span></h1><p id="teamline">Your data engineering workspace.</p>
+      <a class="cta" href="https://maarthala.github.io/data-engineering-lab/" target="_blank" rel="noopener" title="Build the ShopFlow lakehouse end to end">🎓 Open the course ↗</a></div>
 
     <section class="card"><h3>Continue where you left off</h3><div class="resume" id="resume"><span class="note">Loading…</span></div></section>
 
@@ -60,14 +62,7 @@
       <section class="card" id="pipes"><h3>My pipelines <a href="/tool.html#airflow">Open Airflow →</a></h3><div class="note">Loading…</div></section>
     </div>
 
-    <div class="grid2">
-      <section class="card"><h3>The course</h3>
-        <a class="hero" href="https://maarthala.github.io/data-engineering-lab/" target="_blank" rel="noopener">
-          <div><h4>🎓 Start here — the Data Engineering course</h4>
-            <p>Build the ShopFlow lakehouse end to end: SQL, Python, Spark medallion, Airflow, governance and dashboards — every skill mapped to Databricks, Snowflake &amp; Fabric.</p></div>
-          <span class="cta">Open the course ↗</span></a></section>
-      <section class="card" id="exams"><h3>Mock exams <a href="/exams.html">All exams →</a></h3><div class="note">Loading…</div></section>
-    </div>
+    <section class="card" id="exams"><h3>Mock exams <a href="/exams.html">All exams →</a></h3><div class="note">Loading…</div></section>
   </main>
 
   <footer>
@@ -79,7 +74,7 @@
   <script>
     // 🏠 Home — the member's own overview (the tools are in the left menu): continue where you left off
     // (a paused mock exam, Jupyter, recent files), my lakehouse (storage, tables per layer, catalogs,
-    // team), my pipelines (DAGs + last run), the course and my mock-exam results. /api/home + /api/exams.
+    // team), my pipelines (DAGs + last run) and my mock-exam results; the course next to the greeting.
     function el(tag, attrs, kids) {
       var e = document.createElement(tag);
       Object.keys(attrs || {}).forEach(function (k) {
