@@ -107,6 +107,7 @@ class Stack:
     """What we know about each service — from the compose log, `docker compose ps` and `docker stats`."""
 
     def __init__(self, mode="up"):
+        self.version = None                     # the release the lab runs (header)
         self.mode = mode                        # up · watch · stop
         cfg = json.loads(compose("config", "--format", "json").stdout or "{}").get("services", {})
         self.names = list(cfg) or [s for _, g in GROUPS for s in g]
@@ -349,7 +350,11 @@ class View:
                 off = sum(x == "stopped" for x in s.state.values())
             total -= off
         self.put(0, 1, "Epireum DE Lab", self.c["bold"] | self.c["magenta"])
-        self.put(0, 16, f"· {phase}", self.c["bold"])
+        x = 16
+        if s.version:
+            self.put(0, x, s.version, self.c["dim"])
+            x += len(s.version) + 1
+        self.put(0, x, f"· {phase}", self.c["bold"])
         label = f" {ready:>2}/{total} " + ("stopped" if s.mode == "stop" else "ready") + (f" · {off} off" if off else "")
         lx = w - len(label) - 1
         if self.watch:
@@ -998,6 +1003,18 @@ def ensure_shared_lake():
     return "✓ shared lake (polaris_lake) was missing — created it (make polaris-seed)"
 
 
+def lab_version():
+    """The release the lab runs: home-api's LAB_VERSION (set at make up), else this checkout's tag."""
+    def run(*cmd):
+        try:
+            return subprocess.run(cmd, capture_output=True, text=True, timeout=5).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            return ""
+    m = re.search(r"^LAB_VERSION=(v\d+\.\d+(?:\.\d+)?)$", run("docker", "inspect", "home-api", "--format",
+                                                               "{{range .Config.Env}}{{println .}}{{end}}"), re.M)
+    return m[1] if m else run("git", "-C", HERE, "describe", "--tags", "--abbrev=0", "--match", "v[0-9]*").strip() or None
+
+
 def newer_release():
     """"⚠ newer release …" when GitHub has a vX.Y.Z tag above this checkout's, else None. Fetches the
     tags (10 s at most; offline → None). LAB_UPDATE_CHECK=0 in .env turns it off."""
@@ -1123,6 +1140,7 @@ def main():
     locale.setlocale(locale.LC_ALL, "")
     stack = Stack("stop" if stopping else "watch" if watch else "up")
     stack.checks = checks
+    stack.version = lab_version()
     for line in checks:
         stack.lines.append(line)
     if watch:
