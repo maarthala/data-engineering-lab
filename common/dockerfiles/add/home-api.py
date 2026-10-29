@@ -67,6 +67,9 @@ key isn't kept) or a plain exam.json; set questions / pass mark / who may take i
   POST   /api/admin/exams/delete {"exam", "source"?}
   POST   /api/admin/exams/discard {"exam", "attempt"?}   delete attempts in progress (one / all of the exam)
 
+📓 Notebooks — the member's own Jupyter server: GET /api/notebook {running, starting, stopping,
+last_activity} · POST /api/notebook/stop (X-Lab-Request; the page restarts by stopping, then opening it)
+
 🏠 Home — the member's own overview (labadmin.home_overview): storage used / quota, tables per
 namespace, catalogs, team, recent files, Jupyter running?, their (and their team's) DAGs + last run.
   GET    /api/home
@@ -400,6 +403,37 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             return self._json(500, {"error": str(e)})
 
+    def _notebook(self, method):
+        """The member's own Jupyter server (JupyterHub, one per member): GET its state — the
+        Notebooks page asks before starting one; POST /api/notebook/stop (restart = stop, then the page
+        opens Jupyter again, which starts it)."""
+        path, _ = self._route()
+        user = self._user()
+        if not user:
+            return self._json(401, {"error": "not logged in"})
+        try:
+            def state():
+                st, info = labadmin._hub("GET", f"/users/{urllib.parse.quote(user)}")
+                srv = ((info or {}).get("servers") or {}).get("", {}) if st == 200 else {}
+                return {"running": bool(srv.get("ready")), "starting": bool(srv.get("pending")) and srv.get("pending") != "stop",
+                        "stopping": srv.get("pending") == "stop", "last_activity": (info or {}).get("last_activity") if st == 200 else None}
+            if method == "GET" and path == "/api/notebook":
+                return self._json(200, state())
+            if method == "POST" and path == "/api/notebook/stop":
+                if self.headers.get("X-Lab-Request") != "1":
+                    return self._json(403, {"error": "missing X-Lab-Request header"})
+                labadmin._hub("DELETE", f"/users/{urllib.parse.quote(user)}/server")
+                for _ in range(60):                       # stopping is async (202)
+                    s = state()
+                    if not (s["running"] or s["starting"] or s["stopping"]):
+                        break
+                    time.sleep(1)
+                print(f"[home-api] {user}: Jupyter server stopped", flush=True)
+                return self._json(200, state())
+            return self._json(404, {"error": "not found"})
+        except OSError:
+            return self._json(503, {"error": "Notebooks are not running right now"})
+
     def _body(self, limit=8 << 20):
         length = int(self.headers.get("Content-Length") or 0)
         if length > limit:
@@ -671,6 +705,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._env(method)
         if self.path.startswith("/api/exams"):
             return self._exams(method)
+        if self.path.startswith("/api/notebook"):
+            return self._notebook(method)
         return self._files(method)
 
     def do_PUT(self):
@@ -695,6 +731,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._env("GET")
         if self.path.startswith("/api/exams"):
             return self._exams("GET")
+        if self.path == "/api/notebook":
+            return self._notebook("GET")
         if self.path == "/api/home":                     # 🏠 Home: the member's own overview
             if not self._user():
                 return self._json(401, {"error": "not logged in"})
