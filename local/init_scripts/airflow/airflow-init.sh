@@ -73,4 +73,14 @@ if [[ -z "${AIRFLOW_UID}" ]]; then
         echo
         echo "Files in shared volumes:"
         echo
-        ls -la /opt/airflow/{logs,dags,plugins,config}
+        ls -la /opt/airflow/{logs,dags,plugins,config}        echo
+        # The members' DAG processor's login (airflow_parser) — also on a stack made before it
+        # existed (Postgres runs its init scripts only on a fresh volume). Idempotent.
+        echo "Database login for the members' DAG processor:"
+        python - <<'PY' || exit 1
+import psycopg2
+c = psycopg2.connect(host="postgres", dbname="postgres", user="postgres", password="postgres")
+c.autocommit = True
+c.cursor().execute(open("/init_scripts/airflow_parser_role.sql").read())
+print("  airflow_parser ready")
+PY
