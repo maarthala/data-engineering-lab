@@ -1,0 +1,151 @@
+{
+  "exam": {
+    "id": "demo-data-engineering",
+    "provider": "Epireum lab",
+    "name": "Data Engineering Basics (demo)",
+    "exam_format": {"question_count": 10},
+    "domains": [
+      {"id": "1", "name": "Storage and table formats", "weight_percent": 30},
+      {"id": "2", "name": "Data processing", "weight_percent": 20},
+      {"id": "3", "name": "Orchestration", "weight_percent": 20},
+      {"id": "4", "name": "Modelling and governance", "weight_percent": 30}
+    ]
+  },
+  "bank": {
+    "schema_version": "1.0",
+    "exam_id": "demo-data-engineering",
+    "source": "demo",
+    "questions": [
+      {
+        "id": "demo-001",
+        "question": "A faulty job overwrote rows in an Apache Iceberg table an hour ago. You need to read the table as it was just before that job ran, as quickly as possible. What should you do?",
+        "options": [
+          {"key": "A", "text": "Query the table with TIMESTAMP AS OF (or VERSION AS OF) the snapshot before the faulty write."},
+          {"key": "B", "text": "Restore last night's backup of the bucket and re-register the table."},
+          {"key": "C", "text": "Re-run the ingestion for the whole day from the source files."},
+          {"key": "D", "text": "Run VACUUM on the table to remove the faulty data files."}
+        ],
+        "answer": ["A"],
+        "explanation": "Every Iceberg write creates a new **snapshot**, and older snapshots stay readable until they are expired. Time travel (`TIMESTAMP AS OF` / `VERSION AS OF`) reads an earlier snapshot directly — no copy, no re-run.\n\n- **A (correct):** reads the state before the faulty write in seconds.\n- **B:** slow, and loses every good change since the backup.\n- **C:** works, but takes far longer and assumes the sources are still there.\n- **D:** `VACUUM` is a Delta Lake command that deletes old files — it would make recovery *harder*.",
+        "domain": "1"
+      },
+      {
+        "id": "demo-002",
+        "question": "In a medallion (bronze / silver / gold) lakehouse, which layer should hold data that is cleaned, deduplicated and given consistent types, but not yet aggregated for a business report?",
+        "options": [
+          {"key": "A", "text": "Bronze"},
+          {"key": "B", "text": "Silver"},
+          {"key": "C", "text": "Gold"},
+          {"key": "D", "text": "The source system"}
+        ],
+        "answer": ["B"],
+        "explanation": "**Bronze** keeps the raw data as it arrived, **silver** is the cleaned and conformed version (types fixed, duplicates removed, keys aligned), and **gold** holds the business-level tables — aggregates, marts and KPIs built for a use case.",
+        "domain": "2"
+      },
+      {
+        "id": "demo-003",
+        "question": "In Spark you write `df = spark.read.parquet(path).filter(...).select(...).withColumn(...)`. When does Spark actually read the data?",
+        "options": [
+          {"key": "A", "text": "When spark.read.parquet(path) runs."},
+          {"key": "B", "text": "After each transformation, one step at a time."},
+          {"key": "C", "text": "Only when an action such as count(), show() or a write runs."},
+          {"key": "D", "text": "When the SparkSession is created."}
+        ],
+        "answer": ["C"],
+        "explanation": "Transformations (`filter`, `select`, `withColumn` …) are **lazy**: Spark only builds a plan. An **action** (`count`, `show`, `collect`, a write) makes it optimise the whole plan and run it — which is how it can push the filter down and read only the columns it needs. (Reading the file's schema may touch its footer earlier, but not the data.)",
+        "domain": "2"
+      },
+      {
+        "id": "demo-004",
+        "question": "A table of 2 billion click events is almost always queried for a range of days (\"last 7 days\", \"March\"). Which column should you partition it by?",
+        "options": [
+          {"key": "A", "text": "user_id"},
+          {"key": "B", "text": "event_id"},
+          {"key": "C", "text": "The event date (day)"},
+          {"key": "D", "text": "No partitioning — one folder is fastest."}
+        ],
+        "answer": ["C"],
+        "explanation": "Partition by what queries **filter on**, with a sensible number of values. By day, a \"last 7 days\" query reads 7 partitions and skips the rest (partition pruning).\n\n- **A / B:** millions of distinct values → millions of tiny partitions, and the date filter can't skip anything.\n- **D:** every query scans all 2 billion rows.",
+        "domain": "1"
+      },
+      {
+        "id": "demo-005",
+        "question": "A daily Airflow DAG loads one day of orders. Which two designs make its load task safe to re-run for the same day? (Choose two.)",
+        "options": [
+          {"key": "A", "text": "Overwrite the partition of the run's logical date (data interval) instead of appending."},
+          {"key": "B", "text": "MERGE (upsert) the rows on the order's business key."},
+          {"key": "C", "text": "Append the rows on every run; duplicates can be removed later."},
+          {"key": "D", "text": "Pick the day to load with datetime.now() inside the task."}
+        ],
+        "answer": ["A", "B"],
+        "explanation": "A re-runnable (**idempotent**) task gives the same result however often it runs.\n\n- **A (correct):** replacing exactly that day's partition can't create duplicates.\n- **B (correct):** a MERGE on the business key updates rows that exist and inserts new ones.\n- **C:** every retry or backfill adds duplicates.\n- **D:** a re-run tomorrow would load *tomorrow's* day — use the run's logical date / data interval instead.",
+        "domain": "3"
+      },
+      {
+        "id": "demo-006",
+        "question": "Your Airflow tasks transform 200 GB of data with pandas inside the Airflow worker, and the worker keeps running out of memory. What is the better design?",
+        "options": [
+          {"key": "A", "text": "Give the Airflow worker more memory and keep the pandas code."},
+          {"key": "B", "text": "Let Airflow orchestrate only: run the transformation in Spark (or the warehouse) and have the task submit it and wait."},
+          {"key": "C", "text": "Split the DAG into 200 tasks of 1 GB that all run in the worker."},
+          {"key": "D", "text": "Move the data into an Airflow Variable between tasks."}
+        ],
+        "answer": ["B"],
+        "explanation": "Airflow is an **orchestrator**: it schedules, retries and tracks work. Heavy processing belongs in an engine built for it (Spark, a warehouse, dbt on a warehouse); the Airflow task starts the job and waits for it.\n\n- **A:** only postpones the problem, and starves other tasks.\n- **C:** still processes everything on the worker.\n- **D:** Variables (and XComs) are for small values, not data.",
+        "domain": "3"
+      },
+      {
+        "id": "demo-007",
+        "question": "Analysts need to see a customer's address as it was at the time of each historical order, even after the customer moves. How should the customer dimension handle address changes?",
+        "options": [
+          {"key": "A", "text": "Overwrite the address in place (SCD Type 1)."},
+          {"key": "B", "text": "Add a new row per change with valid_from / valid_to (and a current flag) — SCD Type 2."},
+          {"key": "C", "text": "Store only the first address ever seen."},
+          {"key": "D", "text": "Copy the full customer record into every order row and drop the dimension."}
+        ],
+        "answer": ["B"],
+        "explanation": "**SCD Type 2** keeps history: each change closes the old row (`valid_to`) and adds a new one, so a fact can join to the version that was valid at its date.\n\n- **A:** Type 1 keeps only the latest value — history is lost.\n- **C:** wrong for every order after the first move.\n- **D:** works for this one attribute but duplicates data and loses the dimension for everything else.",
+        "domain": "4"
+      },
+      {
+        "id": "demo-008",
+        "question": "Why are columnar file formats such as Parquet preferred for analytical queries?",
+        "options": [
+          {"key": "A", "text": "They store each row as a separate file, so single-row lookups are fast."},
+          {"key": "B", "text": "A query reads only the columns it needs, and similar values in a column compress well."},
+          {"key": "C", "text": "They are plain text, so any tool can read them without a library."},
+          {"key": "D", "text": "They don't need a schema."}
+        ],
+        "answer": ["B"],
+        "explanation": "Analytical queries usually touch a few columns of many rows. Parquet stores values **column by column**, so the engine reads only those columns (column pruning), skips row groups using min/max statistics, and compresses well because a column's values are alike. Parquet is binary and carries a schema.",
+        "domain": "1"
+      },
+      {
+        "id": "demo-009",
+        "question": "A new analyst must read the gold tables of the sales lakehouse and nothing else. Which two steps follow the principle of least privilege? (Choose two.)",
+        "options": [
+          {"key": "A", "text": "Grant read (SELECT) on the gold namespace only — not write, not bronze or silver."},
+          {"key": "B", "text": "Grant it to a role (or group) and give the analyst that role, rather than granting to the person directly."},
+          {"key": "C", "text": "Share the platform's admin credentials so they never get an access error."},
+          {"key": "D", "text": "Give write access to every catalog in case they need it later."}
+        ],
+        "answer": ["A", "B"],
+        "explanation": "**Least privilege:** only the access the job needs. \n\n- **A (correct):** read on exactly the data they use.\n- **B (correct):** roles make access reviewable and easy to remove, and the next analyst just gets the same role.\n- **C / D:** far more access than needed — and with shared admin credentials nothing can be traced to a person.",
+        "domain": "4"
+      },
+      {
+        "id": "demo-010",
+        "question": "In a star schema, what does a fact table contain?",
+        "options": [
+          {"key": "A", "text": "Descriptive attributes such as customer name and product category."},
+          {"key": "B", "text": "Measures (amount, quantity …) at a defined grain, plus foreign keys to the dimension tables."},
+          {"key": "C", "text": "Only the primary keys of all dimensions, with no numbers."},
+          {"key": "D", "text": "A copy of every source table, joined together."}
+        ],
+        "answer": ["B"],
+        "explanation": "A **fact** table records events at a stated grain (e.g. one row per order line) with numeric **measures** and **foreign keys** to the **dimensions** around it (date, customer, product). The descriptive attributes (A) live in the dimension tables.",
+        "domain": "4"
+      }
+    ]
+  }
+}

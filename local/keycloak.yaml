@@ -76,6 +76,7 @@ services:
       - ../common/dockerfiles/add/labadmin.py:/app/labadmin.py:ro
       - ../common/dockerfiles/add/labvault.py:/app/labvault.py:ro
       - ../common/dockerfiles/add/labexams.py:/app/labexams.py:ro
+      - ../common/dockerfiles/add/exam_demo.json:/app/exam_demo.json:ro
     depends_on:                      # it provisions in all three: wait for them (a stopped one has no DNS name)
       portal-db:
         condition: service_completed_successfully

@@ -10,6 +10,7 @@ COPY add/seed /app/seed
 COPY add/home-api.py /app/app.py
 COPY add/labadmin.py /app/labadmin.py
 COPY add/labexams.py /app/labexams.py
+COPY add/exam_demo.json /app/exam_demo.json
 USER nobody
 EXPOSE 8000
 CMD ["python", "/app/app.py"]

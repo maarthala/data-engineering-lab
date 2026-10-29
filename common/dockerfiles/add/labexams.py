@@ -16,6 +16,9 @@ a full review. Correct answers never reach the browser before the attempt is sub
 Questions marked review.status = needs-fix are left out; review.answer / review.explanation win
 over the source's when present.
 
+A demo exam (exam_demo.json: 10 questions, open to everyone) is added once, when the tables are
+made; managers may change, close or delete it — it doesn't come back.
+
 DB: PORTAL_DB_URL (postgres://portal:…@postgres:5432/portal); tables are made on first use.
 """
 import base64
@@ -31,6 +34,7 @@ DB_URL = os.environ.get("PORTAL_DB_URL", "postgresql://portal:portal@postgres:54
 FORMAT = "certification-exams/question-bank+aes-256-gcm"
 EXAM_ID = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 AUDIENCES = ("all", "teams", "off")
+DEMO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exam_demo.json")
 PASS_PERCENT = 70
 _ready = False
 _lock = threading.Lock()
@@ -56,6 +60,7 @@ CREATE TABLE IF NOT EXISTS exam_attempts (
   correct int, total int, score int, passed boolean, by_domain jsonb);
 CREATE UNIQUE INDEX IF NOT EXISTS exam_attempts_open ON exam_attempts (exam_id, member) WHERE finished_at IS NULL;
 CREATE INDEX IF NOT EXISTS exam_attempts_member ON exam_attempts (member, exam_id);
+CREATE TABLE IF NOT EXISTS portal_meta (key text PRIMARY KEY, value text);
 """
 
 
@@ -69,10 +74,28 @@ def _conn():
     import psycopg2.extras
     c = psycopg2.connect(DB_URL, cursor_factory=psycopg2.extras.RealDictCursor)
     if not _ready:
-        with _lock, c, c.cursor() as cur:
-            cur.execute(SCHEMA)
-        _ready = True
+        with _lock:
+            with c, c.cursor() as cur:
+                cur.execute(SCHEMA)
+            _ready = True
+            try:
+                _seed_demo()
+            except Exception as e:  # noqa: BLE001 — the portal works without the demo
+                print(f"[exams] demo exam not added: {e}", flush=True)
     return c
+
+
+def _seed_demo():
+    """The demo exam, once (portal_meta remembers it — a manager may delete it for good)."""
+    if not os.path.exists(DEMO) or _q("SELECT 1 AS x FROM portal_meta WHERE key = 'demo_exam'", one=True):
+        return
+    with open(DEMO, "rb") as f:
+        raw = f.read()
+    demo = json.loads(raw)
+    upload_meta(demo["exam"], "lab")
+    _store_bank(demo["bank"], hashlib.sha256(raw).hexdigest(), "lab")
+    _q("UPDATE exams SET audience = 'all' WHERE id = %s", (demo["exam"]["id"],), rows=False)
+    _q("INSERT INTO portal_meta (key, value) VALUES ('demo_exam', %s)", (demo["exam"]["id"],), rows=False)
 
 
 def _q(sql, args=(), one=False, rows=True):
@@ -138,7 +161,10 @@ def _title(exam_id):
 
 def upload_bank(envelope, key_text, by):
     """Decrypt and store one bank (replacing that source). → summary."""
-    bank = decrypt(envelope, key_text)
+    return _store_bank(decrypt(envelope, key_text), json.loads(envelope["header"]).get("sha256"), by)
+
+
+def _store_bank(bank, sha256, by):
     exam_id, source = bank.get("exam_id", ""), bank.get("source", "")
     if not EXAM_ID.match(exam_id) or not EXAM_ID.match(source):
         raise ExamError("the bank has no valid exam_id / source")
@@ -155,7 +181,7 @@ def upload_bank(envelope, key_text, by):
             cur.execute("DELETE FROM exam_banks WHERE exam_id = %s AND source = %s", (exam_id, source))
             cur.execute("INSERT INTO exam_banks (exam_id, source, questions, skipped, sha256, uploaded_by) "
                         "VALUES (%s, %s, %s, %s, %s, %s)",
-                        (exam_id, source, len(rows), skipped, json.loads(envelope["header"]).get("sha256"), by))
+                        (exam_id, source, len(rows), skipped, sha256, by))
             cur.execute("DELETE FROM exam_questions WHERE exam_id = %s AND qid = ANY(%s)",
                         (exam_id, [r["qid"] for r in rows]))       # an id moved between sources
             psycopg2.extras.execute_values(cur, "INSERT INTO exam_questions (exam_id, source, qid, question, "

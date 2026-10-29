@@ -220,6 +220,7 @@ spec:
             - { name: lab-code, mountPath: /app/labadmin.py, subPath: labadmin.py }
             - { name: lab-code, mountPath: /app/labvault.py, subPath: labvault.py }
             - { name: lab-code, mountPath: /app/labexams.py, subPath: labexams.py }
+            - { name: lab-code, mountPath: /app/exam_demo.json, subPath: exam_demo.json }
             - { name: lab-seed, mountPath: /app/seed }
       volumes:
         - { name: lab-code, configMap: { name: lab-code } }
