@@ -157,11 +157,12 @@
         }))])])]);
     });
 
-    // the release this lab runs (footer) · managers: a newer release on GitHub (Hide remembers it per release)
+    // the release this lab runs (footer) · a newer release on GitHub: managers get how to update,
+    // members that their lab managers do it (Hide remembers it per release)
     fetch('/api/version').then(function (r) { return r.ok ? r.json() : {}; }).then(function (v) {
       if (v.current) document.getElementById('lab-version').textContent = '· ' + v.current;
     }).catch(function () {});
-    function updateBanner() {
+    function updateBanner(manager) {
       fetch('/api/version').then(function (r) { return r.ok ? r.json() : {}; }).then(function (v) {
         if (!v.update) return;
         var hidden = null;
@@ -170,7 +171,7 @@
         var k8s = /(^|\.)de\.lan$/.test(location.hostname);
         document.getElementById('update-latest').textContent = v.latest;
         document.getElementById('update-current').textContent = v.current || 'an older version';
-        document.getElementById('update-how').innerHTML = k8s
+        document.getElementById('update-how').innerHTML = !manager ? 'Your lab managers can update it.' : k8s
           ? 'Update the cluster: <code>git pull</code>, then deploy again (course: Kubernetes setup).'
           : 'Update: <code>git pull</code> in the repo, then <code>make up</code> in <code>local/</code>.';
         document.getElementById('update-link').href = v.url;
@@ -184,7 +185,7 @@
     }
     document.addEventListener('lab:me', function (e) {
       document.getElementById('hi').textContent = ', ' + e.detail.user;
-      if ((e.detail.groups || []).indexOf('managers') >= 0) updateBanner();
+      updateBanner((e.detail.groups || []).indexOf('managers') >= 0);
     });
   </script>
 </body>

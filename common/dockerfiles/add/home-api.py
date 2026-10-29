@@ -743,7 +743,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/api/version":
             if not self._user():
                 return self._json(401, {"error": "not logged in"})
-            return self._json(200, update_info() if self._manager() else {"update": False, "current": VERSION or None})
+            return self._json(200, update_info())           # members too: their banner just says so
         if self.path == "/api/services":
             if not self._user():
                 return self._json(401, {"error": "not logged in"})
