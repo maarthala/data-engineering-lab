@@ -9,7 +9,7 @@ and their team's; signed in to the vault UI, the Keycloak group team-<team> adds
 
 member_token(name)       a fresh token for the member's Jupyter (role member, one week); the
                          previous one is revoked, like the Polaris secret at every start
-names / get / fields / put / delete   one member's secrets (home-api, Airflow)
+names / get / fields / put / put_fields / delete   one member's secrets (home-api, Airflow)
 clear(name)              delete all their secrets (wipe) · forget(name): + policy, token,
                          vault sign-in record (delete)
 import_env_file(name)    move an old "My variables" file (.lab/env.json) into the vault, once
@@ -125,6 +125,13 @@ def fields(name, key):
 
 def put(name, key, value, secret=True, updated=None):
     data = {"value": value, "secret": "1" if secret else "0",
+            "updated": updated or time.strftime("%Y-%m-%d %H:%M", time.gmtime())}
+    _ok(_call("POST", f"{MOUNT}/data/{_q(name, key)}", {"data": data})[0], f"write {key}")
+
+
+def put_fields(name, key, fields, secret=True, updated=None):
+    """A secret with several fields (e.g. db: username + password) — key_vault("db", "password")."""
+    data = {**fields, "secret": "1" if secret else "0",
             "updated": updated or time.strftime("%Y-%m-%d %H:%M", time.gmtime())}
     _ok(_call("POST", f"{MOUNT}/data/{_q(name, key)}", {"data": data})[0], f"write {key}")
 

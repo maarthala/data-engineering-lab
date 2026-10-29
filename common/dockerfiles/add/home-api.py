@@ -49,6 +49,7 @@ member's own vault token; DAGs the same, through Airflow. Secret values are neve
 Changes need the X-Lab-Request header (a plain cross-site form can't send it).
   GET    /api/env                                        names (+ values of non-secrets)
   POST   /api/env  {"name", "value"?, "secret"}          add / change (no value = keep it)
+  POST   /api/env  {"name", "fields": {f: value|null}, "secret"}   a secret with several fields (null/empty: keep it)
   DELETE /api/env?name=…                                 remove
 
 "📝 Mock exams" — certification practice exams (labexams.py, in the portal database). Members:
@@ -196,6 +197,8 @@ def _team_of(name):
 # "My secrets": in the key vault (labvault.py), one folder per member. Names like variables:
 # letters, digits and _ (the same names the old "My variables" allowed).
 ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
+FIELD = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]{0,63}$")   # a field of a secret (db: username, password …)
+MAX_FIELDS = 20
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -488,11 +491,21 @@ class Handler(BaseHTTPRequestHandler):
             if method == "GET":
                 if not team:
                     labvault.import_env_file(name)      # once: the old My variables file
-                rows = [(k, labvault.get(name, k)) for k in labvault.names(name)]
-                return self._json(200, {"team": team, "folder": name, "vars": [
-                    {"name": k, "secret": v["secret"], "updated": v["updated"],
-                     **({} if v["secret"] else {"value": v["value"]})}
-                    for k, v in rows if v]})
+                rows = [(k, labvault.get(name, k), labvault.fields(name, k)) for k in labvault.names(name)]
+                out = []
+                for k, v, f in rows:
+                    if not v:
+                        continue
+                    multi = sorted(f or {}) != ["value"]               # several fields (or not called value)
+                    row = {"name": k, "secret": v["secret"], "updated": v["updated"]}
+                    if multi:
+                        row["fields"] = sorted(f)
+                        if not v["secret"]:
+                            row["values"] = f
+                    elif not v["secret"]:
+                        row["value"] = v["value"]
+                    out.append(row)
+                return self._json(200, {"team": team, "folder": name, "vars": out})
             if self.headers.get("X-Lab-Request") != "1":
                 return self._json(403, {"error": "missing X-Lab-Request header"})
             with _lock:                                  # one change at a time (count + write)
@@ -511,6 +524,27 @@ class Handler(BaseHTTPRequestHandler):
                 if not ENV_NAME.match(key):
                     raise ValueError("name: letters, digits and _ only, not starting with a digit (max 64)")
                 old = labvault.get(name, key)
+                if isinstance(body.get("fields"), dict):           # several fields; an empty one keeps its value
+                    have = labvault.fields(name, key) or {}
+                    fields = {}
+                    for f, v in body["fields"].items():
+                        f = str(f).strip()
+                        if not FIELD.match(f) or f in ("secret", "updated"):
+                            raise ValueError(f"field {f!r}: letters, digits, _ . - (not secret / updated)")
+                        if v is None or v == "":
+                            if f not in have:
+                                raise ValueError(f"field {f}: a value is required")
+                            v = have[f]
+                        if not isinstance(v, str) or len(v) > labvault.MAX_VALUE:
+                            raise ValueError(f"field {f}: text up to {labvault.MAX_VALUE} characters")
+                        fields[f] = v
+                    if not fields or len(fields) > MAX_FIELDS:
+                        raise ValueError(f"1–{MAX_FIELDS} fields")
+                    if old is None and len(labvault.names(name)) >= labvault.MAX_SECRETS:
+                        raise ValueError(f"at most {labvault.MAX_SECRETS} secrets")
+                    labvault.put_fields(name, key, fields, bool(body.get("secret")))
+                    print(f"[home-api] {user}: secret {key} saved ({len(fields)} fields)", flush=True)
+                    return self._json(200, {"saved": key})
                 if value is None:
                     if old is None:
                         raise ValueError("value is required")
