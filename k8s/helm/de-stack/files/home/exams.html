@@ -7,7 +7,9 @@
   <link rel="stylesheet" href="/admin.css?v=7">
   <style>
     main{max-width:1100px}
-    .exams{display:grid; grid-template-columns:repeat(auto-fill,minmax(440px,1fr)); gap:16px}
+    .elist td{vertical-align:middle} .hist > td{background:var(--panel2); padding:6px 14px 12px}
+    .hist table th{background:transparent}
+    button.on{border-color:var(--accent); color:var(--accent)}
     .exam h2{margin:0 0 4px; font-size:1.05rem}
     .stats{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:12px 0}
     .stats div{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:8px; text-align:center}
@@ -97,33 +99,43 @@
         main.innerHTML = '';
         if (!d.exams.length) main.appendChild(el('div', {class: 'placeholder',
           text: 'No mock exams are open to you yet — your lab managers add them.'}));
-        else main.appendChild(el('div', {class: 'exams'}, d.exams.map(examCard)));
+        else main.appendChild(el('div', {class: 'card'}, [el('h3', {text: d.exams.length + (d.exams.length === 1 ? ' exam' : ' exams') + ' open to you'}),
+          el('div', {class: 'wrap'}, [el('table', {class: 'elist'}, [el('thead', {}, [el('tr', {},
+            ['Exam', 'Questions', 'Pass mark', 'Attempts', 'Passed', 'Best', 'Average', 'Last', '', ''].map(function (h, i) {
+              return el('th', {class: i >= 1 && i <= 7 ? 'r' : '', text: h}); }))])]
+            .concat([el('tbody', {}, [].concat.apply([], d.exams.map(examRows)))]))])]));
         if (note) alertCard(note);
       }).catch(fail);
     }
-    function stat(v, label, cls) { return el('div', {}, [el('b', {class: cls || '', text: v === null || v === undefined ? '—' : String(v)}), el('span', {text: label})]); }
-    function examCard(e) {
+    function pct(v) { return v === null || v === undefined ? '—' : v + ' %'; }
+    // one exam = one row (+ its attempts in a row below, opened with History)
+    function examRows(e) {
       var s = e.stats;
-      var go = el('button', {class: 'primary', text: e.open ? 'Resume (' + e.open.answered + ' / ' + e.open.total + ' answered)' : (s.attempts ? 'Start a new attempt' : 'Start exam')});
+      var go = el('button', {class: 'small primary', text: e.open ? 'Resume ' + e.open.answered + '/' + e.open.total : (s.attempts ? 'New attempt' : 'Start')});
       go.addEventListener('click', function () {
         go.disabled = true;
         api('POST', '/api/exams/start', {exam: e.id}).then(take).catch(function (x) { alertCard(x.message); go.disabled = false; });
       });
-      var hist = e.history.length ? el('table', {}, [el('tr', {}, ['When', 'Score', '', 'Time', ''].map(function (h) { return el('th', {text: h}); }))]
-        .concat(e.history.map(function (a) {
+      var more = el('button', {class: 'small', text: 'History (' + e.history.length + ')'});
+      more.disabled = !e.history.length;
+      var last = e.history[0];
+      var row = el('tr', {}, [
+        el('td', {}, [el('b', {text: e.name}), el('div', {class: 'sub', text: (e.provider ? e.provider + ' · ' : '') + 'no time limit'})]),
+        el('td', {class: 'r', text: String(e.questions)}), el('td', {class: 'r', text: e.pass_percent + ' %'}),
+        el('td', {class: 'r', text: String(s.attempts)}), el('td', {class: 'r' + (s.passed ? ' pass' : ''), text: String(s.passed)}),
+        el('td', {class: 'r', text: pct(s.best)}), el('td', {class: 'r', text: pct(s.average)}),
+        el('td', {class: 'r'}, last ? [el('span', {class: last.passed ? 'pass' : 'fail', text: last.score + ' %'})] : ['—']),
+        el('td', {class: 'acts'}, [go]), el('td', {class: 'acts'}, [more])]);
+      var hist = el('tr', {class: 'hist', hidden: ''}, [el('td', {colspan: '10'}, [el('table', {}, [el('thead', {}, [el('tr', {},
+        ['When', 'Score', 'Result', 'Time', ''].map(function (h) { return el('th', {text: h}); }))]), el('tbody', {}, e.history.map(function (a) {
           var r = el('button', {class: 'small', text: 'Review'});
           r.addEventListener('click', function () { openAttempt(a.id); });
           return el('tr', {}, [el('td', {class: 'muted', text: when(a.finished_at)}), el('td', {text: a.score + ' % (' + a.correct + '/' + a.total + ')'}),
             el('td', {class: a.passed ? 'pass' : 'fail', text: a.passed ? 'passed' : 'not yet'}), el('td', {class: 'muted', text: a.minutes + ' min'}),
             el('td', {class: 'acts'}, [r])]);
-        }))) : el('div', {class: 'sub', text: 'No attempts yet.'});
-      return el('div', {class: 'card exam'}, [
-        el('h2', {text: e.name}),
-        el('div', {class: 'sub', text: e.questions + ' questions · pass mark ' + e.pass_percent + ' % · no time limit' + (e.provider ? ' · ' + e.provider : '')}),
-        el('div', {class: 'stats'}, [stat(s.attempts, 'attempts'), stat(s.passed, 'passed', s.passed ? 'pass' : ''),
-          stat(s.best === null ? null : s.best + ' %', 'best'), stat(s.average === null ? null : s.average + ' %', 'average')]),
-        el('div', {class: 'row', style: 'margin-bottom:10px'}, [go]),
-        el('div', {class: 'wrap'}, [hist])]);
+        }))])])]);
+      more.addEventListener('click', function () { hist.hidden = !hist.hidden; more.classList.toggle('on', !hist.hidden); });
+      return [row, hist];
     }
     function alertCard(msg) { main.insertBefore(el('div', {class: 'card result err'}, [el('div', {text: msg})]), main.firstChild); }
 
