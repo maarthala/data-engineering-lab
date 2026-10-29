@@ -49,7 +49,7 @@ GROUPS = [
     ("SQL", ["trino", "sqlpad"]),
     ("Notebooks", ["jupyterhub", "jupyter"]),           # pandas, SQL, Python: no Spark needed
     ("Spark", ["spark-master", "spark-worker-1", "spark-connect"]),
-    ("Airflow", ["airflow-init", "airflow-apiserver", "airflow-scheduler", "airflow-dag-processor"]),
+    ("Airflow", ["airflow-init", "airflow-apiserver", "airflow-scheduler", "airflow-dag-processor", "airflow-dag-processor-learners"]),
     ("Superset", ["superset"]),
     ("Polaris console", ["polaris-console", "polaris-proxy"]),
 ]

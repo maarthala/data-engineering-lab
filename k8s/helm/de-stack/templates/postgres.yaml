@@ -71,6 +71,7 @@ spec:
             - { name: PG_POLARIS_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: pg-polaris-password } } }
             - { name: PG_KEYCLOAK_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: pg-keycloak-password } } }
             - { name: PG_SUPERSET_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: pg-superset-password } } }
+            - { name: PG_AIRFLOW_PARSER_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: pg-airflow-parser-password, optional: true } } }
             - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
           ports:
             - containerPort: 5432

@@ -46,6 +46,20 @@ spec:
       default: { cpu: "1", memory: 2Gi }          # a Spark driver (SparkPi) needs ~1.5 Gi
       defaultRequest: { cpu: 100m, memory: 256Mi }
 ---
+# The lab code a member's task pod needs (a copy of part of lab-code: a pod mounts ConfigMaps of
+# its own namespace only). No secrets in it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lab-job-code
+  namespace: {{ $j.namespace }}
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+data:
+{{- range list "airflow_learner_dags.py" "airflow_local_settings.py" "lab_spark.py" "lakehouse.py" "labvault.py" "airflow_lab_logging.py" }}
+  {{ . }}: |
+{{ $.Files.Get (printf "files/lab/%s" .) | indent 4 }}
+{{- end }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:

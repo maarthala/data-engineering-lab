@@ -38,10 +38,11 @@ x-airflow-common:
     # key_vault() in learner DAGs reads the DAG owner's secrets from the key vault
     VAULT_ADDR: http://vault:8200
     VAULT_ADMIN_TOKEN: ${VAULT_ADMIN_TOKEN:-lab-vault-admin-local-token}
-    AIRFLOW_CONN_LEARNER_S3: >-
-      {"conn_type": "aws", "login": "admin", "password": "admin123",
-       "extra": {"endpoint_url": "http://storage:9000", "region_name": "us-east-1",
-                 "config_kwargs": {"s3": {"addressing_style": "path"}}}}
+    # the learners bundle reads members' dags/ folders with storage user dags-reader (that folder
+    # only — airflow_lab_guard.py makes it). Here the scheduler needs it too: on the local stack
+    # member tasks run inside Airflow (k8s: in their own pods, see k8s/helm/de-stack/templates/airflow.yaml)
+    LAB_DAGS_S3_KEY: dags-reader
+    LAB_DAGS_S3_SECRET: ${LAB_DAGS_READER_SECRET:-lab-dags-reader-local}
   volumes:
     - ./code:/code
     - ../common/dockerfiles/add/airflow_webserver_config.py:/opt/airflow/webserver_config.py:ro
@@ -51,6 +52,8 @@ x-airflow-common:
     - ../common/dockerfiles/add/lab_spark.py:/opt/airflow/lab/lab_spark.py:ro
     - ../common/dockerfiles/add/lakehouse.py:/opt/airflow/lab/lakehouse.py:ro
     - ../common/dockerfiles/add/labvault.py:/opt/airflow/lab/labvault.py:ro
+    - ../common/dockerfiles/add/lab_jobs.py:/opt/airflow/lab/lab_jobs.py:ro
+    - ../common/dockerfiles/add/airflow_lab_guard.py:/opt/airflow/lab/airflow_lab_guard.py:ro
     - ./configs/airflow.cfg:/opt/airflow/config/airflow.cfg
     - ./configs/spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
     - ./configs/spark/fairscheduler.xml:/opt/spark/conf/fairscheduler.xml
@@ -101,9 +104,11 @@ services:
       airflow-init:
         condition: service_completed_successfully
 
+  # the stack's own DAGs; also the trusted side of the members' processor (airflow_lab_guard.py:
+  # its database grants, the dags-reader storage user, members' DAG permissions)
   airflow-dag-processor:
     <<: *airflow-common
-    command: dag-processor
+    command: ["bash", "-c", "python /opt/airflow/lab/airflow_lab_guard.py & exec airflow dag-processor --bundle-name dags-folder"]
     container_name: airflow-dag-processor
     healthcheck:
       test: ["CMD-SHELL", 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"']
@@ -116,6 +121,48 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+
+  # Members' DAG files run here (top-level code, DAG callbacks) — with no admin login: database
+  # login airflow_parser (no logins, connections, variables, XComs …), storage user dags-reader,
+  # no FAB (can't grant itself anything). Not under the common env/volumes on purpose.
+  airflow-dag-processor-learners:
+    <<: *airflow-common
+    command: dag-processor --bundle-name learners
+    container_name: airflow-dag-processor-learners
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__AUTH_MANAGER: airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow_parser:airflow_parser@postgres/airflow
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__DAGS_FOLDER: /code/airflow/dags
+      AIRFLOW__DAG_PROCESSOR__DAG_BUNDLE_CONFIG_LIST: >-
+        [{"name": "dags-folder", "classpath": "airflow.dag_processing.bundles.local.LocalDagBundle", "kwargs": {}},
+         {"name": "learners", "classpath": "learner_dags.LearnerDagsBundle", "kwargs": {"refresh_interval": 30}}]
+      PYTHONPATH: /opt/airflow/lab
+      LAB_DAGS_S3_KEY: dags-reader
+      LAB_DAGS_S3_SECRET: ${LAB_DAGS_READER_SECRET:-lab-dags-reader-local}
+      AWS_REGION: us-east-1
+    volumes:
+      - ../common/dockerfiles/add/airflow_learner_dags.py:/opt/airflow/lab/learner_dags.py:ro
+      - ../common/dockerfiles/add/airflow_local_settings.py:/opt/airflow/lab/airflow_local_settings.py:ro
+      - ../common/dockerfiles/add/lab_spark.py:/opt/airflow/lab/lab_spark.py:ro
+      - ../common/dockerfiles/add/lakehouse.py:/opt/airflow/lab/lakehouse.py:ro
+      - ../common/dockerfiles/add/labvault.py:/opt/airflow/lab/labvault.py:ro
+      - airflow-logs:/opt/airflow/logs
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+      airflow-dag-processor:          # its guard grants this login's tables first
+        condition: service_healthy
 
   airflow-init:
     <<: *airflow-common

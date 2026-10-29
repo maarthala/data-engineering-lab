@@ -18,17 +18,17 @@ their team's lakehouse by its name, team_<team>.
             ...
 
 Who: the folder of the running DAG's file (learners/<user>/…), so a learner's DAG gets
-their own lakehouse. A TEAM's DAG (learners/team-<team>/…, from the team bucket) runs as the
-team (login team_<team>_jobs), so it keeps working whoever is in the team: it has team_<team>
-and `shared`, and no `my`. The login is a dedicated Polaris principal <user>_jobs holding the
-learner's own principal-role (so it can do what they can); it's created on first use and its
-secret kept in the Airflow Variable lab_jobs_<user>. (The learner's notebook login is
-re-keyed on every Jupyter start, so jobs need their own.)
+their own lakehouse — always its owner (user= may only name the owner). A TEAM's DAG
+(learners/team-<team>/…, from the team bucket) runs as the team (login team_<team>_jobs), so it
+keeps working whoever is in the team: it has team_<team> and `shared`, and no `my`. The logins
+(Polaris <user>_jobs holding the learner's own principal-role, storage key <user>-jobs, a vault
+token for their secrets) come from lab_jobs.py: on k8s the scheduler puts them into the task's
+own pod (LAB_JOB_* env) and the task never sees an admin login; on the local stack the task
+asks lab_jobs itself.
 """
 import json
 import os
 import re
-import secrets
 
 import lakehouse as lh
 
@@ -44,71 +44,23 @@ def _current_user():
     return loc.split(BUNDLE, 1)[1].split("/", 1)[0]          # bucket prefix, e.g. ravi or ravi-k
 
 
-TEAM_DIR = "team-"                                            # learners/team-<team>/ = a team's DAGs
+def _job(user=None):
+    """The logins this task runs with (lab_jobs.job_env): the pod's own env on k8s, else asked
+    for here (local stack). Always the DAG's owner."""
+    owner = os.environ.get("LAB_JOB_OWNER") or _current_user()
+    if user and user != owner:
+        raise PermissionError(f"this DAG runs as {owner}, not {user!r}")
+    if os.environ.get("LAB_JOB_CREDENTIAL"):
+        return {k: v for k, v in os.environ.items() if k.startswith("LAB_JOB_")}
+    import lab_jobs
+    return lab_jobs.job_env(owner)
 
 
 def _whose(user=None):
     """(name, own catalog, team) the running task works as: a member (ravi, ravi_lake, their
     team) or — for a team's DAG — the team (team_sales, team_sales, sales)."""
-    who = user or _current_user()
-    name = lh.lake_name(who)
-    if not re.fullmatch(r"[a-z0-9_]+", name):
-        raise ValueError(f"bad learner name {name!r}")
-    if who.startswith(TEAM_DIR):                              # (usernames team-… are reserved)
-        team = who[len(TEAM_DIR):]
-        return name, lh.team_catalog(team), team
-    return name, f"{name}_lake", lh.team_of(name)
-
-
-def _works(cred):
-    cid, secret = cred.split(":", 1)
-    st, _ = lh._call("POST", "/api/catalog/v1/oauth/tokens", form={
-        "grant_type": "client_credentials", "client_id": cid, "client_secret": secret,
-        "scope": "PRINCIPAL_ROLE:ALL"})
-    return st == 200
-
-
-def _jobs_credential(name, team=None):
-    """client_id:secret of <name>_jobs (created + bound to the learner's role on first use).
-    team: <name> is that team's job identity team_<team> — its role is set up first."""
-    from airflow.sdk import Variable
-    key = f"lab_jobs_{name}"
-    cred = Variable.get(key, default=None)
-    if cred and _works(cred):
-        return cred
-    if team:
-        lh.team_jobs_role(team)
-    # first use — or the stored login no longer works (secret reset elsewhere): make a fresh one
-    t, m, jobs = lh._admin_token(), "/api/management/v1", f"{name}_jobs"
-    lh._ok(lh._call("POST", f"{m}/principals", {"principal": {"name": jobs}}, t)[0], "jobs principal")
-    lh._ok(lh._call("PUT", f"{m}/principals/{jobs}/principal-roles", {"principalRole": {"name": name}}, t)[0],
-           "jobs role")
-    secret = secrets.token_urlsafe(24)
-    st, _ = lh._call("POST", f"{m}/principals/{jobs}/reset", {"clientId": jobs, "clientSecret": secret}, t)
-    if st != 200:
-        raise RuntimeError(f"jobs login for {name}: HTTP {st}")
-    cred = f"{jobs}:{secret}"
-    Variable.set(key, cred)
-    return cred
-
-
-def _jobs_storage_key(name):
-    """(key, secret) of the learner's own-bucket storage user <user>-jobs (kept in the Airflow
-    Variable lab_jobs_s3_<name>; minted again if it stopped working)."""
-    import urllib.error
-    from airflow.sdk import Variable
-    var = f"lab_jobs_s3_{name}"
-    saved = Variable.get(var, default=None)
-    if saved:
-        key, secret = saved.split(":", 1)
-        try:
-            lh._s3_as(key, secret, "GET", lh.bucket_name(name), query={"list-type": "2", "max-keys": "1"}).close()
-            return key, secret
-        except urllib.error.HTTPError:
-            pass
-    key, secret = lh.storage_key(name, "jobs")
-    Variable.set(var, f"{key}:{secret}")
-    return key, secret
+    j = _job(user)
+    return j["LAB_JOB_NAME"], j["LAB_JOB_CATALOG"], j["LAB_JOB_TEAM"] or None
 
 
 def lab_spark(user=None):
@@ -117,9 +69,10 @@ def lab_spark(user=None):
     polaris_lake. (`iceberg`, the default catalog, is my too — the older name.) In a team's DAG:
     team_<team> and shared (iceberg = team_<team>)."""
     from pyspark.sql import SparkSession
-    name, own, team = _whose(user)
+    j = _job(user)
+    name, own, team = j["LAB_JOB_NAME"], j["LAB_JOB_CATALOG"], j["LAB_JOB_TEAM"] or None
     is_team = own == name
-    cred = _jobs_credential(name, team if is_team else None)
+    cred = j["LAB_JOB_CREDENTIAL"]
     spark = SparkSession.builder.remote(SPARK_REMOTE).getOrCreate()
     # same settings as the server's own `iceberg` catalog — only the warehouse + login differ
     base = "spark.sql.catalog.iceberg"
@@ -135,9 +88,8 @@ def lab_spark(user=None):
         spark.conf.set(f"spark.sql.catalog.{cat}.warehouse", warehouse)
         spark.conf.set(f"spark.sql.catalog.{cat}.credential", cred)
     # raw files (s3a://…): the cluster has no storage keys — use the learner's own (jobs) key
-    key, secret = _jobs_storage_key(name)
-    spark.conf.set("fs.s3a.access.key", key)
-    spark.conf.set("fs.s3a.secret.key", secret)
+    spark.conf.set("fs.s3a.access.key", j["LAB_JOB_S3_KEY"])
+    spark.conf.set("fs.s3a.secret.key", j["LAB_JOB_S3_SECRET"])
     print(f"lab_spark: " + (f"team {team} · {own}" if is_team else
           f"you are {name} · my = {own}" + (f" · your team: {lh.team_catalog(team)}" if team else ""))
           + f" · shared = {lh.SHARED}")
@@ -157,7 +109,7 @@ def run_notebook(notebook, user=None):
     import json
     from IPython.core.interactiveshell import InteractiveShell
 
-    who = user or _current_user()
+    who = _job(user)["LAB_JOB_OWNER"]
     key = f"{lh.SRC}notebooks/{notebook}"
     with lh.get_object(lh.bucket_name(lh.lake_name(who)), key) as r:      # (a team's DAG: the team bucket)
         nb = json.loads(r.read())
@@ -203,7 +155,8 @@ def lab_dbt(command="build", project="shop", user=None):
     import subprocess
     import tempfile
 
-    name, own, team = _whose(user)
+    j = _job(user)
+    name, own, team = j["LAB_JOB_NAME"], j["LAB_JOB_CATALOG"], j["LAB_JOB_TEAM"] or None
     if not re.fullmatch(r"[A-Za-z0-9_-]+", project):
         raise ValueError(f"bad project name {project!r}")
     bucket, prefix = lh.bucket_name(name), f"{lh.SRC}dbt/{project}/"
@@ -223,7 +176,7 @@ def lab_dbt(command="build", project="shop", user=None):
         print(f"lab_dbt: {'team ' + team if own == name else 'you are ' + name} · project dbt/{project}"
               f" ({n} files) · lakehouse {own}")
         env = {**os.environ, "SPARK_REMOTE": SPARK_REMOTE, "LAKE_WAREHOUSE": own,
-               "LAKE_CREDENTIAL": _jobs_credential(name, team if own == name else None), "DBT_PROFILES_DIR": tmp,
+               "LAKE_CREDENTIAL": j["LAB_JOB_CREDENTIAL"], "DBT_PROFILES_DIR": tmp,
                "DBT_SEND_ANONYMOUS_USAGE_STATS": "false", "DBT_USE_COLORS": "false"}
         steps = ([["deps"]] if os.path.exists(os.path.join(tmp, "packages.yml")) else []) + [shlex.split(command)]
         for args in steps:
@@ -271,7 +224,7 @@ def key_vault(name, field=None, user=None, team=False):
             pw = key_vault("db", "password")       # one field of a secret with several
             tok = key_vault("API_TOKEN", team="sales")  # one of the owner's team's secrets
 
-    Whose: the running DAG's owner (as lab_spark), read with Airflow's vault login. Never logged.
+    Whose: the running DAG's owner (as lab_spark), read with the task's own vault token. Never logged.
     In a team's DAG: always the team's secrets."""
     d = _vault_fields(name, user, team)
     if field is not None:

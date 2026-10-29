@@ -168,8 +168,12 @@ def _airflow_forget(user, name, h=None):
     for d in (dags or {}).get("dags", []) if isinstance(dags, dict) else []:
         if d["dag_id"].startswith(f"{name}_"):          # their DAG runs and task history
             _http("DELETE", f"{AIRFLOW}/api/v2/dags/{urllib.parse.quote(d['dag_id'])}", headers=h)
-    for var in (f"lab_jobs_{name}", f"lab_jobs_s3_{name}"):   # their job logins (lab_spark)
+    for var in (f"lab_jobs_{name}", f"lab_jobs_s3_{name}"):   # their job logins (before lab_jobs.py)
         _http("DELETE", f"{AIRFLOW}/api/v2/variables/{var}", headers=h)
+    if labvault.enabled():                              # their job logins (lab_jobs.py) + a team's policy
+        labvault._call("DELETE", f"{labvault.MOUNT}/metadata/_lab/jobs/{name}")
+        if not user:
+            labvault._call("DELETE", f"sys/policies/acl/member-{name}")
     if user:
         _http("DELETE", f"{AIRFLOW}/auth/fab/v1/users/{urllib.parse.quote(user)}", headers=h)
     for role in {f"lab_{user or name}", f"lab_{name}"}:

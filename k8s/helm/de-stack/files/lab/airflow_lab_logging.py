@@ -1,0 +1,1 @@
+../../../../../common/dockerfiles/add/airflow_lab_logging.py

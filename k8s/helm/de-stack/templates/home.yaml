@@ -165,7 +165,7 @@ spec:
             # ⚙️ Settings → Services: managers turn units off/on (scale to 0/1); stopped tools' tiles grey
             # the release deployed (its vX.Y.Z tag; ansible sets it) — managers get a "newer release" banner
             - { name: LAB_VERSION, value: {{ .Values.labVersion | default "" | quote }} }
-            - { name: LAB_UNITS, value: "SQL=trino,sqlpad;Notebooks=jupyterhub;Spark=spark-master,spark-worker,spark-connect;Airflow=airflow;Superset=superset;Polaris console=polaris-console" }
+            - { name: LAB_UNITS, value: "SQL=trino,sqlpad;Notebooks=jupyterhub;Spark=spark-master,spark-worker,spark-connect;Airflow=airflow,airflow-parser;Superset=superset;Polaris console=polaris-console" }
             - { name: LAB_SERVICES, value: "jupyter=jupyterhub:8000,spark=spark-master:8080,sqlpad=sqlpad:3000,airflow=airflow-apiserver:8080,superset=superset:8088,governance=polaris-console:8080" }
             # "Manage members" (managers only): Keycloak admin + a JupyterHub service token
             - { name: KEYCLOAK_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: keycloak-admin-password } } }
@@ -296,7 +296,7 @@ metadata:
 rules:
   - apiGroups: ["apps"]
     resources: ["deployments", "deployments/scale"]
-    resourceNames: [trino, sqlpad, jupyterhub, spark-master, spark-worker, spark-connect, airflow, superset, polaris-console]
+    resourceNames: [trino, sqlpad, jupyterhub, spark-master, spark-worker, spark-connect, airflow, airflow-parser, superset, polaris-console]
     verbs: ["get", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

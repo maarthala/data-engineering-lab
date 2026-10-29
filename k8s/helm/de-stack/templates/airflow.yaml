@@ -1,5 +1,11 @@
 {{- if .Values.airflow.enabled }}
 {{- $img := include "de-stack.image" (dict "root" $ "repo" .Values.airflow.repo "tag" .Values.airflow.tag) }}
+{{- $j := .Values.airflow.jobs }}
+{{- $learners := `{"name": "learners", "classpath": "learner_dags.LearnerDagsBundle", "kwargs": {"refresh_interval": 30}}` }}
+{{- $bundles := printf `[{"name": "dags-folder", "classpath": "airflow.dag_processing.bundles.local.LocalDagBundle", "kwargs": {}}, %s]` $learners }}
+{{- if .Values.git.enabled }}
+{{- $bundles = printf `[{"name": "dags-folder", "classpath": "airflow.dag_processing.bundles.local.LocalDagBundle", "kwargs": {"path": "/git/repo/%s"}}, {"name": "stack-dags", "classpath": "airflow.dag_processing.bundles.local.LocalDagBundle", "kwargs": {"path": "/opt/airflow/dags"}}, %s]` .Values.git.dagsPath $learners }}
+{{- end }}
 # Its service account may start pods only in the jobs namespace (templates/jobs.yaml).
 apiVersion: v1
 kind: ServiceAccount
@@ -30,6 +36,116 @@ data:
   {{ base $path }}: |
 {{ $.Files.Get $path | indent 4 }}
 {{- end }}
+---
+# A member's task pod (KubernetesExecutor): pod_mutation_hook builds every one from THIS, with
+# the DAG owner's logins added (lab_jobs.job_env) — nothing of the DAG's executor_config survives.
+# Runs in the jobs namespace: no service-account token, no admin login, short service names
+# resolve in the stack's namespace (dnsConfig).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airflow-job-pod
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+data:
+  job-pod.yaml: |
+    apiVersion: v1
+    kind: Pod
+    metadata:
+      name: placeholder
+      namespace: {{ $j.namespace }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: default
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      dnsConfig:
+        searches: [{{ $j.stackNamespace }}.svc.cluster.local]
+      securityContext: { runAsUser: 50000, runAsGroup: 0 }
+      containers:
+        - name: base
+          image: {{ $img }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            - { name: AIRFLOW__CORE__EXECUTION_API_SERVER_URL, value: "http://airflow-apiserver:8080/execution/" }
+            - { name: AIRFLOW__CORE__LOAD_EXAMPLES, value: "false" }
+            - { name: AIRFLOW__DAG_PROCESSOR__DAG_BUNDLE_CONFIG_LIST, value: {{ printf "[%s]" $learners | squote }} }
+            - { name: AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS, value: airflow_lab_logging.LOGGING_CONFIG }
+            - { name: AIRFLOW__LOGGING__REMOTE_LOGGING, value: "True" }
+            - { name: AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER, value: "s3://member-buckets" }
+            - { name: PYTHONPATH, value: /opt/airflow/lab }
+            - { name: SPARK_REMOTE, value: "sc://spark-connect:15002" }
+            - { name: VAULT_ADDR, value: "http://vault:8200" }
+            - { name: AWS_REGION, value: us-east-1 }
+          resources:
+            requests: { cpu: 100m, memory: 512Mi }
+            limits: { cpu: "1", memory: 2Gi }
+          volumeMounts:
+{{- range list "airflow_learner_dags.py:learner_dags.py" "airflow_local_settings.py" "lab_spark.py" "lakehouse.py" "labvault.py" "airflow_lab_logging.py" }}
+{{- $f := splitList ":" . }}
+            - { name: lab-code, mountPath: /opt/airflow/lab/{{ last $f }}, subPath: {{ first $f }} }
+{{- end }}
+      volumes:
+        - { name: lab-code, configMap: { name: lab-job-code } }
+---
+# Members' DAG files are read here — top-level code and DAG callbacks run in this pod, which holds
+# no admin login: database login airflow_parser (no logins, connections, variables, XComs …),
+# storage user dags-reader (every bucket's dags/ folder only), no FAB (grants nothing), no
+# service-account token. Its trusted side: airflow_lab_guard.py in the airflow pod.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-parser
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {{- include "de-stack.selector" (dict "app" "airflow-parser") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "de-stack.selector" (dict "app" "airflow-parser") | nindent 8 }}
+      annotations:
+        {{- include "de-stack.labChecksum" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      containers:
+        - name: parser
+          image: {{ $img }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          args:
+            - bash
+            - -c
+            # wait for the guard's grants (a first write refused at start leaves the session broken)
+            - |
+              until python -c "import os, sqlalchemy as s; s.create_engine(os.environ['AIRFLOW__DATABASE__SQL_ALCHEMY_CONN']).connect().execute(s.text('SELECT id FROM log LIMIT 0'))" 2>/dev/null; do
+                echo "waiting for airflow_parser's grants (airflow pod)"; sleep 10; done
+              exec airflow dag-processor --bundle-name learners
+          env:
+            - { name: PG_AIRFLOW_PARSER_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: pg-airflow-parser-password } } }
+            - { name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN, value: "postgresql+psycopg2://airflow_parser:$(PG_AIRFLOW_PARSER_PASSWORD)@postgres:5432/airflow" }
+            - { name: AIRFLOW__CORE__AUTH_MANAGER, value: airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager }
+            - { name: AIRFLOW__CORE__EXECUTOR, value: "LocalExecutor,KubernetesExecutor" }
+            - { name: LAB_MEMBER_EXECUTOR, value: KubernetesExecutor }
+            - { name: AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION, value: "true" }
+            - { name: AIRFLOW__CORE__LOAD_EXAMPLES, value: "false" }
+            - { name: AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL, value: "30" }
+            - { name: AIRFLOW__DAG_PROCESSOR__DAG_BUNDLE_CONFIG_LIST, value: {{ $bundles | squote }} }
+            - { name: PYTHONPATH, value: /opt/airflow/lab }
+            - { name: LAB_DAGS_S3_KEY, value: dags-reader }
+            - { name: LAB_DAGS_S3_SECRET, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: storage-dags-reader-password } } }
+            - { name: AWS_REGION, value: us-east-1 }
+          resources:
+            requests: { cpu: 100m, memory: 512Mi }
+            limits: { memory: 1536Mi }
+          volumeMounts:
+{{- range list "airflow_learner_dags.py:learner_dags.py" "airflow_local_settings.py" "lab_spark.py" "lakehouse.py" "labvault.py" }}
+{{- $f := splitList ":" . }}
+            - { name: lab-code, mountPath: /opt/airflow/lab/{{ last $f }}, subPath: {{ first $f }} }
+{{- end }}
+      volumes:
+        - { name: lab-code, configMap: { name: lab-code } }
 ---
 # Single-pod Airflow: api-server + scheduler + dag-processor + triggerer in one pod.
 # With Keycloak: started directly, FAB auth manager (lab-account login). Without:
@@ -76,7 +192,15 @@ spec:
               airflow users create --username {{ .Values.airflow.adminUser }} --firstname Platform --lastname Service \
                 --email {{ .Values.airflow.adminUser }}@de.lan --role Admin --password "$AIRFLOW_ADMIN_PASSWORD" >/dev/null 2>&1
               airflow users reset-password --username {{ .Values.airflow.adminUser }} --password "$AIRFLOW_ADMIN_PASSWORD" >/dev/null 2>&1
-              airflow scheduler & airflow dag-processor & airflow triggerer & airflow api-server &
+              # members' DAG files are read by airflow-parser, never here (this pod holds the admin
+              # logins); the guard is that processor's trusted side (airflow_lab_guard.py)
+              python /opt/airflow/lab/airflow_lab_guard.py &
+              airflow scheduler & airflow dag-processor --bundle-name dags-folder{{ if .Values.git.enabled }} --bundle-name stack-dags{{ end }} &
+              # triggers come from members' DAGs too (asset watchers, deferred tasks): no admin login
+              env -u STORAGE_ROOT_PASSWORD -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u POLARIS_ROOT_SECRET \
+                -u POLARIS_ADMIN -u POLARIS_CREDENTIAL -u VAULT_ADMIN_TOKEN -u TRINO_LAB_SECRET -u TRINO_POLARIS_LOGIN \
+                -u LAB_DAGS_READER_SECRET -u AIRFLOW_ADMIN_PASSWORD -u KEYCLOAK_CLIENT_SECRET airflow triggerer &
+              airflow api-server &
               wait -n; echo "an Airflow component exited — restarting"; exit 1
 {{- else }}
             - >
@@ -86,7 +210,21 @@ spec:
               exec airflow standalone
 {{- end }}
           env:
-            - { name: AIRFLOW__CORE__EXECUTOR, value: "LocalExecutor" }
+            # the stack's own tasks: here (LocalExecutor) · members' tasks: each in its own pod in the
+            # jobs namespace (task_policy + pod_mutation_hook in airflow_local_settings.py)
+            - { name: AIRFLOW__CORE__EXECUTOR, value: "LocalExecutor,KubernetesExecutor" }
+            - { name: LAB_MEMBER_EXECUTOR, value: KubernetesExecutor }
+            - { name: LAB_JOB_POD_TEMPLATE, value: /opt/airflow/job-pod/job-pod.yaml }
+            - { name: AIRFLOW__KUBERNETES_EXECUTOR__NAMESPACE, value: {{ $j.namespace }} }
+            - { name: AIRFLOW__KUBERNETES_EXECUTOR__POD_TEMPLATE_FILE, value: /opt/airflow/job-pod/job-pod.yaml }
+            - { name: AIRFLOW__KUBERNETES_EXECUTOR__WORKER_CONTAINER_REPOSITORY, value: {{ (splitList ":" $img | initial | join ":") | quote }} }
+            - { name: AIRFLOW__KUBERNETES_EXECUTOR__WORKER_CONTAINER_TAG, value: {{ (splitList ":" $img | last) | quote }} }
+            - { name: AIRFLOW__KUBERNETES_EXECUTOR__DELETE_WORKER_PODS_ON_FAILURE, value: "True" }
+            # members' task logs: in their own bucket (airflow_lab_logging.py)
+            - { name: AIRFLOW__LOGGING__LOGGING_CONFIG_CLASS, value: airflow_lab_logging.LOGGING_CONFIG }
+            - { name: AIRFLOW__LOGGING__REMOTE_LOGGING, value: "True" }
+            - { name: AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER, value: "s3://member-buckets" }
+            - { name: LAB_DAGS_READER_SECRET, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: storage-dags-reader-password } } }
             # secrets first: the values below build on them with $(VAR)
             - { name: PG_AIRFLOW_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: pg-airflow-password } } }
             - { name: STORAGE_ROOT_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: storage-root-password } } }
@@ -111,12 +249,11 @@ spec:
             # (paired with the pre-written passwords file in args above).
             - { name: AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS, value: "{{ .Values.airflow.adminUser }}:admin" }
 {{- end }}
-            # Learners' DAGs: one bundle syncs every <user>-lake/dags/ (learner_dags.py); dag
-            # ids must start with <user>_ (airflow_local_settings.py). Both in /opt/airflow/lab.
+            # Learners' DAGs: the "learners" bundle (learner_dags.py) — read by airflow-parser and
+            # each member's task pod, never in this pod (no key for it here); dag ids must start
+            # with <user>_ (airflow_local_settings.py). Both in /opt/airflow/lab.
             # Polaris login for the platform's own Spark jobs (the cluster holds none)
             - { name: POLARIS_CREDENTIAL, value: "root:$(POLARIS_ROOT_SECRET)" }
-            - name: AIRFLOW_CONN_LEARNER_S3
-              value: '{"conn_type": "aws", "login": "{{ .Values.storage.rootUser }}", "password": "$(STORAGE_ROOT_PASSWORD)", "extra": {"endpoint_url": "http://storage:9000", "region_name": "us-east-1", "config_kwargs": {"s3": {"addressing_style": "path"}}}}'
 
             - { name: AIRFLOW__DATABASE__SQL_ALCHEMY_CONN, value: "postgresql+psycopg2://airflow:$(PG_AIRFLOW_PASSWORD)@postgres:5432/airflow" }
             - { name: AIRFLOW__CORE__FERNET_KEY, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: airflow-fernet-key } } }
@@ -130,14 +267,12 @@ spec:
             # Two DAG bundles: the git repo AND the chart's built-in DAGs (/opt/airflow/dags,
             # e.g. spark_k8s_dag). With only DAGS_FOLDER, the built-ins went stale and their
             # runs sat in "queued" forever once git was enabled.
-            - name: AIRFLOW__DAG_PROCESSOR__DAG_BUNDLE_CONFIG_LIST
-              value: '[{"name": "dags-folder", "classpath": "airflow.dag_processing.bundles.local.LocalDagBundle", "kwargs": {"path": "/git/repo/{{ .Values.git.dagsPath }}"}}, {"name": "stack-dags", "classpath": "airflow.dag_processing.bundles.local.LocalDagBundle", "kwargs": {"path": "/opt/airflow/dags"}}, {"name": "learners", "classpath": "learner_dags.LearnerDagsBundle", "kwargs": {"refresh_interval": 30}}]'
+            - { name: AIRFLOW__DAG_PROCESSOR__DAG_BUNDLE_CONFIG_LIST, value: {{ $bundles | squote }} }
             # shared library code from the repo, importable by DAGs/tasks (+ the lab modules)
             - { name: PYTHONPATH, value: "/git/repo/{{ .Values.git.srcPath }}:/opt/airflow/lab" }
 {{- else }}
             - { name: AIRFLOW__CORE__DAGS_FOLDER, value: "/opt/airflow/dags" }
-            - name: AIRFLOW__DAG_PROCESSOR__DAG_BUNDLE_CONFIG_LIST
-              value: '[{"name": "dags-folder", "classpath": "airflow.dag_processing.bundles.local.LocalDagBundle", "kwargs": {}}, {"name": "learners", "classpath": "learner_dags.LearnerDagsBundle", "kwargs": {"refresh_interval": 30}}]'
+            - { name: AIRFLOW__DAG_PROCESSOR__DAG_BUNDLE_CONFIG_LIST, value: {{ $bundles | squote }} }
             - { name: PYTHONPATH, value: "/opt/airflow/lab" }
 {{- end }}
             - { name: AIRFLOW__API__SECRET_KEY, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: airflow-secret-key } } }
@@ -177,6 +312,10 @@ spec:
             - { name: lab-code, mountPath: /opt/airflow/lab/lab_spark.py, subPath: lab_spark.py }
             - { name: lab-code, mountPath: /opt/airflow/lab/lakehouse.py, subPath: lakehouse.py }
             - { name: lab-code, mountPath: /opt/airflow/lab/labvault.py, subPath: labvault.py }
+            - { name: lab-code, mountPath: /opt/airflow/lab/lab_jobs.py, subPath: lab_jobs.py }
+            - { name: lab-code, mountPath: /opt/airflow/lab/airflow_lab_guard.py, subPath: airflow_lab_guard.py }
+            - { name: lab-code, mountPath: /opt/airflow/lab/airflow_lab_logging.py, subPath: airflow_lab_logging.py }
+            - { name: job-pod, mountPath: /opt/airflow/job-pod, readOnly: true }
 {{- range $path, $_ := .Files.Glob "files/medallion-jobs/*.py" }}
             - name: medallion-jobs
               mountPath: /opt/airflow/jobs/{{ base $path }}
@@ -194,6 +333,7 @@ spec:
         - { name: logs, emptyDir: {} }
         - { name: medallion-jobs, configMap: { name: medallion-jobs } }
         - { name: lab-code, configMap: { name: lab-code } }
+        - { name: job-pod, configMap: { name: airflow-job-pod } }
 ---
 apiVersion: v1
 kind: Service

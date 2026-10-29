@@ -25,7 +25,7 @@ import urllib.parse
 import urllib.request
 
 VAULT = os.environ.get("VAULT_ADDR", "http://vault:8200").rstrip("/")
-TOKEN = os.environ.get("VAULT_ADMIN_TOKEN", "")
+TOKEN = os.environ.get("VAULT_ADMIN_TOKEN", "") or os.environ.get("VAULT_TOKEN", "")   # a task pod: its own (lab_jobs)
 MOUNT = "secret"
 TOKENS = "_lab/tokens"           # admin-only: the accessor of each member's current token
 MAX_SECRETS, MAX_VALUE = 50, 4096
