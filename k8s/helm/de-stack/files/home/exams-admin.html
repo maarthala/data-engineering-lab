@@ -16,6 +16,7 @@
     .form input, .form select{width:100%}
     .teampick{display:flex; flex-wrap:wrap; gap:6px 14px; margin:6px 0 2px}
     .teampick label{display:flex; gap:6px; align-items:center; font-size:.9rem; color:var(--ink)}
+    .ask{display:inline-flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 10px; border:1px solid var(--gold); border-radius:9px; background:rgba(226,185,59,.08); font-size:.88rem}
     .nums{display:flex; flex-wrap:wrap; gap:18px; margin:8px 0} .nums b{font-size:1.1rem}
   </style>
 </head>
@@ -35,6 +36,16 @@
     var el = admin.el;
     admin.page('📝 Exams');
 
+    // inline "are you sure?" next to a button (no browser popups): hides the button and shows the
+    // question with Yes / Cancel; Yes runs `yes(button)`
+    function ask(btn, question, yesText, yes, danger) {
+      var y = el('button', {class: 'small ' + (danger ? 'danger' : 'primary'), text: yesText});
+      var n = el('button', {class: 'small', text: 'Cancel'});
+      var box = el('span', {class: 'ask'}, [el('span', {text: question}), y, n]);
+      btn.hidden = true; btn.parentNode.insertBefore(box, btn.nextSibling);
+      n.addEventListener('click', function () { box.remove(); btn.hidden = false; });
+      y.addEventListener('click', function () { box.remove(); btn.hidden = false; yes(btn); });
+    }
     function readJson(input) {
       return new Promise(function (resolve, reject) {
         var f = input.files[0];
@@ -121,20 +132,22 @@
       });
       var del = el('button', {class: 'danger', text: 'Delete exam'});
       del.addEventListener('click', function () {
-        if (!confirm('Delete ' + e.name + ' — its questions and every member\'s attempts?')) return;
-        admin.api('POST', '/api/admin/exams/delete', {exam: e.id})
-          .then(function () { admin.show('Deleted ' + e.name, []); load(); })
-          .catch(function (x) { admin.show('Could not delete', [x.message], null, true); });
+        ask(del, 'Delete ' + e.name + ' — its questions and every member\'s attempts?', 'Yes, delete', function () {
+          admin.api('POST', '/api/admin/exams/delete', {exam: e.id})
+            .then(function () { admin.show('Deleted ' + e.name, []); load(); })
+            .catch(function (x) { admin.show('Could not delete', [x.message], null, true); });
+        }, true);
       });
 
       var banks = el('table', {}, [el('tr', {}, ['Source', 'Questions', 'Left out', 'Uploaded', ''].map(function (h) { return el('th', {text: h}); }))]
         .concat(e.banks.map(function (b) {
           var x = el('button', {class: 'small danger', text: 'Remove'});
           x.addEventListener('click', function () {
-            if (!confirm('Remove source ' + b.source + ' (' + b.questions + ' questions) from ' + e.name + '?')) return;
-            admin.api('POST', '/api/admin/exams/delete', {exam: e.id, source: b.source})
-              .then(function () { admin.show('Removed ' + b.source, []); load(); })
-              .catch(function (y) { admin.show('Could not remove', [y.message], null, true); });
+            ask(x, 'Remove ' + b.source + ' (' + b.questions + ' questions)?', 'Yes, remove', function () {
+              admin.api('POST', '/api/admin/exams/delete', {exam: e.id, source: b.source})
+                .then(function () { admin.show('Removed ' + b.source, []); load(); })
+                .catch(function (y) { admin.show('Could not remove', [y.message], null, true); });
+            }, true);
           });
           return el('tr', {}, [el('td', {text: b.source}), el('td', {text: String(b.questions)}), el('td', {text: String(b.skipped || 0)}),
             el('td', {class: 'muted', text: b.uploaded_at.slice(0, 16).replace('T', ' ') + ' · ' + (b.uploaded_by || '')}),
@@ -142,11 +155,12 @@
         })));
 
       function discard(ctl, body, what) {
-        if (!confirm('Delete ' + what + '? The answers so far are lost; the next start draws a new set with the current settings.')) return;
-        ctl.disabled = true;
-        admin.api('POST', '/api/admin/exams/discard', Object.assign({exam: e.id}, body))
-          .then(function (r) { admin.show('Deleted ' + r.deleted + ' attempt(s) in progress', ['They start afresh, with the current settings.']); load(); })
-          .catch(function (x) { admin.show('Could not delete', [x.message], null, true); ctl.disabled = false; });
+        ask(ctl, 'Delete ' + what + '? Their answers so far are lost.', 'Yes, delete', function () {
+          ctl.disabled = true;
+          admin.api('POST', '/api/admin/exams/discard', Object.assign({exam: e.id}, body))
+            .then(function (r) { admin.show('Deleted ' + r.deleted + ' attempt(s) in progress', ['They start afresh, with the current settings.']); load(); })
+            .catch(function (x) { admin.show('Could not delete', [x.message], null, true); ctl.disabled = false; });
+        }, true);
       }
       var all = el('button', {class: 'small danger', text: 'Delete all in progress'});
       all.addEventListener('click', function () { discard(all, {}, 'all ' + e.ongoing.length + ' attempts in progress of ' + e.name); });

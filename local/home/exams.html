@@ -29,6 +29,7 @@
     .meter{height:8px; background:var(--panel2); border-radius:999px; overflow:hidden} .meter i{display:block; height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2))}
     .expl{margin-top:10px; padding:10px 12px; border-left:3px solid var(--accent); background:var(--panel2); border-radius:6px; font-size:.92rem; line-height:1.55}
     .expl ul{margin:6px 0; padding-left:20px} .expl p{margin:6px 0} .expl a{color:var(--accent)}
+    .ask{display:inline-flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 10px; border:1px solid var(--gold); border-radius:9px; background:rgba(226,185,59,.08); font-size:.88rem}
     .nav{display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-top:12px}
     @media (max-width:640px){ .stats{grid-template-columns:repeat(2,1fr)} .dom{grid-template-columns:1fr 70px} .dom .meter{display:none} }
   </style>
@@ -60,6 +61,16 @@
           headers: body ? {'Content-Type': 'application/json', 'X-Lab-Request': '1'} : {},
           body: body ? JSON.stringify(body) : undefined})
         .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); });
+    }
+    // inline "are you sure?" next to a button (no browser popups): hides the button and shows the
+    // question with Yes / Cancel; Yes runs `yes(button)`
+    function ask(btn, question, yesText, yes, danger) {
+      var y = el('button', {class: 'small ' + (danger ? 'danger' : 'primary'), text: yesText});
+      var n = el('button', {class: 'small', text: 'Cancel'});
+      var box = el('span', {class: 'ask'}, [el('span', {text: question}), y, n]);
+      btn.hidden = true; btn.parentNode.insertBefore(box, btn.nextSibling);
+      n.addEventListener('click', function () { box.remove(); btn.hidden = false; });
+      y.addEventListener('click', function () { box.remove(); btn.hidden = false; yes(btn); });
     }
     function fail(e) { main.innerHTML = ''; main.appendChild(el('div', {class: 'placeholder', text: 'Could not load: ' + e.message})); }
     function esc(s) { return String(s || '').replace(/[&<>"]/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]; }); }
@@ -159,10 +170,11 @@
         var submit = el('button', {class: i === a.questions.length - 1 ? 'primary' : '', text: 'Submit exam'});
         submit.addEventListener('click', function () {
           var left = a.questions.length - Object.keys(answers).length;
-          if (!confirm(left ? left + ' question(s) are not answered — they count as wrong. Submit anyway?' : 'Submit your answers?')) return;
-          submit.disabled = true;
-          saving.then(function () { return api('POST', '/api/exams/submit', {attempt: a.id}); }).then(showReview)
-            .catch(function (e) { alertCard(e.message); submit.disabled = false; });
+          ask(submit, left ? left + ' not answered — they count as wrong. Submit anyway?' : 'Submit your answers?', 'Yes, submit', function () {
+            submit.disabled = true;
+            saving.then(function () { return api('POST', '/api/exams/submit', {attempt: a.id}); }).then(showReview)
+              .catch(function (e) { alertCard(e.message); submit.disabled = false; });
+          });
         });
         var pal = el('div', {class: 'palette'}, a.questions.map(function (x, n) {
           var b = el('button', {class: (answers[x.qid] ? 'done' : '') + (n === i ? ' cur' : ''), text: String(n + 1)});
