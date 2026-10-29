@@ -336,6 +336,8 @@ def home_overview(user):
                 "last_activity": (info or {}).get("last_activity") if st == 200 else None}
 
     def pipelines():
+        u = urllib.parse.urlparse(AIRFLOW)                 # off (unit stopped): say so at once, not after a timeout
+        socket.create_connection((u.hostname, u.port or 80), timeout=2).close()
         h = _airflow_auth()
         if not h:
             raise RuntimeError("Airflow is not reachable")

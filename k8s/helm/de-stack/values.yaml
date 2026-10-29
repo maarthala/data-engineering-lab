@@ -188,7 +188,7 @@ keycloak:
 oauth2Proxy:
   image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.4
 homeApi:
-  image: ghcr.io/maarthala/de-stack/home-api:20261002-7   # dated tags: re-importing :latest can leave the old image
+  image: ghcr.io/maarthala/de-stack/home-api:20261029-1   # dated tags: re-importing :latest can leave the old image
 home:
   enabled: true
   # Plain nginx; the home-html ConfigMap supplies index.html (rewritten to the ingress
