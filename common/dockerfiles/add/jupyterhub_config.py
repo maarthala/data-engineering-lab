@@ -118,6 +118,14 @@ PASS = ["SPARK_REMOTE", "AWS_DEFAULT_REGION",
         "GIT_USERNAME", "GIT_TOKEN"]
 c.Spawner.environment = {k: env[k] for k in PASS if env.get(k)}
 
+# The portal shows Jupyter inside its own page (tool.html, left menu kept): the Hub and every
+# learner server may be framed by the portal (PORTAL_ORIGIN, e.g. http://localhost:8000).
+PORTAL = env.get("PORTAL_ORIGIN", "")
+if PORTAL:
+    c.JupyterHub.tornado_settings = {"headers": {
+        "Content-Security-Policy": f"frame-ancestors 'self' {PORTAL}; report-uri /hub/security/csp-report"}}
+    c.Spawner.environment["PORTAL_ORIGIN"] = PORTAL
+
 
 async def pre_spawn(spawner):
     """Learner's own lakehouse + a fresh Polaris secret, handed only to their server."""

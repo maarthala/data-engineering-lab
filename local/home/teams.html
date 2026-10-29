@@ -4,15 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Teams — Epireum's Data Engineering Lab</title>
-  <link rel="stylesheet" href="/admin.css?v=6">
+  <link rel="stylesheet" href="/admin.css?v=7">
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=10"></script>
+  <script src="/lab-header.js?v=11"></script>
   <main id="main">
     <div class="placeholder">Loading…</div>
   </main>
-  <script src="/admin.js?v=3"></script>
+  <script src="/admin.js?v=4"></script>
   <script>
     // 🧩 Teams — a member is in no team (only their own lakehouse) until added to one, then in
     // exactly one, and reads and writes its lakehouse team_<team>. Left: the teams. Right: the
@@ -22,7 +22,7 @@
     var el = admin.el;
     var teams = [], people = [], current = null;
     var listFilter = '';
-    admin.page('🧩 Teams');
+    admin.page('Teams', 'A team shares a lakehouse, files, secrets and Airflow DAGs.');
 
     function select(team) {
       current = team;

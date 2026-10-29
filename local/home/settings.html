@@ -4,22 +4,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Settings — Epireum's Data Engineering Lab</title>
-  <link rel="stylesheet" href="/admin.css?v=6">
+  <link rel="stylesheet" href="/admin.css?v=7">
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=10"></script>
+  <script src="/lab-header.js?v=11"></script>
   <main id="main">
     <div class="placeholder">Loading…</div>
   </main>
-  <script src="/admin.js?v=3"></script>
+  <script src="/admin.js?v=4"></script>
   <script>
     // ⚙️ Settings — lab-wide switches: self-registration on the sign-in page, and members' limits
     // (Jupyter idle time / memory / CPU, bucket sizes) — no restart: each applies as its note says —
     // and Services: which tools run (k8s: switch a unit off to free the server; local: make status) —
     // and Lab version: the release this lab runs, and whether a newer one is on GitHub.
     var el = admin.el;
-    admin.page('⚙️ Settings');
+    admin.page('Settings', 'Lab-wide switches — no restart needed.');
+    var cfg = null;
+    var tab = admin.tabs([['general', 'General'], ['services', 'Services'], ['version', 'Lab version']], function (t) { tab = t; render(); });
+    function render() {
+      if (!cfg) return;
+      admin.fill(tab === 'services' ? [servicesCard()] : tab === 'version' ? [versionCard()]
+                 : [registrationCard(cfg.registration), limitsCard(cfg)]);
+    }
 
     function registrationCard(on) {
       var sw = el('span', {class: 'switch', role: 'switch', tabindex: '0'},
@@ -34,7 +41,7 @@
         var want = !sw.classList.contains('on');
         sw.classList.add('busy');
         admin.api('POST', '/api/admin/settings', {registration: want})
-          .then(function (r) { paint(r.registration); })
+          .then(function (r) { cfg = r; paint(r.registration); })
           .catch(function (e) { admin.show('Could not change self-registration', [e.message], null, true); })
           .then(function () { sw.classList.remove('busy'); });
       }
@@ -184,7 +191,7 @@
       return card;
     }
     admin.api('GET', '/api/admin/settings')
-      .then(function (r) { admin.fill([registrationCard(r.registration), limitsCard(r), servicesCard(), versionCard()]); })
+      .then(function (r) { cfg = r; render(); })
       .catch(admin.failed);
   </script>
 </body>

@@ -258,6 +258,21 @@ def discard(exam_id, attempt_id=None):
     return {"deleted": n}
 
 
+def results(exam_id):
+    """Managers: each member's numbers for the exam, and the latest submitted attempts."""
+    members = _q("SELECT member, count(*) AS attempts, max(score) AS best, round(avg(score)) AS average, "
+                 "sum(CASE WHEN passed THEN 1 ELSE 0 END) AS passed, max(finished_at) AS last "
+                 "FROM exam_attempts WHERE exam_id = %s AND finished_at IS NOT NULL GROUP BY member ORDER BY member",
+                 (exam_id,))
+    recent = _q("SELECT id, member, score, passed, correct, total, started_at, finished_at FROM exam_attempts "
+                "WHERE exam_id = %s AND finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 100", (exam_id,))
+    return {"members": [dict(m, average=int(m["average"]), last=m["last"].isoformat()) for m in members],
+            "recent": [{"id": a["id"], "member": a["member"], "score": a["score"], "passed": a["passed"],
+                        "correct": a["correct"], "total": a["total"], "finished_at": a["finished_at"].isoformat(),
+                        "minutes": max(1, round((a["finished_at"] - a["started_at"]).total_seconds() / 60))}
+                       for a in recent]}
+
+
 def admin_exams():
     """Every exam with its banks, pool and attempt numbers (managers)."""
     exams = _q("SELECT e.*, (SELECT count(*) FROM exam_questions q WHERE q.exam_id = e.id) AS pool, "

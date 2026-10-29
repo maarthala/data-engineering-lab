@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tools — Epireum's Data Engineering Lab</title>
+  <link rel="stylesheet" href="/admin.css?v=7">
+  <style>
+    body{height:100vh; overflow:hidden}
+    .tbar{display:flex; align-items:center; gap:10px; padding:8px 18px; border-bottom:1px solid var(--line); background:var(--panel); height:46px}
+    .tbar .what{color:var(--muted); font-size:.86rem}
+    .tbar .sp{flex:1}
+    .tbar a.btn{border:1px solid var(--line2); border-radius:8px; padding:4px 10px; font-size:.84rem; color:var(--ink)}
+    .tbar a.btn:hover{border-color:#aab3c0}
+    iframe{display:block; width:100%; height:calc(100vh - var(--top-h) - 46px); border:0; background:#fff}
+    .off{max-width:560px; margin:60px auto; text-align:center}
+    .off h2{margin:0 0 8px; font-size:1.2rem}
+  </style>
+</head>
+<body>
+  <header id="lab-top"></header>
+  <script src="/lab-header.js?v=11"></script>
+  <div class="tbar"><b id="t-name"></b><span class="what" id="t-what"></span><span class="sp"></span>
+    <button class="small" id="t-reload">Reload</button>
+    <a class="btn" id="t-open" target="_blank" rel="noopener">Open in new tab ↗</a></div>
+  <div id="t-body"></div>
+  <script>
+    // A tool (Jupyter, SQLPad, Airflow, Superset, Spark UI, storage console, Polaris Console) inside the
+    // portal, the left menu staying: #<tool> in the address (window.LAB_TOOLS, lab-header.js). The tools
+    // let the portal frame them (each tool's frame-ancestors setting); the sign-in is the portal's own.
+    var key = location.hash.slice(1), t = LAB_TOOLS[key], body = document.getElementById('t-body');
+    window.addEventListener('hashchange', function () { location.reload(); });
+    function off(head, text) {
+      body.innerHTML = '';
+      var d = document.createElement('div'); d.className = 'card off';
+      d.innerHTML = '<h2></h2><div class="sub"></div>';
+      d.querySelector('h2').textContent = head; d.querySelector('.sub').textContent = text;
+      body.appendChild(d);
+    }
+    if (!t) {
+      off('Unknown tool', 'Pick a tool in the menu on the left.');
+    } else {
+      document.title = t.name + ' — Epireum\'s Data Engineering Lab';
+      document.getElementById('t-name').textContent = t.name;
+      document.getElementById('t-what').textContent = t.what;
+      function show(manager) {
+        if (t.managers && !manager) return off(t.name + ' is for lab managers', 'Your own catalogs are on My catalogs.');
+        fetch('/api/services').then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; }).then(function (up) {
+          document.getElementById('t-open').href = t.url;
+          if (t.svc && up[t.svc] === false)
+            return off(t.what + ' is not running', manager ? 'Start its unit: make status (local) or Manage → Settings → Services (k8s).'
+                                                             : 'Ask your lab managers to switch it on.');
+          var f = document.createElement('iframe');
+          f.src = t.url; f.title = t.what;
+          f.setAttribute('allow', 'clipboard-read; clipboard-write; fullscreen');
+          body.innerHTML = ''; body.appendChild(f);
+          document.getElementById('t-reload').onclick = function () { f.src = t.url; };
+        });
+      }
+      document.addEventListener('lab:me', function (e) { show((e.detail.groups || []).indexOf('managers') >= 0); });
+    }
+  </script>
+</body>
+</html>

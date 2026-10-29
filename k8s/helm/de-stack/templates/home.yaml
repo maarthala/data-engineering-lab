@@ -42,6 +42,8 @@ data:
 {{ .Files.Get "files/home/exams.html" | indent 4 }}
   exams-admin.html: |
 {{ .Files.Get "files/home/exams-admin.html" | indent 4 }}
+  tool.html: |
+{{ .Files.Get "files/home/tool.html" | indent 4 }}
   lab-header.js: |
 {{ .Files.Get "files/home/lab-header.js" | indent 4 }}
   default.conf: |
@@ -83,6 +85,7 @@ spec:
             - { name: html, mountPath: /usr/share/nginx/html/lab-header.js, subPath: lab-header.js }
             - { name: html, mountPath: /usr/share/nginx/html/exams.html, subPath: exams.html }
             - { name: html, mountPath: /usr/share/nginx/html/exams-admin.html, subPath: exams-admin.html }
+            - { name: html, mountPath: /usr/share/nginx/html/tool.html, subPath: tool.html }
             - { name: html, mountPath: /usr/share/nginx/html/img/epireum-logo.png, subPath: epireum-logo.png }
             # bigger header limit: oauth2-proxy forwards the session + sign-in cookies
             - { name: html, mountPath: /etc/nginx/conf.d/default.conf, subPath: default.conf }

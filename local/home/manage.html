@@ -4,20 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Manage members — Epireum's Data Engineering Lab</title>
-  <link rel="stylesheet" href="/admin.css?v=6">
+  <link rel="stylesheet" href="/admin.css?v=7">
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=10"></script>
+  <script src="/lab-header.js?v=11"></script>
   <main id="main">
     <div class="placeholder">Loading…</div>
   </main>
-  <script src="/admin.js?v=3"></script>
+  <script src="/admin.js?v=4"></script>
   <script>
-    // 👥 Members — create lab accounts, new passwords, reset / wipe / delete. Teams are on
-    // 🧩 Teams, self-registration on ⚙️ Settings.
-    var el = admin.el, me = null;
-    admin.page('👥 Manage members');
+    // Members — tab Members: every lab account (search; Actions: new password, reset lakehouse,
+    // wipe, delete). Tab Add a member: create an account. Teams are on Teams, self-registration on
+    // Settings.
+    var el = admin.el, me = null, data = null, filter = '';
+    admin.page('Members', 'Lab accounts, their lakehouse and storage.');
+    var tab = admin.tabs([['members', 'Members'], ['add', 'Add a member']], function (t) { tab = t; render(); });
 
     function addCard(teams) {
       var u = el('input', {type: 'text', placeholder: 'username (a-z, 0-9, -)', autocomplete: 'off'});
@@ -33,11 +35,14 @@
           return [['Lakehouse ' + r.lakehouse + ', bucket ' + r.bucket + ', SQLPad user' + (r.team ? ', team ' + r.team : '') + ' — ready to sign in.'], r.password];
         }, load);
       });
-      return el('div', {class: 'card'}, [
-        el('h3', {text: 'Add a member'}),
-        el('div', {class: 'row'}, [u, p, el('span', {class: 'sub', text: 'team'}), tm, b]),
-        el('div', {class: 'sub', style: 'margin-top:8px',
-          text: 'Creates the lab account with its own lakehouse, bucket and SQLPad user, and adds it to the team you pick (or none). Members can also register themselves on the sign-in page (⚙️ Settings).'})]);
+      function field(label, input) { return el('label', {style: 'display:flex; flex-direction:column; gap:5px; font-size:.84rem; color:var(--muted)'}, [label, input]); }
+      u.style.width = p.style.width = '100%';
+      return el('div', {class: 'card', style: 'max-width:640px'}, [
+        el('h3', {text: 'New lab account'}),
+        el('div', {style: 'display:grid; grid-template-columns:1fr 1fr; gap:12px'}, [field('Username', u), field('Password', p), field('Team', tm)]),
+        el('div', {class: 'row', style: 'margin-top:14px'}, [b]),
+        el('div', {class: 'sub', style: 'margin-top:10px',
+          text: 'Creates the account with its own lakehouse, bucket and SQLPad user, in the team you pick (or none). Without a password a random one is shown once. Members can also register themselves on the sign-in page (Settings).'})]);
     }
 
     // ---- the members table --------------------------------------------------------------
@@ -80,19 +85,18 @@
       var body = el('tbody');
       list.forEach(function (l) {
         var self = l.user === me;
-        var acts = el('td', {class: 'acts'});
-        Object.keys(ACTIONS).forEach(function (key) {
+        var items = Object.keys(ACTIONS).filter(function (key) {
+          if (self && key !== 'password') return false;                      // not on your own account
+          if (l.manager && (key === 'wipe' || key === 'delete')) return false; // managers: via Keycloak
+          return !(!l.lakehouse && (key === 'reset' || key === 'wipe'));
+        }).map(function (key) {
           var a = ACTIONS[key];
-          if (self && key !== 'password') return;                      // not on your own account
-          if (l.manager && (key === 'wipe' || key === 'delete')) return; // managers: via Keycloak
-          if (!l.lakehouse && (key === 'reset' || key === 'wipe')) return;
-          var b = el('button', {class: 'small' + (a.danger ? ' danger' : ''), text: a.label, style: 'margin-right:6px'});
-          b.addEventListener('click', function () {
+          return {label: a.label, danger: a.danger, click: function (b) {
             if (a.danger) return confirmRow(tr, l, key);
             admin.act(b, key, {user: l.user}, a.title + l.user, a.describe, load);
-          });
-          acts.appendChild(b);
+          }};
         });
+        var acts = el('td', {class: 'acts'}, [admin.menu('Actions', items)]);
         var who = el('td', {}, [el('b', {text: l.user}),
           l.manager ? el('span', {class: 'tag mgr', text: 'manager'}) : null,
           self ? el('span', {class: 'tag', text: 'you'}) : null,
@@ -104,21 +108,35 @@
           el('td', {class: 'r', text: l.bucket_mb == null ? '—' : l.bucket_mb + ' MB'}),
           el('td', {class: 'r muted', text: l.created ? new Date(l.created).toLocaleDateString() : ''}),
           acts]);
+        tr.dataset.user = l.user + ' ' + (l.team || '');
         body.appendChild(tr);
       });
+      var q = el('input', {type: 'search', placeholder: 'Search members…', style: 'width:240px'});
+      q.value = filter;
+      q.addEventListener('input', function () {
+        filter = q.value.trim().toLowerCase();
+        body.querySelectorAll('tr').forEach(function (tr) {
+          tr.hidden = !!filter && (tr.dataset.user || '').indexOf(filter) < 0;
+        });
+      });
+      body.querySelectorAll('tr').forEach(function (tr) { tr.hidden = !!filter && (tr.dataset.user || '').indexOf(filter) < 0; });
       return el('div', {class: 'card'}, [
-        el('h3', {text: 'Lab accounts (' + list.length + ')'}),
+        el('div', {class: 'bar'}, [el('h3', {style: 'margin:0', text: list.length + ' lab accounts'}), q]),
         el('div', {class: 'wrap'}, [el('table', {}, [el('thead', {}, [el('tr', {}, [
           el('th', {text: 'Account'}), el('th', {text: 'Team'}), el('th', {text: 'Lakehouse'}), el('th', {class: 'r', text: 'Catalogs'}),
           el('th', {class: 'r', text: 'Bucket'}), el('th', {class: 'r', text: 'Since'}), el('th', {text: ''})])]), body])]),
-        el('div', {class: 'sub', style: 'margin-top:8px', text: 'Add members to a team, move or remove them on 🧩 Teams.'})]);
+        el('div', {class: 'sub', style: 'margin-top:8px', text: 'Add members to a team, move or remove them on Teams.'})]);
     }
 
     function load() {
       return Promise.all([admin.api('GET', '/api/admin/members'), admin.api('GET', '/api/admin/teams')]).then(function (r) {
         me = r[0].me;
-        admin.fill([addCard(r[1].teams), table(r[0].members)]);
+        data = r;
+        render();
       }).catch(admin.failed);
+    }
+    function render() {
+      if (data) admin.fill([tab === 'add' ? addCard(data[1].teams) : table(data[0].members)]);
     }
     load();
   </script>

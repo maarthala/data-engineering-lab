@@ -4,48 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My catalogs — Epireum's Data Engineering Lab</title>
+  <link rel="stylesheet" href="/admin.css?v=7">
   <style>
-    :root{
-      --bg:#0b1020; --panel:#141b2e; --panel2:#1b2438; --line:#2a3550;
-      --ink:#e8edf7; --muted:#9aa8c7; --accent:#6d8bff; --accent2:#39d0c4; --danger:#ff6b6b; --gold:#e2b93b;
-      --shadow:0 10px 30px rgba(0,0,0,.35);
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{margin:0; color:var(--ink); display:flex; flex-direction:column;
-      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-      background:radial-gradient(1200px 600px at 80% -10%, rgba(109,139,255,.18), transparent 60%),
-                 radial-gradient(900px 500px at -10% 10%, rgba(57,208,196,.12), transparent 55%), var(--bg)}
+    body{display:flex; flex-direction:column; min-height:100vh}
     a{color:inherit; text-decoration:none}
-    button{font:inherit; cursor:pointer; border-radius:9px; padding:6px 12px; border:1px solid var(--line); background:var(--panel2); color:var(--ink)}
-    button:hover{border-color:var(--accent)}
-    button.primary{border:0; font-weight:700; color:#0b1020; background:linear-gradient(135deg,var(--accent),var(--accent2))}
-    button.small{padding:3px 9px; font-size:.82rem}
-    button.danger{border-color:rgba(255,107,107,.55); color:#ffb3b0}
-    input[type=text], select{font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:6px 9px; outline:none}
-    input[type=text]:focus, select:focus{border-color:var(--accent)}
-    code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--accent2)}
     /* page title (under the shared lab header, lab-header.js) */
-    .pagebar{padding:10px 28px; border-bottom:1px solid var(--line); background:rgba(20,27,46,.45)}
-    .pagebar h1{margin:0; font-size:1.1rem; font-weight:800} .pagebar h1 .dot{color:var(--accent)}
     .app{flex:1; display:grid; grid-template-columns:290px 1fr; min-height:0}
-    aside{border-right:1px solid var(--line); background:rgba(20,27,46,.55); overflow:auto; padding:12px 10px}
+    aside{border-right:1px solid var(--line); background:var(--panel2); overflow:auto; padding:12px 10px}
     .title{font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); padding:10px 8px 6px; display:flex; justify-content:space-between; align-items:center}
     .cat{display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:8px; cursor:pointer; color:var(--muted); font-size:.93rem}
     .cat:hover{background:rgba(109,139,255,.08); color:var(--ink)}
     .cat.active{background:rgba(109,139,255,.16); color:var(--ink); font-weight:600}
     .tag{font-size:.68rem; padding:1px 7px; border-radius:999px; border:1px solid var(--line); color:var(--muted); margin-left:auto}
-    .tag.read{border-color:rgba(57,208,196,.5); color:var(--accent2)} .tag.write{border-color:rgba(226,185,59,.55); color:#f3d98b}
+    .tag.read{border-color:rgba(57,208,196,.5); color:var(--accent2)} .tag.write{border-color:rgba(226,185,59,.55); color:var(--warn-ink)}
     .newcat{display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:6px 8px} .newcat input{flex:1; min-width:90px}
     .empty{color:var(--muted); padding:10px 9px; font-size:.88rem}
     main{overflow:auto; padding:18px 22px; display:flex; flex-direction:column; gap:14px}
-    .card{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px}
     .card h2{margin:0 0 4px; font-size:1.15rem} .card h3{margin:0 0 10px; font-size:.95rem; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em}
     .sub{color:var(--muted); font-size:.88rem}
-    table{width:100%; border-collapse:collapse}
-    td,th{padding:8px 10px; border-bottom:1px solid var(--line); text-align:left; font-size:.92rem; vertical-align:middle}
-    th{color:var(--muted); font-size:.75rem; text-transform:uppercase; letter-spacing:.05em}
-    tr:last-child td{border-bottom:0}
     td.r{text-align:right; white-space:nowrap}
     .ns td:first-child{font-weight:600; cursor:pointer; user-select:none} .ns:hover td{background:rgba(109,139,255,.06)}
     .ns .car{display:inline-block; width:14px; color:var(--muted); transition:transform .15s} .ns.open .car{transform:rotate(90deg)}
@@ -60,7 +36,7 @@
     pre{margin:0; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; overflow:auto; font-size:.86rem}
     .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--line);
            padding:10px 16px; border-radius:10px; box-shadow:var(--shadow); display:none; z-index:10}
-    .toast.err{border-color:var(--danger); color:#ffb3b0}
+    .toast.err{border-color:var(--danger); color:var(--bad-ink)}
     .placeholder{color:var(--muted); padding:40px; text-align:center}
     @media (max-width:760px){ .app{grid-template-columns:1fr} aside{max-height:35vh; border-right:0; border-bottom:1px solid var(--line)} }
     .plink{display:inline-block;margin-top:8px;font-size:.88rem;color:var(--accent);font-weight:600}
@@ -68,7 +44,7 @@
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=10"></script>
+  <script src="/lab-header.js?v=11"></script>
   <div class="pagebar"><h1>🗂️ My catalogs <span class="dot">·</span> Polaris</h1></div>
   <div class="app">
     <aside>

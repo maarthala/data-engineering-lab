@@ -1,9 +1,8 @@
-// Shared by the managers' pages — 👥 Members (manage.html), 🧩 Teams (teams.html) and
-// ⚙️ Settings (settings.html): the page bar with its tabs, the result card, and calls to
-// /api/admin (home-api, behind the Keycloak login; managers only). Actions run in the
-// background — run() polls the job until it finishes.
+// Shared by the managers' pages (Manage in the left menu — Members, Teams, Activity, Exams,
+// Settings): the page title, sub-tabs, the Actions menu, the result card, and calls to /api/admin
+// (home-api, behind the Keycloak login; managers only). Actions run in the background — run()
+// polls the job until it finishes.
 var admin = (function () {
-  var TABS = [['/manage.html', '👥 Members'], ['/teams.html', '🧩 Teams'], ['/activity.html', '📊 Activity'], ['/exams-admin.html', '📝 Exams'], ['/settings.html', '⚙️ Settings']];
   var main, result, busy = false;
 
   function el(tag, attrs, kids) {
@@ -77,17 +76,57 @@ var admin = (function () {
     });
   }
 
-  // page bar + tabs + result card; `load()` fills the page and is re-run after each action
-  function page(title) {
-    var here = location.pathname;
-    document.body.insertBefore(el('div', {class: 'pagebar'}, [
-      el('h1', {}, [title + ' ', el('span', {class: 'dot', text: '·'}), ' managers only']),
-      el('nav', {class: 'tabs'}, TABS.map(function (t) {
-        return el('a', {href: t[0], class: here === t[0] ? 'on' : '', text: t[1]});
-      }))]), document.getElementById('main'));
+  // page title (+ a line about it) + result card; `load()` fills the page and is re-run after each action
+  var bar;
+  function page(title, desc) {
+    bar = el('div', {class: 'pagebar'}, [el('h1', {text: title}), desc ? el('div', {class: 'desc', text: desc}) : null]);
+    document.body.insertBefore(bar, document.getElementById('main'));
     main = document.getElementById('main');
     result = el('div', {class: 'card result', hidden: ''});
   }
+
+  // sub-tabs under the title: [[id, label], …]; the open one is #<id> in the address. → current id
+  function tabs(list, onChange) {
+    var cur = location.hash.slice(1).split('/')[0];
+    if (!list.some(function (t) { return t[0] === cur; })) cur = list[0][0];
+    var nav = el('nav', {class: 'tabs'});
+    list.forEach(function (t) {
+      var a = el('a', {href: '#' + t[0], class: t[0] === cur ? 'on' : '', text: t[1]});
+      a.addEventListener('click', function (e) {
+        e.preventDefault();
+        cur = t[0];
+        history.replaceState(null, '', '#' + t[0]);
+        nav.querySelectorAll('a').forEach(function (x) { x.className = x === a ? 'on' : ''; });
+        result.hidden = true;
+        onChange(cur);
+      });
+      nav.appendChild(a);
+    });
+    var old = bar.querySelector('nav.tabs');
+    if (old) old.remove();
+    bar.appendChild(nav);
+    return cur;
+  }
+
+  // an "Actions ▾" button with a small menu: [{label, danger, click}] (closes on any outside click)
+  function menu(label, items) {
+    var box = el('span', {style: 'position:relative; display:inline-block'});
+    var b = el('button', {class: 'small', text: label + ' ▾'});
+    var pop = el('div', {class: 'menu-pop', hidden: ''});
+    items.forEach(function (it) {
+      var x = el('button', {class: it.danger ? 'danger' : '', text: it.label});
+      x.addEventListener('click', function (e) { e.stopPropagation(); pop.hidden = true; it.click(b); });
+      pop.appendChild(x);
+    });
+    b.addEventListener('click', function (e) {
+      e.stopPropagation();
+      document.querySelectorAll('.menu-pop').forEach(function (p) { if (p !== pop) p.hidden = true; });
+      pop.hidden = !pop.hidden;
+    });
+    box.appendChild(b); box.appendChild(pop);
+    return box;
+  }
+  document.addEventListener('click', function () { document.querySelectorAll('.menu-pop').forEach(function (p) { p.hidden = true; }); });
 
   // replace the page's cards (the result card stays on top)
   function fill(cards) {
@@ -103,5 +142,5 @@ var admin = (function () {
       ? 'This page is for lab managers (Keycloak group “managers”).' : 'Could not load: ' + e.message}));
   }
 
-  return {el: el, api: api, run: run, act: act, show: show, page: page, fill: fill, failed: failed};
+  return {el: el, api: api, run: run, act: act, show: show, page: page, tabs: tabs, menu: menu, fill: fill, failed: failed};
 })();

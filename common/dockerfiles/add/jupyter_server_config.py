@@ -115,3 +115,8 @@ try:                                    # never block the server from starting
     lab_sync.initial_sync(lab_sync.ROOT)
 except Exception as exc:
     print(f"[lab_sync] initial sync failed: {exc}", flush=True)
+
+# The portal frames JupyterLab (tool.html): its origin may embed this server (PORTAL_ORIGIN, from the Hub).
+if os.environ.get("PORTAL_ORIGIN"):
+    c.ServerApp.tornado_settings = {"headers": {
+        "Content-Security-Policy": "frame-ancestors 'self' " + os.environ["PORTAL_ORIGIN"]}}

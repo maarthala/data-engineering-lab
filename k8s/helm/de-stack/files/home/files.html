@@ -4,44 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My files — Epireum's Data Engineering Lab</title>
+  <link rel="stylesheet" href="/admin.css?v=7">
   <style>
-    :root{
-      --bg:#0b1020; --panel:#141b2e; --panel2:#1b2438; --line:#2a3550;
-      --ink:#e8edf7; --muted:#9aa8c7; --accent:#6d8bff; --accent2:#39d0c4; --danger:#ff6b6b; --gold:#e2b93b;
-      --shadow:0 10px 30px rgba(0,0,0,.35);
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0; color:var(--ink); display:flex; flex-direction:column;
-      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-      background:
-        radial-gradient(1200px 600px at 80% -10%, rgba(109,139,255,.18), transparent 60%),
-        radial-gradient(900px 500px at -10% 10%, rgba(57,208,196,.12), transparent 55%),
-        var(--bg);
-    }
+    body{display:flex; flex-direction:column; min-height:100vh}
     a{color:inherit; text-decoration:none}
-    button{font:inherit; cursor:pointer; border-radius:9px; padding:7px 13px; border:1px solid var(--line); background:var(--panel2); color:var(--ink)}
-    button:hover{border-color:var(--accent)}
-    button:disabled{opacity:.45; cursor:not-allowed}
-    button.primary{border:0; font-weight:700; color:#0b1020; background:linear-gradient(135deg,var(--accent),var(--accent2))}
-    button.danger{border-color:rgba(255,107,107,.6); color:#ffb3b0}
-    button.danger:hover{background:rgba(255,107,107,.12)}
     button.icon{padding:3px 8px; font-size:.85rem; background:transparent; border-color:transparent; color:var(--muted)}
     button.icon:hover{border-color:var(--line); color:var(--ink)}
     button.icon.del:hover{border-color:var(--danger); color:var(--danger)}
-    input[type=text]{font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:7px 10px; outline:none}
-    input[type=text]:focus{border-color:var(--accent)}
 
     /* ---- page title (under the shared lab header, lab-header.js) ---- */
-    .pagebar{padding:10px 28px; border-bottom:1px solid var(--line); background:rgba(20,27,46,.45)}
-    .pagebar h1{margin:0; font-size:1.1rem; font-weight:800}
-    .pagebar h1 .dot{color:var(--accent)}
-    .pagebar h1 .bucket{color:var(--accent2)}
 
     /* ---- two-pane app ---- */
     .app{flex:1; display:grid; grid-template-columns:270px 1fr; min-height:0}
-    aside{border-right:1px solid var(--line); background:rgba(20,27,46,.55); overflow:auto; padding:12px 8px}
+    aside{border-right:1px solid var(--line); background:var(--panel2); overflow:auto; padding:12px 8px}
     aside .title{font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); padding:4px 10px 8px}
     .tree ul{list-style:none; margin:0; padding-left:16px}
     .tree > ul{padding-left:0}
@@ -50,8 +25,8 @@
     .node.active{background:rgba(109,139,255,.16); color:var(--ink); font-weight:600}
     .caret{width:16px; text-align:center; font-size:.75rem; color:var(--muted); flex:none}
     .caret.leaf{visibility:hidden}
-    .badge.cat{border-color:rgba(109,139,255,.55); color:#b9c6ff}
-    .badge{font-size:.68rem; margin-left:6px; padding:1px 6px; border-radius:999px; border:1px solid rgba(226,185,59,.5); color:#f3d98b}
+    .badge.cat{border-color:rgba(109,139,255,.55); color:var(--accent)}
+    .badge{font-size:.68rem; margin-left:6px; padding:1px 6px; border-radius:999px; border:1px solid rgba(226,185,59,.5); color:var(--warn-ink)}
     main{display:flex; flex-direction:column; min-width:0; min-height:0; padding:16px 20px; gap:12px}
     .toolbar{display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
              background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px}
@@ -59,12 +34,10 @@
     .crumbs a{color:var(--accent2)} .crumbs a:hover{text-decoration:underline}
     .crumbs .sep{color:var(--muted)}
     .btns{display:flex; gap:8px}
-    .banner{padding:10px 14px; border-radius:10px; border:1px solid rgba(226,185,59,.5); background:rgba(226,185,59,.08); color:#f3d98b; display:none; font-size:.92rem}
+    .banner{padding:10px 14px; border-radius:10px; border:1px solid rgba(226,185,59,.5); background:rgba(226,185,59,.08); color:var(--warn-ink); display:none; font-size:.92rem}
     .banner code, .hint code{background:var(--panel2); border-radius:5px; padding:1px 5px}
     .list{position:relative; flex:1; min-height:240px; overflow:auto; background:var(--panel); border:1px solid var(--line); border-radius:12px}
-    table{width:100%; border-collapse:collapse}
     th,td{text-align:left; padding:10px 14px; border-bottom:1px solid var(--line); font-size:.93rem}
-    th{position:sticky; top:0; z-index:1; color:var(--muted); font-weight:600; font-size:.76rem; text-transform:uppercase; letter-spacing:.05em; background:var(--panel2)}
     tbody tr:hover{background:rgba(109,139,255,.06)}
     td.name{display:flex; align-items:center; gap:8px}
     td.name a{color:var(--ink)} td.name a:hover{color:var(--accent2)}
@@ -74,7 +47,7 @@
     tr.newrow input{width:260px}
     .empty{padding:40px; text-align:center; color:var(--muted)}
     .drop{position:absolute; inset:0; display:none; align-items:center; justify-content:center; font-weight:700; font-size:1.05rem;
-          background:rgba(11,16,32,.86); border:2px dashed var(--accent2); border-radius:12px; color:var(--accent2); z-index:2}
+          background:rgba(255,255,255,.92); border:2px dashed var(--accent2); border-radius:12px; color:var(--accent2); z-index:2}
     .list.dragging .drop{display:flex}
     .hint{color:var(--muted); font-size:.85rem}
 
@@ -99,31 +72,29 @@
     .prow .fill{height:100%; width:0; background:linear-gradient(90deg,var(--accent),var(--accent2))}
 
     /* ---- dialog ---- */
-    .scrim{position:fixed; inset:0; background:rgba(5,8,18,.65); display:none; align-items:center; justify-content:center; z-index:10}
+    .scrim{position:fixed; inset:0; background:rgba(16,24,40,.35); display:none; align-items:center; justify-content:center; z-index:10}
     .dialog{width:min(460px,92vw); background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); padding:20px}
     .dialog h3{margin:0 0 8px; font-size:1.1rem}
     .dialog p{margin:0 0 12px; color:var(--muted); line-height:1.45; white-space:pre-line}
     .dialog p b{color:var(--ink)}
     .dialog input{width:100%; margin-bottom:12px}
     .dialog .row{display:flex; justify-content:flex-end; gap:8px}
-    .dialog.warn h3{color:#f3d98b}
+    .dialog.warn h3{color:var(--warn-ink)}
     .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--line);
            padding:10px 16px; border-radius:10px; box-shadow:var(--shadow); display:none; max-width:90vw; z-index:11}
-    .toast.err{border-color:var(--danger); color:#ffb3b0}
-    .pagebar{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px}
-    .pagebar h1 .muted-label{color:var(--muted); font-weight:500; font-size:.9rem}
+    .toast.err{border-color:var(--danger); color:var(--bad-ink)}
     .spaces{display:flex; gap:6px}
     .spaces a{color:var(--muted); text-decoration:none; padding:4px 12px; border-radius:9px; border:1px solid transparent; font-size:.9rem}
     .spaces a:hover{color:var(--ink); border-color:var(--line)}
     .spaces a.on{color:var(--ink); background:var(--panel2); border-color:var(--line)}
     .stag{font-size:.68rem; margin-left:6px; padding:1px 7px; border-radius:999px; border:1px solid rgba(57,208,196,.5); color:var(--accent2)}
-    .stag.write{border-color:rgba(226,185,59,.55); color:#f3d98b}
+    .stag.write{border-color:rgba(226,185,59,.55); color:var(--warn-ink)}
     @media (max-width:760px){ .app{grid-template-columns:1fr} aside{max-height:30vh; border-right:0; border-bottom:1px solid var(--line)} }
   </style>
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=10"></script>
+  <script src="/lab-header.js?v=11"></script>
   <div class="pagebar"><h1><span id="space-title">📁 My files</span> <span class="dot">·</span> <span class="muted-label">bucket</span> <span class="bucket" id="bucket">…</span>
     <span class="dot" id="lh-dot" hidden>·</span> <span class="muted-label" id="lh-label" hidden>lakehouse</span> <span class="bucket" id="lakehouse"></span></h1>
     <nav class="spaces"><a href="/files.html" id="sp-mine">🪣 Mine</a><a href="/files.html?space=team" id="sp-team" hidden>👥 Team</a><a href="/files.html?space=shared" id="sp-shared">🤝 Shared with me</a></nav></div>
