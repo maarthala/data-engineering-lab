@@ -352,7 +352,7 @@ class View:
         self.put(0, 1, "Epireum DE Lab", self.c["bold"] | self.c["magenta"])
         x = 16
         if s.version:
-            self.put(0, x, s.version, self.c["dim"])
+            self.put(0, x, s.version, self.c["blue"] | self.c["bold"])
             x += len(s.version) + 1
         self.put(0, x, f"· {phase}", self.c["bold"])
         label = f" {ready:>2}/{total} " + ("stopped" if s.mode == "stop" else "ready") + (f" · {off} off" if off else "")
