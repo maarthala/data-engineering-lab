@@ -64,6 +64,7 @@ key isn't kept) or a plain exam.json; set questions / pass mark / who may take i
   GET    /api/admin/exams · POST /api/admin/exams/upload {"file": {…}, "key"} · …/meta {"file": {…}}
   POST   /api/admin/exams/settings {"exam", "name", "num_questions", "pass_percent", "audience", "teams"}
   POST   /api/admin/exams/delete {"exam", "source"?}
+  POST   /api/admin/exams/discard {"exam", "attempt"?}   delete attempts in progress (one / all of the exam)
 
 Which tools are up (local: units can be stopped in make status — the home page greys their tiles):
   GET    /api/services                                   {"jupyter": true, "sqlpad": false, …} — from
@@ -416,6 +417,11 @@ class Handler(BaseHTTPRequestHandler):
                 r = labexams.set_exam(str(body.get("exam", "")), user, body.get("name"), body.get("num_questions"),
                                       body.get("pass_percent"), body.get("audience"), body.get("teams"))
                 print(f"[home-api] manager {user}: exam {body.get('exam')} settings", flush=True)
+                return self._json(200, r)
+            if path == "/api/admin/exams/discard":         # attempts in progress: one, or all of the exam
+                exam = str(body.get("exam", ""))
+                r = labexams.discard(exam, body.get("attempt"))
+                print(f"[home-api] manager {user}: exam {exam} — {r['deleted']} attempt(s) in progress deleted", flush=True)
                 return self._json(200, r)
             if path == "/api/admin/exams/delete":
                 exam, source = str(body.get("exam", "")), body.get("source")

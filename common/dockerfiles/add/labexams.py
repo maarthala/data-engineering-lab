@@ -5,7 +5,8 @@ see decrypt()) together with the key; the key is used once and never stored. Eac
 is one exam (its exam_id); several banks (sources: dump1, dump2 …) add up to its question pool,
 uploading a source again replaces it. An optional plain exam.json gives the name and domains.
 Managers set how many questions an attempt has, the pass mark, and who may take it: everyone,
-chosen teams, or nobody (off).
+chosen teams, or nobody (off). They see the attempts in progress and can delete them (one or all
+of an exam) — the member's next start then draws a new set with the current settings.
 
 Members take an exam any number of times. Each attempt draws its questions at random, preferring
 the ones the member has seen least; answers are saved as they go, so leaving is a pause and the
@@ -221,6 +222,16 @@ def delete_exam(exam_id):
     return {"deleted": _q("DELETE FROM exams WHERE id = %s", (exam_id,), rows=False)}
 
 
+def discard(exam_id, attempt_id=None):
+    """Delete an attempt in progress (or all of the exam's): the member starts afresh."""
+    if attempt_id is not None:
+        n = _q("DELETE FROM exam_attempts WHERE id = %s AND exam_id = %s AND finished_at IS NULL",
+               (int(attempt_id), exam_id), rows=False)
+    else:
+        n = _q("DELETE FROM exam_attempts WHERE exam_id = %s AND finished_at IS NULL", (exam_id,), rows=False)
+    return {"deleted": n}
+
+
 def admin_exams():
     """Every exam with its banks, pool and attempt numbers (managers)."""
     exams = _q("SELECT e.*, (SELECT count(*) FROM exam_questions q WHERE q.exam_id = e.id) AS pool, "
@@ -229,8 +240,13 @@ def admin_exams():
                "(SELECT round(avg(score)) FROM exam_attempts a WHERE a.exam_id = e.id AND finished_at IS NOT NULL) AS avg_score "
                "FROM exams e ORDER BY e.name")
     banks = _q("SELECT exam_id, source, questions, skipped, uploaded_at, uploaded_by FROM exam_banks ORDER BY source")
+    ongoing = _q("SELECT id, exam_id, member, started_at, cardinality(qids) AS total, "
+                 "(SELECT count(*) FROM jsonb_object_keys(answers)) AS answered "
+                 "FROM exam_attempts WHERE finished_at IS NULL ORDER BY started_at")
     for e in exams:
         e["banks"] = [dict(b, uploaded_at=b["uploaded_at"].isoformat()) for b in banks if b["exam_id"] == e["id"]]
+        e["ongoing"] = [{"id": a["id"], "member": a["member"], "started_at": a["started_at"].isoformat(),
+                         "answered": a["answered"], "total": a["total"]} for a in ongoing if a["exam_id"] == e["id"]]
         e["updated_at"] = e["updated_at"].isoformat()
         e["avg_score"] = int(e["avg_score"]) if e["avg_score"] is not None else None
     return {"exams": exams}

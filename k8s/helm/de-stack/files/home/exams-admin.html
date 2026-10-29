@@ -30,6 +30,8 @@
     // 📝 Exams — managers add certification question banks (encrypted .enc.json + the key; the
     // key is used once to decrypt and not kept) or a plain exam.json (name, domains), then set per
     // exam: questions per attempt, pass mark and who may take it (everyone, chosen teams, nobody).
+    // "In progress": members' unfinished attempts — delete one (or all) and that member's next start
+    // draws a new set with the exam's current settings.
     var el = admin.el;
     admin.page('📝 Exams');
 
@@ -113,7 +115,8 @@
           pass_percent: +pass.value, audience: who.value,
           teams: picks.filter(function (p) { return p.c.checked; }).map(function (p) { return p.t; })})
           .then(function () { admin.show('Saved ' + name.value, [who.value === 'off' ? 'Members can\'t see it (off).' :
-              who.value === 'all' ? 'Open to all members.' : 'Open to the chosen teams.']); load(); })
+              who.value === 'all' ? 'Open to all members.' : 'Open to the chosen teams.'].concat(e.ongoing.length ?
+              [e.ongoing.length + ' attempt(s) in progress keep their questions — delete them under In progress to start them with the new settings.'] : [])); load(); })
           .catch(function (x) { admin.show('Could not save', [x.message], null, true); save.disabled = false; });
       });
       var del = el('button', {class: 'danger', text: 'Delete exam'});
@@ -138,6 +141,25 @@
             el('td', {class: 'acts'}, [x])]);
         })));
 
+      function discard(ctl, body, what) {
+        if (!confirm('Delete ' + what + '? The answers so far are lost; the next start draws a new set with the current settings.')) return;
+        ctl.disabled = true;
+        admin.api('POST', '/api/admin/exams/discard', Object.assign({exam: e.id}, body))
+          .then(function (r) { admin.show('Deleted ' + r.deleted + ' attempt(s) in progress', ['They start afresh, with the current settings.']); load(); })
+          .catch(function (x) { admin.show('Could not delete', [x.message], null, true); ctl.disabled = false; });
+      }
+      var all = el('button', {class: 'small danger', text: 'Delete all in progress'});
+      all.addEventListener('click', function () { discard(all, {}, 'all ' + e.ongoing.length + ' attempts in progress of ' + e.name); });
+      var ongoing = e.ongoing.length ? el('div', {}, [
+        el('div', {class: 'bar'}, [el('b', {text: 'In progress (' + e.ongoing.length + ')'}), all]),
+        el('div', {class: 'wrap'}, [el('table', {}, [el('tr', {}, ['Member', 'Started', 'Answered', ''].map(function (h) { return el('th', {text: h}); }))]
+          .concat(e.ongoing.map(function (a) {
+            var x = el('button', {class: 'small danger', text: 'Delete'});
+            x.addEventListener('click', function () { discard(x, {attempt: a.id}, a.member + '\'s attempt in progress'); });
+            return el('tr', {}, [el('td', {text: a.member}), el('td', {class: 'muted', text: a.started_at.slice(0, 16).replace('T', ' ')}),
+              el('td', {text: a.answered + ' / ' + a.total}), el('td', {class: 'acts'}, [x])]);
+          })))])]) : el('div', {class: 'sub', text: 'No attempts in progress.'});
+
       return el('div', {class: 'card exam'}, [
         el('div', {class: 'bar'}, [el('div', {}, [el('h2', {text: e.name}), el('div', {class: 'id', text: e.id + (e.provider ? ' · ' + e.provider : '')})]),
           el('span', {class: 'tag' + (e.audience === 'off' ? '' : ' on'), text: e.audience === 'off' ? 'off' : e.audience === 'all' ? 'all members' : (e.teams || []).join(', ')})]),
@@ -151,7 +173,8 @@
           el('label', {}, ['Pass mark (%)', pass]), el('label', {}, ['Who can take it', who])]),
         pickBox,
         el('div', {class: 'row', style: 'margin:10px 0 14px'}, [save, del]),
-        el('div', {class: 'wrap'}, [banks])]);
+        el('div', {class: 'wrap'}, [banks]),
+        el('div', {style: 'margin-top:14px'}, [ongoing])]);
     }
 
     function load() {

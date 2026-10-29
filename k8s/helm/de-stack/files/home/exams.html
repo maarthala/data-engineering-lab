@@ -80,13 +80,14 @@
     function when(iso) { return new Date(iso).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}); }
 
     // ---- the list: exams open to me + my stats -------------------------------------------------
-    function list() {
+    function list(note) {
       if (location.hash) history.replaceState(null, '', location.pathname);
       api('GET', '/api/exams').then(function (d) {
         main.innerHTML = '';
-        if (!d.exams.length) return main.appendChild(el('div', {class: 'placeholder',
+        if (!d.exams.length) main.appendChild(el('div', {class: 'placeholder',
           text: 'No mock exams are open to you yet — your lab managers add them.'}));
-        main.appendChild(el('div', {class: 'exams'}, d.exams.map(examCard)));
+        else main.appendChild(el('div', {class: 'exams'}, d.exams.map(examCard)));
+        if (note) alertCard(note);
       }).catch(fail);
     }
     function stat(v, label, cls) { return el('div', {}, [el('b', {class: cls || '', text: v === null || v === undefined ? '—' : String(v)}), el('span', {text: label})]); }
@@ -126,7 +127,10 @@
       var i = Math.min(a.position || 0, a.questions.length - 1), answers = a.answers || {}, saving = Promise.resolve();
       function save(q, keys) {
         saving = saving.then(function () { return api('POST', '/api/exams/answer', {attempt: a.id, qid: q.qid, keys: keys, position: i}); })
-          .catch(function (e) { alertCard('Could not save your answer: ' + e.message); });
+          .catch(function (e) {
+            if (e.message === 'no such attempt') return list('Your lab managers reset this attempt — start the exam again for a new set of questions.');
+            alertCard('Could not save your answer: ' + e.message);
+          });
       }
       function render() {
         var q = a.questions[i], picked = answers[q.qid] || [], multi = q.choose > 1;
@@ -151,7 +155,7 @@
         var next = el('button', {class: 'primary', text: 'Next →'}); next.hidden = i === a.questions.length - 1;
         next.addEventListener('click', function () { i++; save(q, answers[q.qid] || []); render(); });
         var pause = el('button', {text: '⏸ Pause'});
-        pause.addEventListener('click', function () { save(q, answers[q.qid] || []); saving.then(list); });
+        pause.addEventListener('click', function () { save(q, answers[q.qid] || []); saving.then(function () { list(); }); });
         var submit = el('button', {class: i === a.questions.length - 1 ? 'primary' : '', text: 'Submit exam'});
         submit.addEventListener('click', function () {
           var left = a.questions.length - Object.keys(answers).length;
@@ -180,7 +184,7 @@
       history.replaceState(null, '', '#attempt=' + r.id);
       main.innerHTML = '';
       var wrongOnly = false, box = el('div');
-      var back = el('button', {text: '← All exams'}); back.addEventListener('click', list);
+      var back = el('button', {text: '← All exams'}); back.addEventListener('click', function () { list(); });
       var again = el('button', {class: 'primary', text: 'New attempt'});
       again.addEventListener('click', function () { api('POST', '/api/exams/start', {exam: r.exam.id}).then(take).catch(function (e) { alertCard(e.message); }); });
       var toggle = el('button', {text: 'Show only wrong'});
