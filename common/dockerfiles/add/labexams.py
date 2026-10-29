@@ -13,8 +13,14 @@ the ones the member has seen least; answers are saved as they go, so leaving is 
 attempt resumes where it was. No time limit. After submitting: score, pass/fail, per domain and
 a full review. Correct answers never reach the browser before the attempt is submitted.
 
-Questions marked review.status = needs-fix are left out; review.answer / review.explanation win
-over the source's when present.
+Question banks are schema 1.0 or 1.1. 1.1 adds slot questions — hotspot (a dropdown per box),
+drag-drop (values from the choice_pool onto targets or steps; shown as a dropdown per slot) and
+yes-no (one per statement) — graded per slot: each slot is a share of the question's point. It also
+adds case studies, stored once per bank and shown with each question that refers to one. Text is
+Markdown with inline HTML; the page renders it and keeps only harmless tags.
+
+Questions marked review.status = needs-fix are left out; review.answer / review.slot_answers /
+review.explanation win over the source's when present.
 
 A demo exam (exam_demo.json: 10 questions, open to everyone) is added once, when the tables are
 made; managers may change, close or delete it — it doesn't come back.
@@ -34,6 +40,7 @@ DB_URL = os.environ.get("PORTAL_DB_URL", "postgresql://portal:portal@postgres:54
 FORMAT = "certification-exams/question-bank+aes-256-gcm"
 EXAM_ID = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 AUDIENCES = ("all", "teams", "off")
+SLOT_TYPES = ("hotspot", "drag-drop", "yes-no")
 DEMO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exam_demo.json")
 PASS_PERCENT = 70
 _ready = False
@@ -53,6 +60,12 @@ CREATE TABLE IF NOT EXISTS exam_questions (
   exam_id text, source text, qid text, question text NOT NULL, options jsonb NOT NULL,
   answer text[] NOT NULL, explanation text, refs jsonb NOT NULL DEFAULT '[]', domain text,
   PRIMARY KEY (exam_id, qid), FOREIGN KEY (exam_id, source) REFERENCES exam_banks ON DELETE CASCADE);
+ALTER TABLE exam_questions ADD COLUMN IF NOT EXISTS qtype text NOT NULL DEFAULT 'choice';
+ALTER TABLE exam_questions ADD COLUMN IF NOT EXISTS slots jsonb;
+ALTER TABLE exam_questions ADD COLUMN IF NOT EXISTS case_study text;
+CREATE TABLE IF NOT EXISTS exam_cases (
+  exam_id text, source text, cid text, title text NOT NULL, content text NOT NULL,
+  PRIMARY KEY (exam_id, source, cid), FOREIGN KEY (exam_id, source) REFERENCES exam_banks ON DELETE CASCADE);
 CREATE TABLE IF NOT EXISTS exam_attempts (
   id bigserial PRIMARY KEY, exam_id text REFERENCES exams ON DELETE CASCADE, member text NOT NULL,
   qids text[] NOT NULL, answers jsonb NOT NULL DEFAULT '{}', position int NOT NULL DEFAULT 0,
@@ -140,19 +153,37 @@ def decrypt(envelope, key_text):
     return json.loads(raw)
 
 
-def _question(q):
-    """(stored fields) of one bank question, or None if it isn't usable (needs-fix, broken)."""
+def _question(q, cases):
+    """(stored fields) of one bank question, or None if it isn't usable (needs-fix, broken, an
+    unknown type, or a case study the bank doesn't have)."""
     review = q.get("review") or {}
-    if review.get("status") == "needs-fix":
+    corrected = review.get("status") == "corrected"
+    qtype = q.get("type") or "choice"
+    if review.get("status") == "needs-fix" or not q.get("question") or (q.get("case_study") and q["case_study"] not in cases):
         return None
-    answer = review.get("answer") if review.get("status") == "corrected" and review.get("answer") else q.get("answer")
+    row = {"qid": q["id"], "question": q["question"], "qtype": qtype, "options": [], "answer": [], "slots": None,
+           "case_study": q.get("case_study"), "domain": q.get("domain"),
+           "explanation": review.get("explanation") or q.get("explanation") or "",
+           "refs": review.get("references") or q.get("references") or []}
+    if qtype in SLOT_TYPES:
+        fixed = (review.get("slot_answers") if corrected else None) or {}
+        row["slots"] = []
+        for s in q.get("slots") or []:
+            choices = s.get("choices") or q.get("choice_pool") or (["Yes", "No"] if qtype == "yes-no" else [])
+            answer = fixed.get(s.get("id")) or s.get("answer")
+            if not s.get("id") or len(choices) < 2 or not answer or not set(answer) <= set(choices):
+                return None
+            row["slots"].append({"id": s["id"], "label": s.get("label") or "", "choices": list(choices), "answer": list(answer)})
+        return row if row["slots"] else None
+    if qtype != "choice":
+        return None
+    answer = review.get("answer") if corrected and review.get("answer") else q.get("answer")
     keys = [o.get("key") for o in q.get("options") or []]
-    if not q.get("question") or len(keys) < 2 or not answer or not set(answer) <= set(keys):
+    if len(keys) < 2 or not answer or not set(answer) <= set(keys):
         return None
-    return {"qid": q["id"], "question": q["question"],
-            "options": [{"key": o["key"], "text": o["text"]} for o in q["options"]],
-            "answer": sorted(answer), "explanation": review.get("explanation") or q.get("explanation") or "",
-            "refs": review.get("references") or q.get("references") or [], "domain": q.get("domain")}
+    row["options"] = [{"key": o["key"], "text": o["text"]} for o in q["options"]]
+    row["answer"] = sorted(answer)
+    return row
 
 
 def _title(exam_id):
@@ -168,7 +199,9 @@ def _store_bank(bank, sha256, by):
     exam_id, source = bank.get("exam_id", ""), bank.get("source", "")
     if not EXAM_ID.match(exam_id) or not EXAM_ID.match(source):
         raise ExamError("the bank has no valid exam_id / source")
-    rows = [r for r in (_question(q) for q in bank.get("questions") or []) if r]
+    cases = {c["id"]: c for c in bank.get("case_studies") or [] if c.get("id") and c.get("content")}
+    rows = [r for r in (_question(q, cases) for q in bank.get("questions") or []) if r]
+    used = {r["case_study"] for r in rows if r["case_study"]}
     skipped = len(bank.get("questions") or []) - len(rows)
     if not rows:
         raise ExamError("no usable questions in this file")
@@ -185,10 +218,15 @@ def _store_bank(bank, sha256, by):
             cur.execute("DELETE FROM exam_questions WHERE exam_id = %s AND qid = ANY(%s)",
                         (exam_id, [r["qid"] for r in rows]))       # an id moved between sources
             psycopg2.extras.execute_values(cur, "INSERT INTO exam_questions (exam_id, source, qid, question, "
-                                           "options, answer, explanation, refs, domain) VALUES %s",
+                                           "options, answer, explanation, refs, domain, qtype, slots, case_study) VALUES %s",
                                            [(exam_id, source, r["qid"], r["question"], json.dumps(r["options"]),
-                                             r["answer"], r["explanation"], json.dumps(r["refs"]), r["domain"])
+                                             r["answer"], r["explanation"], json.dumps(r["refs"]), r["domain"],
+                                             r["qtype"], json.dumps(r["slots"]) if r["slots"] else None, r["case_study"])
                                             for r in rows])
+            if used:
+                psycopg2.extras.execute_values(cur, "INSERT INTO exam_cases (exam_id, source, cid, title, content) VALUES %s",
+                                               [(exam_id, source, c, cases[c].get("title") or c, cases[c]["content"])
+                                                for c in sorted(used)])
     finally:
         c.close()
     print(f"[exams] {by}: {exam_id}/{source} — {len(rows)} questions ({skipped} skipped)", flush=True)
@@ -373,22 +411,61 @@ def attempt(attempt_id, member, team):
     e = _exam_for(a["exam_id"], team)
     qs = _questions(a["exam_id"], a["qids"])
     return {"id": a["id"], "exam": {"id": e["id"], "name": e["name"], "pass_percent": e["pass_percent"]},
-            "done": False, "position": a["position"], "answers": a["answers"],
-            "questions": [{"qid": q["qid"], "question": q["question"], "options": q["options"],
-                           "choose": len(q["answer"])} for q in qs]}
+            "done": False, "position": a["position"], "answers": a["answers"], "cases": _cases(a["exam_id"], qs),
+            "questions": [_shown(q) for q in qs]}
 
 
-def answer(attempt_id, member, qid, keys, position=None):
-    """Save one answer (and where the member is) — leaving now is a pause."""
+def _case_key(q):
+    return q["source"] + "/" + q["case_study"] if q.get("case_study") else None
+
+
+def _cases(exam_id, qs):
+    """The case studies of these questions: {source/id: {title, content}} — once, not per question."""
+    keys = {_case_key(q) for q in qs} - {None}
+    if not keys:
+        return {}
+    return {r["source"] + "/" + r["cid"]: {"title": r["title"], "content": r["content"]}
+            for r in _q("SELECT * FROM exam_cases WHERE exam_id = %s", (exam_id,)) if r["source"] + "/" + r["cid"] in keys}
+
+
+def _shown(q):
+    """A question as the member sees it while answering — no answers."""
+    d = {"qid": q["qid"], "type": q["qtype"], "question": q["question"], "case": _case_key(q)}
+    if q["qtype"] in SLOT_TYPES:
+        d["slots"] = [{"id": s["id"], "label": s["label"], "choices": s["choices"]} for s in q["slots"]]
+    else:
+        d["options"], d["choose"] = q["options"], len(q["answer"])
+    return d
+
+
+def _mark(q, given):
+    """(points 0…1, per-slot right/wrong or None): a choice question is right only with exactly the
+    right keys; a slot question gets a share of its point for each slot that is right."""
+    if q["qtype"] in SLOT_TYPES:
+        given = given if isinstance(given, dict) else {}
+        oks = [given.get(s["id"]) in s["answer"] for s in q["slots"]]
+        return sum(oks) / len(oks), oks
+    return float(isinstance(given, list) and sorted(given) == sorted(q["answer"])), None
+
+
+def answer(attempt_id, member, qid, keys, position=None, slots=None):
+    """Save one answer — option keys, or {slot id: value} for a slot question — and where the
+    member is: leaving now is a pause."""
     a = _own(attempt_id, member)
     if a["finished_at"]:
         raise ExamError("this attempt is already submitted")
     if qid not in a["qids"]:
         raise ExamError("that question isn't in this attempt")
-    keys = sorted({k for k in keys or [] if isinstance(k, str) and re.fullmatch(r"[A-Z]", k)})
+    q = (_questions(a["exam_id"], [qid]) or [None])[0]
+    if q and q["qtype"] in SLOT_TYPES:
+        choices = {s["id"]: s["choices"] for s in q["slots"]}
+        value = {k: v for k, v in (slots if isinstance(slots, dict) else {}).items()
+                 if k in choices and isinstance(v, str) and v in choices[k]}
+    else:
+        value = sorted({k for k in keys or [] if isinstance(k, str) and re.fullmatch(r"[A-Z]", k)})
     answers = dict(a["answers"])
-    if keys:
-        answers[qid] = keys
+    if value:
+        answers[qid] = value
     else:
         answers.pop(qid, None)
     pos = a["position"] if position is None else max(0, min(int(position), len(a["qids"]) - 1))
@@ -398,22 +475,23 @@ def answer(attempt_id, member, qid, keys, position=None):
 
 
 def submit(attempt_id, member, team):
-    """Mark the attempt (a question is right only with exactly the right keys) → the review."""
+    """Mark the attempt (_mark: whole points, slot questions in shares) → the review."""
     a = _own(attempt_id, member)
     if a["finished_at"]:
         return review(attempt_id, member)
     e = _q("SELECT * FROM exams WHERE id = %s", (a["exam_id"],), one=True)
     qs = _questions(a["exam_id"], a["qids"])
-    right, by_domain = 0, {}
+    right, points, by_domain = 0, 0.0, {}
     for q in qs:
-        ok = sorted(a["answers"].get(q["qid"], [])) == sorted(q["answer"])
-        right += ok
+        p, _ = _mark(q, a["answers"].get(q["qid"]))
+        right += p == 1
+        points += p
         d = (q["domain"] or "").split(".")[0] or "-"
         by_domain.setdefault(d, [0, 0])
-        by_domain[d][0] += ok
+        by_domain[d][0] = round(by_domain[d][0] + p, 2)
         by_domain[d][1] += 1
     total = len(qs) or 1
-    score = round(100 * right / total)
+    score = round(100 * points / total)
     _q("UPDATE exam_attempts SET finished_at = now(), correct = %s, total = %s, score = %s, passed = %s, "
        "by_domain = %s WHERE id = %s",
        (right, len(qs), score, score >= e["pass_percent"], json.dumps(by_domain), a["id"]), rows=False)
@@ -428,6 +506,7 @@ def review(attempt_id, member):
         raise ExamError("submit the attempt first")
     e = _q("SELECT * FROM exams WHERE id = %s", (a["exam_id"],), one=True)
     names = {d["id"]: d["name"] for d in (e["domains"] or [])}
+    qs = _questions(a["exam_id"], a["qids"])
     return {"id": a["id"], "done": True,
             "exam": {"id": e["id"], "name": e["name"], "pass_percent": e["pass_percent"]},
             "score": a["score"], "passed": a["passed"], "correct": a["correct"], "total": a["total"],
@@ -435,11 +514,21 @@ def review(attempt_id, member):
             "minutes": max(1, round((a["finished_at"] - a["started_at"]).total_seconds() / 60)),
             "by_domain": [{"domain": d, "name": names.get(d, "Unassigned" if d == "-" else f"Domain {d}"),
                            "correct": v[0], "total": v[1]} for d, v in sorted((a["by_domain"] or {}).items())],
-            "questions": [{"qid": q["qid"], "question": q["question"], "options": q["options"],
-                           "answer": q["answer"], "picked": a["answers"].get(q["qid"], []),
-                           "right": sorted(a["answers"].get(q["qid"], [])) == sorted(q["answer"]),
-                           "explanation": q["explanation"], "refs": q["refs"]}
-                          for q in _questions(a["exam_id"], a["qids"])]}
+            "cases": _cases(a["exam_id"], qs), "questions": [_reviewed(q, a["answers"].get(q["qid"])) for q in qs]}
+
+
+def _reviewed(q, given):
+    """A question in the review: the member's answer, the right one, points, the explanation."""
+    p, oks = _mark(q, given)
+    d = dict(_shown(q), points=round(p, 2), right=p == 1, answered=bool(given),
+             explanation=q["explanation"], refs=q["refs"])
+    if oks is None:
+        d.update(answer=q["answer"], picked=given or [])
+    else:
+        given = given if isinstance(given, dict) else {}
+        d["slots"] = [{"id": s["id"], "label": s["label"], "answer": s["answer"], "picked": given.get(s["id"]), "right": ok}
+                      for s, ok in zip(q["slots"], oks)]
+    return d
 
 
 def forget_member(member):

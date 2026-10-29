@@ -15,7 +15,20 @@
     .stats div{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:8px; text-align:center}
     .stats b{display:block; font-size:1.15rem} .stats span{font-size:.75rem; color:var(--muted)}
     .pass{color:var(--accent2)} .fail{color:var(--bad-ink)}
-    .q{font-size:1.02rem; line-height:1.55; white-space:pre-wrap; margin:6px 0 14px}
+    .q{font-size:1.02rem; line-height:1.55; margin:6px 0 14px}
+    .md p{margin:0 0 10px} .md ul, .md ol{margin:0 0 10px; padding-left:22px} .md h1, .md h2, .md h3, .md h4{font-size:1rem; margin:12px 0 6px}
+    .md pre{background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:8px 10px; overflow:auto; font-size:.86rem; line-height:1.45; margin:0 0 10px}
+    .md pre code{background:none; padding:0; color:inherit}
+    .md table{width:auto; max-width:100%; margin:0 0 10px; font-size:.9rem; display:block; overflow:auto}
+    .md th, .md td{border:1px solid var(--line); padding:4px 8px; text-align:left; vertical-align:top}
+    .md td pre{margin:0}
+    .case{border:1px solid var(--line); border-radius:10px; margin:6px 0 12px; background:var(--panel2)}
+    .case summary{cursor:pointer; padding:8px 12px; font-weight:600}
+    .case .md{max-height:340px; overflow:auto; padding:2px 14px 8px; font-size:.92rem; line-height:1.5; border-top:1px solid var(--line); background:var(--panel)}
+    .slots{border-collapse:collapse; width:100%; margin-bottom:8px} .slots td{padding:8px 10px; border-top:1px solid var(--line); vertical-align:middle}
+    .slots td:first-child{width:40%; font-weight:600} .slots select{max-width:100%; min-width:220px}
+    .slots label{margin-right:16px; cursor:pointer} .slots .ok{color:var(--accent2)} .slots .bad{color:var(--bad-ink)}
+    .palette button.part{background:var(--warn-bg); border-color:#f0d9a8}
     .opt{display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid var(--line); border-radius:10px;
          margin-bottom:8px; cursor:pointer; line-height:1.45}
     .opt:hover{border-color:var(--accent)} .opt.sel{border-color:var(--accent); background:rgba(109,139,255,.12)}
@@ -77,19 +90,89 @@
     }
     function fail(e) { main.innerHTML = ''; main.appendChild(el('div', {class: 'placeholder', text: 'Could not load: ' + e.message})); }
     function esc(s) { return String(s || '').replace(/[&<>"]/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]; }); }
-    // the explanations' small Markdown: paragraphs, - lists, **bold**, `code`, [text](url)
-    function md(s) {
-      return esc(s).split(/\n{2,}/).map(function (block) {
-        var lines = block.split('\n');
-        var inline = function (t) {
-          return t.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>')
-                  .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-        };
-        if (lines.every(function (l) { return /^\s*[-*] /.test(l); }))
-          return '<ul>' + lines.map(function (l) { return '<li>' + inline(l.replace(/^\s*[-*] /, '')) + '</li>'; }).join('') + '</ul>';
-        return '<p>' + inline(lines.join('<br>')) + '</p>';
-      }).join('');
+    // Question texts, options, case studies and explanations are Markdown with inline HTML (bank
+    // schema 1.1): paragraphs, # headings, - / 1. lists (nested by indent), | tables |, ``` code ```,
+    // **bold**, *italic*, `code`, [text](url) — and HTML tags, of which clean() keeps only harmless ones
+    var TAGS = 'table|thead|tbody|tfoot|tr|th|td|caption|br|hr|pre|code|b|strong|i|em|u|s|del|sub|sup|kbd|ul|ol|li|p|div|span|blockquote|h[1-6]|a';
+    var KEEP = new RegExp('^(' + TAGS + ')$'), DROP = /^(script|style|iframe|frame|object|embed|svg|math|template|noscript|textarea|select|option|input|button|form|link|meta|base|img|video|audio|source|title|head)$/;
+    function clean(html) {                                // only TAGS stay; attributes only colspan/rowspan/start/href (http)
+      var t = document.createElement('template'); t.innerHTML = html;
+      (function walk(n) {
+        Array.prototype.slice.call(n.childNodes).forEach(function (c) {
+          if (c.nodeType === 3) return;
+          if (c.nodeType !== 1) return c.remove();
+          var tag = c.tagName.toLowerCase();
+          if (DROP.test(tag)) return c.remove();
+          walk(c);
+          if (!KEEP.test(tag)) return c.replaceWith.apply(c, Array.prototype.slice.call(c.childNodes));
+          Array.prototype.slice.call(c.attributes).forEach(function (x) {
+            var ok = /^(colspan|rowspan)$/.test(x.name) && /^\d+$/.test(x.value) || x.name === 'start' && tag === 'ol' && /^\d+$/.test(x.value) ||
+                     x.name === 'href' && tag === 'a' && /^https?:\/\//i.test(x.value);
+            if (!ok) c.removeAttribute(x.name);
+          });
+          if (tag === 'a') { c.setAttribute('target', '_blank'); c.setAttribute('rel', 'noopener'); }
+        });
+      })(t.content);
+      return t.innerHTML;
     }
+    var TAG_START = new RegExp('<(?!\\/?(' + TAGS + ')[\\s>/])', 'gi');
+    function mdText(t) {                                  // plain text: & and < escaped, except the HTML tags we keep
+      return t.replace(/&(?![a-zA-Z]+;|#\d+;|#x[0-9a-fA-F]+;)/g, '&amp;').replace(TAG_START, '&lt;');
+    }
+    function inline(t) {
+      var codes = [];
+      t = t.replace(/`([^`\n]+)`/g, function (_, c) { codes.push('<code>' + esc(c) + '</code>'); return '\u0001' + (codes.length - 1) + '\u0001'; });
+      return mdText(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[\s(])[*_]([^*_\s](?:[^*_\n]*[^*_\s])?)[*_](?=[\s).,;:!?]|$)/g, '$1<i>$2</i>')
+        .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2">$1</a>')
+        .replace(/\u0001(\d+)\u0001/g, function (_, n) { return codes[n]; });
+    }
+    function mdList(lines) {                                 // - / 1. items, nested by indent
+      var out = '', stack = [];
+      lines.forEach(function (l) {
+        var m = /^(\s*)([-*+]|(\d+)[.)])\s+(.*)$/.exec(l);
+        if (!m) { out += ' ' + inline(l.trim()); return; }                 // a wrapped line of the item above
+        var ind = m[1].length, tag = m[3] ? 'ol' : 'ul';
+        while (stack.length && ind < stack[stack.length - 1].ind) out += '</li></' + stack.pop().tag + '>';
+        if (!stack.length || ind > stack[stack.length - 1].ind) {
+          stack.push({ind: ind, tag: tag});
+          out += '<' + tag + (m[3] && m[3] !== '1' ? ' start="' + m[3] + '"' : '') + '><li>';
+        } else out += '</li><li>';
+        out += inline(m[4]);
+      });
+      while (stack.length) out += '</li></' + stack.pop().tag + '>';
+      return out;
+    }
+    function mdTable(lines) {
+      var cells = function (l) { return l.trim().replace(/^\||\|$/g, '').split('|').map(function (c) { return inline(c.trim()); }); };
+      return '<table><thead><tr>' + cells(lines[0]).map(function (c) { return '<th>' + c + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        lines.slice(2).map(function (l) { return '<tr>' + cells(l).map(function (c) { return '<td>' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>';
+    }
+    function md(s) {
+      var held = [];
+      var hold = function (h) { held.push(h); return '\n\n\u0002' + (held.length - 1) + '\u0002\n\n'; };
+      s = String(s || '').replace(/\r\n?/g, '\n')
+        .replace(/^ *```[^\n]*\n([\s\S]*?)\n? *```[^\n]*$/gm, function (_, c) { return hold('<pre><code>' + esc(c) + '</code></pre>'); })
+        .replace(/^ *<(table|pre|div|blockquote|ul|ol)\b[\s\S]*?<\/\1>/gim, function (h) { return hold(mdText(h)); });
+      var out = s.split(/\n{2,}/).map(function (block) {
+        var lines = block.split('\n').filter(function (l) { return l.trim(); });
+        if (!lines.length) return '';
+        var m = /^\u0002(\d+)\u0002$/.exec(lines[0].trim());
+        if (m && lines.length === 1) return held[m[1]];
+        if (lines.length === 1 && (m = /^(#{1,6})\s+(.*)$/.exec(lines[0]))) return '<h' + m[1].length + '>' + inline(m[2]) + '</h' + m[1].length + '>';
+        if (lines.length >= 2 && /^\s*\|/.test(lines[0]) && /^\s*\|?\s*:?-{2,}/.test(lines[1])) return mdTable(lines);
+        if (/^\s*([-*+]|\d+[.)])\s+/.test(lines[0])) return mdList(lines);
+        return '<p>' + lines.map(inline).join('<br>') + '</p>';
+      }).join('');
+      return clean(out);
+    }
+    function mdLine(s) { return clean(inline(String(s || '').replace(/\n/g, ' '))); }   // an option: one line
+    function caseBox(a, q) {                               // the case study this question refers to
+      var c = q.case && (a.cases || {})[q.case];
+      if (!c) return null;
+      return el('details', {class: 'case', open: ''}, [el('summary', {text: '📄 Case study — ' + c.title}), el('div', {class: 'md', html: md(c.content)})]);
+    }
+    var SLOT_HINT = {hotspot: 'pick a value in each box', 'drag-drop': 'pick a value for each target or step', 'yes-no': 'Yes or No for each statement'};
+    function fmt(n) { return String(Math.round(n * 10) / 10); }
     function refs(q) { return (q.refs || []).filter(function (x) { return /^https?:\/\//.test(x.url || ''); }); }
     function when(iso) { return new Date(iso).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}); }
 
@@ -149,8 +232,10 @@
       if (a.done) return showReview(a);
       history.replaceState(null, '', '#attempt=' + a.id);
       var i = Math.min(a.position || 0, a.questions.length - 1), answers = a.answers || {}, saving = Promise.resolve();
-      function save(q, keys) {
-        saving = saving.then(function () { return api('POST', '/api/exams/answer', {attempt: a.id, qid: q.qid, keys: keys, position: i}); })
+      function save(q) {
+        var v = answers[q.qid], body = {attempt: a.id, qid: q.qid, position: i};
+        if (q.slots) body.slots = v || {}; else body.keys = v || [];
+        saving = saving.then(function () { return api('POST', '/api/exams/answer', body); })
           .catch(function (e) {
             if (e.message === 'no such attempt') return list('Your lab managers reset this attempt — start the exam again for a new set of questions.');
             alertCard('Could not save your answer: ' + e.message);
@@ -160,26 +245,50 @@
         var q = a.questions[i], picked = answers[q.qid] || [], multi = q.choose > 1;
         main.innerHTML = '';
         var answered = Object.keys(answers).length;
-        var opts = q.options.map(function (o) {
+        var opts = q.slots ? [slotArea(q)] : q.options.map(function (o) {
           var on = picked.indexOf(o.key) >= 0;
           var box = el('input', {type: multi ? 'checkbox' : 'radio', name: 'opt'}); box.checked = on;
-          var row = el('label', {class: 'opt' + (on ? ' sel' : '')}, [box, el('span', {class: 'k', text: o.key}), el('span', {text: o.text})]);
+          var row = el('label', {class: 'opt' + (on ? ' sel' : '')}, [box, el('span', {class: 'k', text: o.key}), el('span', {class: 'md', html: mdLine(o.text)})]);
           box.addEventListener('change', function () {
             var cur = answers[q.qid] || [];
             if (!multi) cur = [o.key];
             else if (box.checked) { if (cur.length >= q.choose) { box.checked = false; return; } cur = cur.concat([o.key]); }
             else cur = cur.filter(function (k) { return k !== o.key; });
             if (cur.length) answers[q.qid] = cur.sort(); else delete answers[q.qid];
-            save(q, cur); render();
+            save(q); render();
           });
           return row;
         });
+        // hotspot / drag-drop: a dropdown per box, target or step; yes-no: Yes / No per statement
+        function slotArea(q) {
+          var mine = answers[q.qid] || {};
+          function set(id, v) {
+            var cur = Object.assign({}, answers[q.qid] || {});
+            if (v) cur[id] = v; else delete cur[id];
+            if (Object.keys(cur).length) answers[q.qid] = cur; else delete answers[q.qid];
+            save(q); render();
+          }
+          return el('table', {class: 'slots'}, [el('tbody', {}, q.slots.map(function (s) {
+            var pick;
+            if (q.type === 'yes-no') pick = el('span', {}, s.choices.map(function (c) {
+              var r = el('input', {type: 'radio', name: 'slot-' + s.id}); r.checked = mine[s.id] === c;
+              r.addEventListener('change', function () { set(s.id, c); });
+              return el('label', {}, [r, ' ' + c]);
+            }));
+            else {
+              pick = el('select', {}, [el('option', {value: '', text: '— choose —'})].concat(s.choices.map(function (c) { return el('option', {value: c, text: c}); })));
+              pick.value = mine[s.id] || '';
+              pick.addEventListener('change', function () { set(s.id, pick.value); });
+            }
+            return el('tr', {}, [el('td', {class: 'md', html: mdLine(s.label || s.id)}), el('td', {}, [pick])]);
+          }))]);
+        }
         var prev = el('button', {text: '← Previous'}); prev.disabled = i === 0;
         prev.addEventListener('click', function () { i--; render(); });
         var next = el('button', {class: 'primary', text: 'Next →'}); next.hidden = i === a.questions.length - 1;
-        next.addEventListener('click', function () { i++; save(q, answers[q.qid] || []); render(); });
+        next.addEventListener('click', function () { i++; save(q); render(); });
         var pause = el('button', {text: '⏸ Pause'});
-        pause.addEventListener('click', function () { save(q, answers[q.qid] || []); saving.then(function () { list(); }); });
+        pause.addEventListener('click', function () { save(q); saving.then(function () { list(); }); });
         var submit = el('button', {class: i === a.questions.length - 1 ? 'primary' : '', text: 'Submit exam'});
         submit.addEventListener('click', function () {
           var left = a.questions.length - Object.keys(answers).length;
@@ -196,8 +305,8 @@
         }));
         main.appendChild(el('div', {class: 'card'}, [
           el('div', {class: 'bar'}, [el('b', {text: a.exam.name}), el('span', {class: 'sub', text: answered + ' / ' + a.questions.length + ' answered · saved as you go'})]),
-          el('div', {class: 'sub', text: 'Question ' + (i + 1) + ' of ' + a.questions.length + (multi ? ' · choose ' + q.choose : '')}),
-          el('div', {class: 'q', text: q.question}), el('div', {}, opts),
+          el('div', {class: 'sub', text: 'Question ' + (i + 1) + ' of ' + a.questions.length + (q.slots ? ' · ' + SLOT_HINT[q.type] : multi ? ' · choose ' + q.choose : '')}),
+          caseBox(a, q), el('div', {class: 'q md', html: md(q.question)}), el('div', {}, opts),
           el('div', {class: 'nav'}, [el('div', {class: 'row'}, [prev, next]), el('div', {class: 'row'}, [pause, submit])])]));
         main.appendChild(el('div', {class: 'card'}, [el('h3', {text: 'Questions'}), pal]));
       }
@@ -209,6 +318,7 @@
       history.replaceState(null, '', '#attempt=' + r.id);
       main.innerHTML = '';
       var box = el('div'), pal = el('div', {class: 'palette'});
+      var parts = r.questions.filter(function (q) { return q.points > 0 && !q.right; }).length;
       var cur = r.questions.findIndex(function (q) { return !q.right; });   // start at the first wrong one
       if (cur < 0) cur = 0;
       var back = el('button', {text: '← All exams'}); back.addEventListener('click', function () { list(); });
@@ -220,11 +330,11 @@
         el('div', {class: 'row', style: 'gap:18px; margin:6px 0 12px'}, [
           el('span', {class: 'big ' + (r.passed ? 'pass' : 'fail'), text: r.score + ' %'}),
           el('span', {}, [el('b', {class: r.passed ? 'pass' : 'fail', text: r.passed ? 'Passed' : 'Not passed yet'}),
-            el('div', {class: 'sub', text: r.correct + ' of ' + r.total + ' right · pass mark ' + r.exam.pass_percent + ' %'})])]),
+            el('div', {class: 'sub', text: r.correct + ' of ' + r.total + ' right' + (parts ? ' · ' + parts + ' partly right' : '') + ' · pass mark ' + r.exam.pass_percent + ' %'})])]),
         el('div', {}, r.by_domain.map(function (d) {
           var p = Math.round(100 * d.correct / (d.total || 1));
           return el('div', {class: 'dom'}, [el('span', {text: (d.domain !== '-' ? d.domain + ' · ' : '') + d.name}),
-            el('div', {class: 'meter'}, [el('i', {style: 'width:' + p + '%'})]), el('span', {class: 'muted', text: d.correct + '/' + d.total})]);
+            el('div', {class: 'meter'}, [el('i', {style: 'width:' + p + '%'})]), el('span', {class: 'muted', text: fmt(d.correct) + '/' + d.total})]);
         }))]));
       var wrong = r.questions.filter(function (q) { return !q.right; }).length;
       main.appendChild(el('div', {class: 'card'}, [el('div', {class: 'bar'}, [el('h3', {style: 'margin:0', text: 'Questions — click one to see it'}),
@@ -233,8 +343,8 @@
       function paint() {
         pal.innerHTML = '';
         r.questions.forEach(function (q, n) {
-          var b = el('button', {class: (q.right ? 'ok' : q.picked.length ? 'bad' : 'none') + (n === cur ? ' cur' : ''), text: String(n + 1),
-                                title: q.right ? 'right' : q.picked.length ? 'wrong' : 'not answered'});
+          var b = el('button', {class: (q.right ? 'ok' : q.points > 0 ? 'part' : q.answered ? 'bad' : 'none') + (n === cur ? ' cur' : ''), text: String(n + 1),
+                                title: q.right ? 'right' : q.points > 0 ? 'partly right' : q.answered ? 'wrong' : 'not answered'});
           b.addEventListener('click', function () { cur = n; paint(); });
           pal.appendChild(b);
         });
@@ -245,14 +355,20 @@
         next.addEventListener('click', function () { cur++; paint(); });
         box.innerHTML = '';
         box.appendChild(el('div', {class: 'card'}, [
-            el('div', {class: 'bar'}, [el('b', {text: 'Question ' + (cur + 1) + ' of ' + r.questions.length}), el('span', {class: q.right ? 'pass' : 'fail', text: q.right ? '✓ right' : (q.picked.length ? '✗ wrong' : '✗ not answered')})]),
-            el('div', {class: 'q', text: q.question}),
+            el('div', {class: 'bar'}, [el('b', {text: 'Question ' + (cur + 1) + ' of ' + r.questions.length}), el('span', {class: q.right ? 'pass' : 'fail',
+              text: q.right ? '✓ right' : q.points > 0 ? '◐ ' + q.slots.filter(function (s) { return s.right; }).length + ' of ' + q.slots.length + ' right' : (q.answered ? '✗ wrong' : '✗ not answered')})]),
+            caseBox(r, q), el('div', {class: 'q md', html: md(q.question)}),
+            q.slots ? el('table', {class: 'slots'}, [el('tbody', {}, [el('tr', {}, ['', 'Your answer', 'Correct'].map(function (h) { return el('td', {class: 'muted', text: h}); }))]
+              .concat(q.slots.map(function (s) {
+                return el('tr', {}, [el('td', {class: 'md', html: mdLine(s.label || s.id)}),
+                  el('td', {class: s.right ? 'ok' : 'bad', text: (s.right ? '✓ ' : '✗ ') + (s.picked || 'not answered')}), el('td', {text: s.answer.join(' / ')})]);
+              })))]) :
             el('div', {}, q.options.map(function (o) {
               var good = q.answer.indexOf(o.key) >= 0, mine = q.picked.indexOf(o.key) >= 0;
-              return el('div', {class: 'opt' + (good ? ' ok' : mine ? ' bad' : '')}, [el('span', {class: 'k', text: o.key}), el('span', {text: o.text}),
+              return el('div', {class: 'opt' + (good ? ' ok' : mine ? ' bad' : '')}, [el('span', {class: 'k', text: o.key}), el('span', {class: 'md', html: mdLine(o.text)}),
                 el('span', {class: 'muted', style: 'margin-left:auto; white-space:nowrap', text: (mine ? 'your answer' : '') + (good ? (mine ? ' · ' : '') + 'correct' : '')})]);
             })),
-            q.explanation || refs(q).length ? el('div', {class: 'expl', html: md(q.explanation) + (refs(q).length ? '<p>' +
+            q.explanation || refs(q).length ? el('div', {class: 'expl md', html: md(q.explanation) + (refs(q).length ? '<p>' +
               refs(q).map(function (x) { return '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.title || x.url) + '</a>'; }).join(' · ') + '</p>' : '')}) : null,
             el('div', {class: 'nav'}, [prev, next])]));
       }

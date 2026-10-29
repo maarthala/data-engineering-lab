@@ -58,7 +58,7 @@ go (leaving = pause), the review comes after submitting. Changes need the X-Lab-
   GET    /api/exams                                      open exams + my stats + my paused attempt
   POST   /api/exams/start {"exam"}                       resume my open attempt or draw a new set
   GET    /api/exams/attempt?id=…                         an open attempt (no answers) · a done one: the review
-  POST   /api/exams/answer {"attempt", "qid", "keys", "position"}   save one answer
+  POST   /api/exams/answer {"attempt", "qid", "keys" | "slots", "position"}   save one answer
   POST   /api/exams/submit {"attempt"}                   mark it → the review
 Managers (/api/admin/exams…, X-Lab-Admin): upload an encrypted bank + its key (decrypted here, the
 key isn't kept) or a plain exam.json; set questions / pass mark / who may take it; delete.
@@ -497,7 +497,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, labexams.start(str(body.get("exam", "")), user, team))
             if path == "/api/exams/answer":
                 return self._json(200, labexams.answer(body.get("attempt", 0), user, str(body.get("qid", "")),
-                                                       body.get("keys") or [], body.get("position")))
+                                                       body.get("keys") or [], body.get("position"), body.get("slots")))
             if path == "/api/exams/submit":
                 return self._json(200, labexams.submit(body.get("attempt", 0), user, team))
             return self._json(404, {"error": "not found"})
