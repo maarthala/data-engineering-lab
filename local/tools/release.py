@@ -34,7 +34,7 @@ def main():
         sys.exit(f"✗ BUMP={bump}: use one of {', '.join(BUMPS)}")
     if git("rev-parse", "--abbrev-ref", "HEAD") != "main":
         sys.exit("✗ releases are tagged on main — git switch main first")
-    if git("status", "--porcelain"):
+    if git("status", "--porcelain", "--untracked-files=no"):     # untracked files aren't in the tag
         sys.exit("✗ uncommitted changes — commit (and push) them first")
     print("Fetching from GitHub...", flush=True)
     git("fetch", "--tags", "--quiet", "origin")
