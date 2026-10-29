@@ -14,76 +14,94 @@
   </main>
   <script src="/admin.js?v=4"></script>
   <script>
-    // 🧩 Teams — a member is in no team (only their own lakehouse) until added to one, then in
-    // exactly one, and reads and writes its lakehouse team_<team>. Left: the teams. Right: the
-    // selected team (#<team> in the address) — its members (filter, select, remove) and "Add
-    // members" (search, pick several, add). Adding a member who is in another team moves them;
-    // removing takes them out of the team (back to only their own lakehouse).
+    // Teams — tab All teams: every team (search; click one → its page). Tab Create a team. A team's
+    // page (#teams/<team>/<section>): Members (filter, select, remove) · Add members (search, pick
+    // several, add — someone in another team moves) · Delete team (only when it has no members).
+    // A member is in no team or exactly one, and reads and writes its lakehouse team_<team>.
     var el = admin.el;
-    var teams = [], people = [], current = null;
-    var listFilter = '';
+    var teams = [], people = [];
     admin.page('Teams', 'A team shares a lakehouse, files, secrets and Airflow DAGs.');
+    var tab = admin.tabs([['teams', 'All teams'], ['create', 'Create a team']], function (t) { tab = t; route(); });
+    function go(hash) { history.replaceState(null, '', '#' + hash); route(); }
+    function stat(v, label) { return el('div', {class: 'stat'}, [el('b', {text: String(v)}), el('span', {text: label})]); }
 
-    function select(team) {
-      current = team;
-      if (location.hash.slice(1) !== team) history.replaceState(null, '', '#' + team);
-      render();
-    }
-
-    // ---- left: the teams + New team -------------------------------------------------------
+    // ---- All teams -------------------------------------------------------------------------
+    var filter = '';
     function listCard() {
-      var q = el('input', {type: 'text', class: 'wide', placeholder: 'filter teams…', autocomplete: 'off'});
-      q.value = listFilter;
-      var box = el('div', {class: 'tlist'});
+      if (!teams.length) return el('div', {class: 'card'}, [el('div', {class: 'sub', text: 'No teams yet — create one on Create a team.'})]);
+      var q = el('input', {type: 'search', placeholder: 'Search teams…', style: 'width:240px'});
+      q.value = filter;
+      var body = el('tbody');
       function paint() {
-        box.innerHTML = '';
-        var shown = teams.filter(function (t) { return t.team.indexOf(listFilter) >= 0; });
-        if (!shown.length) box.appendChild(el('div', {class: 'sub', text: 'No team matches.'}));
+        body.innerHTML = '';
+        var shown = teams.filter(function (t) { return t.team.indexOf(filter) >= 0 || t.members.some(function (m) { return m.indexOf(filter) >= 0; }); });
+        if (!shown.length) body.appendChild(el('tr', {}, [el('td', {class: 'sub', colspan: '4', text: 'No team matches.'})]));
         shown.forEach(function (t) {
-          var a = el('a', {href: '#' + t.team, class: t.team === current ? 'on' : ''}, [
-            el('span', {text: t.team}),
-            el('span', {class: 'n', text: t.members.length + (t.members.length === 1 ? ' member' : ' members')})]);
-          a.addEventListener('click', function (e) { e.preventDefault(); select(t.team); });
-          box.appendChild(a);
+          var tr = el('tr', {class: 'link', style: 'cursor:pointer'}, [el('td', {}, [el('b', {text: t.team})]),
+            el('td', {class: 'r', text: String(t.members.length)}), el('td', {}, [el('code', {text: t.catalog})]),
+            el('td', {class: 'r', text: t.bucket_mb == null ? '—' : t.bucket_mb + ' MB'})]);
+          tr.addEventListener('click', function () { go('teams/' + t.team + '/members'); });
+          body.appendChild(tr);
         });
       }
-      q.addEventListener('input', function () { listFilter = q.value.trim().toLowerCase(); paint(); });
+      q.addEventListener('input', function () { filter = q.value.trim().toLowerCase(); paint(); });
       paint();
+      return el('div', {class: 'card'}, [el('div', {class: 'bar'}, [el('h3', {style: 'margin:0', text: teams.length + (teams.length === 1 ? ' team' : ' teams') + ' — click one to manage it'}), q]),
+        el('div', {class: 'wrap'}, [el('table', {}, [el('thead', {}, [el('tr', {}, [el('th', {text: 'Team'}), el('th', {class: 'r', text: 'Members'}),
+          el('th', {text: 'Lakehouse'}), el('th', {class: 'r', text: 'Bucket'})])]), body])])]);
+    }
 
-      var name = el('input', {type: 'text', placeholder: 'new team (a-z, 0-9)', autocomplete: 'off', style: 'flex:1; min-width:0'});
-      var b = el('button', {class: 'primary', text: 'Create'});
+    // ---- Create a team ---------------------------------------------------------------------
+    function createCard() {
+      var name = el('input', {type: 'text', placeholder: 'e.g. sales', autocomplete: 'off', style: 'width:100%'});
+      var b = el('button', {class: 'primary', text: 'Create team'});
       function create() {
         var team = name.value.trim().toLowerCase();
         if (!team) return name.focus();
         admin.act(b, 'team-create', {team: team}, 'Created team ' + team, function (r) {
-          return [['Lakehouse ' + r.catalog + ' (bronze / silver / gold) and bucket ' + r.bucket + '. Add its members on the right.']];
-        }, function () { current = team; load(); });
+          return [['Lakehouse ' + r.catalog + ' (bronze / silver / gold) and bucket ' + r.bucket + '. Now add its members.']];
+        }, function () { history.replaceState(null, '', '#teams/' + team + '/add'); tab = 'teams'; load(); });
       }
       b.addEventListener('click', create);
       name.addEventListener('keydown', function (e) { if (e.key === 'Enter') create(); });
-      return el('div', {class: 'card'}, [
-        el('h3', {text: 'Teams (' + teams.length + ')'}), q, box,
-        el('div', {class: 'row', style: 'flex-wrap:nowrap'}, [name, b])]);
+      return el('div', {class: 'card', style: 'max-width:520px'}, [el('h3', {text: 'New team'}),
+        el('label', {style: 'display:flex; flex-direction:column; gap:5px; font-size:.84rem; color:var(--muted)'}, ['Team name (a-z, 0-9)', name]),
+        el('div', {class: 'sub', style: 'margin-top:10px', text: 'Creates the team\'s lakehouse team_<name> (bronze / silver / gold) and its bucket. Add members next.'}),
+        el('div', {class: 'row', style: 'margin-top:14px'}, [b])]);
     }
 
-    // ---- right: one team ------------------------------------------------------------------
-    function teamCard(t) {
+    // ---- one team --------------------------------------------------------------------------
+    function teamView(t, section) {
       var inTeam = {}; t.members.forEach(function (u) { inTeam[u] = true; });
-      var head = el('div', {class: 'bar', style: 'margin-top:0'}, [
-        el('div', {}, [el('h2', {style: 'margin:0 0 4px; font-size:1.2rem', text: t.team}),
-          el('div', {class: 'sub'}, ['Lakehouse ', el('code', {text: t.catalog}), ' · bucket ', el('code', {text: t.bucket}),
-            t.bucket_mb == null ? '' : ' (' + t.bucket_mb + ' MB)'])])]);
-      if (!t.members.length) {
-        var del = el('button', {class: 'small danger', text: 'Delete team'});
-        del.addEventListener('click', function () {
-          if (!del.dataset.armed) { del.dataset.armed = '1'; del.textContent = 'Delete its tables and files too?'; return; }
-          admin.act(del, 'team-delete', {team: t.team}, 'Deleted team ' + t.team, function (r) {
-            return [['Its lakehouse team_' + r.team + ' (' + r.dropped + ' table(s)/view(s)) and bucket ' + r.bucket + ' are gone.']];
-          }, function () { current = null; load(); });
-        });
-        head.appendChild(del);
-      }
-      return el('div', {class: 'card'}, [head, addBox(t, inTeam), membersBox(t)]);
+      var back = el('a', {href: '#teams', style: 'font-size:.88rem; color:var(--muted)', text: '← All teams'});
+      back.addEventListener('click', function (x) { x.preventDefault(); go('teams'); });
+      var subs = [['members', 'Members (' + t.members.length + ')'], ['add', 'Add members'], ['delete', 'Delete team']];
+      var nav = el('div', {class: 'tabs', style: 'margin-top:4px'}, subs.map(function (x) {
+        var a = el('a', {class: x[0] === section ? 'on' : '', text: x[1], style: 'cursor:pointer'});
+        a.addEventListener('click', function () { go('teams/' + t.team + '/' + x[0]); });
+        return a;
+      }));
+      var body = section === 'add' ? addBox(t, inTeam) : section === 'delete' ? deleteCard(t) : membersBox(t);
+      return [el('div', {}, [back]),
+        el('div', {style: 'display:flex; align-items:baseline; gap:12px; flex-wrap:wrap'}, [el('h2', {style: 'margin:0; font-size:1.2rem', text: t.team}),
+          el('span', {class: 'sub'}, ['lakehouse ', el('code', {text: t.catalog}), ' · bucket ', el('code', {text: t.bucket})])]),
+        el('div', {class: 'stat-row'}, [stat(t.members.length, 'members'), stat(t.bucket_mb == null ? '—' : t.bucket_mb + ' MB', 'team bucket')]),
+        nav, body];
+    }
+
+    function deleteCard(t) {
+      if (t.members.length) return el('div', {class: 'card'}, [el('h3', {text: 'Delete team'}),
+        el('div', {class: 'sub', text: t.team + ' still has ' + t.members.length + ' member(s) — remove them (Members) or move them to another team first.'})]);
+      var del = el('button', {class: 'danger', text: 'Delete ' + t.team});
+      del.addEventListener('click', function () {
+        if (!del.dataset.armed) { del.dataset.armed = '1'; del.textContent = 'Yes — delete its tables and files too'; return; }
+        admin.act(del, 'team-delete', {team: t.team}, 'Deleted team ' + t.team, function (r) {
+          return [['Its lakehouse team_' + r.team + ' (' + r.dropped + ' table(s)/view(s)) and bucket ' + r.bucket + ' are gone.']];
+        }, function () { history.replaceState(null, '', '#teams'); load(); });
+      });
+      return el('div', {class: 'card', style: 'border-color:#f1b5b0'}, [el('h3', {text: 'Delete team'}),
+        el('div', {class: 'sub', style: 'margin-bottom:12px', text: 'Removes the team\'s lakehouse (every table in it) and its bucket. This cannot be undone.'}),
+        el('div', {class: 'row'}, [del])]);
     }
 
     // Add members: type to search, click (or ↑ ↓ Enter) to pick, then add them all at once
@@ -147,7 +165,8 @@
         }, load);
       });
       paintChips();
-      return el('div', {style: 'margin:12px 0 4px'}, [el('h3', {text: 'Add members'}),
+      return el('div', {class: 'card'}, [el('h3', {text: 'Add members to ' + t.team}),
+        el('div', {class: 'sub', style: 'margin-bottom:10px', text: 'Search, pick one or more, then add them. Someone in another team moves here.'}),
         el('div', {class: 'row', style: 'flex-wrap:nowrap; align-items:flex-start'}, [el('div', {class: 'picker'}, [q, drop]), go]),
         chips]);
     }
@@ -167,7 +186,7 @@
         shown = t.members.filter(function (u) { return u.indexOf(s) >= 0; });
         body.innerHTML = '';
         if (!shown.length) body.appendChild(el('tr', {}, [el('td', {class: 'sub', colspan: '3',
-          text: t.members.length ? 'No member matches.' : 'No members yet — add some above.'})]));
+          text: t.members.length ? 'No member matches.' : 'No members yet — add them on Add members.'})]));
         shown.forEach(function (u) {
           var cb = el('input', {type: 'checkbox'}); cb.checked = !!ticked[u];
           cb.addEventListener('change', function () { if (cb.checked) ticked[u] = true; else delete ticked[u]; tally(); });
@@ -199,31 +218,26 @@
       f.addEventListener('input', paint);
       var thead = el('thead', {}, [el('tr', {}, [canRemove ? el('th', {style: 'width:28px'}, [all]) : null, el('th', {text: 'Member'}), el('th', {})])]);
       paint();
-      return el('div', {style: 'margin-top:14px'}, [el('h3', {text: 'Members'}),
+      return el('div', {class: 'card'}, [el('h3', {text: 'Members'}),
         el('div', {class: 'bar'}, [el('div', {class: 'row'}, [f, count]), rm]),
         el('div', {class: 'scroll'}, [el('table', {}, [thead, body])])]);
     }
 
     // ---- page -----------------------------------------------------------------------------
-    var left, right;
-    function render() {
-      var t = teams.filter(function (x) { return x.team === current; })[0];
-      var l = listCard(), r = t ? teamCard(t) : el('div', {class: 'card placeholder', text: 'Pick a team on the left.'});
-      if (left) { left.replaceWith(l); right.replaceWith(r); }
-      else admin.fill([el('div', {class: 'split'}, [l, r])]);
-      left = l; right = r;
+    function route() {
+      if (tab === 'create') return admin.fill([createCard()]);
+      var m = /^teams\/([a-z0-9-]+)(?:\/(\w+))?/.exec(location.hash.slice(1));
+      var t = m && teams.filter(function (x) { return x.team === m[1]; })[0];
+      admin.fill(t ? teamView(t, m[2] || 'members') : [listCard()]);
     }
-
     function load() {
       return Promise.all([admin.api('GET', '/api/admin/teams'), admin.api('GET', '/api/admin/people')]).then(function (r) {
         teams = r[0].teams; people = r[1].people;
-        var want = current || decodeURIComponent(location.hash.slice(1));
-        current = teams.some(function (t) { return t.team === want; }) ? want : (teams[0] || {}).team;
-        left = right = null;
-        render();
+        var nav = document.querySelectorAll('.pagebar .tabs a');              // a create lands on the team: All teams tab
+        nav.forEach(function (a) { a.className = a.getAttribute('href') === '#' + tab ? 'on' : ''; });
+        route();
       }).catch(admin.failed);
     }
-    window.addEventListener('hashchange', function () { var h = location.hash.slice(1); if (h && h !== current) select(h); });
     load();
   </script>
 </body>
