@@ -56,6 +56,7 @@ integration-level updates (like AdventureWorks or SQLPad) get an entry.
 
 | Date | Release / integration | What it adds | Scope |
 |---|---|---|---|
+| 2026-10-29 | **New portal** | Light look with a left menu; the tools open inside the portal; a personal Home; Manage split into tabs. Locally one open port: everything at `http://<app>.lab.localhost:8000` | local · k8s |
 | 2026-10-29 | **Mock exams** | Managers upload encrypted certification question banks (with the key, not kept) and open each exam to everyone or chosen teams; members take it any number of times — a new set each time, pause and resume, full review and their stats | local · k8s |
 | 2026-10-29 | **Members isolated in Airflow** | Members' DAG code can't reach admin logins or other members' work: own DAG processor, logins in the vault, runs only as the DAG's owner. k8s: RBAC on, each member task in its own pod (`de-jobs`), logs in the member's bucket | local · k8s |
 | 2026-10-21 | **Newer-release notice** | Releases are git tags (`v1.4.0`). When GitHub has a newer one, managers see a banner on the home page (link to what's new, Hide per release) and the state in Manage → Settings → Lab version; the home page footer shows the running release to everyone and `make up` / `make status` print `git pull, then make up`; members never see it. `make release` (BUMP=minor|major) tags and pushes the next release. home-api asks GitHub at most once an hour (`/api/version`); `LAB_UPDATE_CHECK=0` turns it off. k8s: `deploy.yml` passes the deployed release (`labVersion`) | local · k8s |
