@@ -16,6 +16,9 @@ rules:
   - apiGroups: [""]
     resources: ["pods", "pods/log", "pods/exec"]
     verbs: ["create", "get", "list", "watch", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["events"]                     # KubernetesPodOperator logs a pending pod's events
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

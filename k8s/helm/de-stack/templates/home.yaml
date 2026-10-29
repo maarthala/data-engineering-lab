@@ -306,7 +306,7 @@ metadata:
   labels: {{- include "de-stack.labels" . | nindent 4 }}
 roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: home-api-units }
 subjects:
-  - { kind: ServiceAccount, name: home-api, namespace: {{ .Release.Namespace }} }
+  - { kind: ServiceAccount, name: home-api }      # namespace = the binding's own
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -315,5 +315,5 @@ metadata:
   labels: {{- include "de-stack.labels" . | nindent 4 }}
 roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: home-api-trino-rules }
 subjects:
-  - { kind: ServiceAccount, name: home-api, namespace: {{ .Release.Namespace }} }
+  - { kind: ServiceAccount, name: home-api }      # namespace = the binding's own
 {{- end }}
