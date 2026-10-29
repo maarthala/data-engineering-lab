@@ -278,6 +278,90 @@ def _owned_catalogs(name, t):
             if not lh.is_team_catalog(c["name"]) and lh._owned(name, c["name"], t)]
 
 
+def home_overview(user):
+    """🏠 Home for the signed-in member — each part on its own (a stopped tool → that part has
+    {"error"}): lakehouse (storage used / quota, tables per namespace, catalogs, team), recent files,
+    jupyter (running?), pipelines (their DAGs + team DAGs with the last run)."""
+    import xml.etree.ElementTree as ET
+    name, out = lh.lake_name(user), {}
+
+    def part(key, fn):
+        try:
+            out[key] = fn()
+        except Exception as e:  # noqa: BLE001 — shown on the card, the rest still loads
+            out[key] = {"error": str(e)[:160]}
+
+    team = None
+    try:
+        team = lh.team_of(name)
+    except Exception:  # noqa: BLE001
+        pass
+
+    def storage():
+        objs, token, bucket = [], None, lh.bucket_name(name)
+        while True:
+            q = {"list-type": "2"}
+            if token:
+                q["continuation-token"] = token
+            with lh._s3("GET", bucket, query=q) as r:
+                root = ET.fromstring(r.read())
+            objs += [(c.findtext(f"{lh._NS}Key"), int(c.findtext(f"{lh._NS}Size") or 0), c.findtext(f"{lh._NS}LastModified"))
+                     for c in root.findall(f"{lh._NS}Contents")]
+            token = root.findtext(f"{lh._NS}NextContinuationToken")
+            if root.findtext(f"{lh._NS}IsTruncated") != "true":
+                break
+        generated = ("/logs/", "/target/", "/dbt_packages/", "/.ipynb_checkpoints/")    # task logs, dbt output …
+        files = sorted((o for o in objs if o[0].startswith("files/") and not o[0].endswith("/")
+                        and not any(g in o[0] for g in generated)), key=lambda o: o[2], reverse=True)[:6]
+        return ({"bucket": bucket, "used_mb": round(sum(o[1] for o in objs) / 1048576, 1), "quota_mb": lh.member_quota_mb(),
+                 "files": sum(1 for o in objs if o[0].startswith("files/") and not o[0].endswith("/"))},
+                [{"key": k, "size": z, "modified": m} for k, z, m in files])
+
+    def lakehouse():
+        st, recent = storage()
+        out["recent"] = recent
+        own = f"{name}_lake"
+        layers = []
+        for ns in lh.catalog_tree(name, own):
+            if "." not in ns:
+                layers.append({"namespace": ns, "tables": len(lh.catalog_tree(name, own, ns))})
+        cats = lh.my_catalogs(name)
+        return dict(st, catalog=own, layers=layers, team=team, team_catalog=lh.team_catalog(team) if team else None,
+                    owned=[c["name"] for c in cats["owned"]], shared=[c["name"] for c in cats["shared"]])
+
+    def jupyter():
+        st, info = _hub("GET", f"/users/{urllib.parse.quote(user)}")
+        srv = ((info or {}).get("servers") or {}).get("", {}) if st == 200 else {}
+        return {"running": bool(srv.get("ready")), "starting": bool(srv.get("pending")),
+                "last_activity": (info or {}).get("last_activity") if st == 200 else None}
+
+    def pipelines():
+        h = _airflow_auth()
+        if not h:
+            raise RuntimeError("Airflow is not reachable")
+        prefixes = [name + "_"] + ([f"team_{team}_"] if team else [])
+        dags = []
+        for pre in prefixes:
+            st, body = _http("GET", f"{AIRFLOW}/api/v2/dags?" + urllib.parse.urlencode({"dag_id_pattern": pre, "limit": 50}), headers=h)
+            for d in (body or {}).get("dags", []) if st == 200 and isinstance(body, dict) else []:
+                if not d["dag_id"].startswith(pre):
+                    continue
+                st2, runs = _http("GET", f"{AIRFLOW}/api/v2/dags/{urllib.parse.quote(d['dag_id'])}/dagRuns?" +
+                                  urllib.parse.urlencode({"limit": 1, "order_by": "-run_after"}), headers=h)
+                last = ((runs or {}).get("dag_runs") or [None])[0] if st2 == 200 and isinstance(runs, dict) else None
+                dags.append({"dag_id": d["dag_id"], "paused": d.get("is_paused"), "team": pre != name + "_",
+                             "schedule": d.get("timetable_summary"), "next": d.get("next_dagrun_run_after"),
+                             "last": {"state": last.get("state"), "when": last.get("end_date") or last.get("start_date") or last.get("run_after")} if last else None})
+        return {"dags": dags}
+
+    part("lakehouse", lakehouse)
+    out.setdefault("recent", [])
+    part("jupyter", jupyter)
+    part("pipelines", pipelines)
+    out["team"] = team
+    return out
+
+
 def _bucket_mb(bucket):
     import xml.etree.ElementTree as ET
     total, token = 0, None

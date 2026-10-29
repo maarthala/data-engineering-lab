@@ -67,6 +67,10 @@ key isn't kept) or a plain exam.json; set questions / pass mark / who may take i
   POST   /api/admin/exams/delete {"exam", "source"?}
   POST   /api/admin/exams/discard {"exam", "attempt"?}   delete attempts in progress (one / all of the exam)
 
+🏠 Home — the member's own overview (labadmin.home_overview): storage used / quota, tables per
+namespace, catalogs, team, recent files, Jupyter running?, their (and their team's) DAGs + last run.
+  GET    /api/home
+
 Which tools are up (local: units can be stopped in make status — the home page greys their tiles):
   GET    /api/services                                   {"jupyter": true, "sqlpad": false, …} — from
          LAB_SERVICES (tile=host:port,…); not set (k8s) → {} and every tile stays as it is
@@ -691,6 +695,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._env("GET")
         if self.path.startswith("/api/exams"):
             return self._exams("GET")
+        if self.path == "/api/home":                     # 🏠 Home: the member's own overview
+            if not self._user():
+                return self._json(401, {"error": "not logged in"})
+            self._ensure(lake_name(self._user()))
+            return self._json(200, labadmin.home_overview(self._user()))
         if self.path == "/api/version":
             if not self._user():
                 return self._json(401, {"error": "not logged in"})

@@ -8,46 +8,42 @@
   <link rel="icon" type="image/png" href="/img/epireum-logo.png">
   <style>
     body{display:flex; flex-direction:column; min-height:100vh}
-    a{color:inherit; text-decoration:none}
-    main{flex:1; max-width:1280px; width:100%; padding:24px 28px 28px; display:flex; flex-direction:column; gap:22px}
-    .welcome h1{margin:0; font-size:1.5rem; letter-spacing:-.01em} .welcome p{margin:4px 0 0; color:var(--muted)}
-    .hero{display:flex; gap:18px; align-items:center; justify-content:space-between; flex-wrap:wrap;
-      background:linear-gradient(135deg,#eef3ff,#f2fbf9); border:1px solid #d9e3fb; border-radius:12px; padding:18px 22px}
-    .hero-left{display:flex; gap:14px; align-items:center; min-width:280px}
-    .hero .ico{font-size:2rem; line-height:1}
-    .hero h2{margin:0 0 3px; font-size:1.1rem}
-    .hero p{margin:0; color:var(--muted); max-width:820px}
-    .cta{background:var(--accent); color:#fff; font-weight:600; padding:9px 16px; border-radius:8px; white-space:nowrap}
-    .cta:hover{background:#2452bd}
-    .board{display:grid; gap:22px}
-    .col h4{margin:0 0 10px; font-size:.78rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#8a94a3}
-    .col .grid{display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
-    .card[hidden]{display:none}
-    .card{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 16px; display:flex; gap:14px;
-      align-items:flex-start; box-shadow:var(--shadow); transition:border-color .15s, box-shadow .15s}
-    .card:hover{border-color:#b9c8f5; box-shadow:0 4px 16px rgba(43,95,217,.12)}
-    .card .ico{width:38px; height:38px; flex:none; border-radius:9px; background:var(--accent-bg); display:flex; align-items:center;
-      justify-content:center; font-size:1.25rem}
-    .card h3{margin:0 0 2px; font-size:.98rem}
-    .card p{margin:0; color:var(--muted); font-size:.86rem; line-height:1.42}
-    .card.off{opacity:.5; pointer-events:none; cursor:default; box-shadow:none}
-    .card .offnote{display:none}
-    .card.off .offnote{display:block; margin-top:6px; font-size:.78rem; color:var(--muted)}
+    main{flex:1; width:100%; padding:22px 28px 28px; display:flex; flex-direction:column; gap:18px}
+    .welcome{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap}
+    .welcome h1{margin:0; font-size:1.5rem; letter-spacing:-.01em} .welcome p{margin:0; color:var(--muted)}
+    .grid2{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; align-items:start}
+    @media (max-width:1100px){ .grid2{grid-template-columns:1fr} }
+    .card h3{display:flex; align-items:center; justify-content:space-between; gap:8px}
+    .card h3 a{font-size:.84rem; font-weight:500}
+    .resume{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px}
+    .tile{display:flex; gap:12px; align-items:center; padding:12px 14px; border:1px solid var(--line); border-radius:9px; color:var(--ink); background:var(--panel)}
+    .tile:hover{border-color:#b9c8f5; background:#fafcff}
+    .tile .ico{width:34px; height:34px; flex:none; border-radius:8px; background:var(--accent-bg); display:flex; align-items:center; justify-content:center; font-size:1.1rem}
+    .tile b{display:block; font-size:.92rem} .tile span{font-size:.82rem; color:var(--muted)}
+    .meter{height:8px; background:var(--panel2); border-radius:999px; overflow:hidden; margin:6px 0 4px} .meter i{display:block; height:100%; background:var(--accent)}
+    .meter.full i{background:var(--danger)}
+    .layers{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:14px 0}
+    .layers div{border:1px solid var(--line); border-radius:9px; padding:10px 12px} .layers b{display:block; font-size:1.25rem} .layers span{color:var(--muted); font-size:.8rem}
+    .kv{display:grid; grid-template-columns:max-content 1fr; gap:6px 14px; font-size:.88rem} .kv dt{color:var(--muted)} .kv dd{margin:0}
+    .state{font-size:.76rem; padding:1px 8px; border-radius:999px; border:1px solid var(--line2); white-space:nowrap}
+    .state.success{color:var(--ok-ink); background:var(--ok-bg); border-color:#b7e1c4}
+    .state.failed{color:var(--bad-ink); background:var(--bad-bg); border-color:#f1b5b0}
+    .state.running, .state.queued{color:var(--accent); background:var(--accent-bg); border-color:#c9d6f6}
+    .pass{color:var(--ok-ink); font-weight:600} .fail{color:var(--bad-ink)}
+    .hero{display:flex; gap:16px; align-items:center; justify-content:space-between; flex-wrap:wrap;
+      background:linear-gradient(135deg,#eef3ff,#f2fbf9); border:1px solid #d9e3fb; border-radius:10px; padding:16px 18px; color:var(--ink)}
+    .hero h4{margin:0 0 3px; font-size:1rem} .hero p{margin:0; color:var(--muted); font-size:.88rem}
+    .cta{background:var(--accent); color:#fff; font-weight:600; padding:8px 14px; border-radius:8px; white-space:nowrap}
+    .note{color:var(--muted); font-size:.86rem}
     footer{padding:14px 28px; border-top:1px solid var(--line); color:var(--muted); font-size:.84rem;
       display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; background:var(--panel)}
-    footer a{color:var(--accent); font-weight:600}
-    /* managers only: a newer release of the lab is on GitHub */
-    .update{display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:10px 16px; border:1px solid #f0d9a8;
-      border-radius:10px; background:var(--warn-bg)}
-    .update[hidden]{display:none}
-    .update a{color:var(--accent); font-weight:600}
-    .update button{margin-left:auto}
+    .update{display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding:10px 16px; border:1px solid #f0d9a8; border-radius:10px; background:var(--warn-bg)}
+    .update a{font-weight:600} .update button{margin-left:auto}
   </style>
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=11"></script>
-
+  <script src="/lab-header.js?v=12"></script>
   <main>
     <div class="update" id="update" hidden role="status">
       <span>⬆️ <b>A newer release of the lab is out: <span id="update-latest"></span></b>
@@ -55,113 +51,121 @@
         <a id="update-link" href="#" target="_blank" rel="noopener">What's new</a></span>
       <button type="button" id="update-hide">Hide</button>
     </div>
-    <div class="welcome"><h1>Welcome<span id="hi"></span></h1><p>Your data engineering workspace — notebooks, SQL, pipelines and dashboards on your own lakehouse.</p></div>
-    <a class="hero" href="https://maarthala.github.io/data-engineering-lab/" target="_blank" rel="noopener">
-      <div class="hero-left">
-        <div class="ico">🎓</div>
-        <div>
-          <h2>Start here — the Data Engineering course</h2>
-          <p>Build the ShopFlow lakehouse end to end: SQL, Python, Spark medallion, Airflow, governance, and dashboards — every skill mapped to Databricks, Snowflake &amp; Fabric.</p>
-        </div>
-      </div>
-      <span class="cta">Open the course →</span>
-    </a>
+    <div class="welcome"><h1>Welcome<span id="hi"></span></h1><p id="teamline">Your data engineering workspace.</p></div>
 
-    <div class="board">
-      <section class="col">
-        <h4>Tools</h4><div class="grid">
-        <a class="card" data-svc="jupyter" href="/tool.html#jupyter">
-          <div class="ico">📓</div>
-          <div><h3>Notebook</h3><p><b>Jupyter</b> — your own notebooks: Python, pandas &amp; Spark (Spark Connect). <code>my</code> = your lakehouse.</p></div>
-        </a>
-        <a class="card" data-svc="spark" href="/tool.html#spark">
-          <div class="ico">⚡</div>
-          <div><h3>Compute</h3><p><b>Spark</b> — cluster master UI: jobs, workers, executors.</p></div>
-        </a>
-        <a class="card" data-svc="sqlpad" href="/tool.html#sqlpad">
-          <div class="ico">🧰</div>
-          <div><h3>SQL workbench</h3><p><b>SQLPad</b> — SQL on your lakehouse via Trino, incl. INSERT/UPDATE/DDL (your own connection); query the Postgres sources read-only.</p></div>
-        </a>
-      
-        <a class="card" data-svc="airflow" id="airflow-tile" href="/tool.html#airflow">
-          <div class="ico">🌬️</div>
-          <div><h3>Orchestration</h3><p><b>Airflow</b> — schedule the Bronze→Silver→Gold pipeline. Your own DAGs come from your bucket's <code>dags/</code>.</p></div>
-        </a>
-      
-        <a class="card" data-svc="superset" href="/tool.html#superset">
-          <div class="ico">📊</div>
-          <div><h3>BI</h3><p><b>Superset</b> — dashboards &amp; SQL Lab over the Gold layer.</p></div>
-        </a>
-      </div></section>
+    <section class="card"><h3>Continue where you left off</h3><div class="resume" id="resume"><span class="note">Loading…</span></div></section>
 
-      <section class="col">
-        <h4>Your lakehouse</h4><div class="grid">
-        <a class="card mine" href="/files.html">
-          <div class="ico">📁</div>
-          <div><h3>My files</h3><p>Your bucket — notebooks, DAGs and data. Browse, upload, download.</p></div>
-        </a>
-        <a class="card mine" href="/catalogs.html">
-          <div class="ico">🤝</div>
-          <div><h3>My catalogs</h3><p>Your catalogs: create, share namespaces or tables with other members, open them in the Polaris Console.</p></div>
-        </a>
-        <!-- managers only (Polaris admin view of every catalog); members open their own catalogs
-             in the Console from My catalogs — the Console can't list catalogs for them -->
-        <a class="card" data-svc="governance" id="gov-tile" href="/tool.html#governance" hidden>
-          <div class="ico">🗂️</div>
-          <div><h3>Governance</h3><p><b>Polaris Console</b> — every catalog, principal, role &amp; grant (managers).</p></div>
-        </a>
-        <a class="card" href="/tool.html#storage">
-          <div class="ico">🪣</div>
-          <div><h3>Storage</h3><p><b>RustFS</b> — S3-compatible object storage, the lake; you see your own bucket.</p></div>
-        </a>
-      </div></section>
+    <div class="grid2">
+      <section class="card" id="lake"><h3>My lakehouse <a href="/catalogs.html">My catalogs →</a></h3><div class="note">Loading…</div></section>
+      <section class="card" id="pipes"><h3>My pipelines <a href="/tool.html#airflow">Open Airflow →</a></h3><div class="note">Loading…</div></section>
+    </div>
+
+    <div class="grid2">
+      <section class="card"><h3>The course</h3>
+        <a class="hero" href="https://maarthala.github.io/data-engineering-lab/" target="_blank" rel="noopener">
+          <div><h4>🎓 Start here — the Data Engineering course</h4>
+            <p>Build the ShopFlow lakehouse end to end: SQL, Python, Spark medallion, Airflow, governance and dashboards — every skill mapped to Databricks, Snowflake &amp; Fabric.</p></div>
+          <span class="cta">Open the course ↗</span></a></section>
+      <section class="card" id="exams"><h3>Mock exams <a href="/exams.html">All exams →</a></h3><div class="note">Loading…</div></section>
     </div>
   </main>
 
   <footer>
     <span>© Epireum — Data Engineering Lab <span id="lab-version" title="The lab's release"></span></span>
-    <span>
-      🎓 <a href="https://maarthala.github.io/data-engineering-lab/" target="_blank" rel="noopener">Data Engineering course</a>
-      &nbsp;·&nbsp;
-      📖 <a href="https://github.com/maarthala/data-engineering-lab#readme" target="_blank">Docs &amp; GitHub</a>
-    </span>
+    <span>🎓 <a href="https://maarthala.github.io/data-engineering-lab/" target="_blank" rel="noopener">Data Engineering course</a>
+      &nbsp;·&nbsp; 📖 <a href="https://github.com/maarthala/data-engineering-lab#readme" target="_blank" rel="noopener">Docs &amp; GitHub</a></span>
   </footer>
 
   <script>
-    // Local: units stopped in `make status` → their tiles grey and unclickable; rechecked every 10 s,
-    // so a tile lights up once its unit is started. (k8s: /api/services is {} → nothing changes.)
-    // Members are told to ask; a local manager is the admin, so they're told how to start it.
-    var manager = false;
-    function offNotes() {
-      document.querySelectorAll('.card .offnote').forEach(function (n) {
-        n.textContent = manager ? 'Not running — start it in make status (s)' : 'Not running. Contact admin.';
+    // 🏠 Home — the member's own overview (the tools are in the left menu): continue where you left off
+    // (a paused mock exam, Jupyter, recent files), my lakehouse (storage, tables per layer, catalogs,
+    // team), my pipelines (DAGs + last run), the course and my mock-exam results. /api/home + /api/exams.
+    function el(tag, attrs, kids) {
+      var e = document.createElement(tag);
+      Object.keys(attrs || {}).forEach(function (k) {
+        if (k === 'text') e.textContent = attrs[k]; else e.setAttribute(k, attrs[k]);
       });
+      (kids || []).forEach(function (c) { if (c) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+      return e;
     }
-    (function () {
-      function check() {
-        fetch('/api/services').then(function (r) { return r.ok ? r.json() : {}; }).then(function (up) {
-          document.querySelectorAll('.card[data-svc]').forEach(function (a) {
-            var off = up[a.dataset.svc] === false;
-            a.classList.toggle('off', off);
-            if (off) { a.setAttribute('aria-disabled', 'true'); a.tabIndex = -1; }
-            else { a.removeAttribute('aria-disabled'); a.removeAttribute('tabindex'); }
-            if (!a.querySelector('.offnote')) {
-              var n = document.createElement('span');
-              n.className = 'offnote';
-              a.querySelector('div:last-child').appendChild(n);
-            }
-          });
-          offNotes();
-        }).catch(function () {});
+    function ago(iso) {
+      if (!iso) return '';
+      var s = (Date.now() - new Date(iso).getTime()) / 1000;
+      return s < 60 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : s < 86400 ? Math.round(s / 3600) + ' h ago'
+        : Math.round(s / 86400) + ' days ago';
+    }
+    function tile(icon, title, sub, href) {
+      return el('a', {class: 'tile', href: href}, [el('div', {class: 'ico', text: icon}), el('div', {}, [el('b', {text: title}), el('span', {text: sub})])]);
+    }
+    function body(id, kids) { var c = document.getElementById(id); while (c.children.length > 1) c.removeChild(c.lastChild); kids.forEach(function (k) { c.appendChild(k); }); }
+    function note(t) { return el('div', {class: 'note', text: t}); }
+
+    var home = fetch('/api/home').then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; });
+    var exams = fetch('/api/exams').then(function (r) { return r.ok ? r.json() : {exams: []}; }).catch(function () { return {exams: []}; });
+
+    Promise.all([home, exams]).then(function (r) {
+      var h = r[0], x = r[1].exams || [];
+      // ---- continue where you left off
+      var tiles = [];
+      x.filter(function (e) { return e.open; }).forEach(function (e) {
+        tiles.push(tile('📝', 'Resume ' + e.name, e.open.answered + ' of ' + e.open.total + ' answered', '/exams.html'));
+      });
+      var j = h.jupyter || {};
+      tiles.push(tile('📓', j.running ? 'Jupyter is running' : 'Open Jupyter', j.running ? 'last active ' + ago(j.last_activity) : 'your notebooks and Spark', '/tool.html#jupyter'));
+      (h.recent || []).slice(0, 4).forEach(function (f) {
+        var dir = f.key.slice(0, f.key.lastIndexOf('/') + 1);
+        tiles.push(tile(/\.ipynb$/.test(f.key) ? '📒' : /\.py$/.test(f.key) ? '🐍' : /\.sql$/.test(f.key) ? '🧮' : '📄',
+                        f.key.split('/').pop(), dir.replace(/^files\//, '') + ' · ' + ago(f.modified), '/files.html#' + encodeURIComponent(dir)));
+      });
+      body('resume', []); document.getElementById('resume').innerHTML = '';
+      tiles.forEach(function (t) { document.getElementById('resume').appendChild(t); });
+
+      // ---- my lakehouse
+      var l = h.lakehouse || {};
+      if (l.error || !l.bucket) body('lake', [note('Not available right now' + (l.error ? ' — ' + l.error : '') + '.')]);
+      else {
+        var pct = Math.min(100, Math.round(100 * l.used_mb / (l.quota_mb || 1)));
+        var byNs = {}; (l.layers || []).forEach(function (n) { byNs[n.namespace] = n.tables; });
+        body('lake', [
+          el('div', {class: 'note', text: 'Storage — ' + l.used_mb + ' of ' + l.quota_mb + ' MB (' + pct + ' %) · ' + l.files + ' files'}),
+          el('div', {class: 'meter' + (pct >= 90 ? ' full' : '')}, [el('i', {style: 'width:' + pct + '%'})]),
+          el('div', {class: 'layers'}, ['bronze', 'silver', 'gold'].map(function (n) {
+            return el('div', {}, [el('b', {text: String(byNs[n] || 0)}), el('span', {text: n + ' tables'})]);
+          })),
+          el('dl', {class: 'kv'}, [el('dt', {text: 'Your lakehouse'}), el('dd', {}, [el('code', {text: l.catalog})]),
+            el('dt', {text: 'Catalogs'}), el('dd', {text: l.owned.length + ' yours' + (l.shared.length ? ' · ' + l.shared.length + ' shared with you' : '')}),
+            el('dt', {text: 'Team'}), el('dd', {}, l.team ? [el('code', {text: l.team_catalog})] : ['not in a team yet']),
+            el('dt', {text: 'Files'}), el('dd', {}, [el('a', {href: '/files.html', text: 'bucket ' + l.bucket + ' →'})])])]);
       }
-      check();
-      setInterval(check, 10000);
-    })();
-    // Everyone: the release this lab runs, in the footer (helps when reporting a problem).
+
+      // ---- my pipelines
+      var p = h.pipelines || {};
+      if (p.error) body('pipes', [note('Airflow is not running right now.')]);
+      else if (!(p.dags || []).length) body('pipes', [note('No DAGs yet — save a .py file into dags/ in Jupyter (or My files → files/src/dags/) and it shows up here.')]);
+      else body('pipes', [el('div', {class: 'wrap'}, [el('table', {}, [el('thead', {}, [el('tr', {}, ['DAG', 'Last run', 'When', ''].map(function (t) { return el('th', {text: t}); }))]),
+        el('tbody', {}, p.dags.map(function (d) {
+          var st = d.last ? d.last.state : null;
+          return el('tr', {}, [el('td', {}, [el('b', {text: d.dag_id}), d.team ? el('span', {class: 'tag', text: 'team'}) : null]),
+            el('td', {}, [st ? el('span', {class: 'state ' + st, text: st}) : el('span', {class: 'muted', text: 'never run'})]),
+            el('td', {class: 'muted', text: d.last ? ago(d.last.when) : ''}),
+            el('td', {class: 'muted', text: d.paused ? 'paused' : (d.schedule || '')})]);
+        }))])])]);
+
+      // ---- mock exams
+      if (!x.length) body('exams', [note('No mock exams are open to you yet.')]);
+      else body('exams', [el('div', {class: 'wrap'}, [el('table', {}, [el('thead', {}, [el('tr', {}, ['Exam', 'Attempts', 'Passed', 'Best', 'Last'].map(function (t, i) { return el('th', {class: i ? 'r' : '', text: t}); }))]),
+        el('tbody', {}, x.map(function (e) {
+          var last = e.history[0];
+          return el('tr', {}, [el('td', {}, [el('a', {href: '/exams.html', text: e.name})]), el('td', {class: 'r', text: String(e.stats.attempts)}),
+            el('td', {class: 'r', text: String(e.stats.passed)}), el('td', {class: 'r', text: e.stats.best === null ? '—' : e.stats.best + ' %'}),
+            el('td', {class: 'r'}, last ? [el('span', {class: last.passed ? 'pass' : 'fail', text: last.score + ' %'})] : ['—'])]);
+        }))])])]);
+    });
+
+    // the release this lab runs (footer) · managers: a newer release on GitHub (Hide remembers it per release)
     fetch('/api/version').then(function (r) { return r.ok ? r.json() : {}; }).then(function (v) {
       if (v.current) document.getElementById('lab-version').textContent = '· ' + v.current;
     }).catch(function () {});
-    // Managers: is a newer release (vX.Y.Z tag) on GitHub? Hide remembers the release in this browser.
     function updateBanner() {
       fetch('/api/version').then(function (r) { return r.ok ? r.json() : {}; }).then(function (v) {
         if (!v.update) return;
@@ -183,13 +187,9 @@
         };
       }).catch(function () {});
     }
-    // (tools open inside the portal — /tool.html knows their addresses, incl. Airflow's local port)
     document.addEventListener('lab:me', function (e) {
-      manager = (e.detail.groups || []).indexOf('managers') >= 0;
-      document.getElementById('gov-tile').hidden = !manager;
       document.getElementById('hi').textContent = ', ' + e.detail.user;
-      offNotes();
-      if (manager) updateBanner();
+      if ((e.detail.groups || []).indexOf('managers') >= 0) updateBanner();
     });
   </script>
 </body>
