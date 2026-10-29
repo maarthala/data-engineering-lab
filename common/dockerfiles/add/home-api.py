@@ -51,6 +51,20 @@ Changes need the X-Lab-Request header (a plain cross-site form can't send it).
   POST   /api/env  {"name", "value"?, "secret"}          add / change (no value = keep it)
   DELETE /api/env?name=…                                 remove
 
+"📝 Mock exams" — certification practice exams (labexams.py, in the portal database). Members:
+the exams open to them (everyone, or their team), as often as they like; answers are saved as they
+go (leaving = pause), the review comes after submitting. Changes need the X-Lab-Request header.
+  GET    /api/exams                                      open exams + my stats + my paused attempt
+  POST   /api/exams/start {"exam"}                       resume my open attempt or draw a new set
+  GET    /api/exams/attempt?id=…                         an open attempt (no answers) · a done one: the review
+  POST   /api/exams/answer {"attempt", "qid", "keys", "position"}   save one answer
+  POST   /api/exams/submit {"attempt"}                   mark it → the review
+Managers (/api/admin/exams…, X-Lab-Admin): upload an encrypted bank + its key (decrypted here, the
+key isn't kept) or a plain exam.json; set questions / pass mark / who may take it; delete.
+  GET    /api/admin/exams · POST /api/admin/exams/upload {"file": {…}, "key"} · …/meta {"file": {…}}
+  POST   /api/admin/exams/settings {"exam", "name", "num_questions", "pass_percent", "audience", "teams"}
+  POST   /api/admin/exams/delete {"exam", "source"?}
+
 Which tools are up (local: units can be stopped in make status — the home page greys their tiles):
   GET    /api/services                                   {"jupyter": true, "sqlpad": false, …} — from
          LAB_SERVICES (tile=host:port,…); not set (k8s) → {} and every tile stays as it is
@@ -76,6 +90,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import labadmin
+import labexams
 import lakehouse as lh
 import labvault
 from lakehouse import POLARIS, bucket_name, lake_name, provision
@@ -166,6 +181,16 @@ _ACTIONS = {"create": labadmin.create, "password": labadmin.set_password,
 _TEAM_ACTIONS = {"team-create": labadmin.create_team, "team-delete": labadmin.delete_team,
                  "move": labadmin.set_team, "team-add": labadmin.add_to_team,
                  "team-remove": labadmin.remove_from_team}
+
+_teams = {}               # member → (time, team): the exams' audience check, not one Polaris call per click
+
+
+def _team_of(name):
+    hit = _teams.get(name)
+    if not hit or time.time() - hit[0] > 60:
+        hit = _teams[name] = (time.time(), lh.team_of(name))
+    return hit[1]
+
 
 # "My secrets": in the key vault (labvault.py), one folder per member. Names like variables:
 # letters, digits and _ (the same names the old "My variables" allowed).
@@ -367,6 +392,72 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             return self._json(500, {"error": str(e)})
 
+    def _body(self, limit=8 << 20):
+        length = int(self.headers.get("Content-Length") or 0)
+        if length > limit:
+            raise ValueError(f"request larger than {limit >> 20} MB")
+        return json.loads(self.rfile.read(length) or b"{}") if length else {}
+
+    def _admin_exams(self, method, path, user):
+        """Managers' 📝 Exams (called from _admin: already a manager)."""
+        try:
+            if method == "GET" and path == "/api/admin/exams":
+                return self._json(200, dict(labexams.admin_exams(), teams=[t["team"] for t in labadmin.teams()]))
+            if method != "POST":
+                return self._json(404, {"error": "not found"})
+            if self.headers.get("X-Lab-Admin") != "1":
+                return self._json(403, {"error": "missing X-Lab-Admin header"})
+            body = self._body(32 << 20)
+            if path == "/api/admin/exams/upload":
+                return self._json(200, labexams.upload_bank(body.get("file") or {}, body.get("key"), user))
+            if path == "/api/admin/exams/meta":
+                return self._json(200, labexams.upload_meta(body.get("file") or {}, user))
+            if path == "/api/admin/exams/settings":
+                r = labexams.set_exam(str(body.get("exam", "")), user, body.get("name"), body.get("num_questions"),
+                                      body.get("pass_percent"), body.get("audience"), body.get("teams"))
+                print(f"[home-api] manager {user}: exam {body.get('exam')} settings", flush=True)
+                return self._json(200, r)
+            if path == "/api/admin/exams/delete":
+                exam, source = str(body.get("exam", "")), body.get("source")
+                r = labexams.delete_bank(exam, str(source)) if source else labexams.delete_exam(exam)
+                print(f"[home-api] manager {user}: exam {exam} {source or ''} deleted", flush=True)
+                return self._json(200, r)
+            return self._json(404, {"error": "not found"})
+        except (labexams.ExamError, ValueError, TypeError, KeyError) as e:
+            return self._json(400, {"error": str(e)})
+
+    def _exams(self, method):
+        """Members' 📝 Mock exams — always as the logged-in member."""
+        path, q = self._route()
+        user = self._user()
+        if not user:
+            return self._json(401, {"error": "not logged in"})
+        try:
+            team = _team_of(lake_name(user))
+            if method == "GET" and path == "/api/exams":
+                return self._json(200, labexams.my_exams(user, team))
+            if method == "GET" and path == "/api/exams/attempt":
+                return self._json(200, labexams.attempt(q.get("id", "0"), user, team))
+            if method != "POST":
+                return self._json(404, {"error": "not found"})
+            if self.headers.get("X-Lab-Request") != "1":
+                return self._json(403, {"error": "missing X-Lab-Request header"})
+            body = self._body()
+            if path == "/api/exams/start":
+                return self._json(200, labexams.start(str(body.get("exam", "")), user, team))
+            if path == "/api/exams/answer":
+                return self._json(200, labexams.answer(body.get("attempt", 0), user, str(body.get("qid", "")),
+                                                       body.get("keys") or [], body.get("position")))
+            if path == "/api/exams/submit":
+                return self._json(200, labexams.submit(body.get("attempt", 0), user, team))
+            return self._json(404, {"error": "not found"})
+        except PermissionError as e:
+            return self._json(403, {"error": str(e)})
+        except (labexams.ExamError, ValueError, TypeError) as e:
+            return self._json(400, {"error": str(e)})
+        except Exception as e:                       # show it on the page, don't crash
+            return self._json(500, {"error": str(e)})
+
     def _env(self, method):
         """All /api/env calls — the logged-in learner's own secrets (or with space=team their
         team's), in their vault folder secret/<name>/ (secret/<team>_team/)."""
@@ -483,6 +574,8 @@ class Handler(BaseHTTPRequestHandler):
                         return self._json(400, {"error": str(e)})
                     print(f"[home-api] manager {user}: settings {values}", flush=True)
                 return self._json(200, labadmin.settings())
+            if path.startswith("/api/admin/exams"):
+                return self._admin_exams(method, path, user)
             action = path.rsplit("/", 1)[-1]
             if method != "POST" or action not in {**_ACTIONS, **_TEAM_ACTIONS}:
                 return self._json(404, {"error": "not found"})
@@ -529,6 +622,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._catalogs(method)
         if self.path.startswith("/api/env"):
             return self._env(method)
+        if self.path.startswith("/api/exams"):
+            return self._exams(method)
         return self._files(method)
 
     def do_PUT(self):
@@ -551,6 +646,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._admin("GET")
         if self.path.startswith("/api/env"):
             return self._env("GET")
+        if self.path.startswith("/api/exams"):
+            return self._exams("GET")
         if self.path == "/api/version":
             if not self._user():
                 return self._json(401, {"error": "not logged in"})

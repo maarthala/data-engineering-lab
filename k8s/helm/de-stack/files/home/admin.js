@@ -3,7 +3,7 @@
 // /api/admin (home-api, behind the Keycloak login; managers only). Actions run in the
 // background — run() polls the job until it finishes.
 var admin = (function () {
-  var TABS = [['/manage.html', '👥 Members'], ['/teams.html', '🧩 Teams'], ['/activity.html', '📊 Activity'], ['/settings.html', '⚙️ Settings']];
+  var TABS = [['/manage.html', '👥 Members'], ['/teams.html', '🧩 Teams'], ['/activity.html', '📊 Activity'], ['/exams-admin.html', '📝 Exams'], ['/settings.html', '⚙️ Settings']];
   var main, result, busy = false;
 
   function el(tag, attrs, kids) {

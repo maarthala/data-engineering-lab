@@ -45,7 +45,7 @@ MEMBERS = "members' Jupyter"   # group of the JupyterHub-started servers (jupyte
 # and storage, secrets) is what every unit needs: stopping it stops the whole stack, like make down.
 GROUPS = [
     ("Core", ["postgres", "redis", "keycloak", "vault-db", "vault", "vault-init", "oauth2-proxy", "nginx",
-              "home-api", "storage", "storage-init", "polaris-bootstrap", "polaris"]),
+              "portal-db", "home-api", "storage", "storage-init", "polaris-bootstrap", "polaris"]),
     ("SQL", ["trino", "sqlpad"]),
     ("Notebooks", ["jupyterhub", "jupyter"]),           # pandas, SQL, Python: no Spark needed
     ("Spark", ["spark-master", "spark-worker-1", "spark-connect"]),

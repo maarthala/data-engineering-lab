@@ -66,6 +66,8 @@ services:
       # "My secrets" — the key vault (vault.yaml); same lab-only token as there
       VAULT_ADDR: http://vault:8200
       VAULT_ADMIN_TOKEN: ${VAULT_ADMIN_TOKEN:-lab-vault-admin-local-token}
+      # "📝 Mock exams" — the portal's own database (portal-db makes it)
+      PORTAL_DB_URL: postgresql://portal:portal@postgres:5432/portal
     volumes:
       - ./configs/trino/access:/trino-access
       # lab code mounted over the image's copies (as on Kubernetes) — edits need only a restart
@@ -73,7 +75,10 @@ services:
       - ../common/dockerfiles/add/home-api.py:/app/app.py:ro
       - ../common/dockerfiles/add/labadmin.py:/app/labadmin.py:ro
       - ../common/dockerfiles/add/labvault.py:/app/labvault.py:ro
+      - ../common/dockerfiles/add/labexams.py:/app/labexams.py:ro
     depends_on:                      # it provisions in all three: wait for them (a stopped one has no DNS name)
+      portal-db:
+        condition: service_completed_successfully
       polaris:
         condition: service_started
       storage:
@@ -81,6 +86,30 @@ services:
       keycloak:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - sparknet
+
+  # One-shot: the portal's database + login in the stack's Postgres (mock exams …) — also on a
+  # stack made before it existed (Postgres runs its init scripts only on an empty volume). Members'
+  # PostgreSQL login `learner` may not connect to it.
+  portal-db:
+    image: postgres:18
+    container_name: portal-db
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    command:
+      - sh
+      - -c
+      - |
+        psql -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'portal'" | grep -q 1 || psql -c "CREATE USER portal WITH PASSWORD 'portal'"
+        psql -tAc "SELECT 1 FROM pg_database WHERE datname = 'portal'" | grep -q 1 || psql -c "CREATE DATABASE portal OWNER portal"
+        psql -qc "REVOKE CONNECT ON DATABASE portal FROM PUBLIC"
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - sparknet
 

@@ -1,12 +1,15 @@
 # home-api — the landing page's backend (who am I + per-learner lakehouse provisioning).
-# Standard-library Python only; sits behind oauth2-proxy, never published directly.
+# Standard-library Python, plus psycopg2 + cryptography for the 📝 Mock exams (portal database,
+# AES-256-GCM question banks); sits behind oauth2-proxy, never published directly.
 #   docker build -f common/dockerfiles/Dockerfile.home-api -t <ref> common/dockerfiles
 FROM python:3.10-slim
+RUN pip install --no-cache-dir psycopg2-binary==2.9.10 cryptography==44.0.2
 COPY add/lakehouse.py /app/lakehouse.py
 COPY add/labvault.py /app/labvault.py
 COPY add/seed /app/seed
 COPY add/home-api.py /app/app.py
 COPY add/labadmin.py /app/labadmin.py
+COPY add/labexams.py /app/labexams.py
 USER nobody
 EXPOSE 8000
 CMD ["python", "/app/app.py"]

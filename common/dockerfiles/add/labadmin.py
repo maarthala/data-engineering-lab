@@ -105,8 +105,12 @@ def _hub(method, path):
 def _hub_forget(user):
     """Stop the learner's Jupyter and delete them from the Hub — with them goes their work
     volume (Docker volume / PVC), so old notebooks can't sync back into a wiped bucket. The
-    Hub re-creates the user (fresh volume) at their next sign-in. False if it didn't work."""
-    st, info = _hub("GET", f"/users/{user}")
+    Hub re-creates the user (fresh volume) at their next sign-in. False if it didn't work (also
+    when the Notebooks unit is off — the rest of a wipe / delete still goes ahead)."""
+    try:
+        st, info = _hub("GET", f"/users/{user}")
+    except OSError:                                   # Hub stopped: no DNS name
+        return False
     if st == 404:
         return True                                   # never opened Jupyter
     if st != 200:
@@ -552,6 +556,11 @@ def delete(user):
     except Exception as e:
         airflow = False
         print(f"[labadmin] airflow {user}: {e}", flush=True)
+    try:                                                 # their mock-exam attempts
+        import labexams
+        labexams.forget_member(user)
+    except Exception as e:  # noqa: BLE001 — no portal database (yet)
+        print(f"[labadmin] exams {user}: {e}", flush=True)
     try:                                                 # folders they shared / were shared
         lh.forget_folder_shares(name)
     except Exception as e:  # noqa: BLE001

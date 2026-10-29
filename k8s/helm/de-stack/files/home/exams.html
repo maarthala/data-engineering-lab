@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mock exams — Epireum's Data Engineering Lab</title>
+  <link rel="stylesheet" href="/admin.css?v=6">
+  <style>
+    main{max-width:1000px; margin:0 auto}
+    .exams{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px}
+    .exam h2{margin:0 0 4px; font-size:1.05rem}
+    .stats{display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:12px 0}
+    .stats div{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:8px; text-align:center}
+    .stats b{display:block; font-size:1.15rem} .stats span{font-size:.75rem; color:var(--muted)}
+    .pass{color:var(--accent2)} .fail{color:#ffb3b0}
+    .q{font-size:1.02rem; line-height:1.55; white-space:pre-wrap; margin:6px 0 14px}
+    .opt{display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid var(--line); border-radius:10px;
+         margin-bottom:8px; cursor:pointer; line-height:1.45}
+    .opt:hover{border-color:var(--accent)} .opt.sel{border-color:var(--accent); background:rgba(109,139,255,.12)}
+    .opt input{margin-top:3px} .opt .k{font-weight:700; color:var(--muted); min-width:18px}
+    .opt.ok{border-color:var(--accent2); background:rgba(57,208,196,.1)} .opt.bad{border-color:var(--danger); background:rgba(255,107,107,.08)}
+    .palette{display:flex; flex-wrap:wrap; gap:5px; margin-top:8px}
+    .palette button{width:34px; padding:4px 0; font-size:.8rem}
+    .palette button.done{background:rgba(57,208,196,.22); border-color:rgba(57,208,196,.5)}
+    .palette button.cur{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent)}
+    .palette button.ok{background:rgba(57,208,196,.22)} .palette button.bad{background:rgba(255,107,107,.18)}
+    .big{font-size:2.2rem; font-weight:800}
+    .dom{display:grid; grid-template-columns:minmax(0,1fr) 160px 70px; gap:10px; align-items:center; padding:6px 0; border-top:1px solid var(--line); font-size:.9rem}
+    .meter{height:8px; background:var(--panel2); border-radius:999px; overflow:hidden} .meter i{display:block; height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2))}
+    .expl{margin-top:10px; padding:10px 12px; border-left:3px solid var(--accent); background:var(--panel2); border-radius:6px; font-size:.92rem; line-height:1.55}
+    .expl ul{margin:6px 0; padding-left:20px} .expl p{margin:6px 0} .expl a{color:var(--accent)}
+    .nav{display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-top:12px}
+    @media (max-width:640px){ .stats{grid-template-columns:repeat(2,1fr)} .dom{grid-template-columns:1fr 70px} .dom .meter{display:none} }
+  </style>
+</head>
+<body>
+  <header id="lab-top"></header>
+  <script src="/lab-header.js?v=10"></script>
+  <div class="pagebar"><h1>📝 Mock exams <span class="dot">·</span> practise for a certification</h1></div>
+  <main id="main"><div class="placeholder">Loading…</div></main>
+  <script>
+    // 📝 Mock exams — the exams open to you (everyone, or your team). Take one as often as you like:
+    // each attempt draws a new set of questions; answers are saved as you go, so leave any time and
+    // resume later (no time limit). After you submit: your score, per domain, and every question
+    // with the right answer and the explanation. #attempt=<id> in the address = that attempt.
+    var main = document.getElementById('main');
+    function el(tag, attrs, kids) {
+      var e = document.createElement(tag);
+      Object.keys(attrs || {}).forEach(function (k) {
+        if (k === 'text') e.textContent = attrs[k];
+        else if (k === 'html') e.innerHTML = attrs[k];
+        else if (k === 'on') Object.keys(attrs.on).forEach(function (ev) { e.addEventListener(ev, attrs.on[ev]); });
+        else e.setAttribute(k, attrs[k]);
+      });
+      (kids || []).forEach(function (c) { if (c) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+      return e;
+    }
+    function api(method, path, body) {
+      return fetch(path, {method: method, credentials: 'same-origin',
+          headers: body ? {'Content-Type': 'application/json', 'X-Lab-Request': '1'} : {},
+          body: body ? JSON.stringify(body) : undefined})
+        .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); });
+    }
+    function fail(e) { main.innerHTML = ''; main.appendChild(el('div', {class: 'placeholder', text: 'Could not load: ' + e.message})); }
+    function esc(s) { return String(s || '').replace(/[&<>"]/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]; }); }
+    // the explanations' small Markdown: paragraphs, - lists, **bold**, `code`, [text](url)
+    function md(s) {
+      return esc(s).split(/\n{2,}/).map(function (block) {
+        var lines = block.split('\n');
+        var inline = function (t) {
+          return t.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>')
+                  .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+        };
+        if (lines.every(function (l) { return /^\s*[-*] /.test(l); }))
+          return '<ul>' + lines.map(function (l) { return '<li>' + inline(l.replace(/^\s*[-*] /, '')) + '</li>'; }).join('') + '</ul>';
+        return '<p>' + inline(lines.join('<br>')) + '</p>';
+      }).join('');
+    }
+    function refs(q) { return (q.refs || []).filter(function (x) { return /^https?:\/\//.test(x.url || ''); }); }
+    function when(iso) { return new Date(iso).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}); }
+
+    // ---- the list: exams open to me + my stats -------------------------------------------------
+    function list() {
+      if (location.hash) history.replaceState(null, '', location.pathname);
+      api('GET', '/api/exams').then(function (d) {
+        main.innerHTML = '';
+        if (!d.exams.length) return main.appendChild(el('div', {class: 'placeholder',
+          text: 'No mock exams are open to you yet — your lab managers add them.'}));
+        main.appendChild(el('div', {class: 'exams'}, d.exams.map(examCard)));
+      }).catch(fail);
+    }
+    function stat(v, label, cls) { return el('div', {}, [el('b', {class: cls || '', text: v === null || v === undefined ? '—' : String(v)}), el('span', {text: label})]); }
+    function examCard(e) {
+      var s = e.stats;
+      var go = el('button', {class: 'primary', text: e.open ? 'Resume (' + e.open.answered + ' / ' + e.open.total + ' answered)' : (s.attempts ? 'Start a new attempt' : 'Start exam')});
+      go.addEventListener('click', function () {
+        go.disabled = true;
+        api('POST', '/api/exams/start', {exam: e.id}).then(take).catch(function (x) { alertCard(x.message); go.disabled = false; });
+      });
+      var hist = e.history.length ? el('table', {}, [el('tr', {}, ['When', 'Score', '', 'Time', ''].map(function (h) { return el('th', {text: h}); }))]
+        .concat(e.history.map(function (a) {
+          var r = el('button', {class: 'small', text: 'Review'});
+          r.addEventListener('click', function () { openAttempt(a.id); });
+          return el('tr', {}, [el('td', {class: 'muted', text: when(a.finished_at)}), el('td', {text: a.score + ' % (' + a.correct + '/' + a.total + ')'}),
+            el('td', {class: a.passed ? 'pass' : 'fail', text: a.passed ? 'passed' : 'not yet'}), el('td', {class: 'muted', text: a.minutes + ' min'}),
+            el('td', {class: 'acts'}, [r])]);
+        }))) : el('div', {class: 'sub', text: 'No attempts yet.'});
+      return el('div', {class: 'card exam'}, [
+        el('h2', {text: e.name}),
+        el('div', {class: 'sub', text: e.questions + ' questions · pass mark ' + e.pass_percent + ' % · no time limit' + (e.provider ? ' · ' + e.provider : '')}),
+        el('div', {class: 'stats'}, [stat(s.attempts, 'attempts'), stat(s.passed, 'passed', s.passed ? 'pass' : ''),
+          stat(s.best === null ? null : s.best + ' %', 'best'), stat(s.average === null ? null : s.average + ' %', 'average')]),
+        el('div', {class: 'row', style: 'margin-bottom:10px'}, [go]),
+        el('div', {class: 'wrap'}, [hist])]);
+    }
+    function alertCard(msg) { main.insertBefore(el('div', {class: 'card result err'}, [el('div', {text: msg})]), main.firstChild); }
+
+    function openAttempt(id) {
+      api('GET', '/api/exams/attempt?id=' + id).then(function (a) { a.done ? showReview(a) : take(a); }).catch(fail);
+    }
+
+    // ---- taking an attempt: one question at a time, saved on every change ----------------------
+    function take(a) {
+      if (a.done) return showReview(a);
+      history.replaceState(null, '', '#attempt=' + a.id);
+      var i = Math.min(a.position || 0, a.questions.length - 1), answers = a.answers || {}, saving = Promise.resolve();
+      function save(q, keys) {
+        saving = saving.then(function () { return api('POST', '/api/exams/answer', {attempt: a.id, qid: q.qid, keys: keys, position: i}); })
+          .catch(function (e) { alertCard('Could not save your answer: ' + e.message); });
+      }
+      function render() {
+        var q = a.questions[i], picked = answers[q.qid] || [], multi = q.choose > 1;
+        main.innerHTML = '';
+        var answered = Object.keys(answers).length;
+        var opts = q.options.map(function (o) {
+          var on = picked.indexOf(o.key) >= 0;
+          var box = el('input', {type: multi ? 'checkbox' : 'radio', name: 'opt'}); box.checked = on;
+          var row = el('label', {class: 'opt' + (on ? ' sel' : '')}, [box, el('span', {class: 'k', text: o.key}), el('span', {text: o.text})]);
+          box.addEventListener('change', function () {
+            var cur = answers[q.qid] || [];
+            if (!multi) cur = [o.key];
+            else if (box.checked) { if (cur.length >= q.choose) { box.checked = false; return; } cur = cur.concat([o.key]); }
+            else cur = cur.filter(function (k) { return k !== o.key; });
+            if (cur.length) answers[q.qid] = cur.sort(); else delete answers[q.qid];
+            save(q, cur); render();
+          });
+          return row;
+        });
+        var prev = el('button', {text: '← Previous'}); prev.disabled = i === 0;
+        prev.addEventListener('click', function () { i--; render(); });
+        var next = el('button', {class: 'primary', text: 'Next →'}); next.hidden = i === a.questions.length - 1;
+        next.addEventListener('click', function () { i++; save(q, answers[q.qid] || []); render(); });
+        var pause = el('button', {text: '⏸ Pause'});
+        pause.addEventListener('click', function () { save(q, answers[q.qid] || []); saving.then(list); });
+        var submit = el('button', {class: i === a.questions.length - 1 ? 'primary' : '', text: 'Submit exam'});
+        submit.addEventListener('click', function () {
+          var left = a.questions.length - Object.keys(answers).length;
+          if (!confirm(left ? left + ' question(s) are not answered — they count as wrong. Submit anyway?' : 'Submit your answers?')) return;
+          submit.disabled = true;
+          saving.then(function () { return api('POST', '/api/exams/submit', {attempt: a.id}); }).then(showReview)
+            .catch(function (e) { alertCard(e.message); submit.disabled = false; });
+        });
+        var pal = el('div', {class: 'palette'}, a.questions.map(function (x, n) {
+          var b = el('button', {class: (answers[x.qid] ? 'done' : '') + (n === i ? ' cur' : ''), text: String(n + 1)});
+          b.addEventListener('click', function () { i = n; render(); });
+          return b;
+        }));
+        main.appendChild(el('div', {class: 'card'}, [
+          el('div', {class: 'bar'}, [el('b', {text: a.exam.name}), el('span', {class: 'sub', text: answered + ' / ' + a.questions.length + ' answered · saved as you go'})]),
+          el('div', {class: 'sub', text: 'Question ' + (i + 1) + ' of ' + a.questions.length + (multi ? ' · choose ' + q.choose : '')}),
+          el('div', {class: 'q', text: q.question}), el('div', {}, opts),
+          el('div', {class: 'nav'}, [el('div', {class: 'row'}, [prev, next]), el('div', {class: 'row'}, [pause, submit])])]));
+        main.appendChild(el('div', {class: 'card'}, [el('h3', {text: 'Questions'}), pal]));
+      }
+      render();
+    }
+
+    // ---- the review of a submitted attempt -----------------------------------------------------
+    function showReview(r) {
+      history.replaceState(null, '', '#attempt=' + r.id);
+      main.innerHTML = '';
+      var wrongOnly = false, box = el('div');
+      var back = el('button', {text: '← All exams'}); back.addEventListener('click', list);
+      var again = el('button', {class: 'primary', text: 'New attempt'});
+      again.addEventListener('click', function () { api('POST', '/api/exams/start', {exam: r.exam.id}).then(take).catch(function (e) { alertCard(e.message); }); });
+      var toggle = el('button', {text: 'Show only wrong'});
+      toggle.addEventListener('click', function () { wrongOnly = !wrongOnly; toggle.textContent = wrongOnly ? 'Show all' : 'Show only wrong'; paint(); });
+      main.appendChild(el('div', {class: 'card'}, [
+        el('div', {class: 'bar'}, [el('div', {}, [el('b', {text: r.exam.name}), el('div', {class: 'sub', text: when(r.finished_at) + ' · ' + r.minutes + ' min'})]),
+          el('div', {class: 'row'}, [back, again])]),
+        el('div', {class: 'row', style: 'gap:18px; margin:6px 0 12px'}, [
+          el('span', {class: 'big ' + (r.passed ? 'pass' : 'fail'), text: r.score + ' %'}),
+          el('span', {}, [el('b', {class: r.passed ? 'pass' : 'fail', text: r.passed ? 'Passed' : 'Not passed yet'}),
+            el('div', {class: 'sub', text: r.correct + ' of ' + r.total + ' right · pass mark ' + r.exam.pass_percent + ' %'})])]),
+        el('div', {}, r.by_domain.map(function (d) {
+          var p = Math.round(100 * d.correct / (d.total || 1));
+          return el('div', {class: 'dom'}, [el('span', {text: (d.domain !== '-' ? d.domain + ' · ' : '') + d.name}),
+            el('div', {class: 'meter'}, [el('i', {style: 'width:' + p + '%'})]), el('span', {class: 'muted', text: d.correct + '/' + d.total})]);
+        }))]));
+      main.appendChild(el('div', {class: 'row'}, [toggle]));
+      main.appendChild(box);
+      function paint() {
+        box.innerHTML = '';
+        r.questions.forEach(function (q, n) {
+          if (wrongOnly && q.right) return;
+          box.appendChild(el('div', {class: 'card', style: 'margin-bottom:12px'}, [
+            el('div', {class: 'bar'}, [el('b', {text: 'Question ' + (n + 1)}), el('span', {class: q.right ? 'pass' : 'fail', text: q.right ? '✓ right' : (q.picked.length ? '✗ wrong' : '✗ not answered')})]),
+            el('div', {class: 'q', text: q.question}),
+            el('div', {}, q.options.map(function (o) {
+              var good = q.answer.indexOf(o.key) >= 0, mine = q.picked.indexOf(o.key) >= 0;
+              return el('div', {class: 'opt' + (good ? ' ok' : mine ? ' bad' : '')}, [el('span', {class: 'k', text: o.key}), el('span', {text: o.text}),
+                el('span', {class: 'muted', style: 'margin-left:auto; white-space:nowrap', text: (mine ? 'your answer' : '') + (good ? (mine ? ' · ' : '') + 'correct' : '')})]);
+            })),
+            q.explanation || refs(q).length ? el('div', {class: 'expl', html: md(q.explanation) + (refs(q).length ? '<p>' +
+              refs(q).map(function (x) { return '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.title || x.url) + '</a>'; }).join(' · ') + '</p>' : '')}) : null]));
+        });
+        if (!box.children.length) box.appendChild(el('div', {class: 'placeholder', text: 'All answers right 🎉'}));
+      }
+      paint();
+      window.scrollTo({top: 0});
+    }
+
+    var m = /attempt=(\d+)/.exec(location.hash);
+    if (m) openAttempt(m[1]); else list();
+  </script>
+</body>
+</html>

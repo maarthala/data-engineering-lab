@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exams — Epireum's Data Engineering Lab</title>
+  <link rel="stylesheet" href="/admin.css?v=6">
+  <style>
+    .upl{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; gap:10px; align-items:end}
+    .upl label{display:flex; flex-direction:column; gap:5px; font-size:.85rem; color:var(--muted)}
+    .upl input[type=file]{color:var(--muted); font-size:.85rem}
+    @media (max-width:760px){ .upl{grid-template-columns:1fr} }
+    .exam h2{margin:0; font-size:1.05rem} .exam .id{color:var(--muted); font-size:.82rem; font-family:ui-monospace,Menlo,monospace}
+    .form{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:12px 0 4px}
+    .form label{display:flex; flex-direction:column; gap:5px; font-size:.82rem; color:var(--muted)}
+    .form input, .form select{width:100%}
+    .teampick{display:flex; flex-wrap:wrap; gap:6px 14px; margin:6px 0 2px}
+    .teampick label{display:flex; gap:6px; align-items:center; font-size:.9rem; color:var(--ink)}
+    .nums{display:flex; flex-wrap:wrap; gap:18px; margin:8px 0} .nums b{font-size:1.1rem}
+  </style>
+</head>
+<body>
+  <header id="lab-top"></header>
+  <script src="/lab-header.js?v=10"></script>
+  <main id="main">
+    <div class="placeholder">Loading…</div>
+  </main>
+  <script src="/admin.js?v=3"></script>
+  <script>
+    // 📝 Exams — managers add certification question banks (encrypted .enc.json + the key; the
+    // key is used once to decrypt and not kept) or a plain exam.json (name, domains), then set per
+    // exam: questions per attempt, pass mark and who may take it (everyone, chosen teams, nobody).
+    var el = admin.el;
+    admin.page('📝 Exams');
+
+    function readJson(input) {
+      return new Promise(function (resolve, reject) {
+        var f = input.files[0];
+        if (!f) return reject(new Error('choose a file'));
+        var r = new FileReader();
+        r.onload = function () { try { resolve(JSON.parse(r.result)); } catch (e) { reject(new Error(f.name + ' is not JSON')); } };
+        r.onerror = function () { reject(new Error('could not read ' + f.name)); };
+        r.readAsText(f);
+      });
+    }
+    function readText(input) {
+      return new Promise(function (resolve) {
+        var f = input.files[0];
+        if (!f) return resolve('');
+        var r = new FileReader(); r.onload = function () { resolve(r.result); }; r.readAsText(f);
+      });
+    }
+
+    function uploadCard() {
+      var file = el('input', {type: 'file', accept: '.json,application/json'});
+      var key = el('input', {type: 'password', placeholder: 'paste the key (base64)', autocomplete: 'off'});
+      var keyFile = el('input', {type: 'file', accept: '.key,.txt'});
+      var b = el('button', {class: 'primary', text: 'Upload'});
+      b.addEventListener('click', function () {
+        b.disabled = true; b.textContent = 'Decrypting…';
+        readJson(file).then(function (doc) {
+          if (doc.format) {                                  // an encrypted bank → needs the key
+            return (key.value.trim() ? Promise.resolve(key.value) : readText(keyFile)).then(function (k) {
+              if (!k.trim()) throw new Error('this file is encrypted — paste its key or choose the .key file');
+              return admin.api('POST', '/api/admin/exams/upload', {file: doc, key: k.trim()}).then(function (r) {
+                admin.show('Added ' + r.questions + ' questions to ' + r.exam, [
+                  'Source ' + r.source + (r.skipped ? ' · ' + r.skipped + ' left out (marked needs-fix or incomplete)' : '') +
+                  ' · ' + r.pool + ' questions in the exam now. The key was not stored.']);
+              });
+            });
+          }
+          if (doc.domains || doc.exam_format) {               // plain exam.json
+            return admin.api('POST', '/api/admin/exams/meta', {file: doc}).then(function (r) {
+              admin.show('Exam details saved: ' + r.name, [r.domains + ' domains · id ' + r.exam]);
+            });
+          }
+          throw new Error('not a question bank (.enc.json) or an exam.json');
+        }).then(function () { key.value = ''; file.value = ''; keyFile.value = ''; load(); })
+          .catch(function (e) { admin.show('Upload failed', [e.message], null, true); })
+          .then(function () { b.disabled = false; b.textContent = 'Upload'; });
+      });
+      return el('div', {class: 'card'}, [
+        el('h3', {text: 'Add questions'}),
+        el('div', {class: 'sub', style: 'margin-bottom:10px',
+          text: 'An encrypted question bank (…enc.json) with its key — decrypted here and stored; the key is not kept. ' +
+                'Uploading the same source again replaces it. A plain exam.json adds the exam\'s name and domains.'}),
+        el('div', {class: 'upl'}, [
+          el('label', {}, ['Question bank or exam.json', file]),
+          el('label', {}, ['Key (paste, or choose the .key file)', key, keyFile]),
+          b])]);
+    }
+
+    function examCard(e, teams) {
+      var name = el('input', {type: 'text', value: e.name});
+      var n = el('input', {type: 'number', min: 1, max: Math.max(1, e.pool), value: Math.min(e.num_questions, e.pool || e.num_questions)});
+      var pass = el('input', {type: 'number', min: 1, max: 100, value: e.pass_percent});
+      var who = el('select', {}, [['off', 'Nobody (off)'], ['all', 'All members'], ['teams', 'Chosen teams']].map(function (o) {
+        var opt = el('option', {value: o[0], text: o[1]}); if (o[0] === e.audience) opt.selected = true; return opt;
+      }));
+      var picks = teams.map(function (t) {
+        var c = el('input', {type: 'checkbox', value: t}); c.checked = (e.teams || []).indexOf(t) >= 0;
+        return {t: t, c: c};
+      });
+      var pickBox = el('div', {class: 'teampick'}, picks.length ? picks.map(function (p) { return el('label', {}, [p.c, p.t]); })
+        : [el('span', {class: 'sub', text: 'No teams yet — create them on 🧩 Teams.'})]);
+      function sync() { pickBox.hidden = who.value !== 'teams'; }
+      who.addEventListener('change', sync); sync();
+
+      var save = el('button', {class: 'primary', text: 'Save'});
+      save.addEventListener('click', function () {
+        save.disabled = true;
+        admin.api('POST', '/api/admin/exams/settings', {exam: e.id, name: name.value, num_questions: +n.value,
+          pass_percent: +pass.value, audience: who.value,
+          teams: picks.filter(function (p) { return p.c.checked; }).map(function (p) { return p.t; })})
+          .then(function () { admin.show('Saved ' + name.value, [who.value === 'off' ? 'Members can\'t see it (off).' :
+              who.value === 'all' ? 'Open to all members.' : 'Open to the chosen teams.']); load(); })
+          .catch(function (x) { admin.show('Could not save', [x.message], null, true); save.disabled = false; });
+      });
+      var del = el('button', {class: 'danger', text: 'Delete exam'});
+      del.addEventListener('click', function () {
+        if (!confirm('Delete ' + e.name + ' — its questions and every member\'s attempts?')) return;
+        admin.api('POST', '/api/admin/exams/delete', {exam: e.id})
+          .then(function () { admin.show('Deleted ' + e.name, []); load(); })
+          .catch(function (x) { admin.show('Could not delete', [x.message], null, true); });
+      });
+
+      var banks = el('table', {}, [el('tr', {}, ['Source', 'Questions', 'Left out', 'Uploaded', ''].map(function (h) { return el('th', {text: h}); }))]
+        .concat(e.banks.map(function (b) {
+          var x = el('button', {class: 'small danger', text: 'Remove'});
+          x.addEventListener('click', function () {
+            if (!confirm('Remove source ' + b.source + ' (' + b.questions + ' questions) from ' + e.name + '?')) return;
+            admin.api('POST', '/api/admin/exams/delete', {exam: e.id, source: b.source})
+              .then(function () { admin.show('Removed ' + b.source, []); load(); })
+              .catch(function (y) { admin.show('Could not remove', [y.message], null, true); });
+          });
+          return el('tr', {}, [el('td', {text: b.source}), el('td', {text: String(b.questions)}), el('td', {text: String(b.skipped || 0)}),
+            el('td', {class: 'muted', text: b.uploaded_at.slice(0, 16).replace('T', ' ') + ' · ' + (b.uploaded_by || '')}),
+            el('td', {class: 'acts'}, [x])]);
+        })));
+
+      return el('div', {class: 'card exam'}, [
+        el('div', {class: 'bar'}, [el('div', {}, [el('h2', {text: e.name}), el('div', {class: 'id', text: e.id + (e.provider ? ' · ' + e.provider : '')})]),
+          el('span', {class: 'tag' + (e.audience === 'off' ? '' : ' on'), text: e.audience === 'off' ? 'off' : e.audience === 'all' ? 'all members' : (e.teams || []).join(', ')})]),
+        el('div', {class: 'nums'}, [
+          el('span', {}, [el('b', {text: String(e.pool)}), ' questions in the pool']),
+          el('span', {}, [el('b', {text: String(e.attempts)}), ' attempts']),
+          el('span', {}, [el('b', {text: String(e.members)}), ' members']),
+          el('span', {}, [el('b', {text: e.avg_score === null ? '—' : e.avg_score + ' %'}), ' average score'])]),
+        el('div', {class: 'form'}, [
+          el('label', {}, ['Name', name]), el('label', {}, ['Questions per attempt', n]),
+          el('label', {}, ['Pass mark (%)', pass]), el('label', {}, ['Who can take it', who])]),
+        pickBox,
+        el('div', {class: 'row', style: 'margin:10px 0 14px'}, [save, del]),
+        el('div', {class: 'wrap'}, [banks])]);
+    }
+
+    function load() {
+      admin.api('GET', '/api/admin/exams').then(function (d) {
+        admin.fill([uploadCard()].concat(d.exams.length ? d.exams.map(function (e) { return examCard(e, d.teams); })
+          : [el('div', {class: 'card'}, [el('div', {class: 'sub', text: 'No exams yet — upload a question bank above.'})])]));
+      }).catch(admin.failed);
+    }
+    load();
+  </script>
+</body>
+</html>

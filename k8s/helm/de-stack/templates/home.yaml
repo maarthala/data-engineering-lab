@@ -38,6 +38,10 @@ data:
 {{ .Files.Get "files/home/secrets.html" | indent 4 }}
   variables.html: |
 {{ .Files.Get "files/home/variables.html" | indent 4 }}
+  exams.html: |
+{{ .Files.Get "files/home/exams.html" | indent 4 }}
+  exams-admin.html: |
+{{ .Files.Get "files/home/exams-admin.html" | indent 4 }}
   lab-header.js: |
 {{ .Files.Get "files/home/lab-header.js" | indent 4 }}
   default.conf: |
@@ -77,6 +81,8 @@ spec:
             - { name: html, mountPath: /usr/share/nginx/html/secrets.html, subPath: secrets.html }
             - { name: html, mountPath: /usr/share/nginx/html/variables.html, subPath: variables.html }   # → secrets.html
             - { name: html, mountPath: /usr/share/nginx/html/lab-header.js, subPath: lab-header.js }
+            - { name: html, mountPath: /usr/share/nginx/html/exams.html, subPath: exams.html }
+            - { name: html, mountPath: /usr/share/nginx/html/exams-admin.html, subPath: exams-admin.html }
             - { name: html, mountPath: /usr/share/nginx/html/img/epireum-logo.png, subPath: epireum-logo.png }
             # bigger header limit: oauth2-proxy forwards the session + sign-in cookies
             - { name: html, mountPath: /etc/nginx/conf.d/default.conf, subPath: default.conf }
@@ -141,6 +147,29 @@ spec:
         {{- include "de-stack.labChecksum" . | nindent 8 }}
     spec:
       serviceAccountName: home-api        # may update the trino-access ConfigMap (Trino's rules)
+      initContainers:
+        # the portal's database + login ("📝 Mock exams"; Postgres' init scripts only run on an empty
+        # volume); members' PostgreSQL login `learner` may not connect to it
+        - name: portal-db
+          image: {{ .Values.postgres.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            - { name: PGHOST, value: postgres }
+            - { name: PGUSER, value: "{{ .Values.postgres.user }}" }
+            - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: postgres-password } } }
+            - { name: PG_PORTAL_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: pg-portal-password } } }
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -q; do sleep 2; done
+              if psql -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'portal'" | grep -q 1; then
+                psql -qc "ALTER USER portal WITH PASSWORD '$PG_PORTAL_PASSWORD'"
+              else
+                psql -qc "CREATE USER portal WITH PASSWORD '$PG_PORTAL_PASSWORD'"
+              fi
+              psql -tAc "SELECT 1 FROM pg_database WHERE datname = 'portal'" | grep -q 1 || psql -qc "CREATE DATABASE portal OWNER portal"
+              psql -qc "REVOKE CONNECT ON DATABASE portal FROM PUBLIC"
       containers:
         - name: home-api
           image: {{ .Values.homeApi.image }}
@@ -178,6 +207,9 @@ spec:
             - { name: VAULT_ADDR, value: http://vault:8200 }
             - { name: VAULT_ADMIN_TOKEN, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: vault-admin-token } } }
             {{- end }}
+            # "📝 Mock exams" — the portal's own database (the portal-db init container makes it)
+            - { name: PG_PORTAL_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: pg-portal-password } } }
+            - { name: PORTAL_DB_URL, value: "postgresql://portal:$(PG_PORTAL_PASSWORD)@postgres:5432/portal" }
           ports:
             - { name: http, containerPort: 8000 }
           readinessProbe:
@@ -187,6 +219,7 @@ spec:
             - { name: lab-code, mountPath: /app/app.py, subPath: home-api.py }
             - { name: lab-code, mountPath: /app/labadmin.py, subPath: labadmin.py }
             - { name: lab-code, mountPath: /app/labvault.py, subPath: labvault.py }
+            - { name: lab-code, mountPath: /app/labexams.py, subPath: labexams.py }
             - { name: lab-seed, mountPath: /app/seed }
       volumes:
         - { name: lab-code, configMap: { name: lab-code } }
