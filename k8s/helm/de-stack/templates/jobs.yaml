@@ -1,0 +1,72 @@
+{{- if .Values.airflow.enabled }}
+{{- $j := .Values.airflow.jobs }}
+# Namespace for the pods Airflow starts (KubernetesPodOperator · members' tasks). Airflow's
+# service account may create pods only here — not in the stack's namespace, where it could
+# start a pod with another service account or mount the stack's Secrets. Pod Security
+# "baseline": no privileged pods, host paths or host network. No token in these pods.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $j.namespace }}
+  labels:
+    {{- include "de-stack.labels" . | nindent 4 }}
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: baseline
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: {{ $j.namespace }}
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: jobs
+  namespace: {{ $j.namespace }}
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  hard:
+    pods: {{ $j.quota.pods | quote }}
+    limits.cpu: {{ $j.quota.cpu | quote }}
+    limits.memory: {{ $j.quota.memory }}
+---
+# a pod without its own limits gets these (the quota needs every pod to have some)
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: jobs
+  namespace: {{ $j.namespace }}
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  limits:
+    - type: Container
+      default: { cpu: "1", memory: 2Gi }          # a Spark driver (SparkPi) needs ~1.5 Gi
+      defaultRequest: { cpu: 100m, memory: 256Mi }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: airflow-pod-launcher
+  namespace: {{ $j.namespace }}
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/exec"]
+    verbs: ["create", "get", "list", "watch", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["events"]                     # KubernetesPodOperator logs a pending pod's events
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: airflow-pod-launcher
+  namespace: {{ $j.namespace }}
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: airflow-pod-launcher }
+subjects:
+  - { kind: ServiceAccount, name: airflow, namespace: {{ $j.stackNamespace }} }
+{{- end }}

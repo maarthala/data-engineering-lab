@@ -139,6 +139,12 @@ airflow:
   repo: airflow-slim
   tag: "20261013-1"        # dated: re-importing :latest can leave the old image
   adminUser: airflow         # password: secret key airflow-admin-password
+  # Pods Airflow starts (KubernetesPodOperator, and members' tasks) run in their own namespace:
+  # Airflow may create pods only there, never in the stack's namespace (templates/jobs.yaml).
+  jobs:
+    namespace: de-jobs
+    stackNamespace: de-stack   # the stack's own (helm template without -n renders "default")
+    quota: { pods: "12", cpu: "6", memory: 12Gi }
 jupyter:
   enabled: true
   # JupyterHub: Keycloak login, one Jupyter pod per learner (KubeSpawner) with their own

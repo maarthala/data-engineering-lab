@@ -1,37 +1,11 @@
 {{- if .Values.airflow.enabled }}
 {{- $img := include "de-stack.image" (dict "root" $ "repo" .Values.airflow.repo "tag" .Values.airflow.tag) }}
-# RBAC so KubernetesPodOperator can launch/watch/delete Spark task pods.
+# Its service account may start pods only in the jobs namespace (templates/jobs.yaml).
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: airflow
   labels: {{- include "de-stack.labels" . | nindent 4 }}
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: airflow-pod-launcher
-  labels: {{- include "de-stack.labels" . | nindent 4 }}
-rules:
-  - apiGroups: [""]
-    resources: ["pods", "pods/log", "pods/exec"]
-    verbs: ["create", "get", "list", "watch", "delete", "patch"]
-  - apiGroups: [""]
-    resources: ["events"]                     # KubernetesPodOperator logs a pending pod's events
-    verbs: ["get", "list", "watch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: airflow-pod-launcher
-  labels: {{- include "de-stack.labels" . | nindent 4 }}
-subjects:
-  - kind: ServiceAccount
-    name: airflow
-roleRef:
-  kind: Role
-  name: airflow-pod-launcher
-  apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: v1
 kind: ConfigMap
