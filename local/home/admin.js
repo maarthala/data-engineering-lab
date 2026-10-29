@@ -9,6 +9,7 @@ var admin = (function () {
     var e = document.createElement(tag);
     Object.keys(attrs || {}).forEach(function (k) {
       if (k === 'text') e.textContent = attrs[k];
+      else if (k === 'html') e.innerHTML = attrs[k];
       else if (k === 'on') Object.keys(attrs.on).forEach(function (ev) { e.addEventListener(ev, attrs.on[ev]); });
       else e.setAttribute(k, attrs[k]);
     });

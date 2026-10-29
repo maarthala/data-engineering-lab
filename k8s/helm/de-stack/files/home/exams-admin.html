@@ -23,6 +23,14 @@
     .subtabs a.on{color:var(--accent); border-bottom-color:var(--accent)}
     .pass{color:var(--ok-ink); font-weight:600} .fail{color:var(--bad-ink)}
     .danger-zone{border-color:#f1b5b0}
+    .qfilter{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px} .qfilter input[type=search]{flex:1; min-width:200px}
+    .palette{display:flex; flex-wrap:wrap; gap:5px; max-height:180px; overflow:auto}
+    .palette button{min-width:38px; padding:4px 6px; font-size:.8rem} .palette button.cur{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent)}
+    .q{font-size:1.02rem; line-height:1.55; margin:6px 0 14px}
+    .opt{display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid var(--line); border-radius:10px; margin-bottom:8px; line-height:1.45}
+    .opt .k{font-weight:700; color:var(--muted); min-width:18px} .opt.ok{border-color:var(--accent2); background:rgba(57,208,196,.1)}
+    .expl{margin-top:10px; padding:10px 12px; border-left:3px solid var(--accent); background:var(--panel2); border-radius:6px; font-size:.92rem; line-height:1.55}
+    .expl a{color:var(--accent)}
   </style>
 </head>
 <body>
@@ -31,10 +39,11 @@
   <main id="main">
     <div class="placeholder">Loading…</div>
   </main>
-  <script src="/admin.js?v=4"></script>
+  <script src="/admin.js?v=5"></script>
+  <script src="/exam-render.js?v=1"></script>
   <script>
     // Exams — tab All exams: every certification exam (click one: its Settings · Question banks ·
-    // In progress · Results). Tab Upload questions: an encrypted bank (…enc.json + the key — used once to
+    // Questions · In progress · Results). Tab Upload questions: an encrypted bank (…enc.json + the key — used once to
     // decrypt, not kept) or a plain exam.json (name, domains). #exams/<id>/<section> in the address.
     var el = admin.el, data = null;
     admin.page('Exams', 'Mock certification exams — question banks, who may take them, and results.');
@@ -131,7 +140,7 @@
     // ---- one exam ---------------------------------------------------------------------------------
     function stat(v, label) { return el('div', {class: 'stat'}, [el('b', {text: String(v)}), el('span', {text: label})]); }
     function examView(e, section) {
-      var subs = [['settings', 'Settings'], ['banks', 'Question banks (' + e.banks.length + ')'],
+      var subs = [['settings', 'Settings'], ['banks', 'Question banks (' + e.banks.length + ')'], ['questions', 'Questions (' + e.pool + ')'],
                   ['progress', 'In progress (' + e.ongoing.length + ')'], ['results', 'Results']];
       var back = el('a', {class: 'back', href: '#exams', text: '← All exams'});
       back.addEventListener('click', function (x) { x.preventDefault(); go('exams'); });
@@ -140,7 +149,7 @@
         a.addEventListener('click', function () { go('exams/' + e.id + '/' + s[0]); });
         return a;
       }));
-      var body = section === 'banks' ? banksCard(e) : section === 'progress' ? progressCard(e)
+      var body = section === 'banks' ? banksCard(e) : section === 'questions' ? questionsCard(e) : section === 'progress' ? progressCard(e)
                : section === 'results' ? resultsCard(e) : settingsCard(e);
       return [el('div', {}, [back]),
         el('div', {class: 'head'}, [el('h2', {text: e.name}), who(e), el('span', {class: 'id', text: e.id + (e.provider ? ' · ' + e.provider : '')})]),
@@ -208,6 +217,76 @@
       return [el('div', {class: 'card'}, [el('div', {class: 'bar'}, [el('h3', {style: 'margin:0', text: 'Question banks'}), up]),
         rows.length ? el('div', {class: 'wrap'}, [el('table', {}, [th(['Source', 'Questions', 'Left out', 'Uploaded', '']), el('tbody', {}, rows)])])
                     : el('div', {class: 'sub', text: 'No question banks — the exam has only its details (exam.json).'})])];
+    }
+
+    // ---- Questions: every question of the exam with its right answer — filter, number grid, one at a time
+    var TYPE = {choice: 'Multiple choice', hotspot: 'Hotspot', 'drag-drop': 'Drag and drop', 'yes-no': 'Yes / No'};
+    function questionsCard(e) {
+      var card = el('div', {class: 'card'}, [el('h3', {text: 'Questions'}), el('div', {class: 'sub', text: 'Loading…'})]);
+      admin.api('GET', '/api/admin/exams/questions?exam=' + encodeURIComponent(e.id)).then(function (d) {
+        var all = d.questions, shown = all, cur = 0;
+        if (!all.length) { card.lastChild.textContent = 'No questions — upload a question bank.'; return; }
+        var search = el('input', {type: 'search', placeholder: 'Search the text, options, answers, explanation or id…'});
+        function pick(label, values) {
+          return el('select', {}, [el('option', {value: '', text: label})].concat(values.map(function (v) { return el('option', {value: v, text: TYPE[v] || v}); })));
+        }
+        function uniq(f) { return all.map(f).filter(function (v, i, a) { return v && a.indexOf(v) === i; }).sort(); }
+        var source = pick('All banks', uniq(function (q) { return q.source; })), type = pick('All types', uniq(function (q) { return q.type; }));
+        var domain = pick('All domains', uniq(function (q) { return q.domain; }));
+        var count = el('span', {class: 'sub'}), pal = el('div', {class: 'palette'}), box = el('div');
+        var hay = all.map(function (q) {
+          return [q.qid, q.question, q.explanation, (q.options || []).map(function (o) { return o.text; }).join(' '),
+                  (q.slots || []).map(function (s) { return s.label + ' ' + s.answer.join(' '); }).join(' ')].join(' ').toLowerCase();
+        });
+        function filter() {
+          var t = search.value.trim().toLowerCase();
+          shown = all.filter(function (q, n) {
+            return (!t || hay[n].indexOf(t) >= 0) && (!source.value || q.source === source.value) &&
+                   (!type.value || q.type === type.value) && (!domain.value || q.domain === domain.value);
+          });
+          cur = 0; paint();
+        }
+        [search, source, type, domain].forEach(function (x) { x.addEventListener(x === search ? 'input' : 'change', filter); });
+        function paint() {
+          count.textContent = shown.length === all.length ? all.length + ' questions' : shown.length + ' of ' + all.length + ' questions';
+          pal.innerHTML = ''; box.innerHTML = '';
+          shown.forEach(function (q, n) {
+            var b = el('button', {class: n === cur ? 'cur' : '', text: String(n + 1), title: q.qid});
+            b.addEventListener('click', function () { cur = n; paint(); });
+            pal.appendChild(b);
+          });
+          if (!shown.length) return box.appendChild(el('div', {class: 'card'}, [el('div', {class: 'sub', text: 'No question matches.'})]));
+          var q = shown[cur];
+          var prev = el('button', {text: '← Previous'}); prev.disabled = cur === 0;
+          prev.addEventListener('click', function () { cur--; paint(); });
+          var next = el('button', {text: 'Next →'}); next.disabled = cur === shown.length - 1;
+          next.addEventListener('click', function () { cur++; paint(); });
+          var refs = (q.refs || []).filter(function (x) { return /^https?:\/\//.test(x.url || ''); });
+          box.appendChild(el('div', {class: 'card'}, [
+            el('div', {class: 'bar'}, [el('b', {text: 'Question ' + (cur + 1) + ' of ' + shown.length}),
+              el('span', {class: 'id', text: q.qid + ' · ' + q.source + (q.domain ? ' · domain ' + q.domain : '') + ' · ' + (TYPE[q.type] || q.type)})]),
+            caseBox(d, q), el('div', {class: 'q md', html: md(q.question)}),
+            q.slots ? el('table', {class: 'slots'}, [el('tbody', {}, [el('tr', {}, ['', 'Correct', 'Choices'].map(function (h) { return el('td', {class: 'muted', text: h}); }))]
+              .concat(q.slots.map(function (s) {
+                return el('tr', {}, [el('td', {class: 'md', html: mdLine(s.label || s.id)}), el('td', {class: 'ok', text: s.answer.join(' / ')}),
+                  el('td', {class: 'muted', text: s.choices.join(' · ')})]);
+              })))])
+              : el('div', {}, q.options.map(function (o) {
+                var good = q.answer.indexOf(o.key) >= 0;
+                return el('div', {class: 'opt' + (good ? ' ok' : '')}, [el('span', {class: 'k', text: o.key}), el('span', {class: 'md', html: mdLine(o.text)}),
+                  el('span', {class: 'muted', style: 'margin-left:auto; white-space:nowrap', text: good ? 'correct' : ''})]);
+              })),
+            q.explanation || refs.length ? el('div', {class: 'expl md', html: md(q.explanation) + (refs.length ? '<p>' + refs.map(function (x) {
+              return '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.title || x.url) + '</a>'; }).join(' · ') + '</p>' : '')}) : null,
+            el('div', {class: 'row', style: 'justify-content:space-between; margin-top:12px'}, [prev, next])]));
+        }
+        card.innerHTML = '';
+        card.appendChild(el('div', {class: 'qfilter'}, [search, source, type, domain, count]));
+        card.appendChild(pal);
+        card.parentNode.insertBefore(box, card.nextSibling);
+        paint();
+      }).catch(function (x) { card.lastChild.textContent = 'Could not load: ' + x.message; });
+      return [card];
     }
 
     function progressCard(e) {

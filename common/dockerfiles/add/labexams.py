@@ -311,6 +311,20 @@ def results(exam_id):
                        for a in recent]}
 
 
+def admin_questions(exam_id):
+    """Managers: every question of the exam with its right answer and explanation (bank, id order)."""
+    qs = _q("SELECT * FROM exam_questions WHERE exam_id = %s ORDER BY source, qid", (exam_id,))
+    out = []
+    for q in qs:
+        d = dict(_shown(q), source=q["source"], domain=q["domain"], explanation=q["explanation"], refs=q["refs"])
+        if q["qtype"] in SLOT_TYPES:
+            d["slots"] = [{"id": s["id"], "label": s["label"], "choices": s["choices"], "answer": s["answer"]} for s in q["slots"]]
+        else:
+            d["answer"] = q["answer"]
+        out.append(d)
+    return {"cases": _cases(exam_id, qs), "questions": out}
+
+
 def admin_exams():
     """Every exam with its banks, pool and attempt numbers (managers)."""
     exams = _q("SELECT e.*, (SELECT count(*) FROM exam_questions q WHERE q.exam_id = e.id) AS pool, "

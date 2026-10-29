@@ -62,7 +62,7 @@ go (leaving = pause), the review comes after submitting. Changes need the X-Lab-
   POST   /api/exams/submit {"attempt"}                   mark it → the review
 Managers (/api/admin/exams…, X-Lab-Admin): upload an encrypted bank + its key (decrypted here, the
 key isn't kept) or a plain exam.json; set questions / pass mark / who may take it; delete.
-  GET    /api/admin/exams · /api/admin/exams/results?exam=… · POST /api/admin/exams/upload {"file": {…}, "key"} · …/meta {"file": {…}}
+  GET    /api/admin/exams · /api/admin/exams/results?exam=… · /api/admin/exams/questions?exam=… (all, with answers) · POST /api/admin/exams/upload {"file": {…}, "key"} · …/meta {"file": {…}}
   POST   /api/admin/exams/settings {"exam", "name", "num_questions", "pass_percent", "audience", "teams"}
   POST   /api/admin/exams/delete {"exam", "source"?}
   POST   /api/admin/exams/discard {"exam", "attempt"?}   delete attempts in progress (one / all of the exam)
@@ -446,6 +446,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if method == "GET" and path == "/api/admin/exams/results":
                 return self._json(200, labexams.results(q.get("exam", "")))
+            if method == "GET" and path == "/api/admin/exams/questions":
+                return self._json(200, labexams.admin_questions(q.get("exam", "")))
             if method == "GET" and path == "/api/admin/exams":
                 return self._json(200, dict(labexams.admin_exams(), teams=[t["team"] for t in labadmin.teams()]))
             if method != "POST":
