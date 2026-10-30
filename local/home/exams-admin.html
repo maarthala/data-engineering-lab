@@ -26,6 +26,9 @@
     .seg{display:inline-flex; border:1px solid var(--line2); border-radius:9px; overflow:hidden}
     .seg button{border:0; border-radius:0; background:transparent; padding:6px 14px} .seg button + button{border-left:1px solid var(--line2)}
     .seg button.on{background:var(--accent); color:#fff}
+    .palette button.fix{background:var(--warn-bg); border-color:#e8b04a; color:#8a5a00}
+    .card.needsfix{border-color:#e8b04a; background:#fffbf0}
+    .fixnote{margin:0 0 10px; padding:8px 12px; border-radius:8px; background:var(--warn-bg); border:1px solid #f0d9a8; font-size:.9rem; color:#6b4a00}
     tr.why > td{background:var(--panel2); padding:8px 14px}
     .addbank{border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin:10px 0 14px; background:var(--panel2)}
     .qfilter{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px} .qfilter input[type=search]{flex:1; min-width:200px}
@@ -125,7 +128,7 @@
     // ---- one exam ---------------------------------------------------------------------------------
     function stat(v, label) { return el('div', {class: 'stat'}, [el('b', {text: String(v)}), el('span', {text: label})]); }
     function examView(e, section) {
-      var subs = [['banks', 'Question banks (' + e.banks.length + ')'], ['questions', 'Questions (' + e.pool + ')'], ['settings', 'Settings'],
+      var subs = [['banks', 'Question banks (' + e.banks.length + ')'], ['questions', 'Questions (' + e.pool + (e.needs_fix ? ' · ' + e.needs_fix + ' need fix' : '') + ')'], ['settings', 'Settings'],
                   ['progress', 'In progress (' + e.ongoing.length + ')'], ['results', 'Results']];
       var back = el('a', {class: 'back', href: '#exams', text: '← All exams'});
       back.addEventListener('click', function (x) { x.preventDefault(); go('exams'); });
@@ -324,6 +327,7 @@
         function uniq(f) { return all.map(f).filter(function (v, i, a) { return v && a.indexOf(v) === i; }).sort(); }
         var source = pick('All banks', uniq(function (q) { return q.bank; })), type = pick('All types', uniq(function (q) { return q.type; }));
         var domain = pick('All domains', uniq(function (q) { return q.domain; }));
+        var state = el('select', {}, [['', 'All questions'], ['fix', 'Need fix'], ['ok', 'In the exam']].map(function (o) { return el('option', {value: o[0], text: o[1]}); }));
         var count = el('span', {class: 'sub'}), pal = el('div', {class: 'palette'}), box = el('div');
         var hay = all.map(function (q) {
           return [q.ref, q.question, q.explanation, (q.options || []).map(function (o) { return o.text; }).join(' '),
@@ -333,16 +337,20 @@
           var t = search.value.trim().toLowerCase();
           shown = all.filter(function (q, n) {
             return (!t || hay[n].indexOf(t) >= 0) && (!source.value || q.bank === source.value) &&
-                   (!type.value || q.type === type.value) && (!domain.value || q.domain === domain.value);
+                   (!type.value || q.type === type.value) && (!domain.value || q.domain === domain.value) &&
+                   (!state.value || (state.value === 'fix') === !!q.needs_fix);
           });
           cur = 0; paint();
         }
-        [search, source, type, domain].forEach(function (x) { x.addEventListener(x === search ? 'input' : 'change', filter); });
+        [search, source, type, domain, state].forEach(function (x) { x.addEventListener(x === search ? 'input' : 'change', filter); });
         function paint() {
-          count.textContent = shown.length === all.length ? all.length + ' questions' : shown.length + ' of ' + all.length + ' questions';
+          var fix = all.filter(function (q) { return q.needs_fix; }).length;
+          count.textContent = (shown.length === all.length ? all.length + ' questions' : shown.length + ' of ' + all.length + ' questions') +
+            (fix ? ' · ' + fix + ' need fix' : '');
           pal.innerHTML = ''; box.innerHTML = '';
           shown.forEach(function (q, n) {
-            var b = el('button', {class: n === cur ? 'cur' : '', text: String(n + 1), title: q.bank + '/' + q.ref});
+            var b = el('button', {class: (n === cur ? 'cur' : '') + (q.needs_fix ? ' fix' : ''), text: String(n + 1),
+                                  title: q.bank + '/' + q.ref + (q.needs_fix ? ' — needs fix' : '')});
             b.addEventListener('click', function () { cur = n; paint(); });
             pal.appendChild(b);
           });
@@ -353,7 +361,9 @@
           var next = el('button', {text: 'Next →'}); next.disabled = cur === shown.length - 1;
           next.addEventListener('click', function () { cur++; paint(); });
           var refs = (q.refs || []).filter(function (x) { return /^https?:\/\//.test(x.url || ''); });
-          box.appendChild(el('div', {class: 'card'}, [
+          box.appendChild(el('div', {class: 'card' + (q.needs_fix ? ' needsfix' : '')}, [
+            q.needs_fix ? el('div', {class: 'fixnote'}, [el('b', {text: '⚠ Needs fix — not in members\' exams. '}),
+              el('span', {text: (q.note || 'Marked needs-fix in the file.') + ' Fix it in the file and add the bank again.'})]) : null,
             el('div', {class: 'bar'}, [el('b', {text: 'Question ' + (cur + 1) + ' of ' + shown.length}),
               el('span', {class: 'id', text: q.bank + '/' + q.ref + (q.version > 1 ? ' · version ' + q.version + ' since ' + when(q.since) : '') + (q.domain ? ' · domain ' + q.domain : '') + ' · ' + (TYPE[q.type] || q.type)})]),
             caseBox(d, q), el('div', {class: 'q md', html: md(q.question)}),
@@ -372,7 +382,7 @@
             el('div', {class: 'row', style: 'justify-content:space-between; margin-top:12px'}, [prev, next])]));
         }
         card.innerHTML = '';
-        card.appendChild(el('div', {class: 'qfilter'}, [search, source, type, domain, count]));
+        card.appendChild(el('div', {class: 'qfilter'}, [search, source, type, domain, state, count]));
         card.appendChild(pal);
         card.parentNode.insertBefore(box, card.nextSibling);
         paint();

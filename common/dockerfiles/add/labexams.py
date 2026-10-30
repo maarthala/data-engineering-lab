@@ -66,6 +66,7 @@ DEMO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exam_demo.json"
 _ready = False
 _lock = threading.Lock()
 
+# needs_fix: marked so in the file — kept for managers to see (Questions), never in an attempt.
 # exam_banks: the banks of an exam (bank = "<file exam_id>/<source>"); exam_qv: question versions —
 # current = in the pool (one per exam + bank + qid); exam_cv: case study versions; an attempt's
 # vids are the question versions it was drawn with, its answers are keyed by vid.
@@ -90,6 +91,8 @@ CREATE TABLE IF NOT EXISTS exam_qv (
   created_at timestamptz NOT NULL DEFAULT now(), retired_at timestamptz,
   question text NOT NULL, qtype text NOT NULL, options jsonb NOT NULL DEFAULT '[]', answer text[] NOT NULL DEFAULT '{}',
   slots jsonb, case_cv uuid REFERENCES exam_cv, explanation text, refs jsonb NOT NULL DEFAULT '[]', domain text);
+ALTER TABLE exam_qv ADD COLUMN IF NOT EXISTS needs_fix boolean NOT NULL DEFAULT false;
+ALTER TABLE exam_qv ADD COLUMN IF NOT EXISTS note text;
 CREATE UNIQUE INDEX IF NOT EXISTS exam_qv_current ON exam_qv (exam_id, bank, qid) WHERE current;
 CREATE INDEX IF NOT EXISTS exam_qv_key ON exam_qv (exam_id, bank, qid);
 CREATE TABLE IF NOT EXISTS exam_attempts (
@@ -282,7 +285,7 @@ def _question(q, cases):
     refs = review.get("references") or q.get("references") or []
     _need(isinstance(refs, list) and all(isinstance(r, dict) for r in refs), "references must be a list of {title, url}")
     row = {"qid": q["id"], "question": q["question"], "qtype": qtype, "options": [], "answer": [], "slots": None,
-           "case_study": q.get("case_study"), "domain": str(q["domain"]) if q.get("domain") is not None else None,
+           "needs_fix": False, "note": None, "case_study": q.get("case_study"), "domain": str(q["domain"]) if q.get("domain") is not None else None,
            "explanation": review.get("explanation") or q.get("explanation") or "", "refs": refs}
     if qtype in SLOT_TYPES:
         _need("options" not in q and "answer" not in q, f"a {qtype} question has slots, not options / answer")
@@ -333,6 +336,22 @@ def _question(q, cases):
     return row
 
 
+def _rough(q, cases, note):
+    """A needs-fix question as well as it can be read — for managers to see; None without a usable id."""
+    if not (isinstance(q.get("id"), str) and QID.match(q["id"])):
+        return None
+    try:
+        row = _question({k: v for k, v in q.items() if k != "review"}, cases)
+    except _Bad:
+        opts = [o for o in q.get("options") or [] if isinstance(o, dict) and isinstance(o.get("key"), str) and isinstance(o.get("text"), str)]
+        row = {"qid": q["id"], "question": str(q.get("question") or "(no question text)"), "qtype": "choice",
+               "options": [{"key": o["key"], "text": o["text"]} for o in opts], "answer": [], "slots": None,
+               "case_study": q.get("case_study") if q.get("case_study") in cases else None,
+               "domain": str(q["domain"]) if q.get("domain") is not None else None,
+               "explanation": str(q.get("explanation") or ""), "refs": []}
+    return dict(row, needs_fix=True, note=note or None)
+
+
 def _which(q, n):
     """How a person finds a question in the file: its id, its number in the source (or its place in
     the file) and the start of its text."""
@@ -344,8 +363,9 @@ def _which(q, n):
 
 
 def check_bank(bank):
-    """→ (usable rows, case studies, left out [{id, reason}], needs-fix ids). Problems with the file
-    itself raise ExamError, every reason listed."""
+    """→ (rows to store — usable ones, and needs-fix ones flagged —, case studies, left out
+    [{id, number, text, reason}], needs-fix [same]). Problems with the file itself raise ExamError,
+    every reason listed."""
     _need_file = []
     if not isinstance(bank, dict):
         raise ExamError("not a question bank")
@@ -379,13 +399,17 @@ def check_bank(bank):
         qid = q.get("id") if isinstance(q, dict) and isinstance(q.get("id"), str) else f"question #{n + 1}"
         review = (q.get("review") or {}) if isinstance(q, dict) else {}
         if isinstance(review, dict) and review.get("status") == "needs-fix":
-            needs_fix.append(dict(_which(q, n), reason=str(review.get("notes") or "").strip()[:300]))
+            note = str(review.get("notes") or "").strip()[:300]
+            needs_fix.append(dict(_which(q, n), reason=note))
+            row = _rough(q, cases, note)
+            if row:
+                rows.append(row)
             continue
         try:
             rows.append(_question(q, cases))
         except _Bad as e:
             left_out.append(dict(_which(q, n), reason=str(e)))
-    if not rows:
+    if not any(not r["needs_fix"] for r in rows):
         raise ExamError("no usable questions in this file" + (" — " + "; ".join(f"{x['id']} (no. {x['number']}): {x['reason']}" for x in left_out[:5]) if left_out else ""))
     return rows, cases, left_out, needs_fix
 
@@ -397,7 +421,8 @@ def _case_hash(title, content):
 def _hash(r):
     """What a member sees and is marked on — a change makes a new version."""
     return hashlib.sha256(json.dumps({k: r.get(k) for k in ("question", "qtype", "options", "answer", "slots",
-                                                            "explanation", "refs", "domain", "case_hash")},
+                                                            "explanation", "refs", "domain", "case_hash")}
+                                     | ({"needs_fix": True, "note": r.get("note")} if r.get("needs_fix") else {}),
                                      sort_keys=True).encode()).hexdigest()
 
 
@@ -536,7 +561,7 @@ def _store_bank(bank, sha256, by, exam_id=None, new_name=None, dry_run=False, fi
             cur.execute("INSERT INTO exam_sources (exam_id, bank, questions, skipped, sha256, uploaded_by) VALUES (%s, %s, %s, %s, %s, %s) "
                         "ON CONFLICT (exam_id, bank) DO UPDATE SET questions = EXCLUDED.questions, skipped = EXCLUDED.skipped, "
                         "sha256 = EXCLUDED.sha256, uploaded_at = now(), uploaded_by = EXCLUDED.uploaded_by",
-                        (exam_id, key, len(rows), skipped, sha256, by))
+                        (exam_id, key, sum(1 for r in rows if not r["needs_fix"]), skipped, sha256, by))
             cvid = {}
             for cid in {r["case_study"] for r in new + changed if r["case_study"]}:
                 cs = cases[cid]
@@ -554,15 +579,15 @@ def _store_bank(bank, sha256, by, exam_id=None, new_name=None, dry_run=False, fi
                             "AND qid = ANY(%s) AND current", (exam_id, key, retire))
             if new or changed:
                 psycopg2.extras.execute_values(cur, "INSERT INTO exam_qv (vid, exam_id, bank, qid, version, hash, current, question, "
-                                               "qtype, options, answer, slots, case_cv, explanation, refs, domain) VALUES %s",
+                                               "qtype, options, answer, slots, case_cv, explanation, refs, domain, needs_fix, note) VALUES %s",
                                                [(uuid.uuid4(), exam_id, key, r["qid"], have[r["qid"]]["version"] + 1 if r["qid"] in have else 1,
                                                  r["hash"], True, r["question"], r["qtype"], json.dumps(r["options"]), r["answer"],
                                                  json.dumps(r["slots"]) if r["slots"] else None, cvid.get(r["case_study"]),
-                                                 r["explanation"], json.dumps(r["refs"]), r["domain"])
+                                                 r["explanation"], json.dumps(r["refs"]), r["domain"], r["needs_fix"], r["note"])
                                                 for r in new + changed])
             cur.execute("INSERT INTO exam_uploads (exam_id, bank, filename, via, uploaded_by, questions, new, changed, removed, "
                         "unchanged, skipped, problems) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                        (exam_id, key, (filename or "")[:300] or None, via, by, len(rows), len(new), len(changed), len(gone),
+                        (exam_id, key, (filename or "")[:300] or None, via, by, sum(1 for r in rows if not r["needs_fix"]), len(new), len(changed), len(gone),
                          summary["unchanged"], skipped, json.dumps({"left_out": left_out, "needs_fix": needs_fix})
                          if left_out or needs_fix else None))
     finally:
@@ -592,7 +617,7 @@ def upload_meta(meta, by, exam_id=None):
 
 
 def pool_size(exam_id):
-    return _q("SELECT count(*) AS n FROM exam_qv WHERE exam_id = %s AND current", (exam_id,), one=True)["n"]
+    return _q("SELECT count(*) AS n FROM exam_qv WHERE exam_id = %s AND current AND NOT needs_fix", (exam_id,), one=True)["n"]
 
 
 def set_exam(exam_id, by, name=None, num_questions=None, pass_percent=None, audience=None, teams=None):
@@ -657,12 +682,13 @@ def results(exam_id):
 
 
 def admin_questions(exam_id):
-    """Managers: every current question of the exam with its right answer and explanation (bank, id order)."""
+    """Managers: every current question of the exam with its right answer and explanation (bank, id
+    order) — needs-fix ones too, flagged."""
     qs = _q("SELECT * FROM exam_qv WHERE exam_id = %s AND current ORDER BY bank, qid", (exam_id,))
     out = []
     for q in qs:
         d = dict(_shown(q), domain=q["domain"], explanation=q["explanation"], refs=q["refs"],
-                 version=q["version"], since=q["created_at"].isoformat())
+                 version=q["version"], since=q["created_at"].isoformat(), needs_fix=q["needs_fix"], note=q["note"])
         if q["qtype"] in SLOT_TYPES:
             d["slots"] = [{"id": s["id"], "label": s["label"], "choices": s["choices"], "answer": s["answer"]} for s in q["slots"]]
         else:
@@ -673,7 +699,8 @@ def admin_questions(exam_id):
 
 def admin_exams():
     """Every exam with its banks, pool and attempt numbers (managers)."""
-    exams = _q("SELECT e.*, (SELECT count(*) FROM exam_qv q WHERE q.exam_id = e.id AND current) AS pool, "
+    exams = _q("SELECT e.*, (SELECT count(*) FROM exam_qv q WHERE q.exam_id = e.id AND current AND NOT needs_fix) AS pool, "
+               "(SELECT count(*) FROM exam_qv q WHERE q.exam_id = e.id AND current AND needs_fix) AS needs_fix, "
                "(SELECT count(*) FROM exam_attempts a WHERE a.exam_id = e.id AND finished_at IS NOT NULL) AS attempts, "
                "(SELECT count(DISTINCT member) FROM exam_attempts a WHERE a.exam_id = e.id) AS members, "
                "(SELECT round(avg(score)) FROM exam_attempts a WHERE a.exam_id = e.id AND finished_at IS NOT NULL) AS avg_score "
@@ -710,7 +737,7 @@ def _exam_for(exam_id, team):
 def my_exams(member, team):
     """The exams open to the member, each with their stats and any open (paused) attempt."""
     out = []
-    for e in _q("SELECT e.*, (SELECT count(*) FROM exam_qv q WHERE q.exam_id = e.id AND current) AS pool "
+    for e in _q("SELECT e.*, (SELECT count(*) FROM exam_qv q WHERE q.exam_id = e.id AND current AND NOT needs_fix) AS pool "
                 "FROM exams e WHERE audience <> 'off' ORDER BY name"):
         if not _allowed(e, team) or not e["pool"]:
             continue
@@ -742,7 +769,7 @@ def start(exam_id, member, team):
                (exam_id, member), one=True)
     if open_:
         return attempt(open_["id"], member, team)
-    pool = _q("SELECT vid, bank, qid FROM exam_qv WHERE exam_id = %s AND current", (exam_id,))
+    pool = _q("SELECT vid, bank, qid FROM exam_qv WHERE exam_id = %s AND current AND NOT needs_fix", (exam_id,))
     if not pool:
         raise ExamError("this exam has no questions yet")
     seen = {}
