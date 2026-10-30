@@ -64,7 +64,7 @@ Managers (/api/admin/exams…, X-Lab-Admin): create an exam; add encrypted banks
 (decrypted here, the key isn't kept; dry_run = what would change) or a plain exam.json; set
 questions / pass mark / who may take it; delete.
   GET    /api/admin/exams · /api/admin/exams/results?exam=… · /api/admin/exams/questions?exam=… (all, with answers)
-  POST   /api/admin/exams/create {"name"} · …/upload {"file": {…}, "key", "exam" | "new_name", "dry_run"} · …/meta {"file": {…}, "exam"?}
+  POST   /api/admin/exams/create {"name"} · …/upload {"file": {…}, "key", "exam" | "new_name", "dry_run", "filename"} · …/meta {"file": {…}, "exam"?}
   POST   /api/admin/exams/settings {"exam", "name", "num_questions", "pass_percent", "audience", "teams"}
   POST   /api/admin/exams/delete {"exam", "bank"?}      the exam, or one bank (its questions retire)
   POST   /api/admin/exams/discard {"exam", "attempt"?}   delete attempts in progress (one / all of the exam)
@@ -459,7 +459,7 @@ class Handler(BaseHTTPRequestHandler):
             body = self._body(32 << 20)
             if path == "/api/admin/exams/upload":
                 return self._json(200, labexams.upload_bank(body.get("file") or {}, body.get("key"), user, body.get("exam"),
-                                                            body.get("new_name"), bool(body.get("dry_run"))))
+                                                            body.get("new_name"), bool(body.get("dry_run")), body.get("filename")))
             if path == "/api/admin/exams/meta":
                 return self._json(200, labexams.upload_meta(body.get("file") or {}, user, body.get("exam")))
             if path == "/api/admin/exams/create":

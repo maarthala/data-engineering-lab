@@ -91,6 +91,10 @@ CREATE TABLE IF NOT EXISTS exam_attempts (
 ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS vids uuid[];
 CREATE UNIQUE INDEX IF NOT EXISTS exam_attempts_open ON exam_attempts (exam_id, member) WHERE finished_at IS NULL;
 CREATE INDEX IF NOT EXISTS exam_attempts_member ON exam_attempts (member, exam_id);
+CREATE TABLE IF NOT EXISTS exam_uploads (
+  id bigserial PRIMARY KEY, exam_id text REFERENCES exams ON DELETE CASCADE, bank text NOT NULL, filename text,
+  uploaded_at timestamptz NOT NULL DEFAULT now(), uploaded_by text, questions int, new int, changed int,
+  removed int, unchanged int, skipped int);
 CREATE TABLE IF NOT EXISTS portal_meta (key text PRIMARY KEY, value text);
 """
 
@@ -112,6 +116,9 @@ def _conn():
                     cur.execute("SELECT pg_advisory_xact_lock(4711)")   # one home-api at a time
                     cur.execute(SCHEMA)
                     _migrate_v1(cur)
+                    cur.execute("INSERT INTO exam_uploads (exam_id, bank, uploaded_at, uploaded_by, questions, skipped) "
+                                "SELECT exam_id, bank, uploaded_at, uploaded_by, questions, skipped FROM exam_sources "
+                                "WHERE NOT EXISTS (SELECT 1 FROM exam_uploads)")   # history starts with what is there
                 _ready = True
                 try:
                     _seed_demo()
@@ -288,13 +295,13 @@ def create_exam(name, by, cert=None, provider=None, domains=None, num_questions=
     return {"exam": exam_id, "name": name}
 
 
-def upload_bank(envelope, key_text, by, exam_id=None, new_name=None, dry_run=False):
+def upload_bank(envelope, key_text, by, exam_id=None, new_name=None, dry_run=False, filename=None):
     """Decrypt one bank and compare it with what the exam has (dry_run: only that), else store it."""
     return _store_bank(decrypt(envelope, key_text), json.loads(envelope["header"]).get("sha256"), by,
-                       exam_id, new_name, dry_run)
+                       exam_id, new_name, dry_run, filename)
 
 
-def _store_bank(bank, sha256, by, exam_id=None, new_name=None, dry_run=False):
+def _store_bank(bank, sha256, by, exam_id=None, new_name=None, dry_run=False, filename=None):
     """Add or update one bank in an exam (exam_id; or a new exam called new_name). → what changes."""
     cert, source = bank.get("exam_id", ""), bank.get("source", "")
     if not EXAM_ID.match(cert) or not EXAM_ID.match(source):
@@ -359,6 +366,10 @@ def _store_bank(bank, sha256, by, exam_id=None, new_name=None, dry_run=False):
                                                  json.dumps(r["slots"]) if r["slots"] else None, cvid.get(r["case_study"]),
                                                  r["explanation"], json.dumps(r["refs"]), r["domain"])
                                                 for r in new + changed])
+            cur.execute("INSERT INTO exam_uploads (exam_id, bank, filename, uploaded_by, questions, new, changed, removed, "
+                        "unchanged, skipped) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                        (exam_id, key, (filename or "")[:200] or None, by, len(rows), len(new), len(changed), len(gone),
+                         summary["unchanged"], skipped))
     finally:
         c.close()
     print(f"[exams] {by}: {exam_id} ← {key}: {len(new)} new, {len(changed)} changed, {len(gone)} removed, "
@@ -478,7 +489,9 @@ def admin_exams():
     ongoing = _q("SELECT id, exam_id, member, started_at, cardinality(vids) AS total, "
                  "(SELECT count(*) FROM jsonb_object_keys(answers)) AS answered "
                  "FROM exam_attempts WHERE finished_at IS NULL ORDER BY started_at")
+    uploads = _q("SELECT * FROM exam_uploads ORDER BY uploaded_at DESC, id DESC")
     for e in exams:
+        e["uploads"] = [dict(u, uploaded_at=u["uploaded_at"].isoformat()) for u in uploads if u["exam_id"] == e["id"]][:100]
         e["banks"] = [dict(b, uploaded_at=b["uploaded_at"].isoformat()) for b in banks if b["exam_id"] == e["id"]]
         e["ongoing"] = [{"id": a["id"], "member": a["member"], "started_at": a["started_at"].isoformat(),
                          "answered": a["answered"], "total": a["total"]} for a in ongoing if a["exam_id"] == e["id"]]
