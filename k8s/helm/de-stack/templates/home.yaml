@@ -114,12 +114,14 @@ kind: Ingress
 metadata:
   name: home
   labels: {{- include "de-stack.labels" . | nindent 4 }}
-  {{- if .Values.keycloak.enabled }}
   annotations:
+    # nginx's default 1 MB is too small for question bank uploads (sent as base64)
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    {{- if .Values.keycloak.enabled }}
     # oauth2-proxy's session cookie (holds the tokens) is bigger than nginx's default
     # 4k header buffer → "upstream sent too big header" / 502 right after login.
     nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
-  {{- end }}
+    {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   rules:
