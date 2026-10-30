@@ -268,7 +268,7 @@
         box.innerHTML = '';
         box.appendChild(el('div', {class: 'card'}, [
             el('div', {class: 'bar'}, [el('b', {text: 'Question ' + (cur + 1) + ' of ' + r.questions.length}), el('span', {class: q.right ? 'pass' : 'fail',
-              text: q.right ? '✓ right' : q.points > 0 ? '◐ ' + q.slots.filter(function (s) { return s.right; }).length + ' of ' + q.slots.length + ' right' : (q.answered ? '✗ wrong' : '✗ not answered')})]),
+              text: q.right ? '✓ right' : q.points > 0 ? '◐ ' + q.slots.filter(function (s) { return s.right; }).length + ' of ' + q.slots.length + ' right' : (q.answered ? '✗ wrong' + (!q.slots && q.picked.length < q.answer.length ? ' — you picked ' + q.picked.length + ' of ' + q.answer.length : '') : '✗ not answered')})]),
             caseBox(r, q), el('div', {class: 'q md', html: md(q.question)}),
             open ? revealed(q) : retry(q),
             open && (q.explanation || refs(q).length) ? el('div', {class: 'expl md', html: md(q.explanation) + (refs(q).length ? '<p>' +
@@ -290,7 +290,8 @@
       }
       // your first answer marked, the right one hidden: pick again → Check, or Reveal answer
       function retry(q) {
-        var t = again[q.qid] = again[q.qid] || {pick: q.slots ? {} : [], said: null};
+        // your right first picks start ticked — add the one(s) you missed
+        var t = again[q.qid] = again[q.qid] || {pick: q.slots ? {} : q.picked.filter(function (k) { return q.answer.indexOf(k) >= 0; }), said: null};
         var verdict = el('span', {class: t.said === true ? 'pass' : 'fail', text: t.said === true ? '✓ Right — Reveal answer for the explanation.'
                                    : t.said === false ? '✗ Not yet — try again, or reveal the answer.' : ''});
         var check = el('button', {class: 'primary', text: 'Check'});
@@ -320,7 +321,7 @@
             var box = el('input', {type: multi ? 'checkbox' : 'radio', name: 'again'}); box.checked = on;
             box.addEventListener('change', function () {
               if (!multi) t.pick = [o.key];
-              else if (box.checked) { if (t.pick.length >= q.answer.length) { box.checked = false; return; } t.pick = t.pick.concat([o.key]); }
+              else if (box.checked) t.pick = t.pick.concat([o.key]).slice(-q.answer.length);   // full: the oldest pick makes room
               else t.pick = t.pick.filter(function (k) { return k !== o.key; });
               t.said = null; paint();
             });
