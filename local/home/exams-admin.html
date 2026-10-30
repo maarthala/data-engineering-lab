@@ -187,12 +187,19 @@
     // did: new · updated · removed · unchanged), and the history of every file added
     function num(v) { return v === null || v === undefined ? '—' : String(v); }
     // the questions an upload left out, each with why — the file's mistakes, and those marked needs-fix
+    // each as: id (no. N in the source) "the question's first words" — why
     function problems(p) {
       var bad = (p && p.left_out) || [], nf = (p && p.needs_fix) || [];
-      return bad.slice(0, 30).map(function (x) { return '✗ ' + x.id + ' — ' + x.reason; })
+      function which(x) {
+        if (typeof x === 'string') return x;                 // older uploads kept only the id
+        return x.id + (x.number ? ' (no. ' + x.number + ')' : '') + (x.text ? ' “' + x.text + '”' : '');
+      }
+      return bad.slice(0, 30).map(function (x) { return '✗ ' + which(x) + ' — ' + x.reason; })
         .concat(bad.length > 30 ? ['… and ' + (bad.length - 30) + ' more'] : [])
         .concat(bad.length ? ['Fix them in the file and add it again — the other questions are in.'] : [])
-        .concat(nf.length ? ['Marked needs-fix in the file (left out on purpose): ' + nf.slice(0, 30).join(', ') + (nf.length > 30 ? ' …' : '')] : []);
+        .concat(nf.length ? ['Marked needs-fix in the file (left out on purpose):'] : [])
+        .concat(nf.slice(0, 30).map(function (x) { return '• ' + which(x) + (x.reason ? ' — ' + x.reason : ''); }))
+        .concat(nf.length > 30 ? ['… and ' + (nf.length - 30) + ' more'] : []);
     }
     function banksCard(e) {
       var rows = e.banks.map(function (b) {

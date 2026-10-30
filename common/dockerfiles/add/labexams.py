@@ -333,6 +333,16 @@ def _question(q, cases):
     return row
 
 
+def _which(q, n):
+    """How a person finds a question in the file: its id, its number in the source (or its place in
+    the file) and the start of its text."""
+    q = q if isinstance(q, dict) else {}
+    text = re.sub(r"\s+", " ", re.sub(r"[`*#|<>\[\]]", " ", str(q.get("question") or ""))).strip()
+    num = q.get("source_number")
+    return {"id": q.get("id") if isinstance(q.get("id"), str) else f"question #{n + 1}",
+            "number": num if isinstance(num, int) else n + 1, "text": text[:90] + ("…" if len(text) > 90 else "")}
+
+
 def check_bank(bank):
     """→ (usable rows, case studies, left out [{id, reason}], needs-fix ids). Problems with the file
     itself raise ExamError, every reason listed."""
@@ -367,15 +377,16 @@ def check_bank(bank):
     rows, left_out, needs_fix = [], [], []
     for n, q in enumerate(qs):
         qid = q.get("id") if isinstance(q, dict) and isinstance(q.get("id"), str) else f"question #{n + 1}"
-        if isinstance(q, dict) and (q.get("review") or {}).get("status") == "needs-fix":
-            needs_fix.append(qid)
+        review = (q.get("review") or {}) if isinstance(q, dict) else {}
+        if isinstance(review, dict) and review.get("status") == "needs-fix":
+            needs_fix.append(dict(_which(q, n), reason=str(review.get("notes") or "").strip()[:300]))
             continue
         try:
             rows.append(_question(q, cases))
         except _Bad as e:
-            left_out.append({"id": qid, "reason": str(e)})
+            left_out.append(dict(_which(q, n), reason=str(e)))
     if not rows:
-        raise ExamError("no usable questions in this file" + (" — " + "; ".join(f"{x['id']}: {x['reason']}" for x in left_out[:5]) if left_out else ""))
+        raise ExamError("no usable questions in this file" + (" — " + "; ".join(f"{x['id']} (no. {x['number']}): {x['reason']}" for x in left_out[:5]) if left_out else ""))
     return rows, cases, left_out, needs_fix
 
 
