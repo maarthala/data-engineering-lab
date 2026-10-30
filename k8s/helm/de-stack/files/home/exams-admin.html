@@ -26,6 +26,7 @@
     .seg{display:inline-flex; border:1px solid var(--line2); border-radius:9px; overflow:hidden}
     .seg button{border:0; border-radius:0; background:transparent; padding:6px 14px} .seg button + button{border-left:1px solid var(--line2)}
     .seg button.on{background:var(--accent); color:#fff}
+    tr.why > td{background:var(--panel2); padding:8px 14px}
     .addbank{border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin:10px 0 14px; background:var(--panel2)}
     .qfilter{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px} .qfilter input[type=search]{flex:1; min-width:200px}
     .palette{display:flex; flex-wrap:wrap; gap:5px; max-height:180px; overflow:auto}
@@ -185,6 +186,14 @@
     // Question banks: what the exam has now, + Add question bank (file + key → uploaded, then what it
     // did: new · updated · removed · unchanged), and the history of every file added
     function num(v) { return v === null || v === undefined ? '—' : String(v); }
+    // the questions an upload left out, each with why — the file's mistakes, and those marked needs-fix
+    function problems(p) {
+      var bad = (p && p.left_out) || [], nf = (p && p.needs_fix) || [];
+      return bad.slice(0, 30).map(function (x) { return '✗ ' + x.id + ' — ' + x.reason; })
+        .concat(bad.length > 30 ? ['… and ' + (bad.length - 30) + ' more'] : [])
+        .concat(bad.length ? ['Fix them in the file and add it again — the other questions are in.'] : [])
+        .concat(nf.length ? ['Marked needs-fix in the file (left out on purpose): ' + nf.slice(0, 30).join(', ') + (nf.length > 30 ? ' …' : '')] : []);
+    }
     function banksCard(e) {
       var rows = e.banks.map(function (b) {
         var x = el('button', {class: 'small danger', text: 'Remove'});
@@ -208,9 +217,19 @@
         return el('tr', {}, [el('td', {class: 'muted', text: when(u.uploaded_at)}), el('td', {style: 'max-width:340px; overflow-wrap:anywhere'}, [el('b', {text: u.filename || u.bank}),
             el('div', {class: 'id', text: (u.filename ? u.bank : '') + (how ? (u.filename ? ' · ' : '') + how : '')})]),
           el('td', {class: 'r', text: num(u.questions)}), el('td', {class: 'r', text: num(u.new)}), el('td', {class: 'r', text: num(u.changed)}),
-          el('td', {class: 'r', text: num(u.removed)}), el('td', {class: 'r', text: num(u.unchanged)}), el('td', {class: 'r', text: num(u.skipped)}),
+          el('td', {class: 'r', text: num(u.removed)}), el('td', {class: 'r', text: num(u.unchanged)}), el('td', {class: 'r'}, [num(u.skipped)].concat(u.problems ? [' ', why(u)] : [])),
           el('td', {class: 'muted', text: u.uploaded_by || ''})]);
       });
+      function why(u) {                                      // the reasons, in a row under the upload
+        var b = el('button', {class: 'small', text: 'why'}), row = null;
+        b.addEventListener('click', function () {
+          if (row) { row.remove(); row = null; return; }
+          var tr = b.closest('tr');
+          row = el('tr', {class: 'why'}, [el('td', {colspan: '9'}, problems(u.problems).map(function (l) { return el('div', {class: 'sub', text: l}); }))]);
+          tr.parentNode.insertBefore(row, tr.nextSibling);
+        });
+        return b;
+      }
       return [el('div', {class: 'card'}, [el('div', {class: 'bar'}, [el('h3', {style: 'margin:0', text: 'Question banks'}), add]), form,
           rows.length ? el('div', {class: 'wrap'}, [el('table', {}, [th(['Bank', 'Questions', 'Updated', 'Left out', 'Last upload', '']), el('tbody', {}, rows)])])
                       : el('div', {class: 'sub', text: 'No question banks yet — + Add question bank.'})]),
@@ -274,9 +293,10 @@
           var from = way === 'link' ? 'the link' : name, nothing = r.replaces && !r.new && !r.changed && !r.removed;
           admin.show(nothing ? r.bank + ': nothing changed' : (r.replaces ? 'Updated ' : 'Added ') + r.bank + ' from ' + from, [
             r.new + ' new · ' + r.changed + ' updated · ' + r.removed + ' removed · ' + r.unchanged + ' unchanged' +
-            (r.skipped ? ' · ' + r.skipped + ' left out (needs-fix or incomplete)' : '') + ' — ' + r.pool + ' questions in the exam now.']
+            (r.skipped ? ' · ' + r.skipped + ' left out' : '') + ' — ' + r.pool + ' questions in the exam now.']
             .concat(r.changed_ids.length ? ['Updated: ' + r.changed_ids.join(', ') + (r.changed > r.changed_ids.length ? ' …' : '')] : [])
             .concat(r.removed_ids.length ? ['Removed: ' + r.removed_ids.join(', ') + (r.removed > r.removed_ids.length ? ' …' : '')] : [])
+            .concat(problems(r))
             .concat(way === 'encrypted' ? ['The key was not stored.'] : []));
         }).then(load).catch(function (x) { admin.show('Upload failed', [x.message], null, true); go_.disabled = false; go_.textContent = label; });
       });

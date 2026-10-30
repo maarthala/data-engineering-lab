@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS exam_uploads (
   uploaded_at timestamptz NOT NULL DEFAULT now(), uploaded_by text, questions int, new int, changed int,
   removed int, unchanged int, skipped int);
 ALTER TABLE exam_uploads ADD COLUMN IF NOT EXISTS via text;
+ALTER TABLE exam_uploads ADD COLUMN IF NOT EXISTS problems jsonb;
 CREATE TABLE IF NOT EXISTS portal_meta (key text PRIMARY KEY, value text);
 """
 
@@ -238,38 +239,144 @@ def decrypt(envelope, key_text):
     return json.loads(raw)
 
 
+# the bank schema's fields (certification-exams schema/question-bank.schema.json, 1.0 / 1.1) — any
+# other field is a typo ("anwser") and is reported, not ignored
+BANK_FIELDS = {"$schema", "schema_version", "exam_id", "source", "questions", "case_studies"}
+Q_FIELDS = {"id", "source_number", "type", "case_study", "question", "images", "options", "answer", "choice_pool",
+            "slots", "explanation", "references", "domain", "tags", "difficulty", "review"}
+REVIEW_FIELDS = {"status", "answer", "slot_answers", "explanation", "references", "notes", "reviewed_on"}
+REVIEW_STATUS = {"unreviewed", "confirmed", "corrected", "disputed", "needs-fix"}
+QID = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*-[0-9]{3,}$")
+
+
+class _Bad(Exception):
+    """Why one question can't be used — it is left out, and the upload says so."""
+
+
+def _need(ok, reason):
+    if not ok:
+        raise _Bad(reason)
+
+
+def _strings(v):
+    return isinstance(v, list) and all(isinstance(x, str) and x for x in v)
+
+
 def _question(q, cases):
-    """(stored fields) of one bank question, or None if it isn't usable (needs-fix, broken, an
-    unknown type, or a case study the bank doesn't have)."""
-    review = q.get("review") or {}
-    corrected = review.get("status") == "corrected"
+    """(stored fields) of one bank question; _Bad(reason) if it can't be used."""
+    _need(isinstance(q, dict), "not an object")
+    extra = sorted(set(q) - Q_FIELDS)
+    _need(not extra, "unknown field " + ", ".join(f"'{x}'" for x in extra))
+    _need(isinstance(q.get("id"), str) and QID.match(q["id"]), f"id {q.get('id')!r} isn't like set1-001 (lowercase, dashes, a number of 3+ digits)")
+    _need(isinstance(q.get("question"), str) and q["question"].strip(), "no question text")
     qtype = q.get("type") or "choice"
-    if review.get("status") == "needs-fix" or not q.get("question") or not q.get("id") \
-            or (q.get("case_study") and q["case_study"] not in cases):
-        return None
+    _need(qtype == "choice" or qtype in SLOT_TYPES, f"unknown type '{qtype}' (choice, hotspot, drag-drop or yes-no)")
+    review = q.get("review") or {}
+    _need(isinstance(review, dict), "review isn't an object")
+    extra = sorted(set(review) - REVIEW_FIELDS)
+    _need(not extra, "unknown field in review: " + ", ".join(f"'{x}'" for x in extra))
+    _need("status" in review or not review, "review has no status")
+    _need(not review or review.get("status") in REVIEW_STATUS, f"review status '{review.get('status')}' isn't one of {', '.join(sorted(REVIEW_STATUS))}")
+    corrected = review.get("status") == "corrected"
+    _need(not q.get("case_study") or q["case_study"] in cases, f"case study '{q.get('case_study')}' isn't in the file's case_studies")
+    refs = review.get("references") or q.get("references") or []
+    _need(isinstance(refs, list) and all(isinstance(r, dict) for r in refs), "references must be a list of {title, url}")
     row = {"qid": q["id"], "question": q["question"], "qtype": qtype, "options": [], "answer": [], "slots": None,
-           "case_study": q.get("case_study"), "domain": q.get("domain"),
-           "explanation": review.get("explanation") or q.get("explanation") or "",
-           "refs": review.get("references") or q.get("references") or []}
+           "case_study": q.get("case_study"), "domain": str(q["domain"]) if q.get("domain") is not None else None,
+           "explanation": review.get("explanation") or q.get("explanation") or "", "refs": refs}
     if qtype in SLOT_TYPES:
-        fixed = (review.get("slot_answers") if corrected else None) or {}
+        _need("options" not in q and "answer" not in q, f"a {qtype} question has slots, not options / answer")
+        _need(isinstance(q.get("slots"), list) and q["slots"], f"a {qtype} question needs slots")
+        pool = q.get("choice_pool")
+        _need(pool is None or (_strings(pool) and len(pool) >= 2), "choice_pool must list at least 2 values")
+        _need(pool is None or qtype == "drag-drop", "choice_pool is only for drag-drop questions")
+        fixed = review.get("slot_answers") if corrected else None
+        _need(fixed is None or isinstance(fixed, dict), "review.slot_answers must map slot id → values")
+        ids = [s.get("id") if isinstance(s, dict) else None for s in q["slots"]]
+        _need(not fixed or set(fixed) <= set(ids), "review.slot_answers names a slot the question hasn't: " + ", ".join(sorted(set(fixed or {}) - set(ids))))
+        _need(not corrected or fixed or review.get("answer") is None, "a corrected slot question needs review.slot_answers, not review.answer")
+        _need(not corrected or fixed, "review is 'corrected' but has no slot_answers")
+        _need(len(set(ids)) == len(ids), "two slots have the same id")
         row["slots"] = []
-        for s in q.get("slots") or []:
-            choices = s.get("choices") or q.get("choice_pool") or (["Yes", "No"] if qtype == "yes-no" else [])
-            answer = fixed.get(s.get("id")) or s.get("answer")
-            if not s.get("id") or len(choices) < 2 or not answer or not set(answer) <= set(choices):
-                return None
+        for s in q["slots"]:
+            _need(isinstance(s, dict) and isinstance(s.get("id"), str) and s["id"].strip(), "a slot has no id")
+            extra = sorted(set(s) - {"id", "label", "choices", "answer"})
+            _need(not extra, f"slot {s['id']}: unknown field " + ", ".join(f"'{x}'" for x in extra))
+            choices = s.get("choices") or pool or (["Yes", "No"] if qtype == "yes-no" else None)
+            _need(choices, f"slot {s['id']}: no choices" + (" (and no choice_pool)" if qtype == "drag-drop" else ""))
+            _need(_strings(choices) and len(choices) >= 2, f"slot {s['id']}: choices must list at least 2 values")
+            answer = (fixed or {}).get(s["id"]) or s.get("answer")
+            _need(_strings(answer), f"slot {s['id']}: no answer")
+            wrong = [x for x in answer if x not in choices]
+            _need(not wrong, f"slot {s['id']}: answer {', '.join(repr(x) for x in wrong)} isn't one of its choices")
             row["slots"].append({"id": s["id"], "label": s.get("label") or "", "choices": list(choices), "answer": list(answer)})
-        return row if row["slots"] else None
-    if qtype != "choice":
-        return None
-    answer = review.get("answer") if corrected and review.get("answer") else q.get("answer")
-    keys = [o.get("key") for o in q.get("options") or []]
-    if len(keys) < 2 or not answer or not set(answer) <= set(keys):
-        return None
-    row["options"] = [{"key": o["key"], "text": o["text"]} for o in q["options"]]
+        return row
+    _need("slots" not in q and "choice_pool" not in q, "a choice question has options / answer, not slots (set type for hotspot, drag-drop, yes-no)")
+    opts = q.get("options")
+    _need(isinstance(opts, list) and len(opts) >= 2, "needs at least 2 options")
+    keys = []
+    for o in opts:
+        _need(isinstance(o, dict) and set(o) <= {"key", "text"}, "an option must be {key, text}")
+        _need(isinstance(o.get("key"), str) and re.fullmatch(r"[A-Z]", o["key"]), f"option key {o.get('key')!r} must be one capital letter")
+        _need(isinstance(o.get("text"), str) and o["text"].strip(), f"option {o['key']} has no text")
+        keys.append(o["key"])
+    _need(len(set(keys)) == len(keys), "two options have the same key")
+    _need(not corrected or review.get("answer"), "review is 'corrected' but has no answer")
+    answer = review.get("answer") if corrected else q.get("answer")
+    where = "review.answer" if corrected else "answer"
+    _need(_strings(answer), f"no {where}")
+    _need(len(set(answer)) == len(answer), f"{where} lists a key twice")
+    wrong = [x for x in answer if x not in keys]
+    _need(not wrong, f"{where} {', '.join(wrong)} isn't one of the options ({', '.join(keys)})")
+    row["options"] = [{"key": o["key"], "text": o["text"]} for o in opts]
     row["answer"] = sorted(answer)
     return row
+
+
+def check_bank(bank):
+    """→ (usable rows, case studies, left out [{id, reason}], needs-fix ids). Problems with the file
+    itself raise ExamError, every reason listed."""
+    _need_file = []
+    if not isinstance(bank, dict):
+        raise ExamError("not a question bank")
+    extra = sorted(set(bank) - BANK_FIELDS)
+    if extra:
+        _need_file.append("unknown field " + ", ".join(f"'{x}'" for x in extra) + " (fields: " + ", ".join(sorted(BANK_FIELDS)) + ")")
+    if bank.get("schema_version") not in ("1.0", "1.1"):
+        _need_file.append(f"schema_version must be \"1.0\" or \"1.1\" (it is {bank.get('schema_version')!r})")
+    for f in ("exam_id", "source"):
+        if not isinstance(bank.get(f), str) or not EXAM_ID.match(bank[f]):
+            _need_file.append(f"{f} {bank.get(f)!r} must be lowercase letters and digits with dashes, e.g. my-exam")
+    qs = bank.get("questions")
+    if not isinstance(qs, list) or not qs:
+        _need_file.append("questions must be a list with at least one question")
+    cases = {}
+    for n, c in enumerate(bank.get("case_studies") or []):
+        if not isinstance(c, dict) or not isinstance(c.get("id"), str) or not str(c.get("content") or "").strip():
+            _need_file.append(f"case study #{n + 1} needs an id and content")
+        elif set(c) - {"id", "title", "content"}:
+            _need_file.append(f"case study {c['id']}: unknown field " + ", ".join(f"'{x}'" for x in sorted(set(c) - {"id", "title", "content"})))
+        else:
+            cases[c["id"]] = c
+    ids = [q.get("id") for q in qs or [] if isinstance(q, dict)]
+    twice = sorted({i for i in ids if i and ids.count(i) > 1})
+    if twice:
+        _need_file.append("the same question id more than once: " + ", ".join(twice[:10]))
+    if _need_file:
+        raise ExamError("; ".join(_need_file))
+    rows, left_out, needs_fix = [], [], []
+    for n, q in enumerate(qs):
+        qid = q.get("id") if isinstance(q, dict) and isinstance(q.get("id"), str) else f"question #{n + 1}"
+        if isinstance(q, dict) and (q.get("review") or {}).get("status") == "needs-fix":
+            needs_fix.append(qid)
+            continue
+        try:
+            rows.append(_question(q, cases))
+        except _Bad as e:
+            left_out.append({"id": qid, "reason": str(e)})
+    if not rows:
+        raise ExamError("no usable questions in this file" + (" — " + "; ".join(f"{x['id']}: {x['reason']}" for x in left_out[:5]) if left_out else ""))
+    return rows, cases, left_out, needs_fix
 
 
 def _case_hash(title, content):
@@ -385,17 +492,10 @@ def upload_bank(envelope, key_text, by, exam_id=None, new_name=None, dry_run=Fal
 
 def _store_bank(bank, sha256, by, exam_id=None, new_name=None, dry_run=False, filename=None, via=None):
     """Add or update one bank in an exam (exam_id; or a new exam called new_name). → what changes."""
-    cert, source = bank.get("exam_id", ""), bank.get("source", "")
-    if not EXAM_ID.match(cert) or not EXAM_ID.match(source):
-        raise ExamError("the bank has no valid exam_id / source")
+    rows, cases, left_out, needs_fix = check_bank(bank)
+    cert, source = bank["exam_id"], bank["source"]
     key = f"{cert}/{source}"
-    cases = {c["id"]: c for c in bank.get("case_studies") or [] if c.get("id") and c.get("content")}
-    rows = [r for r in (_question(q, cases) for q in bank.get("questions") or []) if r]
-    if len({r["qid"] for r in rows}) != len(rows):
-        raise ExamError("the bank has the same question id twice")
-    skipped = len(bank.get("questions") or []) - len(rows)
-    if not rows:
-        raise ExamError("no usable questions in this file")
+    skipped = len(left_out) + len(needs_fix)
     for r in rows:
         c = cases.get(r["case_study"])
         r["case_hash"] = _case_hash(c.get("title") or c["id"], c["content"]) if c else None
@@ -411,6 +511,7 @@ def _store_bank(bank, sha256, by, exam_id=None, new_name=None, dry_run=False, fi
     summary = {"exam": e["id"] if e else None, "name": e["name"] if e else new_name.strip(), "bank": key,
                "replaces": bool(have), "new": len(new), "changed": len(changed), "removed": len(gone),
                "unchanged": len(rows) - len(new) - len(changed), "skipped": skipped,
+               "left_out": left_out, "needs_fix": needs_fix,
                "changed_ids": [r["qid"] for r in changed][:50], "removed_ids": gone[:50]}
     if dry_run:
         return summary
@@ -449,9 +550,10 @@ def _store_bank(bank, sha256, by, exam_id=None, new_name=None, dry_run=False, fi
                                                  r["explanation"], json.dumps(r["refs"]), r["domain"])
                                                 for r in new + changed])
             cur.execute("INSERT INTO exam_uploads (exam_id, bank, filename, via, uploaded_by, questions, new, changed, removed, "
-                        "unchanged, skipped) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                        "unchanged, skipped, problems) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                         (exam_id, key, (filename or "")[:300] or None, via, by, len(rows), len(new), len(changed), len(gone),
-                         summary["unchanged"], skipped))
+                         summary["unchanged"], skipped, json.dumps({"left_out": left_out, "needs_fix": needs_fix})
+                         if left_out or needs_fix else None))
     finally:
         c.close()
     print(f"[exams] {by}: {exam_id} ← {key}: {len(new)} new, {len(changed)} changed, {len(gone)} removed, "
