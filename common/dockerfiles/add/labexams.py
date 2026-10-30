@@ -7,8 +7,8 @@ here (fetch_link()); or a plain file they made themselves from the template (exa
 certification (dump1, dump2 …) or several. A bank is known in its exam by "<file exam_id>/<source>"
 (e.g. dp-700/dump1) and a question by that plus its id (dp-700/dump1/dump1-042).
 
-Uploading a bank again updates it: the upload is checked first (preview — what is new, changed,
-removed, unchanged) and applied on confirm. A changed question gets a new version (own uuid);
+Adding a bank the exam has already updates it, and says what is new, changed, removed, unchanged
+(each upload is kept in the history). A changed question gets a new version (own uuid);
 the old version is kept, so submitted attempts keep showing exactly what they were marked on.
 Questions missing from the new file are retired (out of the pool, still in old reviews). An
 attempt holds its question versions: it isn't changed by later uploads. An optional plain
@@ -396,7 +396,6 @@ def check_bank(bank):
         raise ExamError("; ".join(_need_file))
     rows, left_out, needs_fix = [], [], []
     for n, q in enumerate(qs):
-        qid = q.get("id") if isinstance(q, dict) and isinstance(q.get("id"), str) else f"question #{n + 1}"
         review = (q.get("review") or {}) if isinstance(q, dict) else {}
         if isinstance(review, dict) and review.get("status") == "needs-fix":
             note = str(review.get("notes") or "").strip()[:300]
@@ -520,14 +519,8 @@ def upload(by, exam_id, file=None, key=None, url=None, filename=None):
     return _store_bank(bank, sha256, by, exam_id, filename=filename, via=via)
 
 
-def upload_bank(envelope, key_text, by, exam_id=None, new_name=None, dry_run=False, filename=None):
-    """Decrypt one bank and compare it with what the exam has (dry_run: only that), else store it."""
-    return _store_bank(decrypt(envelope, key_text), json.loads(envelope["header"]).get("sha256"), by,
-                       exam_id, new_name, dry_run, filename, "encrypted")
-
-
-def _store_bank(bank, sha256, by, exam_id=None, new_name=None, dry_run=False, filename=None, via=None):
-    """Add or update one bank in an exam (exam_id; or a new exam called new_name). → what changes."""
+def _store_bank(bank, sha256, by, exam_id, dry_run=False, filename=None, via=None):
+    """Add or update one bank in an exam. → what changes (dry_run: only say so)."""
     rows, cases, left_out, needs_fix = check_bank(bank)
     cert, source = bank["exam_id"], bank["source"]
     key = f"{cert}/{source}"
@@ -536,24 +529,21 @@ def _store_bank(bank, sha256, by, exam_id=None, new_name=None, dry_run=False, fi
         c = cases.get(r["case_study"])
         r["case_hash"] = _case_hash(c.get("title") or c["id"], c["content"]) if c else None
         r["hash"] = _hash(r)
-    e = _q("SELECT id, name FROM exams WHERE id = %s", (exam_id,), one=True) if exam_id else None
-    if not e and not (new_name or "").strip():
-        raise ExamError("pick the exam to add these questions to (or name a new one)")
+    e = _q("SELECT id, name FROM exams WHERE id = %s", (exam_id,), one=True)
+    if not e:
+        raise ExamError(f"no exam {exam_id}")
     have = {r["qid"]: r for r in _q("SELECT qid, hash, version FROM exam_qv WHERE exam_id = %s AND bank = %s AND current",
-                                    (e["id"], key))} if e else {}
+                                    (exam_id, key))}
     new = [r for r in rows if r["qid"] not in have]
     changed = [r for r in rows if r["qid"] in have and have[r["qid"]]["hash"] != r["hash"]]
     gone = sorted(set(have) - {r["qid"] for r in rows})
-    summary = {"exam": e["id"] if e else None, "name": e["name"] if e else new_name.strip(), "bank": key,
+    summary = {"exam": exam_id, "name": e["name"], "bank": key,
                "replaces": bool(have), "new": len(new), "changed": len(changed), "removed": len(gone),
                "unchanged": len(rows) - len(new) - len(changed), "skipped": skipped,
                "left_out": left_out, "needs_fix": needs_fix,
                "changed_ids": [r["qid"] for r in changed][:50], "removed_ids": gone[:50]}
     if dry_run:
         return summary
-    if not e:
-        summary["exam"] = create_exam(new_name, by, cert=cert)["exam"]
-    exam_id = summary["exam"]
     import psycopg2.extras
     c = _conn()
     try:

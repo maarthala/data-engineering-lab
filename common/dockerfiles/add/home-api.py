@@ -61,7 +61,7 @@ go (leaving = pause), the review comes after submitting. Changes need the X-Lab-
   POST   /api/exams/answer {"attempt", "qid", "keys" | "slots", "position"}   save one answer
   POST   /api/exams/submit {"attempt"}                   mark it → the review
 Managers (/api/admin/exams…, X-Lab-Admin): create an exam; add encrypted banks + their key to it
-(decrypted here, the key isn't kept; dry_run = what would change) or a plain exam.json; set
+(decrypted here, the key isn't kept), a link or a plain file, or a plain exam.json; set
 questions / pass mark / who may take it; delete.
   GET    /api/admin/exams · /api/admin/exams/results?exam=… · /api/admin/exams/questions?exam=… (all, with answers)
   POST   /api/admin/exams/create {"name"} · …/meta {"file": {…}, "exam"?}
