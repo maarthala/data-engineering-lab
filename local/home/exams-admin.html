@@ -255,6 +255,76 @@
       return box;
     }
 
+    // ---- Questions: every question of the exam with its right answer — filter, number grid, one at a time
+    var TYPE = {choice: 'Multiple choice', hotspot: 'Hotspot', 'drag-drop': 'Drag and drop', 'yes-no': 'Yes / No'};
+    function questionsCard(e) {
+      var card = el('div', {class: 'card'}, [el('h3', {text: 'Questions'}), el('div', {class: 'sub', text: 'Loading…'})]);
+      admin.api('GET', '/api/admin/exams/questions?exam=' + encodeURIComponent(e.id)).then(function (d) {
+        var all = d.questions, shown = all, cur = 0;
+        if (!all.length) { card.lastChild.textContent = 'No questions — upload a question bank.'; return; }
+        var search = el('input', {type: 'search', placeholder: 'Search the text, options, answers, explanation or id…'});
+        function pick(label, values) {
+          return el('select', {}, [el('option', {value: '', text: label})].concat(values.map(function (v) { return el('option', {value: v, text: TYPE[v] || v}); })));
+        }
+        function uniq(f) { return all.map(f).filter(function (v, i, a) { return v && a.indexOf(v) === i; }).sort(); }
+        var source = pick('All banks', uniq(function (q) { return q.bank; })), type = pick('All types', uniq(function (q) { return q.type; }));
+        var domain = pick('All domains', uniq(function (q) { return q.domain; }));
+        var count = el('span', {class: 'sub'}), pal = el('div', {class: 'palette'}), box = el('div');
+        var hay = all.map(function (q) {
+          return [q.ref, q.question, q.explanation, (q.options || []).map(function (o) { return o.text; }).join(' '),
+                  (q.slots || []).map(function (s) { return s.label + ' ' + s.answer.join(' '); }).join(' ')].join(' ').toLowerCase();
+        });
+        function filter() {
+          var t = search.value.trim().toLowerCase();
+          shown = all.filter(function (q, n) {
+            return (!t || hay[n].indexOf(t) >= 0) && (!source.value || q.bank === source.value) &&
+                   (!type.value || q.type === type.value) && (!domain.value || q.domain === domain.value);
+          });
+          cur = 0; paint();
+        }
+        [search, source, type, domain].forEach(function (x) { x.addEventListener(x === search ? 'input' : 'change', filter); });
+        function paint() {
+          count.textContent = shown.length === all.length ? all.length + ' questions' : shown.length + ' of ' + all.length + ' questions';
+          pal.innerHTML = ''; box.innerHTML = '';
+          shown.forEach(function (q, n) {
+            var b = el('button', {class: n === cur ? 'cur' : '', text: String(n + 1), title: q.bank + '/' + q.ref});
+            b.addEventListener('click', function () { cur = n; paint(); });
+            pal.appendChild(b);
+          });
+          if (!shown.length) return box.appendChild(el('div', {class: 'card'}, [el('div', {class: 'sub', text: 'No question matches.'})]));
+          var q = shown[cur];
+          var prev = el('button', {text: '← Previous'}); prev.disabled = cur === 0;
+          prev.addEventListener('click', function () { cur--; paint(); });
+          var next = el('button', {text: 'Next →'}); next.disabled = cur === shown.length - 1;
+          next.addEventListener('click', function () { cur++; paint(); });
+          var refs = (q.refs || []).filter(function (x) { return /^https?:\/\//.test(x.url || ''); });
+          box.appendChild(el('div', {class: 'card'}, [
+            el('div', {class: 'bar'}, [el('b', {text: 'Question ' + (cur + 1) + ' of ' + shown.length}),
+              el('span', {class: 'id', text: q.bank + '/' + q.ref + (q.version > 1 ? ' · version ' + q.version + ' since ' + when(q.since) : '') + (q.domain ? ' · domain ' + q.domain : '') + ' · ' + (TYPE[q.type] || q.type)})]),
+            caseBox(d, q), el('div', {class: 'q md', html: md(q.question)}),
+            q.slots ? el('table', {class: 'slots'}, [el('tbody', {}, [el('tr', {}, ['', 'Correct', 'Choices'].map(function (h) { return el('td', {class: 'muted', text: h}); }))]
+              .concat(q.slots.map(function (s) {
+                return el('tr', {}, [el('td', {class: 'md', html: mdLine(s.label || s.id)}), el('td', {class: 'ok', text: s.answer.join(' / ')}),
+                  el('td', {class: 'muted', text: s.choices.join(' · ')})]);
+              })))])
+              : el('div', {}, q.options.map(function (o) {
+                var good = q.answer.indexOf(o.key) >= 0;
+                return el('div', {class: 'opt' + (good ? ' ok' : '')}, [el('span', {class: 'k', text: o.key}), el('span', {class: 'md', html: mdLine(o.text)}),
+                  el('span', {class: 'muted', style: 'margin-left:auto; white-space:nowrap', text: good ? 'correct' : ''})]);
+              })),
+            q.explanation || refs.length ? el('div', {class: 'expl md', html: md(q.explanation) + (refs.length ? '<p>' + refs.map(function (x) {
+              return '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.title || x.url) + '</a>'; }).join(' · ') + '</p>' : '')}) : null,
+            el('div', {class: 'row', style: 'justify-content:space-between; margin-top:12px'}, [prev, next])]));
+        }
+        card.innerHTML = '';
+        card.appendChild(el('div', {class: 'qfilter'}, [search, source, type, domain, count]));
+        card.appendChild(pal);
+        card.parentNode.insertBefore(box, card.nextSibling);
+        paint();
+      }).catch(function (x) { card.lastChild.textContent = 'Could not load: ' + x.message; });
+      return [card];
+    }
+
     function progressCard(e) {
       function discard(ctl, body, what) {
         ask(ctl, 'Delete ' + what + '? Their answers so far are lost.', 'Yes, delete', function () {
