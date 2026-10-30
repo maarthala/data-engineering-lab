@@ -909,7 +909,8 @@ def _reviewed(q, given):
         d.update(answer=q["answer"], picked=given or [])
     else:
         given = given if isinstance(given, dict) else {}
-        d["slots"] = [{"id": s["id"], "label": s["label"], "answer": s["answer"], "picked": given.get(s["id"]), "right": ok}
+        d["slots"] = [{"id": s["id"], "label": s["label"], "choices": s["choices"], "answer": s["answer"],
+                       "picked": given.get(s["id"]), "right": ok}
                       for s, ok in zip(q["slots"], oks)]
     return d
 

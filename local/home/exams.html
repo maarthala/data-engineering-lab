@@ -242,9 +242,15 @@
             el('div', {class: 'meter'}, [el('i', {style: 'width:' + p + '%'})]), el('span', {class: 'muted', text: fmt(d.correct) + '/' + d.total})]);
         }))]));
       var wrong = r.questions.filter(function (q) { return !q.right; }).length;
+      var revealAll = el('button', {class: 'small', text: 'Reveal all answers'});
       main.appendChild(el('div', {class: 'card'}, [el('div', {class: 'bar'}, [el('h3', {style: 'margin:0', text: 'Questions — click one to see it'}),
-        el('span', {class: 'sub', text: (r.questions.length - wrong) + ' right · ' + wrong + ' wrong or not answered'})]), pal]));
+        el('span', {class: 'row', style: 'gap:10px'}, [el('span', {class: 'sub', text: (r.questions.length - wrong) + ' right · ' + wrong + ' wrong or not answered'}), revealAll])]), pal]));
       main.appendChild(box);
+      // a question you got wrong hides its answer at first: try again (Check — not marked, your score
+      // stays) or Reveal answer; right ones are shown open. Reveal all opens every one.
+      var shown = {}, again = {};
+      r.questions.forEach(function (q) { if (q.right) shown[q.qid] = true; });
+      revealAll.addEventListener('click', function () { r.questions.forEach(function (q) { shown[q.qid] = true; }); paint(); });
       function paint() {
         pal.innerHTML = '';
         r.questions.forEach(function (q, n) {
@@ -253,7 +259,8 @@
           b.addEventListener('click', function () { cur = n; paint(); });
           pal.appendChild(b);
         });
-        var q = r.questions[cur];
+        revealAll.hidden = r.questions.every(function (q) { return shown[q.qid]; });
+        var q = r.questions[cur], open = !!shown[q.qid];
         var prev = el('button', {text: '← Previous'}); prev.disabled = cur === 0;
         prev.addEventListener('click', function () { cur--; paint(); });
         var next = el('button', {text: 'Next →'}); next.disabled = cur === r.questions.length - 1;
@@ -263,19 +270,69 @@
             el('div', {class: 'bar'}, [el('b', {text: 'Question ' + (cur + 1) + ' of ' + r.questions.length}), el('span', {class: q.right ? 'pass' : 'fail',
               text: q.right ? '✓ right' : q.points > 0 ? '◐ ' + q.slots.filter(function (s) { return s.right; }).length + ' of ' + q.slots.length + ' right' : (q.answered ? '✗ wrong' : '✗ not answered')})]),
             caseBox(r, q), el('div', {class: 'q md', html: md(q.question)}),
-            q.slots ? el('table', {class: 'slots'}, [el('tbody', {}, [el('tr', {}, ['', 'Your answer', 'Correct'].map(function (h) { return el('td', {class: 'muted', text: h}); }))]
-              .concat(q.slots.map(function (s) {
-                return el('tr', {}, [el('td', {class: 'md', html: mdLine(s.label || s.id)}),
-                  el('td', {class: s.right ? 'ok' : 'bad', text: (s.right ? '✓ ' : '✗ ') + (s.picked || 'not answered')}), el('td', {text: s.answer.join(' / ')})]);
-              })))]) :
-            el('div', {}, q.options.map(function (o) {
-              var good = q.answer.indexOf(o.key) >= 0, mine = q.picked.indexOf(o.key) >= 0;
-              return el('div', {class: 'opt' + (good ? ' ok' : mine ? ' bad' : '')}, [el('span', {class: 'k', text: o.key}), el('span', {class: 'md', html: mdLine(o.text)}),
-                el('span', {class: 'muted', style: 'margin-left:auto; white-space:nowrap', text: (mine ? 'your answer' : '') + (good ? (mine ? ' · ' : '') + 'correct' : '')})]);
-            })),
-            q.explanation || refs(q).length ? el('div', {class: 'expl md', html: md(q.explanation) + (refs(q).length ? '<p>' +
+            open ? revealed(q) : retry(q),
+            open && (q.explanation || refs(q).length) ? el('div', {class: 'expl md', html: md(q.explanation) + (refs(q).length ? '<p>' +
               refs(q).map(function (x) { return '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.title || x.url) + '</a>'; }).join(' · ') + '</p>' : '')}) : null,
             el('div', {class: 'nav'}, [prev, next])]));
+      }
+      // the answer and how you did
+      function revealed(q) {
+        if (q.slots) return el('table', {class: 'slots'}, [el('tbody', {}, [el('tr', {}, ['', 'Your answer', 'Correct'].map(function (h) { return el('td', {class: 'muted', text: h}); }))]
+          .concat(q.slots.map(function (s) {
+            return el('tr', {}, [el('td', {class: 'md', html: mdLine(s.label || s.id)}),
+              el('td', {class: s.right ? 'ok' : 'bad', text: (s.right ? '✓ ' : '✗ ') + (s.picked || 'not answered')}), el('td', {text: s.answer.join(' / ')})]);
+          })))]);
+        return el('div', {}, q.options.map(function (o) {
+          var good = q.answer.indexOf(o.key) >= 0, mine = q.picked.indexOf(o.key) >= 0;
+          return el('div', {class: 'opt' + (good ? ' ok' : mine ? ' bad' : '')}, [el('span', {class: 'k', text: o.key}), el('span', {class: 'md', html: mdLine(o.text)}),
+            el('span', {class: 'muted', style: 'margin-left:auto; white-space:nowrap', text: (mine ? 'your answer' : '') + (good ? (mine ? ' · ' : '') + 'correct' : '')})]);
+        }));
+      }
+      // your first answer marked, the right one hidden: pick again → Check, or Reveal answer
+      function retry(q) {
+        var t = again[q.qid] = again[q.qid] || {pick: q.slots ? {} : [], said: null};
+        var verdict = el('span', {class: t.said === true ? 'pass' : 'fail', text: t.said === true ? '✓ Right — Reveal answer for the explanation.'
+                                   : t.said === false ? '✗ Not yet — try again, or reveal the answer.' : ''});
+        var check = el('button', {class: 'primary', text: 'Check'});
+        var reveal = el('button', {text: 'Reveal answer'});
+        reveal.addEventListener('click', function () { shown[q.qid] = true; paint(); });
+        var area;
+        if (q.slots) {
+          area = el('table', {class: 'slots'}, [el('tbody', {}, [el('tr', {}, ['', 'Your answer', 'Try again'].map(function (h) { return el('td', {class: 'muted', text: h}); }))]
+            .concat(q.slots.map(function (s) {
+              var mark = t.said === null || !t.pick[s.id] ? '' : t.pick[s.id] && s.answer.indexOf(t.pick[s.id]) >= 0 ? ' ✓' : ' ✗';
+              var pick = el('select', {}, [el('option', {value: '', text: '— choose —'})].concat(s.choices.map(function (c) { return el('option', {value: c, text: c}); })));
+              pick.value = t.pick[s.id] || '';
+              pick.addEventListener('change', function () { t.pick[s.id] = pick.value; t.said = null; paint(); });
+              return el('tr', {}, [el('td', {class: 'md', html: mdLine(s.label || s.id)}), el('td', {class: 'muted', text: s.picked || 'not answered'}),
+                el('td', {}, [pick, el('span', {class: mark === ' ✓' ? 'ok' : 'bad', text: mark})])]);
+            })))]);
+          check.disabled = q.slots.some(function (s) { return !t.pick[s.id]; });
+          check.addEventListener('click', function () {
+            t.said = q.slots.every(function (s) { return s.answer.indexOf(t.pick[s.id]) >= 0; }); paint();
+          });
+        } else {
+          var multi = q.answer.length > 1;
+          area = el('div', {}, q.options.map(function (o) {
+            var on = t.pick.indexOf(o.key) >= 0, mine = q.picked.indexOf(o.key) >= 0;
+            var box = el('input', {type: multi ? 'checkbox' : 'radio', name: 'again'}); box.checked = on;
+            box.addEventListener('change', function () {
+              if (!multi) t.pick = [o.key];
+              else if (box.checked) { if (t.pick.length >= q.answer.length) { box.checked = false; return; } t.pick = t.pick.concat([o.key]); }
+              else t.pick = t.pick.filter(function (k) { return k !== o.key; });
+              t.said = null; paint();
+            });
+            return el('label', {class: 'opt' + (on ? ' sel' : '')}, [box, el('span', {class: 'k', text: o.key}), el('span', {class: 'md', html: mdLine(o.text)}),
+              el('span', {class: 'muted', style: 'margin-left:auto; white-space:nowrap', text: mine ? 'your first answer' : ''})]);
+          }));
+          check.disabled = t.pick.length !== q.answer.length;
+          check.addEventListener('click', function () {
+            t.said = t.pick.slice().sort().join() === q.answer.slice().sort().join(); paint();
+          });
+        }
+        return el('div', {}, [el('div', {class: 'sub', style: 'margin-bottom:8px', text: (q.slots ? 'Pick again' : q.answer.length > 1 ? 'Pick ' + q.answer.length + ' again' : 'Pick again') +
+          ' — this try isn\'t marked; your score stays.'}), area,
+          el('div', {class: 'row', style: 'margin-top:10px; gap:10px'}, [check, reveal, verdict])]);
       }
       paint();
       window.scrollTo({top: 0});
