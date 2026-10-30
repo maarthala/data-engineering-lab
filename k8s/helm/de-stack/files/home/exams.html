@@ -304,7 +304,8 @@
               var pick = el('select', {}, [el('option', {value: '', text: '— choose —'})].concat(s.choices.map(function (c) { return el('option', {value: c, text: c}); })));
               pick.value = t.pick[s.id] || '';
               pick.addEventListener('change', function () { t.pick[s.id] = pick.value; t.said = null; paint(); });
-              return el('tr', {}, [el('td', {class: 'md', html: mdLine(s.label || s.id)}), el('td', {class: 'muted', text: s.picked || 'not answered'}),
+              return el('tr', {}, [el('td', {class: 'md', html: mdLine(s.label || s.id)}),
+                el('td', {class: s.right ? 'ok' : 'bad', text: (s.right ? '✓ ' : '✗ ') + (s.picked || 'not answered')}),
                 el('td', {}, [pick, el('span', {class: mark === ' ✓' ? 'ok' : 'bad', text: mark})])]);
             })))]);
           check.disabled = q.slots.some(function (s) { return !t.pick[s.id]; });
@@ -315,6 +316,7 @@
           var multi = q.answer.length > 1;
           area = el('div', {}, q.options.map(function (o) {
             var on = t.pick.indexOf(o.key) >= 0, mine = q.picked.indexOf(o.key) >= 0;
+            var miss = mine && q.answer.indexOf(o.key) < 0;   // your first pick, wrong: red (the right one stays hidden)
             var box = el('input', {type: multi ? 'checkbox' : 'radio', name: 'again'}); box.checked = on;
             box.addEventListener('change', function () {
               if (!multi) t.pick = [o.key];
@@ -322,8 +324,8 @@
               else t.pick = t.pick.filter(function (k) { return k !== o.key; });
               t.said = null; paint();
             });
-            return el('label', {class: 'opt' + (on ? ' sel' : '')}, [box, el('span', {class: 'k', text: o.key}), el('span', {class: 'md', html: mdLine(o.text)}),
-              el('span', {class: 'muted', style: 'margin-left:auto; white-space:nowrap', text: mine ? 'your first answer' : ''})]);
+            return el('label', {class: 'opt' + (miss ? ' bad' : '') + (on ? ' sel' : '')}, [box, el('span', {class: 'k', text: o.key}), el('span', {class: 'md', html: mdLine(o.text)}),
+              el('span', {class: miss ? 'fail' : 'muted', style: 'margin-left:auto; white-space:nowrap', text: miss ? '✗ your answer' : mine ? 'your answer' : ''})]);
           }));
           check.disabled = t.pick.length !== q.answer.length;
           check.addEventListener('click', function () {
