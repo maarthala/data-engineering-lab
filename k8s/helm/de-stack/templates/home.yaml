@@ -34,6 +34,8 @@ data:
 {{ .Files.Get "files/home/admin.js" | indent 4 }}
   exam-render.js: |
 {{ .Files.Get "files/home/exam-render.js" | indent 4 }}
+  exam-template.json: |
+{{ .Files.Get "files/home/exam-template.json" | indent 4 }}
   admin.css: |
 {{ .Files.Get "files/home/admin.css" | indent 4 }}
   secrets.html: |
@@ -82,6 +84,7 @@ spec:
             - { name: html, mountPath: /usr/share/nginx/html/settings.html, subPath: settings.html }
             - { name: html, mountPath: /usr/share/nginx/html/admin.js, subPath: admin.js }
             - { name: html, mountPath: /usr/share/nginx/html/exam-render.js, subPath: exam-render.js }
+            - { name: html, mountPath: /usr/share/nginx/html/exam-template.json, subPath: exam-template.json }
             - { name: html, mountPath: /usr/share/nginx/html/admin.css, subPath: admin.css }
             - { name: html, mountPath: /usr/share/nginx/html/secrets.html, subPath: secrets.html }
             - { name: html, mountPath: /usr/share/nginx/html/variables.html, subPath: variables.html }   # → secrets.html

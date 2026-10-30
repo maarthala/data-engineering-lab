@@ -1,8 +1,9 @@
 """labexams — mock certification exams on the portal (home-api), kept in the portal database.
 
-Managers create an exam (a name), then add question banks to it: files they receive encrypted
-(certification-exams format, AES-256-GCM — see decrypt()) together with the key; the key is used
-once and never stored. Any number of banks make up one exam's question pool — from one
+Managers create an exam (a name), then add question banks to it (upload()): a file they receive
+encrypted (certification-exams format, AES-256-GCM — see decrypt()) together with the key — used
+once, never stored; a link to the plain file — a public GitHub file or an S3 presigned URL, fetched
+here (fetch_link()); or a plain file they made themselves from the template (exam-template.json). Any number of banks make up one exam's question pool — from one
 certification (dump1, dump2 …) or several. A bank is known in its exam by "<file exam_id>/<source>"
 (e.g. dp-700/dump1) and a question by that plus its id (dp-700/dump1/dump1-042).
 
@@ -45,7 +46,12 @@ import json
 import os
 import random
 import re
+import ipaddress
+import socket
 import threading
+import urllib.error
+import urllib.parse
+import urllib.request
 import uuid
 
 DB_URL = os.environ.get("PORTAL_DB_URL", "postgresql://portal:portal@postgres:5432/portal")
@@ -53,6 +59,9 @@ FORMAT = "certification-exams/question-bank+aes-256-gcm"
 EXAM_ID = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 AUDIENCES = ("all", "teams", "off")
 SLOT_TYPES = ("hotspot", "drag-drop", "yes-no")
+MAX_BYTES = 32 << 20
+GITHUB_HOSTS = ("raw.githubusercontent.com", "gist.githubusercontent.com")
+S3_HOST = re.compile(r"^([a-z0-9.-]+\.)?s3([.-][a-z0-9-]+)*\.amazonaws\.com$")
 DEMO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exam_demo.json")
 _ready = False
 _lock = threading.Lock()
@@ -95,6 +104,7 @@ CREATE TABLE IF NOT EXISTS exam_uploads (
   id bigserial PRIMARY KEY, exam_id text REFERENCES exams ON DELETE CASCADE, bank text NOT NULL, filename text,
   uploaded_at timestamptz NOT NULL DEFAULT now(), uploaded_by text, questions int, new int, changed int,
   removed int, unchanged int, skipped int);
+ALTER TABLE exam_uploads ADD COLUMN IF NOT EXISTS via text;
 CREATE TABLE IF NOT EXISTS portal_meta (key text PRIMARY KEY, value text);
 """
 
@@ -295,13 +305,85 @@ def create_exam(name, by, cert=None, provider=None, domains=None, num_questions=
     return {"exam": exam_id, "name": name}
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+def fetch_link(url):
+    """(bytes, name shown in the history) of a plain bank behind a link: https, a public GitHub file
+    (github.com/…/blob/… is read raw) or an S3 presigned URL — no other hosts, no redirects, only
+    public addresses (the lab's own services are never reached). The name leaves out the query
+    (a presigned URL's signature)."""
+    u = urllib.parse.urlsplit((url or "").strip())
+    host = (u.hostname or "").lower()
+    if u.scheme != "https" or not host:
+        raise ExamError("the link must start with https://")
+    path = u.path
+    if host == "github.com":                              # …/owner/repo/blob/ref/path → the raw file
+        m = re.fullmatch(r"/([^/]+)/([^/]+)/(?:blob|raw)/(.+)", path)
+        if not m:
+            raise ExamError("a GitHub link must point to a file (…/blob/<branch>/<path>)")
+        host, path = "raw.githubusercontent.com", f"/{m[1]}/{m[2]}/{m[3]}"
+    if host not in GITHUB_HOSTS and not S3_HOST.match(host):
+        raise ExamError("only links to a public GitHub file or an AWS S3 presigned URL are accepted")
+    try:
+        addrs = {a[4][0] for a in socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)}
+    except OSError:
+        raise ExamError(f"can't find {host}") from None
+    if not addrs or not all(ipaddress.ip_address(a).is_global for a in addrs):
+        raise ExamError(f"{host} isn't a public address")
+    link = urllib.parse.urlunsplit(("https", host, path, u.query, ""))
+    try:
+        with urllib.request.build_opener(_NoRedirect).open(
+                urllib.request.Request(link, headers={"User-Agent": "de-lab-portal"}), timeout=20) as r:
+            raw = r.read(MAX_BYTES + 1)
+    except urllib.error.HTTPError as e:
+        hint = (" — the presigned link may have expired" if e.code in (400, 403) and S3_HOST.match(host) else
+                " — it points elsewhere: use the file's own link (GitHub: Raw; S3: the presigned URL as given)" if 300 <= e.code < 400 else "")
+        raise ExamError(f"the link answered HTTP {e.code}{hint}") from None
+    except (urllib.error.URLError, OSError) as e:
+        raise ExamError(f"could not download the link: {getattr(e, 'reason', e)}") from None
+    if len(raw) > MAX_BYTES:
+        raise ExamError(f"the file is larger than {MAX_BYTES >> 20} MB")
+    return raw, host + path
+
+
+def upload(by, exam_id, file=None, key=None, url=None, filename=None):
+    """Add a question bank to an exam — an encrypted file + its key, a link (no key) or a plain
+    file (no key) — or an exam.json's details. → what changed (_store_bank) or the details saved."""
+    via = "link" if url else "encrypted" if isinstance(file, dict) and file.get("format") else "file"
+    if url:
+        raw, filename = fetch_link(url)
+        try:
+            doc = json.loads(raw)
+        except ValueError:
+            raise ExamError("the link isn't a JSON file") from None
+    else:
+        doc = file if isinstance(file, dict) else None
+        if not doc:
+            raise ExamError("choose a file")
+        raw = json.dumps(doc, sort_keys=True).encode()
+    if doc.get("format"):
+        if not (key or "").strip():
+            raise ExamError("this file is encrypted — it needs its key (Encrypted file)")
+        bank, sha256 = decrypt(doc, key), json.loads(doc["header"]).get("sha256")
+    elif "questions" in doc:
+        bank, sha256 = doc, hashlib.sha256(raw).hexdigest()
+    elif doc.get("domains") or doc.get("exam_format"):
+        return dict(upload_meta(doc, by, exam_id), details=True)
+    else:
+        raise ExamError("not a question bank (no questions) — start from the template")
+    return _store_bank(bank, sha256, by, exam_id, filename=filename, via=via)
+
+
 def upload_bank(envelope, key_text, by, exam_id=None, new_name=None, dry_run=False, filename=None):
     """Decrypt one bank and compare it with what the exam has (dry_run: only that), else store it."""
     return _store_bank(decrypt(envelope, key_text), json.loads(envelope["header"]).get("sha256"), by,
-                       exam_id, new_name, dry_run, filename)
+                       exam_id, new_name, dry_run, filename, "encrypted")
 
 
-def _store_bank(bank, sha256, by, exam_id=None, new_name=None, dry_run=False, filename=None):
+def _store_bank(bank, sha256, by, exam_id=None, new_name=None, dry_run=False, filename=None, via=None):
     """Add or update one bank in an exam (exam_id; or a new exam called new_name). → what changes."""
     cert, source = bank.get("exam_id", ""), bank.get("source", "")
     if not EXAM_ID.match(cert) or not EXAM_ID.match(source):
@@ -366,9 +448,9 @@ def _store_bank(bank, sha256, by, exam_id=None, new_name=None, dry_run=False, fi
                                                  json.dumps(r["slots"]) if r["slots"] else None, cvid.get(r["case_study"]),
                                                  r["explanation"], json.dumps(r["refs"]), r["domain"])
                                                 for r in new + changed])
-            cur.execute("INSERT INTO exam_uploads (exam_id, bank, filename, uploaded_by, questions, new, changed, removed, "
-                        "unchanged, skipped) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                        (exam_id, key, (filename or "")[:200] or None, by, len(rows), len(new), len(changed), len(gone),
+            cur.execute("INSERT INTO exam_uploads (exam_id, bank, filename, via, uploaded_by, questions, new, changed, removed, "
+                        "unchanged, skipped) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                        (exam_id, key, (filename or "")[:300] or None, via, by, len(rows), len(new), len(changed), len(gone),
                          summary["unchanged"], skipped))
     finally:
         c.close()

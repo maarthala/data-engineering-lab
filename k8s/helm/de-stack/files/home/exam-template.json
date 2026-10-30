@@ -1,0 +1,76 @@
+{
+  "schema_version": "1.1",
+  "exam_id": "my-exam",
+  "source": "set1",
+  "case_studies": [
+    {
+      "id": "contoso",
+      "title": "Contoso, Ltd.",
+      "content": "**Overview**\n\nContoso is an online shop. Orders land in a PostgreSQL database; the analysts work in a lakehouse.\n\n**Requirements**\n\n- Load new orders every hour.\n- Analysts must not see customers' e-mail addresses."
+    }
+  ],
+  "questions": [
+    {
+      "id": "set1-001",
+      "question": "Which file format stores data by column? (one answer)",
+      "options": [
+        { "key": "A", "text": "CSV" },
+        { "key": "B", "text": "Parquet" },
+        { "key": "C", "text": "JSON lines" }
+      ],
+      "answer": ["B"],
+      "explanation": "Parquet is **columnar**: a query reads only the columns it needs.",
+      "references": [{ "title": "Apache Parquet", "url": "https://parquet.apache.org/" }],
+      "domain": "1"
+    },
+    {
+      "id": "set1-002",
+      "question": "Which two are table formats? (Choose two.)",
+      "options": [
+        { "key": "A", "text": "Apache Iceberg" },
+        { "key": "B", "text": "Delta Lake" },
+        { "key": "C", "text": "Apache Kafka" },
+        { "key": "D", "text": "`gzip`" }
+      ],
+      "answer": ["A", "B"],
+      "explanation": "Iceberg and Delta add tables (schema, snapshots, ACID) on top of data files.",
+      "domain": "1"
+    },
+    {
+      "id": "set1-003",
+      "case_study": "contoso",
+      "question": "How should Contoso load the orders?\n\n| Step | Tool |\n|---|---|\n| Extract | [Box1] |\n| Schedule | [Box2] |",
+      "type": "hotspot",
+      "slots": [
+        { "id": "Box1", "choices": ["Spark JDBC read", "Manual CSV export"], "answer": ["Spark JDBC read"] },
+        { "id": "Box2", "choices": ["Airflow, hourly", "Cron on a laptop"], "answer": ["Airflow, hourly"] }
+      ],
+      "explanation": "Read the source with Spark over JDBC and let Airflow run it every hour.",
+      "domain": "2"
+    },
+    {
+      "id": "set1-004",
+      "question": "Put the medallion layers in order, from raw to ready for reports.\n\n1. [Step 1]\n2. [Step 2]\n3. [Step 3]",
+      "type": "drag-drop",
+      "choice_pool": ["Bronze", "Silver", "Gold"],
+      "slots": [
+        { "id": "Step 1", "answer": ["Bronze"] },
+        { "id": "Step 2", "answer": ["Silver"] },
+        { "id": "Step 3", "answer": ["Gold"] }
+      ],
+      "explanation": "Bronze keeps raw data, silver cleans it, gold shapes it for reports.",
+      "domain": "2"
+    },
+    {
+      "id": "set1-005",
+      "question": "For each statement, select Yes if it is true. Otherwise, select No.",
+      "type": "yes-no",
+      "slots": [
+        { "id": "Statement 1", "label": "A Spark DataFrame is evaluated lazily.", "choices": ["Yes", "No"], "answer": ["Yes"] },
+        { "id": "Statement 2", "label": "A CSV file has a fixed schema.", "choices": ["Yes", "No"], "answer": ["No"] }
+      ],
+      "explanation": "Spark builds a plan and runs it on an action; CSV has no schema of its own.",
+      "domain": "3"
+    }
+  ]
+}

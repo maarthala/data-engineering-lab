@@ -23,6 +23,9 @@
     .subtabs a.on{color:var(--accent); border-bottom-color:var(--accent)}
     .pass{color:var(--ok-ink); font-weight:600} .fail{color:var(--bad-ink)}
     .danger-zone{border-color:#f1b5b0}
+    .seg{display:inline-flex; border:1px solid var(--line2); border-radius:9px; overflow:hidden}
+    .seg button{border:0; border-radius:0; background:transparent; padding:6px 14px} .seg button + button{border-left:1px solid var(--line2)}
+    .seg button.on{background:var(--accent); color:#fff}
     .addbank{border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin:10px 0 14px; background:var(--panel2)}
     .qfilter{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px} .qfilter input[type=search]{flex:1; min-width:200px}
     .palette{display:flex; flex-wrap:wrap; gap:5px; max-height:180px; overflow:auto}
@@ -201,8 +204,9 @@
       add.addEventListener('click', function () { form.hidden = false; add.hidden = true; });
       form.addEventListener('lab:cancel', function () { form.hidden = true; add.hidden = false; });
       var hist = (e.uploads || []).map(function (u) {
-        return el('tr', {}, [el('td', {class: 'muted', text: when(u.uploaded_at)}), el('td', {}, [el('b', {text: u.filename || u.bank}),
-            u.filename ? el('div', {class: 'id', text: u.bank}) : null]),
+        var how = {encrypted: 'encrypted file', link: 'link', file: 'own file'}[u.via];
+        return el('tr', {}, [el('td', {class: 'muted', text: when(u.uploaded_at)}), el('td', {style: 'max-width:340px; overflow-wrap:anywhere'}, [el('b', {text: u.filename || u.bank}),
+            el('div', {class: 'id', text: (u.filename ? u.bank : '') + (how ? (u.filename ? ' · ' : '') + how : '')})]),
           el('td', {class: 'r', text: num(u.questions)}), el('td', {class: 'r', text: num(u.new)}), el('td', {class: 'r', text: num(u.changed)}),
           el('td', {class: 'r', text: num(u.removed)}), el('td', {class: 'r', text: num(u.unchanged)}), el('td', {class: 'r', text: num(u.skipped)}),
           el('td', {class: 'muted', text: u.uploaded_by || ''})]);
@@ -214,43 +218,67 @@
           hist.length ? el('div', {class: 'wrap'}, [el('table', {}, [th(['When', 'File', 'Questions', 'New', 'Updated', 'Removed', 'Unchanged', 'Left out', 'By']),
             el('tbody', {}, hist)])]) : el('div', {class: 'sub', text: 'Nothing uploaded yet.'})])];
     }
-    // the file (encrypted bank + key, or a plain exam.json) → uploaded at once; the result says what changed
+    // + Add question bank — three ways: an encrypted file + its key; a link to the plain file (a public
+    // GitHub file or an S3 presigned URL — no key); or an own file made from the template (no key).
+    // Uploaded at once; the result says what changed. (A plain exam.json works as a file too.)
     function addForm(e) {
+      var WAYS = [['encrypted', 'Encrypted file'], ['link', 'Link'], ['own', 'Own file']], way = 'encrypted';
       var file = el('input', {type: 'file', accept: '.json,application/json'});
       var key = el('input', {type: 'password', placeholder: 'paste the key (base64)', autocomplete: 'off'});
       var keyFile = el('input', {type: 'file', accept: '.key,.txt'});
+      var url = el('input', {type: 'url', placeholder: 'https://github.com/…/blob/main/questions/set1.json  or an S3 presigned URL'});
+      var help = el('div', {class: 'sub', style: 'margin:10px 0'});
+      var fileBox = el('label', {}, ['Question bank (.json)', file]), keyBox = el('label', {}, ['Key — paste it, or choose the .key file', key, keyFile]);
+      var urlBox = el('label', {style: 'grid-column:1 / -1'}, ['Link to the question bank', url]);
+      var tpl = el('a', {href: '/exam-template.json', download: 'exam-template.json', text: '⬇ Download the template'});
+      var tplBox = el('div', {class: 'sub', style: 'margin-bottom:10px'}, [tpl, ' — a question bank with one question of each kind (one answer, several answers, ' +
+        'hotspot, drag and drop, yes / no) and a case study. Replace them with yours; keep the structure. exam_id and source name the bank ' +
+        '(lowercase, dashes): it shows as exam_id/source. Question ids start with the source (set1-001 …) and must not change later — ' +
+        'uploading the file again then updates those questions.']);
+      var seg = el('div', {class: 'seg'}, WAYS.map(function (w) {
+        var b = el('button', {type: 'button', text: w[1]});
+        b.addEventListener('click', function () { way = w[0]; paint(); });
+        return b;
+      }));
       var go_ = el('button', {class: 'primary', text: 'Upload'}), cancel = el('button', {text: 'Cancel'});
-      var box = el('div', {class: 'addbank'}, [
-        el('div', {class: 'sub', style: 'margin-bottom:10px', text: 'An encrypted question bank (…enc.json) with its key — the key is used once and not kept. ' +
-          'A bank this exam has already is updated: changed questions get a new version, removed ones leave the pool (old reviews keep them). ' +
-          'A plain exam.json adds the provider and domains.'}),
-        el('div', {class: 'upl'}, [el('label', {}, ['Question bank or exam.json', file]), el('label', {}, ['Key — paste it, or choose the .key file', key, keyFile])]),
+      function paint() {
+        Array.prototype.forEach.call(seg.children, function (b, i) { b.className = WAYS[i][0] === way ? 'on' : ''; });
+        keyBox.hidden = way !== 'encrypted'; fileBox.hidden = way === 'link'; urlBox.hidden = way !== 'link'; tplBox.hidden = way !== 'own';
+        help.textContent = way === 'encrypted' ? 'A question bank you received encrypted (…enc.json) and its key — the key is used once and not kept.'
+          : way === 'link' ? 'A public file on GitHub, or an AWS S3 presigned URL (it works until it expires). No key — the portal downloads the file once.'
+          : 'A question bank you prepared yourself — plain JSON, no key.';
+        go_.textContent = way === 'link' ? 'Add from link' : 'Upload';
+      }
+      var box = el('div', {class: 'addbank'}, [seg, help, tplBox,
+        el('div', {class: 'upl'}, [fileBox, keyBox, urlBox]),
+        el('div', {class: 'sub', style: 'margin-top:10px', text: 'A bank this exam has already is updated: changed questions get a new version, ' +
+          'removed ones leave the pool — submitted attempts keep what they were marked on.'}),
         el('div', {class: 'row', style: 'margin-top:12px'}, [go_, cancel])]);
+      paint();
       cancel.addEventListener('click', function () { box.dispatchEvent(new Event('lab:cancel')); });
       go_.addEventListener('click', function () {
-        var name = file.files[0] ? file.files[0].name : '';
-        go_.disabled = true; go_.textContent = 'Uploading…';
-        readJson(file).then(function (d) {
-          if (d.format) {                                    // an encrypted bank → needs the key
-            return (key.value.trim() ? Promise.resolve(key.value) : readText(keyFile)).then(function (k) {
-              if (!k.trim()) throw new Error('this file is encrypted — paste its key or choose the .key file');
-              return admin.api('POST', '/api/admin/exams/upload', {file: d, key: k.trim(), exam: e.id, filename: name}).then(function (r) {
-                var nothing = r.replaces && !r.new && !r.changed && !r.removed;
-                admin.show(nothing ? name + ': nothing changed' : (r.replaces ? 'Updated ' : 'Added ') + r.bank + ' from ' + name, [
-                  r.new + ' new · ' + r.changed + ' updated · ' + r.removed + ' removed · ' + r.unchanged + ' unchanged' +
-                  (r.skipped ? ' · ' + r.skipped + ' left out (needs-fix or incomplete)' : '') + ' — ' + r.pool + ' questions in the exam now.']
-                  .concat(r.changed_ids.length ? ['Updated: ' + r.changed_ids.join(', ') + (r.changed > r.changed_ids.length ? ' …' : '')] : [])
-                  .concat(r.removed_ids.length ? ['Removed: ' + r.removed_ids.join(', ') + (r.removed > r.removed_ids.length ? ' …' : '')] : [])
-                  .concat(['The key was not stored.']));
+        var label = go_.textContent, name = file.files[0] ? file.files[0].name : '';
+        go_.disabled = true; go_.textContent = way === 'link' ? 'Downloading…' : 'Uploading…';
+        (way === 'link'
+          ? (url.value.trim() ? Promise.resolve({exam: e.id, url: url.value.trim()}) : Promise.reject(new Error('paste the link')))
+          : readJson(file).then(function (d) {
+              if (way === 'encrypted' && !d.format) throw new Error('this file isn\'t encrypted — choose Own file');
+              if (!d.format) return {exam: e.id, file: d, filename: name};
+              return (key.value.trim() ? Promise.resolve(key.value) : readText(keyFile)).then(function (k) {
+                if (!k.trim()) throw new Error('this file is encrypted — paste its key or choose the .key file');
+                return {exam: e.id, file: d, key: k.trim(), filename: name};
               });
-            });
-          }
-          if (d.domains || d.exam_format)                    // plain exam.json
-            return admin.api('POST', '/api/admin/exams/meta', {file: d, exam: e.id}).then(function (r) {
-              admin.show('Exam details saved', [r.domains + ' domains from ' + name]);
-            });
-          throw new Error('not a question bank (.enc.json) or an exam.json');
-        }).then(load).catch(function (x) { admin.show('Upload failed', [x.message], null, true); go_.disabled = false; go_.textContent = 'Upload'; });
+            })
+        ).then(function (body) { return admin.api('POST', '/api/admin/exams/upload', body); }).then(function (r) {
+          if (r.details) return admin.show('Exam details saved', [r.domains + ' domains from ' + (name || 'the file')]);
+          var from = way === 'link' ? 'the link' : name, nothing = r.replaces && !r.new && !r.changed && !r.removed;
+          admin.show(nothing ? r.bank + ': nothing changed' : (r.replaces ? 'Updated ' : 'Added ') + r.bank + ' from ' + from, [
+            r.new + ' new · ' + r.changed + ' updated · ' + r.removed + ' removed · ' + r.unchanged + ' unchanged' +
+            (r.skipped ? ' · ' + r.skipped + ' left out (needs-fix or incomplete)' : '') + ' — ' + r.pool + ' questions in the exam now.']
+            .concat(r.changed_ids.length ? ['Updated: ' + r.changed_ids.join(', ') + (r.changed > r.changed_ids.length ? ' …' : '')] : [])
+            .concat(r.removed_ids.length ? ['Removed: ' + r.removed_ids.join(', ') + (r.removed > r.removed_ids.length ? ' …' : '')] : [])
+            .concat(way === 'encrypted' ? ['The key was not stored.'] : []));
+        }).then(load).catch(function (x) { admin.show('Upload failed', [x.message], null, true); go_.disabled = false; go_.textContent = label; });
       });
       return box;
     }
