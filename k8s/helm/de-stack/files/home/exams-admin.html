@@ -335,6 +335,10 @@
         function uniq(f) { return all.map(f).filter(function (v, i, a) { return v && a.indexOf(v) === i; }).sort(); }
         var source = pick('All banks', uniq(function (q) { return q.bank; })), type = pick('All types', uniq(function (q) { return q.type; }));
         var domain = pick('All domains', uniq(function (q) { return q.domain; }));
+        [].slice.call(domain.options, 1).forEach(function (o) {     // "1.1 · Science"
+          var q = all.filter(function (x) { return x.domain === o.value; })[0];
+          o.textContent = domainOf(d, q).replace(/^Domain /, '');
+        });
         var tags = all.reduce(function (a, q) { return a.concat(q.tags || []); }, []).filter(function (v, i, a) { return a.indexOf(v) === i; }).sort();
         var tag = pick('All tags', tags); tag.hidden = !tags.length;
         var state = el('select', {}, [['', 'All questions'], ['fix', 'Need fix'], ['ok', 'In the exam']].map(function (o) { return el('option', {value: o[0], text: o[1]}); }));
@@ -376,7 +380,8 @@
             q.needs_fix ? el('div', {class: 'fixnote'}, [el('b', {text: '⚠ Needs fix — not in members\' exams. '}),
               el('span', {text: (q.note || 'Marked needs-fix in the file.') + ' Fix it in the file and add the bank again.'})]) : null,
             el('div', {class: 'bar'}, [el('b', {text: 'Question ' + (cur + 1) + ' of ' + shown.length}),
-              el('span', {class: 'id', text: q.bank + '/' + q.ref + (q.version > 1 ? ' · version ' + q.version + ' since ' + when(q.since) : '') + (q.domain ? ' · domain ' + q.domain : '') + ' · ' + (TYPE[q.type] || q.type)})]),
+              el('span', {class: 'id', text: q.bank + '/' + q.ref + (q.version > 1 ? ' · version ' + q.version + ' since ' + when(q.since) : '') + ' · ' + (TYPE[q.type] || q.type)})]),
+            domainOf(d, q) ? el('div', {class: 'sub', style: 'color:var(--accent)', text: domainOf(d, q)}) : null,
             tagList(q, function (t) { tag.value = t; filter(); }),
             caseBox(d, q), el('div', {class: 'q md', html: md(q.question)}),
             q.slots ? el('table', {class: 'slots'}, [el('tbody', {}, [el('tr', {}, ['', 'Correct', 'Choices'].map(function (h) { return el('td', {class: 'muted', text: h}); }))]

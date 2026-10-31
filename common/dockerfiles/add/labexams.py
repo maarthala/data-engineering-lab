@@ -705,7 +705,8 @@ def admin_questions(exam_id):
         else:
             d["answer"] = q["answer"]
         out.append(d)
-    return {"cases": _cases(qs), "questions": out}
+    e = _q("SELECT domains FROM exams WHERE id = %s", (exam_id,), one=True) or {}
+    return {"cases": _cases(qs), "questions": out, "domains": {x["id"]: x["name"] for x in e.get("domains") or []}}
 
 
 def admin_exams():
