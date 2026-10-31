@@ -96,8 +96,18 @@ function md(s) {
 function mdLine(s) { return clean(inline(String(s || '').replace(/\n/g, ' '))); }   // an option: one line
 function domainOf(a, q) {                             // "Domain 2 · Ingest and process data" ('' when none)
   if (!q.domain) return '';
-  var n = (a.domains || {})[q.domain];
+  var n = (a.domains || {})[q.domain] || q.domain_name;   // the exam's list first, else the bank's
   return 'Domain ' + q.domain + (n ? ' · ' + n : '');
+}
+function tagList(q, onPick) {                          // the question's tags as small chips (null when none)
+  if (!(q.tags || []).length) return null;
+  var d = document.createElement('div'); d.className = 'qtags';
+  q.tags.forEach(function (t) {
+    var c = document.createElement(onPick ? 'button' : 'span'); c.className = 'qtag'; c.textContent = '#' + t;
+    if (onPick) { c.title = 'Show the questions tagged ' + t; c.addEventListener('click', function () { onPick(t); }); }
+    d.appendChild(c);
+  });
+  return d;
 }
 function caseBox(a, q) {                               // the case study this question refers to
   var c = q.case && (a.cases || {})[q.case];

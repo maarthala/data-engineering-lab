@@ -6,6 +6,8 @@
   <title>Exams — Epireum's Data Engineering Lab</title>
   <link rel="stylesheet" href="/admin.css?v=8">
   <style>
+    .qtags{display:flex; flex-wrap:wrap; gap:4px; margin-top:4px} .qtag{font-size:.74rem; padding:1px 7px; border:1px solid var(--line2); border-radius:999px; color:var(--muted); background:var(--panel2)}
+    button.qtag{cursor:pointer} button.qtag:hover{border-color:var(--accent); color:var(--accent)}
     .upl{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; max-width:820px}
     .upl label, .form label{display:flex; flex-direction:column; gap:5px; font-size:.84rem; color:var(--muted)}
     .upl input[type=file]{font-size:.86rem; color:var(--muted)}
@@ -48,7 +50,7 @@
     <div class="placeholder">Loading…</div>
   </main>
   <script src="/admin.js?v=5"></script>
-  <script src="/exam-render.js?v=2"></script>
+  <script src="/exam-render.js?v=4"></script>
   <script>
     // Exams — every certification exam (+ New exam). Click one: Question banks (+ Add question bank:
     // an encrypted bank + its key — used once, not kept — or a plain exam.json; the upload history) ·
@@ -327,10 +329,12 @@
         function uniq(f) { return all.map(f).filter(function (v, i, a) { return v && a.indexOf(v) === i; }).sort(); }
         var source = pick('All banks', uniq(function (q) { return q.bank; })), type = pick('All types', uniq(function (q) { return q.type; }));
         var domain = pick('All domains', uniq(function (q) { return q.domain; }));
+        var tags = all.reduce(function (a, q) { return a.concat(q.tags || []); }, []).filter(function (v, i, a) { return a.indexOf(v) === i; }).sort();
+        var tag = pick('All tags', tags); tag.hidden = !tags.length;
         var state = el('select', {}, [['', 'All questions'], ['fix', 'Need fix'], ['ok', 'In the exam']].map(function (o) { return el('option', {value: o[0], text: o[1]}); }));
         var count = el('span', {class: 'sub'}), pal = el('div', {class: 'palette'}), box = el('div');
         var hay = all.map(function (q) {
-          return [q.ref, q.question, q.explanation, (q.options || []).map(function (o) { return o.text; }).join(' '),
+          return [q.ref, q.question, q.explanation, (q.tags || []).join(' '), (q.options || []).map(function (o) { return o.text; }).join(' '),
                   (q.slots || []).map(function (s) { return s.label + ' ' + s.answer.join(' '); }).join(' ')].join(' ').toLowerCase();
         });
         function filter() {
@@ -338,11 +342,12 @@
           shown = all.filter(function (q, n) {
             return (!t || hay[n].indexOf(t) >= 0) && (!source.value || q.bank === source.value) &&
                    (!type.value || q.type === type.value) && (!domain.value || q.domain === domain.value) &&
+                   (!tag.value || (q.tags || []).indexOf(tag.value) >= 0) &&
                    (!state.value || (state.value === 'fix') === !!q.needs_fix);
           });
           cur = 0; paint();
         }
-        [search, source, type, domain, state].forEach(function (x) { x.addEventListener(x === search ? 'input' : 'change', filter); });
+        [search, source, type, domain, tag, state].forEach(function (x) { x.addEventListener(x === search ? 'input' : 'change', filter); });
         function paint() {
           var fix = all.filter(function (q) { return q.needs_fix; }).length;
           count.textContent = (shown.length === all.length ? all.length + ' questions' : shown.length + ' of ' + all.length + ' questions') +
@@ -366,6 +371,7 @@
               el('span', {text: (q.note || 'Marked needs-fix in the file.') + ' Fix it in the file and add the bank again.'})]) : null,
             el('div', {class: 'bar'}, [el('b', {text: 'Question ' + (cur + 1) + ' of ' + shown.length}),
               el('span', {class: 'id', text: q.bank + '/' + q.ref + (q.version > 1 ? ' · version ' + q.version + ' since ' + when(q.since) : '') + (q.domain ? ' · domain ' + q.domain : '') + ' · ' + (TYPE[q.type] || q.type)})]),
+            tagList(q, function (t) { tag.value = t; filter(); }),
             caseBox(d, q), el('div', {class: 'q md', html: md(q.question)}),
             q.slots ? el('table', {class: 'slots'}, [el('tbody', {}, [el('tr', {}, ['', 'Correct', 'Choices'].map(function (h) { return el('td', {class: 'muted', text: h}); }))]
               .concat(q.slots.map(function (s) {
@@ -382,7 +388,7 @@
             el('div', {class: 'row', style: 'justify-content:space-between; margin-top:12px'}, [prev, next])]));
         }
         card.innerHTML = '';
-        card.appendChild(el('div', {class: 'qfilter'}, [search, source, type, domain, state, count]));
+        card.appendChild(el('div', {class: 'qfilter'}, [search, source, type, domain, tag, state, count]));
         card.appendChild(pal);
         card.parentNode.insertBefore(box, card.nextSibling);
         paint();

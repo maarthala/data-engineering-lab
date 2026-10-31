@@ -92,6 +92,8 @@ CREATE TABLE IF NOT EXISTS exam_qv (
   question text NOT NULL, qtype text NOT NULL, options jsonb NOT NULL DEFAULT '[]', answer text[] NOT NULL DEFAULT '{}',
   slots jsonb, case_cv uuid REFERENCES exam_cv, explanation text, refs jsonb NOT NULL DEFAULT '[]', domain text);
 ALTER TABLE exam_qv ADD COLUMN IF NOT EXISTS needs_fix boolean NOT NULL DEFAULT false;
+ALTER TABLE exam_qv ADD COLUMN IF NOT EXISTS tags text[] NOT NULL DEFAULT '{}';
+ALTER TABLE exam_qv ADD COLUMN IF NOT EXISTS domain_name text;
 ALTER TABLE exam_qv ADD COLUMN IF NOT EXISTS note text;
 CREATE UNIQUE INDEX IF NOT EXISTS exam_qv_current ON exam_qv (exam_id, bank, qid) WHERE current;
 CREATE INDEX IF NOT EXISTS exam_qv_key ON exam_qv (exam_id, bank, qid);
@@ -247,10 +249,11 @@ def decrypt(envelope, key_text):
 # other field is a typo ("anwser") and is reported, not ignored
 BANK_FIELDS = {"$schema", "schema_version", "exam_id", "source", "questions", "case_studies"}
 Q_FIELDS = {"id", "source_number", "type", "case_study", "question", "images", "options", "answer", "choice_pool",
-            "slots", "explanation", "references", "domain", "tags", "difficulty", "review"}
+            "slots", "explanation", "references", "domain", "domain_name", "tags", "difficulty", "review"}
 REVIEW_FIELDS = {"status", "answer", "slot_answers", "explanation", "references", "notes", "reviewed_on"}
 REVIEW_STATUS = {"unreviewed", "confirmed", "corrected", "disputed", "needs-fix"}
 QID = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*-[0-9]{3,}$")
+TAG = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
 
 class _Bad(Exception):
@@ -283,11 +286,15 @@ def _question(q, cases):
     _need(not review or review.get("status") in REVIEW_STATUS, f"review status '{review.get('status')}' isn't one of {', '.join(sorted(REVIEW_STATUS))}")
     corrected = review.get("status") == "corrected"
     _need(not q.get("case_study") or q["case_study"] in cases, f"case study '{q.get('case_study')}' isn't in the file's case_studies")
+    tags = q.get("tags") or []
+    _need(isinstance(tags, list) and all(isinstance(t, str) and TAG.match(t) for t in tags),
+          "tags must be a list of lower-case words joined by '-' (e.g. cloud-sql)")
     refs = review.get("references") or q.get("references") or []
     _need(isinstance(refs, list) and all(isinstance(r, dict) for r in refs), "references must be a list of {title, url}")
     row = {"qid": q["id"], "question": q["question"], "qtype": qtype, "options": [], "answer": [], "slots": None,
            "needs_fix": False, "note": None, "case_study": q.get("case_study"), "domain": str(q["domain"]) if q.get("domain") is not None else None,
-           "explanation": review.get("explanation") or q.get("explanation") or "", "refs": refs}
+           "explanation": review.get("explanation") or q.get("explanation") or "", "refs": refs,
+           "tags": list(dict.fromkeys(tags)), "domain_name": q.get("domain_name") if isinstance(q.get("domain_name"), str) else None}
     if qtype in SLOT_TYPES:
         _need("options" not in q and "answer" not in q, f"a {qtype} question has slots, not options / answer")
         _need(isinstance(q.get("slots"), list) and q["slots"], f"a {qtype} question needs slots")
@@ -349,7 +356,9 @@ def _rough(q, cases, note):
                "options": [{"key": o["key"], "text": o["text"]} for o in opts], "answer": [], "slots": None,
                "case_study": q.get("case_study") if q.get("case_study") in cases else None,
                "domain": str(q["domain"]) if q.get("domain") is not None else None,
-               "explanation": str(q.get("explanation") or ""), "refs": []}
+               "explanation": str(q.get("explanation") or ""), "refs": [],
+               "tags": [t for t in q.get("tags") or [] if isinstance(t, str) and TAG.match(t)] if isinstance(q.get("tags"), list) else [],
+               "domain_name": q.get("domain_name") if isinstance(q.get("domain_name"), str) else None}
     return dict(row, needs_fix=True, note=note or None)
 
 
@@ -419,7 +428,8 @@ def _case_hash(title, content):
 
 
 def _hash(r):
-    """What a member sees and is marked on — a change makes a new version."""
+    """What a member sees and is marked on — a change makes a new version. (Tags and the domain's name
+    aren't in it: they only label the question, so a change there updates it in place.)"""
     return hashlib.sha256(json.dumps({k: r.get(k) for k in ("question", "qtype", "options", "answer", "slots",
                                                             "explanation", "refs", "domain", "case_hash")}
                                      | ({"needs_fix": True, "note": r.get("note")} if r.get("needs_fix") else {}),
@@ -570,12 +580,17 @@ def _store_bank(bank, sha256, by, exam_id, dry_run=False, filename=None, via=Non
                             "AND qid = ANY(%s) AND current", (exam_id, key, retire))
             if new or changed:
                 psycopg2.extras.execute_values(cur, "INSERT INTO exam_qv (vid, exam_id, bank, qid, version, hash, current, question, "
-                                               "qtype, options, answer, slots, case_cv, explanation, refs, domain, needs_fix, note) VALUES %s",
+                                               "qtype, options, answer, slots, case_cv, explanation, refs, domain, needs_fix, note, tags, domain_name) VALUES %s",
                                                [(uuid.uuid4(), exam_id, key, r["qid"], have[r["qid"]]["version"] + 1 if r["qid"] in have else 1,
                                                  r["hash"], True, r["question"], r["qtype"], json.dumps(r["options"]), r["answer"],
                                                  json.dumps(r["slots"]) if r["slots"] else None, cvid.get(r["case_study"]),
-                                                 r["explanation"], json.dumps(r["refs"]), r["domain"], r["needs_fix"], r["note"])
+                                                 r["explanation"], json.dumps(r["refs"]), r["domain"], r["needs_fix"], r["note"], r["tags"], r["domain_name"])
                                                 for r in new + changed])
+            same = [r for r in rows if r["qid"] in have and have[r["qid"]]["hash"] == r["hash"]]
+            if same:                                       # only tags / the domain's name changed: in place
+                cur.executemany("UPDATE exam_qv SET tags = %s, domain_name = %s WHERE exam_id = %s AND bank = %s AND qid = %s "
+                                "AND current AND (tags, domain_name) IS DISTINCT FROM (%s, %s)",
+                                [(r["tags"], r["domain_name"], exam_id, key, r["qid"], r["tags"], r["domain_name"]) for r in same])
             cur.execute("INSERT INTO exam_uploads (exam_id, bank, filename, via, uploaded_by, questions, new, changed, removed, "
                         "unchanged, skipped, problems) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                         (exam_id, key, (filename or "")[:300] or None, via, by, sum(1 for r in rows if not r["needs_fix"]), len(new), len(changed), len(gone),
@@ -815,7 +830,7 @@ def _shown(q):
     """A question as the member sees it while answering — no answers. qid is the version's id (the
     answers' key); ref is the question's own id in its bank."""
     d = {"qid": str(q["vid"]), "ref": q["qid"], "bank": q["bank"], "type": q["qtype"], "question": q["question"],
-         "domain": q["domain"], "case": str(q["case_cv"]) if q.get("case_cv") else None}
+         "domain": q["domain"], "domain_name": q.get("domain_name"), "tags": q.get("tags") or [], "case": str(q["case_cv"]) if q.get("case_cv") else None}
     if q["qtype"] in SLOT_TYPES:
         d["slots"] = [{"id": s["id"], "label": s["label"], "choices": s["choices"]} for s in q["slots"]]
     else:
@@ -895,8 +910,9 @@ def review(attempt_id, member):
     if not a["finished_at"]:
         raise ExamError("submit the attempt first")
     e = _q("SELECT * FROM exams WHERE id = %s", (a["exam_id"],), one=True)
-    names = {d["id"]: d["name"] for d in (e["domains"] or [])}
     qs = _questions(a["vids"])
+    names = {q["domain"]: q["domain_name"] for q in qs if q.get("domain_name")}   # the banks' names, the exam's first
+    names.update({d["id"]: d["name"] for d in (e["domains"] or [])})
     return {"id": a["id"], "done": True, "domains": names,
             "exam": {"id": e["id"], "name": e["name"], "pass_percent": e["pass_percent"]},
             "score": a["score"], "passed": a["passed"], "correct": a["correct"], "total": a["total"],
