@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS exam_attempts (
   started_at timestamptz NOT NULL DEFAULT now(), finished_at timestamptz,
   correct int, total int, score int, passed boolean, by_domain jsonb);
 ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS vids uuid[];
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS marked text[] NOT NULL DEFAULT '{}';
 CREATE UNIQUE INDEX IF NOT EXISTS exam_attempts_open ON exam_attempts (exam_id, member) WHERE finished_at IS NULL;
 CREATE INDEX IF NOT EXISTS exam_attempts_member ON exam_attempts (member, exam_id);
 CREATE TABLE IF NOT EXISTS exam_uploads (
@@ -796,7 +797,7 @@ def attempt(attempt_id, member, team):
     e = _exam_for(a["exam_id"], team)
     qs = _questions(a["vids"])
     return {"id": a["id"], "exam": {"id": e["id"], "name": e["name"], "pass_percent": e["pass_percent"]},
-            "done": False, "position": a["position"], "answers": a["answers"], "cases": _cases(qs),
+            "done": False, "position": a["position"], "answers": a["answers"], "marked": a["marked"], "cases": _cases(qs),
             "questions": [_shown(q) for q in qs]}
 
 
@@ -831,14 +832,19 @@ def _mark(q, given):
     return float(isinstance(given, list) and sorted(given) == sorted(q["answer"])), None
 
 
-def answer(attempt_id, member, qid, keys, position=None, slots=None):
+def answer(attempt_id, member, qid, keys, position=None, slots=None, mark=None):
     """Save one answer — option keys, or {slot id: value} for a slot question — and where the
-    member is: leaving now is a pause. qid = the question version's id."""
+    member is: leaving now is a pause. qid = the question version's id. With mark (true/false)
+    only the question's 'marked for review' flag changes, the answer stays."""
     a = _own(attempt_id, member)
     if a["finished_at"]:
         raise ExamError("this attempt is already submitted")
     if qid not in a["vids"]:
         raise ExamError("that question isn't in this attempt")
+    if mark is not None:
+        marked = [m for m in a["marked"] if m != qid] + ([qid] if mark else [])
+        _q("UPDATE exam_attempts SET marked = %s WHERE id = %s", (marked, a["id"]), rows=False)
+        return {"saved": qid, "marked": marked}
     q = (_questions([qid]) or [None])[0]
     if q and q["qtype"] in SLOT_TYPES:
         choices = {s["id"]: s["choices"] for s in q["slots"]}

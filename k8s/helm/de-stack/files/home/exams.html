@@ -25,6 +25,7 @@
     .palette{display:flex; flex-wrap:wrap; gap:5px; margin-top:8px}
     .palette button{width:34px; padding:4px 0; font-size:.8rem}
     .palette button.done{background:rgba(57,208,196,.22); border-color:rgba(57,208,196,.5)}
+    .palette button.flag{position:relative} .palette button.flag::after{content:'⚑'; position:absolute; top:-7px; right:-4px; font-size:.7rem; color:var(--danger)}
     .palette button.cur{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent)}
     .palette button.ok{background:var(--ok-bg); border-color:#b7e1c4; color:var(--ok-ink)} .palette button.bad{background:var(--bad-bg); border-color:#f1b5b0; color:var(--bad-ink)}
     .palette button.none{background:var(--panel2); color:var(--muted)}
@@ -137,6 +138,7 @@
       if (a.done) return showReview(a);
       history.replaceState(null, '', '#attempt=' + a.id);
       var i = Math.min(a.position || 0, a.questions.length - 1), answers = a.answers || {}, saving = Promise.resolve();
+      var marked = a.marked || [];                         // marked for review — a reminder for you, not marked as wrong
       function save(q) {
         var v = answers[q.qid], body = {attempt: a.id, qid: q.qid, position: i};
         if (q.slots) body.slots = v || {}; else body.keys = v || [];
@@ -192,28 +194,39 @@
         prev.addEventListener('click', function () { i--; render(); });
         var next = el('button', {class: 'primary', text: 'Next →'}); next.hidden = i === a.questions.length - 1;
         next.addEventListener('click', function () { i++; save(q); render(); });
+        var flagged = marked.indexOf(q.qid) >= 0;
+        var flag = el('button', {class: 'small' + (flagged ? ' on' : ''), text: flagged ? '⚑ Marked for review' : '⚐ Mark for review',
+                                 title: 'A reminder to come back to this question before you submit'});
+        flag.addEventListener('click', function () {
+          marked = flagged ? marked.filter(function (m) { return m !== q.qid; }) : marked.concat([q.qid]);
+          saving = saving.then(function () { return api('POST', '/api/exams/answer', {attempt: a.id, qid: q.qid, mark: !flagged}); })
+            .catch(function (e) { alertCard('Could not save the mark: ' + e.message); });
+          render();
+        });
         var pause = el('button', {text: '⏸ Pause'});
         pause.addEventListener('click', function () { save(q); saving.then(function () { list(); }); });
         var submit = el('button', {class: i === a.questions.length - 1 ? 'primary' : '', text: 'Submit exam'});
         submit.addEventListener('click', function () {
-          var left = a.questions.length - Object.keys(answers).length;
-          ask(submit, left ? left + ' not answered — they count as wrong. Submit anyway?' : 'Submit your answers?', 'Yes, submit', function () {
+          var left = a.questions.length - Object.keys(answers).length, flags = marked.length;
+          var why = [left ? left + ' not answered — they count as wrong' : '', flags ? flags + ' marked for review' : ''].filter(Boolean).join(' · ');
+          ask(submit, why ? why + '. Submit anyway?' : 'Submit your answers?', 'Yes, submit', function () {
             submit.disabled = true;
             saving.then(function () { return api('POST', '/api/exams/submit', {attempt: a.id}); }).then(showReview)
               .catch(function (e) { alertCard(e.message); submit.disabled = false; });
           });
         });
         var pal = el('div', {class: 'palette'}, a.questions.map(function (x, n) {
-          var b = el('button', {class: (answers[x.qid] ? 'done' : '') + (n === i ? ' cur' : ''), text: String(n + 1)});
+          var b = el('button', {class: (answers[x.qid] ? 'done' : '') + (marked.indexOf(x.qid) >= 0 ? ' flag' : '') + (n === i ? ' cur' : ''), text: String(n + 1),
+                                title: marked.indexOf(x.qid) >= 0 ? 'marked for review' : ''});
           b.addEventListener('click', function () { i = n; render(); });
           return b;
         }));
         main.appendChild(el('div', {class: 'card'}, [
           el('div', {class: 'bar'}, [el('b', {text: a.exam.name}), el('span', {class: 'sub', text: answered + ' / ' + a.questions.length + ' answered · saved as you go'})]),
-          el('div', {class: 'sub', text: 'Question ' + (i + 1) + ' of ' + a.questions.length + (q.slots ? ' · ' + SLOT_HINT[q.type] : multi ? ' · choose ' + q.choose : '')}),
+          el('div', {class: 'bar'}, [el('div', {class: 'sub', text: 'Question ' + (i + 1) + ' of ' + a.questions.length + (q.slots ? ' · ' + SLOT_HINT[q.type] : multi ? ' · choose ' + q.choose : '')}), flag]),
           caseBox(a, q), el('div', {class: 'q md', html: md(q.question)}), el('div', {}, opts),
           el('div', {class: 'nav'}, [el('div', {class: 'row'}, [prev, next]), el('div', {class: 'row'}, [pause, submit])])]));
-        main.appendChild(el('div', {class: 'card'}, [el('h3', {text: 'Questions'}), pal]));
+        main.appendChild(el('div', {class: 'card'}, [el('h3', {text: 'Questions' + (marked.length ? ' · ⚑ ' + marked.length + ' marked for review' : '')}), pal]));
       }
       render();
     }
