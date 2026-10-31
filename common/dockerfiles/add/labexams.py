@@ -77,6 +77,8 @@ CREATE TABLE IF NOT EXISTS exams (
   audience text NOT NULL DEFAULT 'off', teams text[] NOT NULL DEFAULT '{}',
   updated_at timestamptz NOT NULL DEFAULT now(), updated_by text);
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS cert text;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS show_domain boolean NOT NULL DEFAULT true;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS show_tags boolean NOT NULL DEFAULT true;
 CREATE TABLE IF NOT EXISTS exam_sources (
   exam_id text REFERENCES exams ON DELETE CASCADE, bank text, questions int, skipped int,
   sha256 text, uploaded_at timestamptz NOT NULL DEFAULT now(), uploaded_by text,
@@ -626,7 +628,8 @@ def pool_size(exam_id):
     return _q("SELECT count(*) AS n FROM exam_qv WHERE exam_id = %s AND current AND NOT needs_fix", (exam_id,), one=True)["n"]
 
 
-def set_exam(exam_id, by, name=None, num_questions=None, pass_percent=None, audience=None, teams=None):
+def set_exam(exam_id, by, name=None, num_questions=None, pass_percent=None, audience=None, teams=None,
+             show_domain=None, show_tags=None):
     e = _q("SELECT * FROM exams WHERE id = %s", (exam_id,), one=True)
     if not e:
         raise ExamError(f"no exam {exam_id}")
@@ -635,6 +638,8 @@ def set_exam(exam_id, by, name=None, num_questions=None, pass_percent=None, audi
     p = int(pass_percent if pass_percent is not None else e["pass_percent"])
     a = audience if audience is not None else e["audience"]
     t = sorted(set(teams if teams is not None else e["teams"]))
+    sd = bool(show_domain if show_domain is not None else e["show_domain"])
+    st = bool(show_tags if show_tags is not None else e["show_tags"])
     if not name or len(name) > 120:
         raise ExamError("name: 1–120 characters")
     if not 1 <= n <= 500:
@@ -645,8 +650,8 @@ def set_exam(exam_id, by, name=None, num_questions=None, pass_percent=None, audi
         raise ExamError("audience: all, teams or off")
     if a == "teams" and not t:
         raise ExamError("pick at least one team (or choose All members)")
-    _q("UPDATE exams SET name=%s, num_questions=%s, pass_percent=%s, audience=%s, teams=%s, updated_at=now(), "
-       "updated_by=%s WHERE id=%s", (name, n, p, a, t, by, exam_id), rows=False)
+    _q("UPDATE exams SET name=%s, num_questions=%s, pass_percent=%s, audience=%s, teams=%s, show_domain=%s, show_tags=%s, "
+       "updated_at=now(), updated_by=%s WHERE id=%s", (name, n, p, a, t, sd, st, by, exam_id), rows=False)
     return admin_exams()
 
 
@@ -814,7 +819,7 @@ def attempt(attempt_id, member, team):
     return {"id": a["id"], "exam": {"id": e["id"], "name": e["name"], "pass_percent": e["pass_percent"]},
             "done": False, "position": a["position"], "answers": a["answers"], "marked": a["marked"], "cases": _cases(qs),
             "domains": {d["id"]: d["name"] for d in (e.get("domains") or [])},
-            "questions": [_shown(q) for q in qs]}
+            "questions": [_labels(e, _shown(q)) for q in qs]}
 
 
 def _cases(qs):
@@ -920,7 +925,16 @@ def review(attempt_id, member):
             "minutes": max(1, round((a["finished_at"] - a["started_at"]).total_seconds() / 60)),
             "by_domain": [{"domain": d, "name": names.get(d, "Unassigned" if d == "-" else f"Domain {d}"),
                            "correct": v[0], "total": v[1]} for d, v in sorted((a["by_domain"] or {}).items())],
-            "cases": _cases(qs), "questions": [_reviewed(q, a["answers"].get(str(q["vid"]))) for q in qs]}
+            "cases": _cases(qs), "questions": [_labels(e, _reviewed(q, a["answers"].get(str(q["vid"])))) for q in qs]}
+
+
+def _labels(e, d):
+    """The question's domain and tags only when the exam's settings show them to members."""
+    if not e["show_domain"]:
+        d.update(domain=None, domain_name=None)
+    if not e["show_tags"]:
+        d["tags"] = []
+    return d
 
 
 def _reviewed(q, given):

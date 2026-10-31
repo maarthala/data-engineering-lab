@@ -158,13 +158,19 @@
       var picks = data.teams.map(function (t) { var c = el('input', {type: 'checkbox', value: t}); c.checked = (e.teams || []).indexOf(t) >= 0; return {t: t, c: c}; });
       var pickBox = el('div', {class: 'teampick'}, picks.length ? picks.map(function (p) { return el('label', {}, [p.c, p.t]); })
         : [el('span', {class: 'sub', text: 'No teams yet — create them on Teams.'})]);
+      // what members see with each question (the results by domain stay either way)
+      var showDomain = el('input', {type: 'checkbox'}), showTags = el('input', {type: 'checkbox'});
+      showDomain.checked = e.show_domain !== false; showTags.checked = e.show_tags !== false;
+      var labels = el('div', {class: 'teampick'}, [el('span', {class: 'sub', text: 'Members see with each question:'}),
+        el('label', {}, [showDomain, ' Domain']), el('label', {}, [showTags, ' Tags'])]);
       function sync() { pickBox.hidden = audience.value !== 'teams'; }
       audience.addEventListener('change', sync); sync();
       var save = el('button', {class: 'primary', text: 'Save'});
       save.addEventListener('click', function () {
         save.disabled = true;
         admin.api('POST', '/api/admin/exams/settings', {exam: e.id, name: name.value, num_questions: +n.value, pass_percent: +pass.value,
-          audience: audience.value, teams: picks.filter(function (p) { return p.c.checked; }).map(function (p) { return p.t; })})
+          audience: audience.value, teams: picks.filter(function (p) { return p.c.checked; }).map(function (p) { return p.t; }),
+          show_domain: showDomain.checked, show_tags: showTags.checked})
           .then(function () {
             admin.show('Saved ' + name.value, [audience.value === 'off' ? 'Members can\'t see it (off).' : audience.value === 'all'
               ? 'Open to all members.' : 'Open to the chosen teams.'].concat(e.ongoing.length ? [e.ongoing.length +
@@ -183,7 +189,7 @@
       return [el('div', {class: 'card'}, [el('h3', {text: 'Exam settings'}),
           el('div', {class: 'form'}, [el('label', {}, ['Name', name]), el('label', {}, ['Who can take it', audience]),
             el('label', {}, ['Questions per attempt (pool: ' + e.pool + ')', n]), el('label', {}, ['Pass mark (%)', pass])]),
-          pickBox, el('div', {class: 'row', style: 'margin-top:16px'}, [save])]),
+          pickBox, labels, el('div', {class: 'row', style: 'margin-top:16px'}, [save])]),
         el('div', {class: 'card danger-zone'}, [el('h3', {text: 'Delete'}),
           el('div', {class: 'sub', style: 'margin-bottom:10px', text: 'Removes the exam, its question banks and every member\'s attempts.'}), el('div', {class: 'row'}, [del])])];
     }

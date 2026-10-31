@@ -68,7 +68,8 @@ questions / pass mark / who may take it; delete.
   POST   /api/admin/exams/create {"name"} · …/meta {"file": {…}, "exam"?}
   POST   /api/admin/exams/upload {"exam", "file": {…}, "key"?, "filename"} | {"exam", "url"}   a bank: encrypted
          file + key · a plain file (exam-template.json) · a link (public GitHub file / S3 presigned URL)
-  POST   /api/admin/exams/settings {"exam", "name", "num_questions", "pass_percent", "audience", "teams"}
+  POST   /api/admin/exams/settings {"exam", "name", "num_questions", "pass_percent", "audience", "teams",
+                                   "show_domain", "show_tags"}
   POST   /api/admin/exams/delete {"exam", "bank"?}      the exam, or one bank (its questions retire)
   POST   /api/admin/exams/discard {"exam", "attempt"?}   delete attempts in progress (one / all of the exam)
 
@@ -471,7 +472,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, labexams.create_exam(body.get("name"), user))
             if path == "/api/admin/exams/settings":
                 r = labexams.set_exam(str(body.get("exam", "")), user, body.get("name"), body.get("num_questions"),
-                                      body.get("pass_percent"), body.get("audience"), body.get("teams"))
+                                      body.get("pass_percent"), body.get("audience"), body.get("teams"),
+                                      body.get("show_domain"), body.get("show_tags"))
                 print(f"[home-api] manager {user}: exam {body.get('exam')} settings", flush=True)
                 return self._json(200, r)
             if path == "/api/admin/exams/discard":         # attempts in progress: one, or all of the exam
