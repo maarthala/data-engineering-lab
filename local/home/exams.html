@@ -42,7 +42,7 @@
 <body>
   <header id="lab-top"></header>
   <script src="/lab-header.js?v=12"></script>
-  <script src="/exam-render.js?v=1"></script>
+  <script src="/exam-render.js?v=2"></script>
   <div class="pagebar"><h1>📝 Mock exams <span class="dot">·</span> practise for a certification</h1></div>
   <main id="main"><div class="placeholder">Loading…</div></main>
   <script>
@@ -223,7 +223,8 @@
         }));
         main.appendChild(el('div', {class: 'card'}, [
           el('div', {class: 'bar'}, [el('b', {text: a.exam.name}), el('span', {class: 'sub', text: answered + ' / ' + a.questions.length + ' answered · saved as you go'})]),
-          el('div', {class: 'bar'}, [el('div', {class: 'sub', text: 'Question ' + (i + 1) + ' of ' + a.questions.length + (q.slots ? ' · ' + SLOT_HINT[q.type] : multi ? ' · choose ' + q.choose : '')}), flag]),
+          el('div', {class: 'bar'}, [el('div', {}, [el('div', {class: 'sub', text: 'Question ' + (i + 1) + ' of ' + a.questions.length + (q.slots ? ' · ' + SLOT_HINT[q.type] : multi ? ' · choose ' + q.choose : '')}),
+            domainOf(a, q) ? el('div', {class: 'sub', style: 'color:var(--accent)', text: domainOf(a, q)}) : null]), flag]),
           caseBox(a, q), el('div', {class: 'q md', html: md(q.question)}), el('div', {}, opts),
           el('div', {class: 'nav'}, [el('div', {class: 'row'}, [prev, next]), el('div', {class: 'row'}, [pause, submit])])]));
         main.appendChild(el('div', {class: 'card'}, [el('h3', {text: 'Questions' + (marked.length ? ' · ⚑ ' + marked.length + ' marked for review' : '')}), pal]));
@@ -280,7 +281,8 @@
         next.addEventListener('click', function () { cur++; paint(); });
         box.innerHTML = '';
         box.appendChild(el('div', {class: 'card'}, [
-            el('div', {class: 'bar'}, [el('b', {text: 'Question ' + (cur + 1) + ' of ' + r.questions.length}), el('span', {class: q.right ? 'pass' : 'fail',
+            el('div', {class: 'bar'}, [el('div', {}, [el('b', {text: 'Question ' + (cur + 1) + ' of ' + r.questions.length}),
+              domainOf(r, q) ? el('div', {class: 'sub', style: 'color:var(--accent)', text: domainOf(r, q)}) : null]), el('span', {class: q.right ? 'pass' : 'fail',
               text: q.right ? '✓ right' : q.points > 0 ? '◐ ' + q.slots.filter(function (s) { return s.right; }).length + ' of ' + q.slots.length + ' right' : (q.answered ? '✗ wrong' + (!q.slots && q.picked.length < q.answer.length ? ' — you picked ' + q.picked.length + ' of ' + q.answer.length : '') : '✗ not answered')})]),
             caseBox(r, q), el('div', {class: 'q md', html: md(q.question)}),
             open ? revealed(q) : retry(q),

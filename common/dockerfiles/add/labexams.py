@@ -798,6 +798,7 @@ def attempt(attempt_id, member, team):
     qs = _questions(a["vids"])
     return {"id": a["id"], "exam": {"id": e["id"], "name": e["name"], "pass_percent": e["pass_percent"]},
             "done": False, "position": a["position"], "answers": a["answers"], "marked": a["marked"], "cases": _cases(qs),
+            "domains": {d["id"]: d["name"] for d in (e.get("domains") or [])},
             "questions": [_shown(q) for q in qs]}
 
 
@@ -814,7 +815,7 @@ def _shown(q):
     """A question as the member sees it while answering — no answers. qid is the version's id (the
     answers' key); ref is the question's own id in its bank."""
     d = {"qid": str(q["vid"]), "ref": q["qid"], "bank": q["bank"], "type": q["qtype"], "question": q["question"],
-         "case": str(q["case_cv"]) if q.get("case_cv") else None}
+         "domain": q["domain"], "case": str(q["case_cv"]) if q.get("case_cv") else None}
     if q["qtype"] in SLOT_TYPES:
         d["slots"] = [{"id": s["id"], "label": s["label"], "choices": s["choices"]} for s in q["slots"]]
     else:
@@ -896,7 +897,7 @@ def review(attempt_id, member):
     e = _q("SELECT * FROM exams WHERE id = %s", (a["exam_id"],), one=True)
     names = {d["id"]: d["name"] for d in (e["domains"] or [])}
     qs = _questions(a["vids"])
-    return {"id": a["id"], "done": True,
+    return {"id": a["id"], "done": True, "domains": names,
             "exam": {"id": e["id"], "name": e["name"], "pass_percent": e["pass_percent"]},
             "score": a["score"], "passed": a["passed"], "correct": a["correct"], "total": a["total"],
             "finished_at": a["finished_at"].isoformat(),

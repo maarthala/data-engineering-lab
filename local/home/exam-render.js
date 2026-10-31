@@ -94,6 +94,11 @@ function md(s) {
   return clean(out);
 }
 function mdLine(s) { return clean(inline(String(s || '').replace(/\n/g, ' '))); }   // an option: one line
+function domainOf(a, q) {                             // "Domain 2 · Ingest and process data" ('' when none)
+  if (!q.domain) return '';
+  var n = (a.domains || {})[q.domain];
+  return 'Domain ' + q.domain + (n ? ' · ' + n : '');
+}
 function caseBox(a, q) {                               // the case study this question refers to
   var c = q.case && (a.cases || {})[q.case];
   if (!c) return null;
