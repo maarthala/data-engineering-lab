@@ -66,6 +66,7 @@ Managers (/api/admin/exams…, X-Lab-Admin): create an exam; add encrypted banks
 questions / pass mark / who may take it; delete.
   GET    /api/admin/exams · /api/admin/exams/results?exam=… · /api/admin/exams/questions?exam=… (all, with answers)
   POST   /api/admin/exams/create {"name"} · …/meta {"file": {…}, "exam"?}
+  POST   /api/admin/exams/sync-delab                    the DE lab chapters' exams from GitHub (DE_EXAMS_REPO)
   POST   /api/admin/exams/upload {"exam", "file": {…}, "key"?, "filename"} | {"exam", "url"}   a bank: encrypted
          file + key · a plain file (exam-template.json) · a link (public GitHub file / S3 presigned URL)
   POST   /api/admin/exams/settings {"exam", "name", "num_questions", "pass_percent", "audience", "teams",
@@ -470,6 +471,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, labexams.upload_meta(body.get("file") or {}, user, body.get("exam")))
             if path == "/api/admin/exams/create":
                 return self._json(200, labexams.create_exam(body.get("name"), user))
+            if path == "/api/admin/exams/sync-delab":       # the DE lab chapters' exams from GitHub
+                return self._json(200, labexams.sync_delab(user))
             if path == "/api/admin/exams/settings":
                 r = labexams.set_exam(str(body.get("exam", "")), user, body.get("name"), body.get("num_questions"),
                                       body.get("pass_percent"), body.get("audience"), body.get("teams"),

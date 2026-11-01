@@ -33,6 +33,13 @@ tags.
 Questions marked review.status = needs-fix are left out; review.answer / review.slot_answers /
 review.explanation win over the source's when present.
 
+DE lab exams (sync_delab()): one exam per course chapter, free banks in a public GitHub folder
+(DE_EXAMS_REPO, a …/tree/<branch>/<folder> link): <folder>/<chapter>/exam.json (id, name, domains)
+and <folder>/<chapter>/questions/*.json. A manager's Sync makes a new chapter an exam open to all
+members and updates the others like an upload (banks whose file hasn't changed are skipped); a
+bank gone from the folder leaves its exam, a chapter gone from it is turned off. Read at the
+branch's latest commit, so GitHub's cache never serves an old file.
+
 A demo exam (exam_demo.json: 10 questions, open to everyone) is added once, when the tables are
 made; managers may change, close or delete it — it doesn't come back.
 
@@ -61,6 +68,7 @@ AUDIENCES = ("all", "teams", "off")
 SLOT_TYPES = ("hotspot", "drag-drop", "yes-no")
 MAX_BYTES = 32 << 20
 GITHUB_HOSTS = ("raw.githubusercontent.com", "gist.githubusercontent.com")
+DE_EXAMS_REPO = os.environ.get("DE_EXAMS_REPO", "https://github.com/maarthala/de-lab-exams/tree/main/de-lab")
 S3_HOST = re.compile(r"^([a-z0-9.-]+\.)?s3([.-][a-z0-9-]+)*\.amazonaws\.com$")
 DEMO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exam_demo.json")
 _ready = False
@@ -77,6 +85,7 @@ CREATE TABLE IF NOT EXISTS exams (
   audience text NOT NULL DEFAULT 'off', teams text[] NOT NULL DEFAULT '{}',
   updated_at timestamptz NOT NULL DEFAULT now(), updated_by text);
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS cert text;
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS source text;
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS show_domain boolean NOT NULL DEFAULT true;
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS show_tags boolean NOT NULL DEFAULT true;
 CREATE TABLE IF NOT EXISTS exam_sources (
@@ -495,13 +504,18 @@ def fetch_link(url):
         host, path = "raw.githubusercontent.com", f"/{m[1]}/{m[2]}/{m[3]}"
     if host not in GITHUB_HOSTS and not S3_HOST.match(host):
         raise ExamError("only links to a public GitHub file or an AWS S3 presigned URL are accepted")
+    return _download(host, path, u.query), host + path
+
+
+def _download(host, path, query=""):
+    """GET https://host/path — public addresses only, no redirects, at most MAX_BYTES."""
     try:
         addrs = {a[4][0] for a in socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)}
     except OSError:
         raise ExamError(f"can't find {host}") from None
     if not addrs or not all(ipaddress.ip_address(a).is_global for a in addrs):
         raise ExamError(f"{host} isn't a public address")
-    link = urllib.parse.urlunsplit(("https", host, path, u.query, ""))
+    link = urllib.parse.urlunsplit(("https", host, path, query, ""))
     try:
         with urllib.request.build_opener(_NoRedirect).open(
                 urllib.request.Request(link, headers={"User-Agent": "de-lab-portal"}), timeout=20) as r:
@@ -514,7 +528,7 @@ def fetch_link(url):
         raise ExamError(f"could not download the link: {getattr(e, 'reason', e)}") from None
     if len(raw) > MAX_BYTES:
         raise ExamError(f"the file is larger than {MAX_BYTES >> 20} MB")
-    return raw, host + path
+    return raw
 
 
 def upload(by, exam_id, file=None, key=None, url=None, filename=None):
@@ -636,6 +650,104 @@ def upload_meta(meta, by, exam_id=None):
     _q("UPDATE exams SET provider = %s, domains = %s, cert = coalesce(cert, %s), updated_at = now(), updated_by = %s WHERE id = %s",
        (meta.get("provider"), json.dumps(domains), cert, by, e["id"]), rows=False)
     return {"exam": e["id"], "name": e["name"], "domains": len(domains), "created": False}
+
+
+_syncing = threading.Lock()
+
+
+def sync_delab(by):
+    """DE lab exams from the public GitHub folder (DE_EXAMS_REPO) → per chapter what changed."""
+    m = re.fullmatch(r"https://github\.com/([\w.-]+)/([\w.-]+)/tree/([\w./-]+?)/([\w./-]+?)/?", DE_EXAMS_REPO.strip())
+    if not m:
+        raise ExamError("DE_EXAMS_REPO must be https://github.com/<owner>/<repo>/tree/<branch>/<folder>")
+    owner, repo, branch, base = m.groups()
+    if not _syncing.acquire(blocking=False):
+        raise ExamError("a sync is already running — try again in a minute")
+    try:
+        def api(path, query=""):
+            try:
+                return json.loads(_download("api.github.com", f"/repos/{owner}/{repo}/{path}", query))
+            except ExamError as e:
+                raise ExamError(f"GitHub: {e}" + (" (GitHub allows 60 reads an hour without a login)" if "403" in str(e) else "")) from None
+        commit = api(f"commits/{urllib.parse.quote(branch, safe='')}")["sha"]
+        tree = api(f"git/trees/{commit}", "recursive=1")
+        files = [t["path"][len(base) + 1:] for t in tree.get("tree", [])
+                 if t.get("type") == "blob" and t["path"].startswith(base + "/") and t["path"].endswith(".json")]
+        chapters = {}
+        for f in files:
+            parts = f.split("/")
+            if len(parts) == 2 and parts[1] == "exam.json":
+                chapters.setdefault(parts[0], []).insert(0, f)
+            elif len(parts) == 3 and parts[1] == "questions":
+                chapters.setdefault(parts[0], []).append(f)
+        if not chapters:
+            raise ExamError(f"no chapters in {base}/ (each: <chapter>/exam.json and <chapter>/questions/*.json)")
+
+        def raw(f):
+            data = _download("raw.githubusercontent.com", f"/{owner}/{repo}/{commit}/{urllib.parse.quote(base + '/' + f)}")
+            try:
+                return data, json.loads(data)
+            except ValueError:
+                raise ExamError(f"{f} isn't JSON") from None
+        out, seen = [], set()
+        for ch in sorted(chapters):
+            res = {"chapter": ch, "problems": []}
+            out.append(res)
+            try:
+                if not chapters[ch][0].endswith("/exam.json"):
+                    raise ExamError("no exam.json")
+                meta = raw(chapters[ch][0])[1]
+                eid = meta.get("id", "")
+                if not EXAM_ID.match(eid) or not isinstance(meta.get("name"), str) or not meta["name"].strip():
+                    raise ExamError("exam.json needs an id (lower-case words joined by '-') and a name")
+                res.update(exam=eid, name=meta["name"].strip())
+                e = _q("SELECT id, source FROM exams WHERE id = %s", (eid,), one=True)
+                if e and e["source"] != "delab":
+                    raise ExamError(f"the portal already has an exam '{eid}' that isn't from the DE lab — rename one of them")
+                domains = [{"id": str(d.get("id")), "name": d.get("name", ""), "weight": d.get("weight_percent")}
+                           for d in meta.get("domains") or [] if isinstance(d, dict)]
+                if not e:
+                    count = int((meta.get("exam_format") or {}).get("question_count") or 20)
+                    _q("INSERT INTO exams (id, name, cert, provider, domains, num_questions, audience, source, updated_by) "
+                       "VALUES (%s, %s, %s, %s, %s, %s, 'all', 'delab', %s)",
+                       (eid, res["name"], eid, meta.get("provider"), json.dumps(domains), count, by), rows=False)
+                    res["created"] = True
+                else:
+                    _q("UPDATE exams SET name = %s, provider = %s, domains = %s, updated_at = now(), updated_by = %s WHERE id = %s",
+                       (res["name"], meta.get("provider"), json.dumps(domains), by, eid), rows=False)
+                seen.add(eid)
+                have = {b["bank"]: b["sha256"] for b in _q("SELECT bank, sha256 FROM exam_sources WHERE exam_id = %s", (eid,))}
+                keep, totals = set(), {"new": 0, "changed": 0, "removed": 0, "unchanged": 0, "skipped": 0, "banks_removed": 0}
+                for f in chapters[ch][1:]:
+                    try:
+                        data, bank = raw(f)
+                        key = f"{bank.get('exam_id')}/{bank.get('source')}"
+                        keep.add(key)
+                        sha = hashlib.sha256(data).hexdigest()
+                        if have.get(key) == sha:
+                            totals["unchanged"] += _q("SELECT questions FROM exam_sources WHERE exam_id = %s AND bank = %s",
+                                                      (eid, key), one=True)["questions"]
+                            continue
+                        r = _store_bank(bank, sha, by, eid, filename=f"{base}/{f}", via="sync")
+                        for k in ("new", "changed", "removed", "unchanged", "skipped"):
+                            totals[k] += r[k]
+                    except ExamError as x:
+                        res["problems"].append(f"{f}: {x}")
+                for gone in sorted(set(have) - keep):
+                    if not any(p.startswith(f"{ch}/questions/") for p in res["problems"]):
+                        delete_bank(eid, gone)
+                        totals["banks_removed"] += 1
+                res.update(totals, pool=pool_size(eid))
+            except ExamError as x:
+                res["problems"].append(str(x))
+        off = [e["id"] for e in _q("SELECT id FROM exams WHERE source = 'delab' AND audience <> 'off' AND NOT id = ANY(%s)",
+                                    (sorted(seen) or [""],))]
+        if off:
+            _q("UPDATE exams SET audience = 'off', updated_at = now(), updated_by = %s WHERE id = ANY(%s)", (by, off), rows=False)
+        print(f"[exams] {by}: DE lab sync at {commit[:7]} — {len(out)} chapter(s)", flush=True)
+        return {"commit": commit[:7], "repo": DE_EXAMS_REPO, "chapters": out, "turned_off": off}
+    finally:
+        _syncing.release()
 
 
 def pool_size(exam_id):

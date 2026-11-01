@@ -14,6 +14,7 @@
     @media (max-width:760px){ .upl{grid-template-columns:1fr} }
     .form{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; max-width:640px}
     .form input, .form select{width:100%}
+    .delab{margin-left:8px; font-size:.72rem; padding:1px 7px; border-radius:999px; background:var(--accent-bg); color:var(--accent)}
     .teampick{display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:12px}
     .teampick label{display:flex; gap:6px; align-items:center; font-size:.9rem; color:var(--ink)}
     tr.link{cursor:pointer}
@@ -93,11 +94,29 @@
         ok.addEventListener('click', create);
         name.addEventListener('keydown', function (x) { if (x.key === 'Enter') create(); });
       });
-      var head = el('div', {class: 'bar'}, [el('h3', {style: 'margin:0', text: data.exams.length ? data.exams.length + ' exam' + (data.exams.length === 1 ? '' : 's') + ' — click one to manage it' : 'No exams yet'}), add]);
+      // ⟳ Sync DE exams: the DE lab chapters' exams, fresh from their public GitHub folder
+      var sync = el('button', {text: '⟳ Sync DE exams', title: 'Load the DE lab chapters\' question banks from GitHub — new chapters, new and updated questions'});
+      sync.addEventListener('click', function () {
+        sync.disabled = true; sync.textContent = 'Syncing…';
+        admin.api('POST', '/api/admin/exams/sync-delab', {}).then(function (r) {
+          var lines = r.chapters.map(function (c) {
+            if (!c.exam || (c.problems.length && c.pool === undefined)) return '✗ ' + (c.name || c.chapter) + ': ' + c.problems.join('; ');
+            var did = [c.new ? c.new + ' new' : '', c.changed ? c.changed + ' updated' : '', c.removed ? c.removed + ' removed' : '',
+                       c.banks_removed ? c.banks_removed + ' bank(s) gone' : ''].filter(Boolean).join(', ');
+            return (c.problems.length ? '⚠ ' : '✓ ') + c.name + (c.created ? ' — new exam, open to all members' : '') + ': ' +
+              (did || 'no changes') + ' · ' + c.pool + ' questions' + (c.skipped ? ' · ' + c.skipped + ' left out (see its upload history)' : '') +
+              (c.problems.length ? ' · ' + c.problems.join('; ') : '');
+          }).concat(r.turned_off.length ? ['Turned off — no longer on GitHub: ' + r.turned_off.join(', ')] : []);
+          admin.show('DE exams synced (GitHub ' + r.commit + ')', lines);
+          load();
+        }).catch(function (x) { admin.show('Sync failed', [x.message], null, true); sync.disabled = false; sync.textContent = '⟳ Sync DE exams'; });
+      });
+      var head = el('div', {class: 'bar'}, [el('h3', {style: 'margin:0', text: data.exams.length ? data.exams.length + ' exam' + (data.exams.length === 1 ? '' : 's') + ' — click one to manage it' : 'No exams yet'}),
+        el('div', {class: 'row'}, [sync, add])]);
       if (!data.exams.length) return el('div', {class: 'card'}, [head, el('div', {class: 'sub', text: 'Create an exam, then add its question banks.'})]);
       var body = el('tbody', {}, data.exams.map(function (e) {
         var tr = el('tr', {class: 'link'}, [
-          el('td', {}, [el('b', {text: e.name}), el('div', {class: 'id', text: e.id})]),
+          el('td', {}, [el('b', {text: e.name}), e.source === 'delab' ? el('span', {class: 'delab', text: 'DE lab'}) : null, el('div', {class: 'id', text: e.id})]),
           el('td', {}, [who(e)]),
           el('td', {class: 'r', text: String(e.pool)}), el('td', {class: 'r', text: String(Math.min(e.num_questions, e.pool || e.num_questions))}),
           el('td', {class: 'r', text: e.pass_percent + ' %'}), el('td', {class: 'r', text: String(e.attempts)}),
@@ -213,6 +232,7 @@
         .concat(nf.length > 30 ? ['… and ' + (nf.length - 30) + ' more'] : []);
     }
     function banksCard(e) {
+      var delab = e.source === 'delab';                   // its banks come from GitHub: ⟳ Sync DE exams, not by hand
       var rows = e.banks.map(function (b) {
         var x = el('button', {class: 'small danger', text: 'Remove'});
         x.addEventListener('click', function () {
@@ -224,14 +244,14 @@
         });
         return el('tr', {}, [el('td', {}, [el('b', {text: b.bank})]), el('td', {class: 'r', text: String(b.questions)}),
           el('td', {class: 'r', text: String(b.updated || 0)}), el('td', {class: 'r', text: String(b.skipped || 0)}),
-          el('td', {class: 'muted', text: when(b.uploaded_at) + ' · ' + (b.uploaded_by || '')}), el('td', {class: 'acts'}, [x])]);
+          el('td', {class: 'muted', text: when(b.uploaded_at) + ' · ' + (b.uploaded_by || '')}), el('td', {class: 'acts'}, delab ? [] : [x])]);
       });
       var add = el('button', {class: 'primary', text: '+ Add question bank'}), form = addForm(e);
       form.hidden = true;
       add.addEventListener('click', function () { form.hidden = false; add.hidden = true; });
       form.addEventListener('lab:cancel', function () { form.hidden = true; add.hidden = false; });
       var hist = (e.uploads || []).map(function (u) {
-        var how = {encrypted: 'encrypted file', link: 'link', file: 'own file'}[u.via];
+        var how = {encrypted: 'encrypted file', link: 'link', file: 'own file', sync: 'DE lab sync'}[u.via];
         return el('tr', {}, [el('td', {class: 'muted', text: when(u.uploaded_at)}), el('td', {style: 'max-width:340px; overflow-wrap:anywhere'}, [el('b', {text: u.filename || u.bank}),
             el('div', {class: 'id', text: (u.filename ? u.bank : '') + (how ? (u.filename ? ' · ' : '') + how : '')})]),
           el('td', {class: 'r', text: num(u.questions)}), el('td', {class: 'r', text: num(u.new)}), el('td', {class: 'r', text: num(u.changed)}),
@@ -248,7 +268,9 @@
         });
         return b;
       }
+      if (delab) add.hidden = true;
       return [el('div', {class: 'card'}, [el('div', {class: 'bar'}, [el('h3', {style: 'margin:0', text: 'Question banks'}), add]), form,
+          delab ? el('div', {class: 'sub', style: 'margin-bottom:8px', text: 'A DE lab exam — its question banks come from GitHub. ⟳ Sync DE exams (on All exams) loads new and updated questions.'}) : null,
           rows.length ? el('div', {class: 'wrap'}, [el('table', {}, [th(['Bank', 'Questions', 'Updated', 'Left out', 'Last upload', '']), el('tbody', {}, rows)])])
                       : el('div', {class: 'sub', text: 'No question banks yet — + Add question bank.'})]),
         el('div', {class: 'card'}, [el('h3', {text: 'Upload history'}),
