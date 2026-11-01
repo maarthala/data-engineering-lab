@@ -37,7 +37,7 @@ DE lab exams (sync_delab()): one exam per course chapter, free banks in a public
 (DE_EXAMS_REPO, a …/tree/<branch>/<folder> link): <folder>/<chapter>/exam.json (id, name, domains)
 and <folder>/<chapter>/questions/*.json. A manager's Sync makes a new chapter an exam open to all
 members and updates the others like an upload (banks whose file hasn't changed are skipped); a
-bank gone from the folder leaves its exam, a chapter gone from it is turned off. Read at the
+bank gone from the folder leaves its exam, a chapter gone from it is deleted (with its attempts). Read at the
 branch's latest commit, so GitHub's cache never serves an old file.
 
 A demo exam (exam_demo.json: 10 questions, open to everyone) is added once, when the tables are
@@ -680,8 +680,8 @@ def sync_delab(by):
                 chapters.setdefault(parts[0], []).insert(0, f)
             elif len(parts) == 3 and parts[1] == "questions":
                 chapters.setdefault(parts[0], []).append(f)
-        if not chapters:                                  # nothing there (yet): nothing changes, nothing is turned off
-            return {"commit": commit[:7], "repo": DE_EXAMS_REPO, "chapters": [], "turned_off": []}
+        if not chapters:                                  # nothing there (yet): nothing changes, nothing is removed
+            return {"commit": commit[:7], "repo": DE_EXAMS_REPO, "chapters": [], "removed": [], "kept_gone": False}
 
         def raw(f):
             data = _download("raw.githubusercontent.com", f"/{owner}/{repo}/{commit}/{urllib.parse.quote(base + '/' + f)}")
@@ -741,12 +741,16 @@ def sync_delab(by):
                 res.update(totals, pool=pool_size(eid))
             except ExamError as x:
                 res["problems"].append(str(x))
-        off = [e["id"] for e in _q("SELECT id FROM exams WHERE source = 'delab' AND audience <> 'off' AND NOT id = ANY(%s)",
-                                    (sorted(seen) or [""],))]
-        if off:
-            _q("UPDATE exams SET audience = 'off', updated_at = now(), updated_by = %s WHERE id = ANY(%s)", (by, off), rows=False)
-        print(f"[exams] {by}: DE lab sync at {commit[:7]} — {len(out)} chapter(s)", flush=True)
-        return {"commit": commit[:7], "repo": DE_EXAMS_REPO, "chapters": out, "turned_off": off}
+        # a chapter gone from GitHub: its exam goes too (with its attempts) — but only when every
+        # chapter's exam.json was read, so a broken file never deletes an exam
+        removed, kept = [], len(seen) < len(chapters)
+        if not kept:
+            removed = [e["id"] for e in _q("SELECT id FROM exams WHERE source = 'delab' AND NOT id = ANY(%s)", (sorted(seen),))]
+            for eid in removed:
+                delete_exam(eid)
+        print(f"[exams] {by}: DE lab sync at {commit[:7]} — {len(out)} chapter(s)"
+              + (f", removed {', '.join(removed)}" if removed else ""), flush=True)
+        return {"commit": commit[:7], "repo": DE_EXAMS_REPO, "chapters": out, "removed": removed, "kept_gone": kept}
     finally:
         _syncing.release()
 
