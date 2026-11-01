@@ -707,10 +707,11 @@ def sync_delab(by):
                 domains = [{"id": str(d.get("id")), "name": d.get("name", ""), "weight": d.get("weight_percent")}
                            for d in meta.get("domains") or [] if isinstance(d, dict)]
                 if not e:
-                    count = int((meta.get("exam_format") or {}).get("question_count") or 20)
-                    _q("INSERT INTO exams (id, name, cert, provider, domains, num_questions, audience, source, updated_by) "
-                       "VALUES (%s, %s, %s, %s, %s, %s, 'all', 'delab', %s)",
-                       (eid, res["name"], eid, meta.get("provider"), json.dumps(domains), count, by), rows=False)
+                    fmt = meta.get("exam_format") or {}
+                    count, passing = int(fmt.get("question_count") or 20), int(fmt.get("passing_score_percent") or 70)
+                    _q("INSERT INTO exams (id, name, cert, provider, domains, num_questions, pass_percent, audience, source, updated_by) "
+                       "VALUES (%s, %s, %s, %s, %s, %s, %s, 'all', 'delab', %s)",
+                       (eid, res["name"], eid, meta.get("provider"), json.dumps(domains), count, passing, by), rows=False)
                     res["created"] = True
                 else:
                     _q("UPDATE exams SET name = %s, provider = %s, domains = %s, updated_at = now(), updated_by = %s WHERE id = %s",
