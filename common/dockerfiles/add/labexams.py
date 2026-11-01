@@ -917,7 +917,9 @@ def review(attempt_id, member):
         raise ExamError("submit the attempt first")
     e = _q("SELECT * FROM exams WHERE id = %s", (a["exam_id"],), one=True)
     qs = _questions(a["vids"])
-    names = {q["domain"]: q["domain_name"] for q in qs if q.get("domain_name")}   # the banks' names, the exam's first
+    # a section's name: the exam's list (its exam.json), else a bank's name for a question in the
+    # section itself (not a sub-section's)
+    names = {q["domain"]: q["domain_name"] for q in qs if q.get("domain_name") and "." not in (q["domain"] or ".")}
     names.update({d["id"]: d["name"] for d in (e["domains"] or [])})
     return {"id": a["id"], "done": True, "domains": names,
             "exam": {"id": e["id"], "name": e["name"], "pass_percent": e["pass_percent"]},
@@ -931,13 +933,10 @@ def review(attempt_id, member):
 
 
 def _by_domain(qs, answers, names):
-    """{domain: [points, questions]} — sub-sections (1.1, 1.2) count under their section (1) when the
-    section has a name; otherwise each keeps its own, so the results show the names the questions did."""
+    """{domain: [points, questions]} by section: sub-sections (1.1, 1.2) count under theirs (1)."""
     out = {}
     for q in qs:
-        d = q["domain"] or "-"
-        if d.split(".")[0] in names:
-            d = d.split(".")[0]
+        d = (q["domain"] or "").split(".")[0] or "-"
         p, _ = _mark(q, answers.get(str(q["vid"])))
         v = out.setdefault(d, [0, 0])
         v[0], v[1] = round(v[0] + p, 2), v[1] + 1
