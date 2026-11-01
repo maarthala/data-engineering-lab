@@ -71,8 +71,23 @@
     function when(iso) { return new Date(iso).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}); }
     var NUM = /^(Questions|Attempts|Average|In progress|Score|Best|Passed|Time|Left out|Updated|Per attempt|Pass mark|New|Removed|Unchanged)$/;
     function th(list) { return el('thead', {}, [el('tr', {}, list.map(function (h) { return el('th', {class: NUM.test(h) ? 'r' : '', text: h}); }))]); }
-    function who(e) { return e.audience === 'off' ? el('span', {class: 'tag', style: 'margin:0', text: 'off'})
-      : el('span', {class: 'tag on', style: 'margin:0', text: e.audience === 'all' ? 'all members' : (e.teams || []).join(', ')}); }
+    function who(e) { return el('span', {class: 'tag' + (e.enabled ? ' on' : ''), style: 'margin:0', text: e.audience === 'all' ? 'all members' : (e.teams || []).join(', ')}); }
+    // Enabled / Disabled, switched in one click (in the list and in Settings): disabled, members can't
+    // start it, and an attempt in progress can only be submitted as it is
+    function onOff(e) {
+      var b = el('button', {class: 'small' + (e.enabled ? ' on' : ''), text: e.enabled ? '● Enabled' : '○ Disabled',
+                            title: e.enabled ? 'Members can take it — click to disable' : 'Members can\'t start it — click to enable'});
+      b.addEventListener('click', function (x) {
+        x.stopPropagation(); b.disabled = true;
+        admin.api('POST', '/api/admin/exams/settings', {exam: e.id, enabled: !e.enabled}).then(function () {
+          admin.show((e.enabled ? 'Disabled ' : 'Enabled ') + e.name, e.enabled
+            ? ['Members can\'t start it.'].concat(e.ongoing.length ? [e.ongoing.length + ' attempt(s) in progress can\'t be changed any more — only submitted as they are.'] : [])
+            : ['Members can take it again' + (e.ongoing.length ? ', and continue the attempts in progress.' : '.')]);
+          load();
+        }).catch(function (y) { admin.show('Could not change it', [y.message], null, true); b.disabled = false; });
+      });
+      return b;
+    }
     function go(hash) { history.replaceState(null, '', '#' + hash); route(); }
 
     // ---- All exams ----------------------------------------------------------------------------------
@@ -87,7 +102,7 @@
         function create() {
           ok.disabled = true;
           admin.api('POST', '/api/admin/exams/create', {name: name.value}).then(function (r) {
-            admin.show('Exam created: ' + r.name, ['Next: + Add question bank. It is off for members until you open it in Settings.']);
+            admin.show('Exam created: ' + r.name, ['Next: + Add question bank. It is disabled for members until you enable it.']);
             admin.api('GET', '/api/admin/exams').then(function (d) { data = d; go('exams/' + r.exam + '/banks'); });
           }).catch(function (x) { admin.show('Could not create', [x.message], null, true); ok.disabled = false; });
         }
@@ -118,7 +133,7 @@
       var body = el('tbody', {}, data.exams.map(function (e) {
         var tr = el('tr', {class: 'link'}, [
           el('td', {}, [el('b', {text: e.name}), e.source === 'delab' ? el('span', {class: 'delab', text: 'DE lab'}) : null, el('div', {class: 'id', text: e.id})]),
-          el('td', {}, [who(e)]),
+          el('td', {}, [onOff(e)]), el('td', {}, [who(e)]),
           el('td', {class: 'r', text: String(e.pool)}), el('td', {class: 'r', text: String(Math.min(e.num_questions, e.pool || e.num_questions))}),
           el('td', {class: 'r', text: e.pass_percent + ' %'}), el('td', {class: 'r', text: String(e.attempts)}),
           el('td', {class: 'r', text: e.avg_score === null ? '—' : e.avg_score + ' %'}), el('td', {class: 'r', text: String(e.ongoing.length)})]);
@@ -126,7 +141,7 @@
         return tr;
       }));
       return el('div', {class: 'card'}, [head,
-        el('div', {class: 'wrap'}, [el('table', {}, [th(['Exam', 'Who can take it', 'Questions', 'Per attempt', 'Pass mark', 'Attempts', 'Average', 'In progress']), body])])]);
+        el('div', {class: 'wrap'}, [el('table', {}, [th(['Exam', 'Status', 'Who can take it', 'Questions', 'Per attempt', 'Pass mark', 'Attempts', 'Average', 'In progress']), body])])]);
     }
 
     // ---- reading the chosen files ------------------------------------------------------------------
@@ -172,7 +187,7 @@
       var name = el('input', {type: 'text', value: e.name});
       var n = el('input', {type: 'number', min: 1, max: Math.max(1, e.pool), value: Math.min(e.num_questions, e.pool || e.num_questions)});
       var pass = el('input', {type: 'number', min: 1, max: 100, value: e.pass_percent});
-      var audience = el('select', {}, [['off', 'Nobody (off)'], ['all', 'All members'], ['teams', 'Chosen teams']].map(function (o) {
+      var audience = el('select', {}, [['all', 'All members'], ['teams', 'Chosen teams']].map(function (o) {
         var opt = el('option', {value: o[0], text: o[1]}); if (o[0] === e.audience) opt.selected = true; return opt;
       }));
       var picks = data.teams.map(function (t) { var c = el('input', {type: 'checkbox', value: t}); c.checked = (e.teams || []).indexOf(t) >= 0; return {t: t, c: c}; });
@@ -181,6 +196,9 @@
       // what members see with each question (the results by domain stay either way)
       var showDomain = el('input', {type: 'checkbox'}), showTags = el('input', {type: 'checkbox'});
       showDomain.checked = e.show_domain !== false; showTags.checked = e.show_tags !== false;
+      var enabled = el('input', {type: 'checkbox'}); enabled.checked = !!e.enabled;
+      var status = el('div', {class: 'teampick'}, [el('label', {}, [enabled, ' Enabled — members can start it']),
+        el('span', {class: 'sub', text: 'Disabled: no new attempts; one in progress can only be submitted as it is.'})]);
       var labels = el('div', {class: 'teampick'}, [el('span', {class: 'sub', text: 'Members see with each question:'}),
         el('label', {}, [showDomain, ' Domain']), el('label', {}, [showTags, ' Tags'])]);
       function sync() { pickBox.hidden = audience.value !== 'teams'; }
@@ -190,10 +208,10 @@
         save.disabled = true;
         admin.api('POST', '/api/admin/exams/settings', {exam: e.id, name: name.value, num_questions: +n.value, pass_percent: +pass.value,
           audience: audience.value, teams: picks.filter(function (p) { return p.c.checked; }).map(function (p) { return p.t; }),
-          show_domain: showDomain.checked, show_tags: showTags.checked})
+          show_domain: showDomain.checked, show_tags: showTags.checked, enabled: enabled.checked})
           .then(function () {
-            admin.show('Saved ' + name.value, [audience.value === 'off' ? 'Members can\'t see it (off).' : audience.value === 'all'
-              ? 'Open to all members.' : 'Open to the chosen teams.'].concat(e.ongoing.length ? [e.ongoing.length +
+            admin.show('Saved ' + name.value, [(enabled.checked ? 'Enabled' : 'Disabled — members can\'t start it') + ' · ' + (audience.value === 'all'
+              ? 'all members.' : 'the chosen teams.')].concat(e.ongoing.length ? [e.ongoing.length +
               ' attempt(s) in progress keep their questions — delete them under In progress to start them with the new settings.'] : []));
             load();
           }).catch(function (x) { admin.show('Could not save', [x.message], null, true); save.disabled = false; });
@@ -209,7 +227,7 @@
       return [el('div', {class: 'card'}, [el('h3', {text: 'Exam settings'}),
           el('div', {class: 'form'}, [el('label', {}, ['Name', name]), el('label', {}, ['Who can take it', audience]),
             el('label', {}, ['Questions per attempt (pool: ' + e.pool + ')', n]), el('label', {}, ['Pass mark (%)', pass])]),
-          pickBox, labels, el('div', {class: 'row', style: 'margin-top:16px'}, [save])]),
+          pickBox, status, labels, el('div', {class: 'row', style: 'margin-top:16px'}, [save])]),
         el('div', {class: 'card danger-zone'}, [el('h3', {text: 'Delete'}),
           el('div', {class: 'sub', style: 'margin-bottom:10px', text: 'Removes the exam, its question banks and every member\'s attempts.'}), el('div', {class: 'row'}, [del])])];
     }

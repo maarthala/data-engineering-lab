@@ -27,6 +27,7 @@
     .palette{display:flex; flex-wrap:wrap; gap:5px; margin-top:8px}
     .palette button{width:34px; padding:4px 0; font-size:.8rem}
     .palette button.done{background:rgba(57,208,196,.22); border-color:rgba(57,208,196,.5)}
+    .closed{margin-left:8px; font-size:.72rem; padding:1px 7px; border-radius:999px; background:var(--panel2); color:var(--muted); border:1px solid var(--line2)}
     .palette button.flag{position:relative} .palette button.flag::after{content:'⚑'; position:absolute; top:-7px; right:-4px; font-size:.7rem; color:var(--danger)}
     .palette button.cur{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent)}
     .palette button.ok{background:var(--ok-bg); border-color:#b7e1c4; color:var(--ok-ink)} .palette button.bad{background:var(--bad-bg); border-color:#f1b5b0; color:var(--bad-ink)}
@@ -103,7 +104,9 @@
     // one exam = one row (+ its attempts in a row below, opened with History)
     function examRows(e) {
       var s = e.stats;
-      var go = el('button', {class: 'small primary', text: e.open ? 'Resume ' + e.open.answered + '/' + e.open.total : (s.attempts ? 'New attempt' : 'Start')});
+      // closed by the managers: no new attempt; one in progress opens read-only, to submit
+      var go = el('button', {class: 'small primary', text: e.open ? (e.closed ? 'Submit ' : 'Resume ') + e.open.answered + '/' + e.open.total : (s.attempts ? 'New attempt' : 'Start')});
+      go.hidden = e.closed && !e.open;
       go.addEventListener('click', function () {
         go.disabled = true;
         api('POST', '/api/exams/start', {exam: e.id}).then(take).catch(function (x) { alertCard(x.message); go.disabled = false; });
@@ -112,7 +115,8 @@
       more.disabled = !e.history.length;
       var last = e.history[0];
       var row = el('tr', {}, [
-        el('td', {}, [el('b', {text: e.name}), el('div', {class: 'sub', text: (e.provider ? e.provider + ' · ' : '') + 'no time limit'})]),
+        el('td', {}, [el('b', {text: e.name}), e.closed ? el('span', {class: 'closed', text: 'closed'}) : null,
+          el('div', {class: 'sub', text: e.closed ? 'Closed by your lab managers' + (e.open ? ' — submit your attempt as it is' : '') : (e.provider ? e.provider + ' · ' : '') + 'no time limit'})]),
         el('td', {class: 'r', text: String(e.questions)}), el('td', {class: 'r', text: e.pass_percent + ' %'}),
         el('td', {class: 'r', text: String(s.attempts)}), el('td', {class: 'r' + (s.passed ? ' pass' : ''), text: String(s.passed)}),
         el('td', {class: 'r', text: pct(s.best)}), el('td', {class: 'r', text: pct(s.average)}),
@@ -142,11 +146,13 @@
       var i = Math.min(a.position || 0, a.questions.length - 1), answers = a.answers || {}, saving = Promise.resolve();
       var marked = a.marked || [];                         // marked for review — a reminder for you, not marked as wrong
       function save(q) {
+        if (a.closed) return;                              // closed: nothing changes any more
         var v = answers[q.qid], body = {attempt: a.id, qid: q.qid, position: i};
         if (q.slots) body.slots = v || {}; else body.keys = v || [];
         saving = saving.then(function () { return api('POST', '/api/exams/answer', body); })
           .catch(function (e) {
             if (e.message === 'no such attempt') return list('Your lab managers reset this attempt — start the exam again for a new set of questions.');
+            if (/closed this exam/.test(e.message)) return openAttempt(a.id);   // closed meanwhile: read-only, submit
             alertCard('Could not save your answer: ' + e.message);
           });
       }
@@ -207,7 +213,7 @@
         });
         var pause = el('button', {text: '⏸ Pause'});
         pause.addEventListener('click', function () { save(q); saving.then(function () { list(); }); });
-        var submit = el('button', {class: i === a.questions.length - 1 ? 'primary' : '', text: 'Submit exam'});
+        var submit = el('button', {class: i === a.questions.length - 1 || a.closed ? 'primary' : '', text: 'Submit exam'});
         submit.addEventListener('click', function () {
           var left = a.questions.length - Object.keys(answers).length, flags = marked.length;
           var why = [left ? left + ' not answered — they count as wrong' : '', flags ? flags + ' marked for review' : ''].filter(Boolean).join(' · ');
@@ -224,12 +230,18 @@
           return b;
         }));
         main.appendChild(el('div', {class: 'card'}, [
-          el('div', {class: 'bar'}, [el('b', {text: a.exam.name}), el('span', {class: 'sub', text: answered + ' / ' + a.questions.length + ' answered · saved as you go'})]),
+          el('div', {class: 'bar'}, [el('b', {text: a.exam.name}), el('span', {class: 'sub', text: answered + ' / ' + a.questions.length + ' answered · ' + (a.closed ? 'closed — read-only' : 'saved as you go')})]),
           el('div', {class: 'bar'}, [el('div', {}, [el('div', {class: 'sub', text: 'Question ' + (i + 1) + ' of ' + a.questions.length + (q.slots ? ' · ' + SLOT_HINT[q.type] : multi ? ' · choose ' + q.choose : '')}),
             domainOf(a, q) ? el('div', {class: 'sub', style: 'color:var(--accent)', text: domainOf(a, q)}) : null, tagList(q)]), flag]),
           caseBox(a, q), el('div', {class: 'q md', html: md(q.question)}), el('div', {}, opts),
           el('div', {class: 'nav'}, [el('div', {class: 'row'}, [prev, next]), el('div', {class: 'row'}, [pause, submit])])]));
         main.appendChild(el('div', {class: 'card'}, [el('h3', {text: 'Questions' + (marked.length ? ' · ⚑ ' + marked.length + ' marked for review' : '')}), pal]));
+        if (a.closed) {                                    // read-only: look through, then submit
+          main.querySelectorAll('.opt input, table.slots input, table.slots select').forEach(function (x) { x.disabled = true; });
+          flag.hidden = true;
+          main.insertBefore(el('div', {class: 'card result err'}, [el('b', {text: 'Your lab managers closed this exam. '}),
+            el('span', {text: 'You can\'t change your answers any more — submit them as they are to see your result (unanswered questions count as wrong).'})]), main.firstChild);
+        }
       }
       render();
     }

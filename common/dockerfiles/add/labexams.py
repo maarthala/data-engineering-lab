@@ -14,8 +14,9 @@ Questions missing from the new file are retired (out of the pool, still in old r
 attempt holds its question versions: it isn't changed by later uploads. An optional plain
 exam.json gives the provider and domains (and creates the exam when there is none yet).
 
-Managers set how many questions an attempt has, the pass mark, and who may take it: everyone,
-chosen teams, or nobody (off). They see the attempts in progress and can delete them (one or all
+Managers set how many questions an attempt has, the pass mark, who may take it (everyone or chosen
+teams) and whether it is enabled. A disabled exam can't be started; an attempt already in progress
+can't be changed any more, only submitted as it is (and past results stay visible). They see the attempts in progress and can delete them (one or all
 of an exam) — the member's next start then draws a new set from the current questions.
 
 Members take an exam any number of times. Each attempt draws its questions at random, preferring
@@ -82,10 +83,15 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS exams (
   id text PRIMARY KEY, name text NOT NULL, provider text, domains jsonb NOT NULL DEFAULT '[]',
   num_questions int NOT NULL DEFAULT 60, pass_percent int NOT NULL DEFAULT 70,
-  audience text NOT NULL DEFAULT 'off', teams text[] NOT NULL DEFAULT '{}',
+  audience text NOT NULL DEFAULT 'all', teams text[] NOT NULL DEFAULT '{}',
   updated_at timestamptz NOT NULL DEFAULT now(), updated_by text);
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS cert text;
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS source text;
+-- enabled: members may start and work on it; disabled, an attempt in progress can only be submitted.
+-- (It replaces audience 'off': who may take it is all / chosen teams.)
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT true;
+ALTER TABLE exams ALTER COLUMN audience SET DEFAULT 'all';
+UPDATE exams SET enabled = false, audience = 'all' WHERE audience = 'off';
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS show_domain boolean NOT NULL DEFAULT true;
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS show_tags boolean NOT NULL DEFAULT true;
 CREATE TABLE IF NOT EXISTS exam_sources (
@@ -214,7 +220,7 @@ def _seed_demo():
     demo = json.loads(raw)
     exam = upload_meta(demo["exam"], "lab")["exam"]
     _store_bank(demo["bank"], hashlib.sha256(raw).hexdigest(), "lab", exam)
-    _q("UPDATE exams SET audience = 'all' WHERE id = %s", (exam,), rows=False)
+    _q("UPDATE exams SET audience = 'all', enabled = true WHERE id = %s", (exam,), rows=False)
     _q("INSERT INTO portal_meta (key, value) VALUES ('demo_exam', %s)", (exam,), rows=False)
 
 
@@ -471,12 +477,12 @@ def _slug(name):
 
 
 def create_exam(name, by, cert=None, provider=None, domains=None, num_questions=None):
-    """A new, empty exam (off until a manager opens it) → its id."""
+    """A new, empty exam (disabled until a manager enables it) → its id."""
     name = (name or "").strip()
     if not name or len(name) > 120:
         raise ExamError("name: 1–120 characters")
     exam_id = _slug(name)
-    _q("INSERT INTO exams (id, name, cert, provider, domains, num_questions, updated_by) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+    _q("INSERT INTO exams (id, name, cert, provider, domains, num_questions, enabled, updated_by) VALUES (%s, %s, %s, %s, %s, %s, false, %s)",
        (exam_id, name, cert, provider, json.dumps(domains or []), int(num_questions or 60), by), rows=False)
     print(f"[exams] {by}: new exam {exam_id} ({name})", flush=True)
     return {"exam": exam_id, "name": name}
@@ -760,7 +766,7 @@ def pool_size(exam_id):
 
 
 def set_exam(exam_id, by, name=None, num_questions=None, pass_percent=None, audience=None, teams=None,
-             show_domain=None, show_tags=None):
+             show_domain=None, show_tags=None, enabled=None):
     e = _q("SELECT * FROM exams WHERE id = %s", (exam_id,), one=True)
     if not e:
         raise ExamError(f"no exam {exam_id}")
@@ -771,6 +777,9 @@ def set_exam(exam_id, by, name=None, num_questions=None, pass_percent=None, audi
     t = sorted(set(teams if teams is not None else e["teams"]))
     sd = bool(show_domain if show_domain is not None else e["show_domain"])
     st = bool(show_tags if show_tags is not None else e["show_tags"])
+    on = bool(enabled if enabled is not None else e["enabled"])
+    if a == "off":                                       # the old "nobody": disabled
+        a, on = "all", False
     if not name or len(name) > 120:
         raise ExamError("name: 1–120 characters")
     if not 1 <= n <= 500:
@@ -778,11 +787,11 @@ def set_exam(exam_id, by, name=None, num_questions=None, pass_percent=None, audi
     if not 1 <= p <= 100:
         raise ExamError("pass mark: 1–100 %")
     if a not in AUDIENCES:
-        raise ExamError("audience: all, teams or off")
+        raise ExamError("audience: all or teams")
     if a == "teams" and not t:
         raise ExamError("pick at least one team (or choose All members)")
     _q("UPDATE exams SET name=%s, num_questions=%s, pass_percent=%s, audience=%s, teams=%s, show_domain=%s, show_tags=%s, "
-       "updated_at=now(), updated_by=%s WHERE id=%s", (name, n, p, a, t, sd, st, by, exam_id), rows=False)
+       "enabled=%s, updated_at=now(), updated_by=%s WHERE id=%s", (name, n, p, a, t, sd, st, on, by, exam_id), rows=False)
     return admin_exams()
 
 
@@ -878,11 +887,13 @@ def _exam_for(exam_id, team):
 
 
 def my_exams(member, team):
-    """The exams open to the member, each with their stats and any open (paused) attempt."""
+    """The exams open to the member, each with their stats and any open (paused) attempt — and the
+    disabled ones they have attempts in (closed: submit the open one, see past results)."""
     out = []
-    for e in _q("SELECT e.*, (SELECT count(*) FROM exam_qv q WHERE q.exam_id = e.id AND current AND NOT needs_fix) AS pool "
-                "FROM exams e WHERE audience <> 'off' ORDER BY name"):
-        if not _allowed(e, team) or not e["pool"]:
+    for e in _q("SELECT e.*, (SELECT count(*) FROM exam_qv q WHERE q.exam_id = e.id AND current AND NOT needs_fix) AS pool, "
+                "EXISTS (SELECT 1 FROM exam_attempts a WHERE a.exam_id = e.id AND a.member = %s) AS mine "
+                "FROM exams e ORDER BY name", (member,)):
+        if not _allowed(e, team) or not (e["enabled"] and e["pool"] or not e["enabled"] and e["mine"]):
             continue
         done = _q("SELECT id, score, passed, correct, total, started_at, finished_at FROM exam_attempts "
                   "WHERE exam_id = %s AND member = %s AND finished_at IS NOT NULL ORDER BY finished_at DESC",
@@ -890,7 +901,7 @@ def my_exams(member, team):
         open_ = _q("SELECT id, vids, answers, position, started_at FROM exam_attempts "
                    "WHERE exam_id = %s AND member = %s AND finished_at IS NULL", (e["id"], member), one=True)
         scores = [a["score"] for a in done]
-        out.append({"id": e["id"], "name": e["name"], "provider": e["provider"],
+        out.append({"id": e["id"], "name": e["name"], "provider": e["provider"], "closed": not e["enabled"],
                     "questions": min(e["num_questions"], e["pool"]), "pass_percent": e["pass_percent"],
                     "stats": {"attempts": len(done), "passed": sum(1 for a in done if a["passed"]),
                               "best": max(scores) if scores else None, "last": scores[0] if scores else None,
@@ -912,6 +923,8 @@ def start(exam_id, member, team):
                (exam_id, member), one=True)
     if open_:
         return attempt(open_["id"], member, team)
+    if not e["enabled"]:
+        raise ExamError("your lab managers have closed this exam for now")
     pool = _q("SELECT vid, bank, qid FROM exam_qv WHERE exam_id = %s AND current AND NOT needs_fix", (exam_id,))
     if not pool:
         raise ExamError("this exam has no questions yet")
@@ -949,7 +962,7 @@ def attempt(attempt_id, member, team):
     e = _exam_for(a["exam_id"], team)
     qs = _questions(a["vids"])
     return {"id": a["id"], "exam": {"id": e["id"], "name": e["name"], "pass_percent": e["pass_percent"]},
-            "done": False, "position": a["position"], "answers": a["answers"], "marked": a["marked"], "cases": _cases(qs),
+            "done": False, "closed": not e["enabled"], "position": a["position"], "answers": a["answers"], "marked": a["marked"], "cases": _cases(qs),
             "domains": {d["id"]: d["name"] for d in (e.get("domains") or [])},
             "questions": [_labels(e, _shown(q)) for q in qs]}
 
@@ -995,6 +1008,8 @@ def answer(attempt_id, member, qid, keys, position=None, slots=None, mark=None):
         raise ExamError("this attempt is already submitted")
     if qid not in a["vids"]:
         raise ExamError("that question isn't in this attempt")
+    if not _q("SELECT enabled FROM exams WHERE id = %s", (a["exam_id"],), one=True)["enabled"]:
+        raise ExamError("your lab managers closed this exam — your answers so far are kept: submit them to see your result")
     if mark is not None:
         marked = [m for m in a["marked"] if m != qid] + ([qid] if mark else [])
         _q("UPDATE exam_attempts SET marked = %s WHERE id = %s", (marked, a["id"]), rows=False)
