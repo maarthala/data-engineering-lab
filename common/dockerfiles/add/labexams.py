@@ -268,9 +268,10 @@ def decrypt(envelope, key_text):
 
 # the bank schema's fields (certification-exams schema/question-bank.schema.json, 1.0 / 1.1) — any
 # other field is a typo ("anwser") and is reported, not ignored
-BANK_FIELDS = {"$schema", "schema_version", "exam_id", "source", "questions", "case_studies"}
+BANK_FIELDS = {"$schema", "schema_version", "exam_id", "source", "questions", "case_studies", "enabled", "disabled_reason"}
 Q_FIELDS = {"id", "source_number", "type", "case_study", "question", "images", "options", "answer", "choice_pool",
-            "slots", "explanation", "references", "domain", "domain_name", "subdomain_name", "tags", "difficulty", "review"}
+            "slots", "explanation", "references", "domain", "domain_name", "subdomain_name", "tags", "difficulty", "review",
+            "enabled", "disabled_reason"}
 REVIEW_FIELDS = {"status", "answer", "slot_answers", "explanation", "references", "notes", "reviewed_on"}
 REVIEW_STATUS = {"unreviewed", "confirmed", "corrected", "disputed", "needs-fix"}
 QID = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*-[0-9]{3,}$")
@@ -404,8 +405,8 @@ def _which(q, n):
 
 def check_bank(bank):
     """→ (rows to store — usable ones, and needs-fix ones flagged —, case studies, left out
-    [{id, number, text, reason}], needs-fix [same]). Problems with the file itself raise ExamError,
-    every reason listed."""
+    [{id, number, text, reason}], needs-fix [same], disabled at the source [same]). Problems with the
+    file itself raise ExamError, every reason listed."""
     _need_file = []
     if not isinstance(bank, dict):
         raise ExamError("not a question bank")
@@ -434,8 +435,11 @@ def check_bank(bank):
         _need_file.append("the same question id more than once: " + ", ".join(twice[:10]))
     if _need_file:
         raise ExamError("; ".join(_need_file))
-    rows, left_out, needs_fix = [], [], []
+    rows, left_out, needs_fix, disabled = [], [], [], []
     for n, q in enumerate(qs):
+        if isinstance(q, dict) and q.get("enabled") is False:     # disabled at the source: not loaded
+            disabled.append(dict(_which(q, n), reason=str(q.get("disabled_reason") or "").strip()[:300]))
+            continue
         review = (q.get("review") or {}) if isinstance(q, dict) else {}
         if isinstance(review, dict) and review.get("status") == "needs-fix":
             note = str(review.get("notes") or "").strip()[:300]
@@ -448,9 +452,33 @@ def check_bank(bank):
             rows.append(_question(q, cases))
         except _Bad as e:
             left_out.append(dict(_which(q, n), reason=str(e)))
-    if not any(not r["needs_fix"] for r in rows):
+    if not any(not r["needs_fix"] for r in rows) and not disabled:
         raise ExamError("no usable questions in this file" + (" — " + "; ".join(f"{x['id']} (no. {x['number']}): {x['reason']}" for x in left_out[:5]) if left_out else ""))
-    return rows, cases, left_out, needs_fix
+    return rows, cases, left_out, needs_fix, disabled
+
+
+def _disabled_bank(bank, by, exam_id, filename, via, dry_run):
+    """A bank its source disabled: nothing is loaded; if the exam has it, it is removed (its questions
+    retire — submitted attempts keep them), and the history says so."""
+    for f in ("exam_id", "source"):
+        if not isinstance(bank.get(f), str) or not EXAM_ID.match(bank[f]):
+            raise ExamError(f"{f} {bank.get(f)!r} must be lowercase letters and digits with dashes, e.g. my-exam")
+    e = _q("SELECT id, name FROM exams WHERE id = %s", (exam_id,), one=True)
+    if not e:
+        raise ExamError(f"no exam {exam_id}")
+    key, reason = f"{bank['exam_id']}/{bank['source']}", str(bank.get("disabled_reason") or "").strip()[:300]
+    had = _q("SELECT questions FROM exam_sources WHERE exam_id = %s AND bank = %s", (exam_id, key), one=True)
+    summary = {"exam": exam_id, "name": e["name"], "bank": key, "bank_disabled": True, "reason": reason,
+               "replaces": bool(had), "new": 0, "changed": 0, "removed": had["questions"] if had else 0,
+               "unchanged": 0, "skipped": 0, "left_out": [], "needs_fix": [], "disabled": []}
+    if had and not dry_run:
+        delete_bank(exam_id, key)
+        _q("INSERT INTO exam_uploads (exam_id, bank, filename, via, uploaded_by, questions, new, changed, removed, unchanged, "
+           "skipped, problems) VALUES (%s, %s, %s, %s, %s, 0, 0, 0, %s, 0, 0, %s)",
+           (exam_id, key, (filename or "")[:300] or None, via, by, had["questions"],
+            json.dumps({"bank_disabled": reason or "disabled at its source"})), rows=False)
+        print(f"[exams] {by}: {exam_id} ← {key} disabled at its source — removed ({had['questions']} questions)", flush=True)
+    return dict(summary, pool=pool_size(exam_id))
 
 
 def _case_hash(title, content):
@@ -566,8 +594,12 @@ def upload(by, exam_id, file=None, key=None, url=None, filename=None):
 
 
 def _store_bank(bank, sha256, by, exam_id, dry_run=False, filename=None, via=None):
-    """Add or update one bank in an exam. → what changes (dry_run: only say so)."""
-    rows, cases, left_out, needs_fix = check_bank(bank)
+    """Add or update one bank in an exam. → what changes (dry_run: only say so). A bank disabled at its
+    source (enabled: false) isn't loaded, and leaves the exam if it was there; questions disabled at the
+    source are left out, and leave it too."""
+    if isinstance(bank, dict) and bank.get("enabled") is False:
+        return _disabled_bank(bank, by, exam_id, filename, via, dry_run)
+    rows, cases, left_out, needs_fix, disabled = check_bank(bank)
     cert, source = bank["exam_id"], bank["source"]
     key = f"{cert}/{source}"
     skipped = len(left_out) + len(needs_fix)
@@ -586,7 +618,7 @@ def _store_bank(bank, sha256, by, exam_id, dry_run=False, filename=None, via=Non
     summary = {"exam": exam_id, "name": e["name"], "bank": key,
                "replaces": bool(have), "new": len(new), "changed": len(changed), "removed": len(gone),
                "unchanged": len(rows) - len(new) - len(changed), "skipped": skipped,
-               "left_out": left_out, "needs_fix": needs_fix,
+               "left_out": left_out, "needs_fix": needs_fix, "disabled": disabled,
                "changed_ids": [r["qid"] for r in changed][:50], "removed_ids": gone[:50]}
     if dry_run:
         return summary
@@ -630,8 +662,8 @@ def _store_bank(bank, sha256, by, exam_id, dry_run=False, filename=None, via=Non
             cur.execute("INSERT INTO exam_uploads (exam_id, bank, filename, via, uploaded_by, questions, new, changed, removed, "
                         "unchanged, skipped, problems) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                         (exam_id, key, (filename or "")[:300] or None, via, by, sum(1 for r in rows if not r["needs_fix"]), len(new), len(changed), len(gone),
-                         summary["unchanged"], skipped, json.dumps({"left_out": left_out, "needs_fix": needs_fix})
-                         if left_out or needs_fix else None))
+                         summary["unchanged"], skipped, json.dumps({"left_out": left_out, "needs_fix": needs_fix, "disabled": disabled})
+                         if left_out or needs_fix or disabled else None))
     finally:
         c.close()
     print(f"[exams] {by}: {exam_id} ← {key}: {len(new)} new, {len(changed)} changed, {len(gone)} removed, "
@@ -724,7 +756,8 @@ def sync_delab(by):
                        (res["name"], meta.get("provider"), json.dumps(domains), by, eid), rows=False)
                 seen.add(eid)
                 have = {b["bank"]: b["sha256"] for b in _q("SELECT bank, sha256 FROM exam_sources WHERE exam_id = %s", (eid,))}
-                keep, totals = set(), {"new": 0, "changed": 0, "removed": 0, "unchanged": 0, "skipped": 0, "banks_removed": 0}
+                keep, totals = set(), {"new": 0, "changed": 0, "removed": 0, "unchanged": 0, "skipped": 0, "banks_removed": 0,
+                                       "banks_disabled": 0, "disabled": 0}
                 for f in chapters[ch][1:]:
                     try:
                         data, bank = raw(f)
@@ -738,6 +771,8 @@ def sync_delab(by):
                         r = _store_bank(bank, sha, by, eid, filename=f"{base}/{f}", via="sync")
                         for k in ("new", "changed", "removed", "unchanged", "skipped"):
                             totals[k] += r[k]
+                        totals["banks_disabled"] += bool(r.get("bank_disabled"))
+                        totals["disabled"] += len(r["disabled"])
                     except ExamError as x:
                         res["problems"].append(f"{f}: {x}")
                 for gone in sorted(set(have) - keep):

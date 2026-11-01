@@ -118,7 +118,8 @@
           var lines = r.chapters.map(function (c) {
             if (!c.exam || (c.problems.length && c.pool === undefined)) return '✗ ' + (c.name || c.chapter) + ': ' + c.problems.join('; ');
             var did = [c.new ? c.new + ' new' : '', c.changed ? c.changed + ' updated' : '', c.removed ? c.removed + ' removed' : '',
-                       c.banks_removed ? c.banks_removed + ' bank(s) gone' : ''].filter(Boolean).join(', ');
+                       c.banks_removed ? c.banks_removed + ' bank(s) gone' : '', c.banks_disabled ? c.banks_disabled + ' bank(s) disabled at source' : '',
+                       c.disabled ? c.disabled + ' question(s) disabled at source' : ''].filter(Boolean).join(', ');
             return (c.problems.length ? '⚠ ' : '✓ ') + c.name + (c.created ? ' — new exam, open to all members' : '') + ': ' +
               (did || 'no changes') + ' · ' + c.pool + ' questions' + (c.skipped ? ' · ' + c.skipped + ' left out (see its upload history)' : '') +
               (c.problems.length ? ' · ' + c.problems.join('; ') : '');
@@ -266,7 +267,8 @@
     // the questions an upload left out, each with why — the file's mistakes, and those marked needs-fix
     // each as: id (no. N in the source) "the question's first words" — why
     function problems(p) {
-      var bad = (p && p.left_out) || [], nf = (p && p.needs_fix) || [];
+      var bad = (p && p.left_out) || [], nf = (p && p.needs_fix) || [], off = (p && p.disabled) || [];
+      if (p && p.bank_disabled) return ['The whole bank is disabled at its source' + (p.bank_disabled === true ? '' : ': ' + p.bank_disabled) + ' — removed from the exam.'];
       function which(x) {
         if (typeof x === 'string') return x;                 // older uploads kept only the id
         return x.id + (x.number ? ' (no. ' + x.number + ')' : '') + (x.text ? ' “' + x.text + '”' : '');
@@ -276,7 +278,10 @@
         .concat(bad.length ? ['Fix them in the file and add it again — the other questions are in.'] : [])
         .concat(nf.length ? ['Marked needs-fix in the file (left out on purpose):'] : [])
         .concat(nf.slice(0, 30).map(function (x) { return '• ' + which(x) + (x.reason ? ' — ' + x.reason : ''); }))
-        .concat(nf.length > 30 ? ['… and ' + (nf.length - 30) + ' more'] : []);
+        .concat(nf.length > 30 ? ['… and ' + (nf.length - 30) + ' more'] : [])
+        .concat(off.length ? ['Disabled at the source (not loaded; removed if they were in):'] : [])
+        .concat(off.slice(0, 30).map(function (x) { return '○ ' + which(x) + (x.reason ? ' — ' + x.reason : ''); }))
+        .concat(off.length > 30 ? ['… and ' + (off.length - 30) + ' more'] : []);
     }
     function banksCard(e) {
       var delab = e.source === 'delab';                   // its banks come from GitHub: ⟳ Sync DE exams, not by hand
@@ -377,6 +382,8 @@
             })
         ).then(function (body) { return admin.api('POST', '/api/admin/exams/upload', body); }).then(function (r) {
           if (r.details) return admin.show('Exam details saved', [r.domains + ' domains from ' + (name || 'the file')]);
+          if (r.bank_disabled) return admin.show(r.bank + ' is disabled at its source', [(r.replaces ? 'Removed from the exam — its ' + r.removed +
+            ' questions are out (submitted attempts keep them in their reviews).' : 'Not added.') + (r.reason ? ' Reason: ' + r.reason : ''), r.pool + ' questions in the exam now.']);
           var from = way === 'link' ? 'the link' : name, nothing = r.replaces && !r.new && !r.changed && !r.removed;
           admin.show(nothing ? r.bank + ': nothing changed' : (r.replaces ? 'Updated ' : 'Added ') + r.bank + ' from ' + from, [
             r.new + ' new · ' + r.changed + ' updated · ' + r.removed + ' removed · ' + r.unchanged + ' unchanged' +
