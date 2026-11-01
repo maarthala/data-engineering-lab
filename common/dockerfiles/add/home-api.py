@@ -55,7 +55,7 @@ Changes need the X-Lab-Request header (a plain cross-site form can't send it).
 "📝 Mock exams" — certification practice exams (labexams.py, in the portal database). Members:
 the exams open to them (everyone, or their team), as often as they like; answers are saved as they
 go (leaving = pause), the review comes after submitting. Changes need the X-Lab-Request header.
-  GET    /api/exams                                      open exams + my stats + my paused attempt
+  GET    /api/exams?q=&kind=delab|cert|open&offset=&limit=  open exams + my stats + my paused attempt, a page at a time
   POST   /api/exams/start {"exam"}                       resume my open attempt or draw a new set
   GET    /api/exams/attempt?id=…                         an open attempt (no answers) · a done one: the review
   POST   /api/exams/answer {"attempt", "qid", "keys" | "slots", "position"}   save one answer
@@ -501,8 +501,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(401, {"error": "not logged in"})
         try:
             team = _team_of(lake_name(user))
-            if method == "GET" and path == "/api/exams":
-                return self._json(200, labexams.my_exams(user, team))
+            if method == "GET" and path == "/api/exams":                 # ?q=…&kind=delab|cert|open&offset=&limit=
+                return self._json(200, labexams.my_exams(user, team, q.get("q"), q.get("kind"), q.get("offset"), q.get("limit")))
             if method == "GET" and path == "/api/exams/attempt":
                 return self._json(200, labexams.attempt(q.get("id", "0"), user, team))
             if method != "POST":

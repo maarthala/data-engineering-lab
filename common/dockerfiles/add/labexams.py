@@ -886,22 +886,38 @@ def _exam_for(exam_id, team):
     return e
 
 
-def my_exams(member, team):
+KINDS = {"delab": lambda e: e["source"] == "delab", "cert": lambda e: e["source"] != "delab",
+         "open": lambda e: e["going"]}
+
+
+def my_exams(member, team, search=None, kind=None, offset=0, limit=20):
     """The exams open to the member, each with their stats and any open (paused) attempt — and the
-    disabled ones they have attempts in (closed: submit the open one, see past results)."""
-    out = []
+    disabled ones they have attempts in (closed: submit the open one, see past results). Filtered by
+    search (name / provider / id) and kind (delab · cert · open = an attempt in progress), a page at
+    a time: {exams, total, more}."""
+    words = (search or "").lower().split()
+    found = []
     for e in _q("SELECT e.*, (SELECT count(*) FROM exam_qv q WHERE q.exam_id = e.id AND current AND NOT needs_fix) AS pool, "
-                "EXISTS (SELECT 1 FROM exam_attempts a WHERE a.exam_id = e.id AND a.member = %s) AS mine "
-                "FROM exams e ORDER BY name", (member,)):
+                "EXISTS (SELECT 1 FROM exam_attempts a WHERE a.exam_id = e.id AND a.member = %s) AS mine, "
+                "EXISTS (SELECT 1 FROM exam_attempts a WHERE a.exam_id = e.id AND a.member = %s AND finished_at IS NULL) AS going "
+                "FROM exams e ORDER BY name", (member, member)):
         if not _allowed(e, team) or not (e["enabled"] and e["pool"] or not e["enabled"] and e["mine"]):
             continue
+        if kind in KINDS and not KINDS[kind](e):
+            continue
+        hay = " ".join(str(e[k] or "") for k in ("name", "provider", "id")).lower()
+        if all(w in hay for w in words):
+            found.append(e)
+    offset, limit = max(0, int(offset or 0)), max(1, min(int(limit or 20), 100))
+    out = []
+    for e in found[offset:offset + limit]:
         done = _q("SELECT id, score, passed, correct, total, started_at, finished_at FROM exam_attempts "
                   "WHERE exam_id = %s AND member = %s AND finished_at IS NOT NULL ORDER BY finished_at DESC",
                   (e["id"], member))
         open_ = _q("SELECT id, vids, answers, position, started_at FROM exam_attempts "
                    "WHERE exam_id = %s AND member = %s AND finished_at IS NULL", (e["id"], member), one=True)
         scores = [a["score"] for a in done]
-        out.append({"id": e["id"], "name": e["name"], "provider": e["provider"], "closed": not e["enabled"],
+        out.append({"id": e["id"], "name": e["name"], "provider": e["provider"], "closed": not e["enabled"], "delab": e["source"] == "delab",
                     "questions": min(e["num_questions"], e["pool"]), "pass_percent": e["pass_percent"],
                     "stats": {"attempts": len(done), "passed": sum(1 for a in done if a["passed"]),
                               "best": max(scores) if scores else None, "last": scores[0] if scores else None,
@@ -912,7 +928,7 @@ def my_exams(member, team):
                                 for a in done[:20]],
                     "open": {"id": open_["id"], "answered": len(open_["answers"]), "total": len(open_["vids"]),
                              "started_at": open_["started_at"].isoformat()} if open_ else None})
-    return {"exams": out}
+    return {"exams": out, "total": len(found), "more": offset + limit < len(found)}
 
 
 def start(exam_id, member, team):

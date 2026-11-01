@@ -14,6 +14,7 @@
     @media (max-width:760px){ .upl{grid-template-columns:1fr} }
     .form{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; max-width:640px}
     .form input, .form select{width:100%}
+    .seg{display:inline-flex; gap:4px; flex-wrap:wrap}
     .delab{margin-left:8px; font-size:.72rem; padding:1px 7px; border-radius:999px; background:var(--accent-bg); color:var(--accent)}
     .teampick{display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:12px}
     .teampick label{display:flex; gap:6px; align-items:center; font-size:.9rem; color:var(--ink)}
@@ -130,7 +131,32 @@
       var head = el('div', {class: 'bar'}, [el('h3', {style: 'margin:0', text: data.exams.length ? data.exams.length + ' exam' + (data.exams.length === 1 ? '' : 's') + ' — click one to manage it' : 'No exams yet'}),
         el('div', {class: 'row'}, [sync, add])]);
       if (!data.exams.length) return el('div', {class: 'card'}, [head, el('div', {class: 'sub', text: 'Create an exam, then add its question banks.'})]);
-      var body = el('tbody', {}, data.exams.map(function (e) {
+      // search + a quick filter; rows are added 20 at a time as you scroll (lazy)
+      var KINDS = [['', 'All'], ['delab', 'DE lab'], ['other', 'Other'], ['on', 'Enabled'], ['off', 'Disabled']];
+      var search = el('input', {type: 'search', placeholder: 'Search exams…', value: listFilt.q, style: 'max-width:240px'});
+      var seg = el('span', {class: 'seg'}, KINDS.map(function (k) {
+        var b = el('button', {class: 'small' + (listFilt.kind === k[0] ? ' on' : ''), text: k[1]});
+        b.addEventListener('click', function () { listFilt.kind = k[0]; [].forEach.call(seg.children, function (x) { x.classList.toggle('on', x === b); }); fill(); });
+        return b;
+      }));
+      var count = el('span', {class: 'sub'}), more = el('div', {class: 'sub', style: 'text-align:center; padding:8px'});
+      var shown = [], next = 0, timer;
+      function match(e) {
+        var k = listFilt.kind, hay = [e.name, e.id, e.provider || ''].join(' ').toLowerCase();
+        return (!k || (k === 'delab') === (e.source === 'delab') && (k === 'delab' || k === 'other') || k === 'on' && e.enabled || k === 'off' && !e.enabled) &&
+               listFilt.q.toLowerCase().split(/\s+/).every(function (w) { return hay.indexOf(w) >= 0; });
+      }
+      function fill() { body.innerHTML = ''; shown = data.exams.filter(match); next = 0; grow(); }
+      function grow() {
+        shown.slice(next, next + 20).forEach(function (e) { body.appendChild(row(e)); });
+        next = Math.min(next + 20, shown.length);
+        count.textContent = shown.length === data.exams.length ? '' : shown.length + ' of ' + data.exams.length;
+        more.textContent = !shown.length ? 'No exam matches.' : next < shown.length ? 'Scroll for more…' : '';
+      }
+      search.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(function () { listFilt.q = search.value.trim(); fill(); }, 200); });
+      if (window.IntersectionObserver) new IntersectionObserver(function (es) { if (es[0].isIntersecting && next < shown.length) grow(); }, {rootMargin: '200px'}).observe(more);
+      var body = el('tbody');
+      function row(e) {
         var tr = el('tr', {class: 'link'}, [
           el('td', {}, [el('b', {text: e.name}), e.source === 'delab' ? el('span', {class: 'delab', text: 'DE lab'}) : null, el('div', {class: 'id', text: e.id})]),
           el('td', {}, [onOff(e)]), el('td', {}, [who(e)]),
@@ -139,10 +165,12 @@
           el('td', {class: 'r', text: e.avg_score === null ? '—' : e.avg_score + ' %'}), el('td', {class: 'r', text: String(e.ongoing.length)})]);
         tr.addEventListener('click', function () { go('exams/' + e.id + '/banks'); });
         return tr;
-      }));
-      return el('div', {class: 'card'}, [head,
-        el('div', {class: 'wrap'}, [el('table', {}, [th(['Exam', 'Status', 'Who can take it', 'Questions', 'Per attempt', 'Pass mark', 'Attempts', 'Average', 'In progress']), body])])]);
+      }
+      fill();
+      return el('div', {class: 'card'}, [head, el('div', {class: 'row', style: 'gap:10px; margin:0 0 10px'}, [search, seg, count]),
+        el('div', {class: 'wrap'}, [el('table', {}, [th(['Exam', 'Status', 'Who can take it', 'Questions', 'Per attempt', 'Pass mark', 'Attempts', 'Average', 'In progress']), body])]), more]);
     }
+    var listFilt = {q: '', kind: ''};                      // kept while you move around the page
 
     // ---- reading the chosen files ------------------------------------------------------------------
     function readJson(input) {

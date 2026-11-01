@@ -27,6 +27,8 @@
     .palette{display:flex; flex-wrap:wrap; gap:5px; margin-top:8px}
     .palette button{width:34px; padding:4px 0; font-size:.8rem}
     .palette button.done{background:rgba(57,208,196,.22); border-color:rgba(57,208,196,.5)}
+    .closed.dl{background:var(--accent-bg); color:var(--accent); border-color:transparent}
+    .seg{display:inline-flex; gap:4px; flex-wrap:wrap}
     .closed{margin-left:8px; font-size:.72rem; padding:1px 7px; border-radius:999px; background:var(--panel2); color:var(--muted); border:1px solid var(--line2)}
     .palette button.flag{position:relative} .palette button.flag::after{content:'⚑'; position:absolute; top:-7px; right:-4px; font-size:.7rem; color:var(--danger)}
     .palette button.cur{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent)}
@@ -85,20 +87,48 @@
     function refs(q) { return (q.refs || []).filter(function (x) { return /^https?:\/\//.test(x.url || ''); }); }
     function when(iso) { return new Date(iso).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}); }
 
-    // ---- the list: exams open to me + my stats -------------------------------------------------
+    // ---- the list: exams open to me + my stats — search, a quick filter, and 20 at a time: more load
+    // as you scroll to the end (lazy)
+    var KINDS = [['', 'All'], ['delab', 'DE lab'], ['cert', 'Certifications'], ['open', 'In progress']], filt = {q: '', kind: ''};
     function list(note) {
       if (location.hash) history.replaceState(null, '', location.pathname);
-      api('GET', '/api/exams').then(function (d) {
-        main.innerHTML = '';
-        if (!d.exams.length) main.appendChild(el('div', {class: 'placeholder',
-          text: 'No mock exams are open to you yet — your lab managers add them.'}));
-        else main.appendChild(el('div', {class: 'card'}, [el('h3', {text: d.exams.length + (d.exams.length === 1 ? ' exam' : ' exams') + ' open to you'}),
-          el('div', {class: 'wrap'}, [el('table', {class: 'elist'}, [el('thead', {}, [el('tr', {},
-            ['Exam', 'Questions', 'Pass mark', 'Attempts', 'Passed', 'Best', 'Average', 'Last', '', ''].map(function (h, i) {
-              return el('th', {class: i >= 1 && i <= 7 ? 'r' : '', text: h}); }))])]
-            .concat([el('tbody', {}, [].concat.apply([], d.exams.map(examRows)))]))])]));
-        if (note) alertCard(note);
-      }).catch(fail);
+      main.innerHTML = '';
+      var search = el('input', {type: 'search', placeholder: 'Search exams…', value: filt.q, style: 'max-width:260px'});
+      var seg = el('span', {class: 'seg'}, KINDS.map(function (k) {
+        var b = el('button', {class: 'small' + (filt.kind === k[0] ? ' on' : ''), text: k[1]});
+        b.addEventListener('click', function () { filt.kind = k[0]; [].forEach.call(seg.children, function (x) { x.classList.toggle('on', x === b); }); reload(); });
+        return b;
+      }));
+      var title = el('h3', {style: 'margin:0', text: 'Exams open to you'});
+      var body = el('tbody'), more = el('div', {class: 'sub', style: 'text-align:center; padding:10px'});
+      var table = el('table', {class: 'elist'}, [el('thead', {}, [el('tr', {},
+        ['Exam', 'Questions', 'Pass mark', 'Attempts', 'Passed', 'Best', 'Average', 'Last', '', ''].map(function (h, i) {
+          return el('th', {class: i >= 1 && i <= 7 ? 'r' : '', text: h}); }))]), body]);
+      main.appendChild(el('div', {class: 'card'}, [el('div', {class: 'bar'}, [title, el('span', {class: 'row', style: 'gap:10px'}, [search, seg])]),
+        el('div', {class: 'wrap'}, [table]), more]));
+      if (note) alertCard(note);
+      var next = 0, busy = false, done = false, ask_ = 0, timer;
+      function page() {
+        if (busy || done) return;
+        busy = true; more.textContent = 'Loading…';
+        var mine = ++ask_;
+        api('GET', '/api/exams?q=' + encodeURIComponent(filt.q) + '&kind=' + filt.kind + '&offset=' + next + '&limit=20').then(function (d) {
+          if (mine !== ask_) return;                       // a newer search went out meanwhile
+          busy = false; next += d.exams.length; done = !d.more;
+          d.exams.forEach(function (e) { examRows(e).forEach(function (r) { body.appendChild(r); }); });
+          title.textContent = (filt.q || filt.kind ? d.total + ' of your exams match' : d.total + (d.total === 1 ? ' exam' : ' exams') + ' open to you');
+          table.hidden = !d.total;
+          more.textContent = !d.total ? (filt.q || filt.kind ? 'No exam matches.' : 'No mock exams are open to you yet — your lab managers add them.')
+                           : done ? '' : 'Scroll for more…';
+          if (!done) setTimeout(check, 0);                 // the page may not fill the screen yet
+        }).catch(function (e) { busy = false; if (mine === ask_) more.textContent = 'Could not load: ' + e.message; });
+      }
+      function reload() { body.innerHTML = ''; next = 0; done = false; busy = false; page(); }
+      function check() { if (!done && more.isConnected && more.getBoundingClientRect().top < window.innerHeight + 200) page(); }
+      search.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(function () { filt.q = search.value.trim(); reload(); }, 250); });
+      if (window.IntersectionObserver) new IntersectionObserver(function (es) { if (es[0].isIntersecting) page(); }, {rootMargin: '200px'}).observe(more);
+      else window.addEventListener('scroll', check);
+      page();
     }
     function pct(v) { return v === null || v === undefined ? '—' : v + ' %'; }
     // one exam = one row (+ its attempts in a row below, opened with History)
@@ -115,7 +145,7 @@
       more.disabled = !e.history.length;
       var last = e.history[0];
       var row = el('tr', {}, [
-        el('td', {}, [el('b', {text: e.name}), e.closed ? el('span', {class: 'closed', text: 'closed'}) : null,
+        el('td', {}, [el('b', {text: e.name}), e.delab ? el('span', {class: 'closed dl', text: 'DE lab'}) : null, e.closed ? el('span', {class: 'closed', text: 'closed'}) : null,
           el('div', {class: 'sub', text: e.closed ? 'Closed by your lab managers' + (e.open ? ' — submit your attempt as it is' : '') : (e.provider ? e.provider + ' · ' : '') + 'no time limit'})]),
         el('td', {class: 'r', text: String(e.questions)}), el('td', {class: 'r', text: e.pass_percent + ' %'}),
         el('td', {class: 'r', text: String(s.attempts)}), el('td', {class: 'r' + (s.passed ? ' pass' : ''), text: String(s.passed)}),
