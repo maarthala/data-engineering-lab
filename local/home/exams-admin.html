@@ -116,17 +116,20 @@
         sync.disabled = true; sync.textContent = 'Syncing…';
         admin.api('POST', '/api/admin/exams/sync-delab', {}).then(function (r) {
           var empty = r.chapters.filter(function (c) { return c.empty === 'not loaded'; });
-          var lines = r.chapters.filter(function (c) { return c.empty !== 'not loaded'; }).map(function (c) {
-            if (c.empty) return '○ ' + c.name + ' — disabled: no questions on GitHub (kept for members\' results)';
+          var off = r.chapters.filter(function (c) { return c.empty === 'disabled on GitHub'; });
+          var lines = r.chapters.filter(function (c) { return c.empty !== 'not loaded' && c.empty !== 'disabled on GitHub'; }).map(function (c) {
             if (!c.exam || (c.problems.length && c.pool === undefined)) return '✗ ' + (c.name || c.chapter) + ': ' + c.problems.join('; ');
             var did = [c.new ? c.new + ' new' : '', c.changed ? c.changed + ' updated' : '', c.removed ? c.removed + ' removed' : '',
                        c.banks_removed ? c.banks_removed + ' bank(s) gone' : '', c.banks_disabled ? c.banks_disabled + ' bank(s) disabled at source' : '',
                        c.disabled ? c.disabled + ' question(s) disabled at source' : ''].filter(Boolean).join(', ');
             return (c.problems.length ? '⚠ ' : '✓ ') + c.name + (c.created ? ' — new exam, open to all members' : '') +
-              (c.enabled_now ? ' — enabled again' : '') + ': ' +
+              ': ' +
               (did || 'no changes') + ' · ' + c.pool + ' questions' + (c.skipped ? ' · ' + c.skipped + ' left out (see its upload history)' : '') +
               (c.problems.length ? ' · ' + c.problems.join('; ') : '');
-          }).concat(empty.length ? [empty.length + ' chapter(s) without questions — not loaded: ' + empty.map(function (c) { return c.name || c.chapter; }).join(', ')] : [])
+          }).concat(off.length ? [off.length + ' chapter(s) disabled on GitHub — not loaded' + (off.some(function (c) { return c.removed_exam; }) ? ', removed here' : '') + ': ' +
+              off.map(function (c) { return c.name || c.chapter; }).join(', ')] : [])
+            .concat(empty.length ? [empty.length + ' chapter(s) without questions — not loaded' + (empty.some(function (c) { return c.removed_exam; }) ? ', removed here' : '') + ': ' +
+              empty.map(function (c) { return c.name || c.chapter; }).join(', ')] : [])
             .concat(r.removed.length ? ['Removed — no longer on GitHub: ' + r.removed.join(', ')] : [])
             .concat(r.kept_gone ? ['Nothing removed: fix the chapters above first (a chapter that can\'t be read never deletes an exam).'] : []);
           admin.show(r.chapters.length ? 'DE exams synced (GitHub ' + r.commit + ')' : 'No exams to sync', lines);
