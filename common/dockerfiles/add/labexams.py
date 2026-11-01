@@ -925,8 +925,23 @@ def review(attempt_id, member):
             "finished_at": a["finished_at"].isoformat(),
             "minutes": max(1, round((a["finished_at"] - a["started_at"]).total_seconds() / 60)),
             "by_domain": [{"domain": d, "name": names.get(d, "Unassigned" if d == "-" else f"Domain {d}"),
-                           "correct": v[0], "total": v[1]} for d, v in sorted((a["by_domain"] or {}).items())],
+                           "correct": v[0], "total": v[1]} for d, v in sorted(_by_domain(qs, a["answers"], names).items(),
+                                                                 key=lambda x: [(0, int(p)) if p.isdigit() else (1, p) for p in x[0].split(".")])],
             "cases": _cases(qs), "questions": [_labels(e, _reviewed(q, a["answers"].get(str(q["vid"])))) for q in qs]}
+
+
+def _by_domain(qs, answers, names):
+    """{domain: [points, questions]} — sub-sections (1.1, 1.2) count under their section (1) when the
+    section has a name; otherwise each keeps its own, so the results show the names the questions did."""
+    out = {}
+    for q in qs:
+        d = q["domain"] or "-"
+        if d.split(".")[0] in names:
+            d = d.split(".")[0]
+        p, _ = _mark(q, answers.get(str(q["vid"])))
+        v = out.setdefault(d, [0, 0])
+        v[0], v[1] = round(v[0] + p, 2), v[1] + 1
+    return out
 
 
 def _labels(e, d):
