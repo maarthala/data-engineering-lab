@@ -38,7 +38,8 @@ DE lab exams (sync_delab()): one exam per course chapter, free banks in a public
 (DE_EXAMS_REPO, a …/tree/<branch>/<folder> link): <folder>/<chapter>/exam.json (id, name, domains)
 and <folder>/<chapter>/questions/*.json. A manager's Sync makes a new chapter an exam open to all
 members and updates the others like an upload (banks whose file hasn't changed are skipped); a
-chapter without usable questions (no bank, or all disabled) is disabled until it has some; a
+chapter without usable questions (no bank, or all disabled) isn't loaded (kept but disabled when
+members have attempts in it, until it has questions again); a
 bank gone from the folder leaves its exam, a chapter gone from it is deleted (with its attempts). Read at the
 branch's latest commit, so GitHub's cache never serves an old file.
 
@@ -697,13 +698,22 @@ def upload_meta(meta, by, exam_id=None):
 _syncing = threading.Lock()
 
 
-def _sync_state(eid, pool):
-    """A DE lab chapter without usable questions on GitHub (no bank, or all disabled) is disabled until
-    it has some; the sync enables it again only if it was the sync that disabled it."""
-    st = _q("SELECT enabled, sync_off FROM exams WHERE id = %s", (eid,), one=True)
-    if not pool and st["enabled"]:
+def _empty_chapter(eid):
+    """A DE lab chapter without usable questions on GitHub (no bank, or all disabled) isn't loaded: its
+    exam goes — unless members have attempts in it, then it is only disabled (their results stay) until
+    it has questions again."""
+    if not _q("SELECT 1 AS x FROM exam_attempts WHERE exam_id = %s LIMIT 1", (eid,), one=True):
+        delete_exam(eid)
+        return {"empty": "not loaded"}
+    st = _q("SELECT enabled FROM exams WHERE id = %s", (eid,), one=True)
+    if st["enabled"]:
         _q("UPDATE exams SET enabled = false, sync_off = true WHERE id = %s", (eid,), rows=False)
-        return {"disabled_now": True}
+    return {"empty": "disabled", "disabled_now": st["enabled"]}
+
+
+def _sync_state(eid, pool):
+    """A chapter with questions again: the sync enables it if it was the sync that disabled it."""
+    st = _q("SELECT enabled, sync_off FROM exams WHERE id = %s", (eid,), one=True)
     if pool and st["sync_off"]:
         _q("UPDATE exams SET enabled = true, sync_off = false WHERE id = %s", (eid,), rows=False)
         return {"enabled_now": True}
@@ -759,6 +769,10 @@ def sync_delab(by):
                 e = _q("SELECT id, source FROM exams WHERE id = %s", (eid,), one=True)
                 if e and e["source"] != "delab":
                     raise ExamError(f"the portal already has an exam '{eid}' that isn't from the DE lab — rename one of them")
+                seen.add(eid)
+                if len(chapters[ch]) == 1:                    # no question bank in it: not loaded
+                    res.update(_empty_chapter(eid) if e else {"empty": "not loaded"})
+                    continue
                 domains = [{"id": str(d.get("id")), "name": d.get("name", ""), "weight": d.get("weight_percent")}
                            for d in meta.get("domains") or [] if isinstance(d, dict)]
                 if not e:
@@ -771,7 +785,6 @@ def sync_delab(by):
                 else:
                     _q("UPDATE exams SET name = %s, provider = %s, domains = %s, updated_at = now(), updated_by = %s WHERE id = %s",
                        (res["name"], meta.get("provider"), json.dumps(domains), by, eid), rows=False)
-                seen.add(eid)
                 have = {b["bank"]: b["sha256"] for b in _q("SELECT bank, sha256 FROM exam_sources WHERE exam_id = %s", (eid,))}
                 keep, totals = set(), {"new": 0, "changed": 0, "removed": 0, "unchanged": 0, "skipped": 0, "banks_removed": 0,
                                        "banks_disabled": 0, "disabled": 0}
@@ -797,7 +810,7 @@ def sync_delab(by):
                         delete_bank(eid, gone)
                         totals["banks_removed"] += 1
                 res.update(totals, pool=pool_size(eid))
-                res.update(_sync_state(eid, res["pool"]))
+                res.update(_empty_chapter(eid) if not res["pool"] else _sync_state(eid, res["pool"]))
             except ExamError as x:
                 res["problems"].append(str(x))
         # a chapter gone from GitHub: its exam goes too (with its attempts) — but only when every
