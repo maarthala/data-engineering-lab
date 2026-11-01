@@ -38,8 +38,9 @@ DE lab exams (sync_delab()): one exam per course chapter, free banks in a public
 (DE_EXAMS_REPO, a …/tree/<branch>/<folder> link): <folder>/<chapter>/exam.json (id, name, domains)
 and <folder>/<chapter>/questions/*.json. A manager's Sync makes a new chapter an exam open to all
 members and updates the others like an upload (banks whose file hasn't changed are skipped); a
-chapter whose exam.json says "enabled": false, or without usable questions (no bank, or all
-disabled), isn't loaded, and its exam is removed (with its attempts); a
+chapter whose exam.json says "enabled": false — exam.json alone decides; a bank's or question's own
+"enabled" is ignored here — or without usable questions isn't loaded, and its exam is removed (with
+its attempts); a
 bank gone from the folder leaves its exam, a chapter gone from it is deleted (with its attempts). Read at the
 branch's latest commit, so GitHub's cache never serves an old file.
 
@@ -695,6 +696,18 @@ def upload_meta(meta, by, exam_id=None):
 _syncing = threading.Lock()
 
 
+def _all_enabled(bank):
+    """For the sync, exam.json alone says whether a chapter is enabled: a bank's or a question's own
+    enabled / disabled_reason is ignored."""
+    if not isinstance(bank, dict):
+        return bank
+    out = {k: v for k, v in bank.items() if k not in ("enabled", "disabled_reason")}
+    if isinstance(out.get("questions"), list):
+        out["questions"] = [{k: v for k, v in q.items() if k not in ("enabled", "disabled_reason")} if isinstance(q, dict) else q
+                            for q in out["questions"]]
+    return out
+
+
 def _empty_chapter(eid):
     """A DE lab chapter without usable questions on GitHub (no bank, or all disabled) isn't loaded: its
     exam is removed, with its attempts — GitHub decides what the DE lab has."""
@@ -774,8 +787,7 @@ def sync_delab(by):
                     _q("UPDATE exams SET name = %s, provider = %s, domains = %s, updated_at = now(), updated_by = %s WHERE id = %s",
                        (res["name"], meta.get("provider"), json.dumps(domains), by, eid), rows=False)
                 have = {b["bank"]: b["sha256"] for b in _q("SELECT bank, sha256 FROM exam_sources WHERE exam_id = %s", (eid,))}
-                keep, totals = set(), {"new": 0, "changed": 0, "removed": 0, "unchanged": 0, "skipped": 0, "banks_removed": 0,
-                                       "banks_disabled": 0, "disabled": 0}
+                keep, totals = set(), {"new": 0, "changed": 0, "removed": 0, "unchanged": 0, "skipped": 0, "banks_removed": 0}
                 for f in chapters[ch][1:]:
                     try:
                         data, bank = raw(f)
@@ -786,11 +798,9 @@ def sync_delab(by):
                             totals["unchanged"] += _q("SELECT questions FROM exam_sources WHERE exam_id = %s AND bank = %s",
                                                       (eid, key), one=True)["questions"]
                             continue
-                        r = _store_bank(bank, sha, by, eid, filename=f"{base}/{f}", via="sync")
+                        r = _store_bank(_all_enabled(bank), sha, by, eid, filename=f"{base}/{f}", via="sync")
                         for k in ("new", "changed", "removed", "unchanged", "skipped"):
                             totals[k] += r[k]
-                        totals["banks_disabled"] += bool(r.get("bank_disabled"))
-                        totals["disabled"] += len(r["disabled"])
                     except ExamError as x:
                         res["problems"].append(f"{f}: {x}")
                 for gone in sorted(set(have) - keep):

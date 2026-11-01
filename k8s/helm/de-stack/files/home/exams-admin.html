@@ -120,8 +120,7 @@
           var lines = r.chapters.filter(function (c) { return c.empty !== 'not loaded' && c.empty !== 'disabled on GitHub'; }).map(function (c) {
             if (!c.exam || (c.problems.length && c.pool === undefined)) return '✗ ' + (c.name || c.chapter) + ': ' + c.problems.join('; ');
             var did = [c.new ? c.new + ' new' : '', c.changed ? c.changed + ' updated' : '', c.removed ? c.removed + ' removed' : '',
-                       c.banks_removed ? c.banks_removed + ' bank(s) gone' : '', c.banks_disabled ? c.banks_disabled + ' bank(s) disabled at source' : '',
-                       c.disabled ? c.disabled + ' question(s) disabled at source' : ''].filter(Boolean).join(', ');
+                       c.banks_removed ? c.banks_removed + ' bank(s) gone' : ''].filter(Boolean).join(', ');
             return (c.problems.length ? '⚠ ' : '✓ ') + c.name + (c.created ? ' — new exam, open to all members' : '') +
               ': ' +
               (did || 'no changes') + ' · ' + c.pool + ' questions' + (c.skipped ? ' · ' + c.skipped + ' left out (see its upload history)' : '') +
