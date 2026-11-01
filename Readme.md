@@ -56,6 +56,7 @@ integration-level updates (like AdventureWorks or SQLPad) get an entry.
 
 | Date | Release / integration | What it adds | Scope |
 |---|---|---|---|
+| 2026-11-01 | **Mock exams: DE lab exams (v1.5.0)** | ⟳ Sync DE exams loads the course chapters' free banks from GitHub; enable / disable and soft delete exams; mark for review; domains and tags; search and lazy loading | local · k8s |
 | 2026-10-30 | **Mock exams: question banks (v1.4.0)** | Exams hold several banks; re-uploads update questions with versions; add by encrypted file, link or own file (template); upload checks with reasons; second try in the review | local · k8s |
 | 2026-10-29 | **Mock exams: richer questions (v1.3.0)** | Case studies, hotspot / drag-drop / yes-no questions with per-answer credit, and a Questions view for managers | local · k8s |
 | 2026-10-29 | **New portal** | Light look with a left menu; the tools open inside the portal; a personal Home; Manage split into tabs. Locally one open port: everything at `http://<app>.lab.localhost:8000` | local · k8s |
