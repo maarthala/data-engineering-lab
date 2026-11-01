@@ -680,8 +680,8 @@ def sync_delab(by):
                 chapters.setdefault(parts[0], []).insert(0, f)
             elif len(parts) == 3 and parts[1] == "questions":
                 chapters.setdefault(parts[0], []).append(f)
-        if not chapters:
-            raise ExamError(f"no chapters in {base}/ (each: <chapter>/exam.json and <chapter>/questions/*.json)")
+        if not chapters:                                  # nothing there (yet): nothing changes, nothing is turned off
+            return {"commit": commit[:7], "repo": DE_EXAMS_REPO, "chapters": [], "turned_off": []}
 
         def raw(f):
             data = _download("raw.githubusercontent.com", f"/{owner}/{repo}/{commit}/{urllib.parse.quote(base + '/' + f)}")

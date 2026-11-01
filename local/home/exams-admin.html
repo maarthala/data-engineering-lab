@@ -107,7 +107,7 @@
               (did || 'no changes') + ' · ' + c.pool + ' questions' + (c.skipped ? ' · ' + c.skipped + ' left out (see its upload history)' : '') +
               (c.problems.length ? ' · ' + c.problems.join('; ') : '');
           }).concat(r.turned_off.length ? ['Turned off — no longer on GitHub: ' + r.turned_off.join(', ')] : []);
-          admin.show('DE exams synced (GitHub ' + r.commit + ')', lines);
+          admin.show(r.chapters.length ? 'DE exams synced (GitHub ' + r.commit + ')' : 'No exams to sync', lines);
           load();
         }).catch(function (x) { admin.show('Sync failed', [x.message], null, true); sync.disabled = false; sync.textContent = '⟳ Sync DE exams'; });
       });
