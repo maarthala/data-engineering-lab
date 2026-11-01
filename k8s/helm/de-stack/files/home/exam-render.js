@@ -94,10 +94,11 @@ function md(s) {
   return clean(out);
 }
 function mdLine(s) { return clean(inline(String(s || '').replace(/\n/g, ' '))); }   // an option: one line
-function domainOf(a, q) {                             // "Domain 2 · Ingest and process data" ('' when none)
+function domainOf(a, q) {                             // "Domain 1 · Designing … › 1.1 Designing for …" ('' when none)
   if (!q.domain) return '';
-  var n = (a.domains || {})[q.domain] || q.domain_name;   // the exam's list first, else the bank's
-  return 'Domain ' + q.domain + (n ? ' · ' + n : '');
+  var names = a.domains || {}, top = q.domain.split('.')[0];
+  var n = names[top] || q.domain_name, sub = q.domain !== top ? names[q.domain] || q.subdomain_name : null;   // the exam's list first, else the bank's
+  return 'Domain ' + top + (n ? ' · ' + n : '') + (q.domain !== top ? ' › ' + q.domain + (sub ? ' ' + sub : '') : '');
 }
 function tagList(q, onPick) {                          // the question's tags as small chips (null when none)
   if (!(q.tags || []).length) return null;
