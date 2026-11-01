@@ -14,6 +14,14 @@ Bronze→Silver→Gold lakehouse and map every skill to Databricks, Snowflake & 
 Start with **Prerequisites & setup** and **Bring up the stack**, then work through the units.
 The stack's landing page links straight to this course, so it's always the current version.
 
+## 📝 DE lab exams
+
+Free practice questions for each course chapter, in a public repo:
+
+**→ [github.com/maarthala/de-lab-exams](https://github.com/maarthala/de-lab-exams)**
+
+Lab managers load them with **⟳ Sync DE exams** (Mock exams); members then take a mock exam per chapter.
+
 ## 💬 Community & help
 
 Join our **Discord** to discuss the stack, get help with setup or problems, and connect
