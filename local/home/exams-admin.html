@@ -69,6 +69,21 @@
       n.addEventListener('click', function () { box.remove(); btn.hidden = false; });
       y.addEventListener('click', function () { box.remove(); btn.hidden = false; yes(btn); });
     }
+    // Delete an exam (asked inline): a soft delete — the exam and members' attempts and results are
+    // hidden, kept in the database
+    function delButton(e, small) {
+      var del = el('button', {class: (small ? 'small ' : '') + 'danger', text: small ? 'Delete' : 'Delete exam'});
+      del.addEventListener('click', function (x) {
+        x.stopPropagation();
+        ask(del, 'Delete ' + e.name + '? Members\' attempts and results go with it' + (e.ongoing.length ? ' (' + e.ongoing.length + ' in progress)' : '') + '.', 'Yes, delete', function () {
+          admin.api('POST', '/api/admin/exams/delete', {exam: e.id})
+            .then(function () { admin.show('Deleted ' + e.name, ['Members no longer see it or their results for it.']); history.replaceState(null, '', '#exams'); load(); })
+            .catch(function (y) { admin.show('Could not delete', [y.message], null, true); });
+        }, true);
+        var box = del.nextSibling; if (box) box.addEventListener('click', function (y) { y.stopPropagation(); });
+      });
+      return del;
+    }
     function when(iso) { return new Date(iso).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}); }
     var NUM = /^(Questions|Attempts|Average|In progress|Score|Best|Passed|Time|Left out|Updated|Per attempt|Pass mark|New|Removed|Unchanged)$/;
     function th(list) { return el('thead', {}, [el('tr', {}, list.map(function (h) { return el('th', {class: NUM.test(h) ? 'r' : '', text: h}); }))]); }
@@ -157,13 +172,14 @@
           el('td', {}, [onOff(e)]), el('td', {}, [who(e)]),
           el('td', {class: 'r', text: String(e.pool)}), el('td', {class: 'r', text: String(Math.min(e.num_questions, e.pool || e.num_questions))}),
           el('td', {class: 'r', text: e.pass_percent + ' %'}), el('td', {class: 'r', text: String(e.attempts)}),
-          el('td', {class: 'r', text: e.avg_score === null ? '—' : e.avg_score + ' %'}), el('td', {class: 'r', text: String(e.ongoing.length)})]);
+          el('td', {class: 'r', text: e.avg_score === null ? '—' : e.avg_score + ' %'}), el('td', {class: 'r', text: String(e.ongoing.length)}),
+          el('td', {class: 'acts'}, [delButton(e, true)])]);
         tr.addEventListener('click', function () { go('exams/' + e.id + '/banks'); });
         return tr;
       }
       fill();
       return el('div', {class: 'card'}, [head, el('div', {class: 'row', style: 'gap:10px; margin:0 0 10px'}, [search, seg, count]),
-        el('div', {class: 'wrap'}, [el('table', {}, [th(['Exam', 'Status', 'Who can take it', 'Questions', 'Per attempt', 'Pass mark', 'Attempts', 'Average', 'In progress']), body])]), more]);
+        el('div', {class: 'wrap'}, [el('table', {}, [th(['Exam', 'Status', 'Who can take it', 'Questions', 'Per attempt', 'Pass mark', 'Attempts', 'Average', 'In progress', '']), body])]), more]);
     }
     var listFilt = {q: '', kind: ''};                      // kept while you move around the page
 
@@ -239,20 +255,13 @@
             load();
           }).catch(function (x) { admin.show('Could not save', [x.message], null, true); save.disabled = false; });
       });
-      var del = el('button', {class: 'danger', text: 'Delete exam'});
-      del.addEventListener('click', function () {
-        ask(del, 'Delete ' + e.name + ' — its questions and every member\'s attempts?', 'Yes, delete', function () {
-          admin.api('POST', '/api/admin/exams/delete', {exam: e.id})
-            .then(function () { admin.show('Deleted ' + e.name, []); history.replaceState(null, '', '#exams'); load(); })
-            .catch(function (x) { admin.show('Could not delete', [x.message], null, true); });
-        }, true);
-      });
+      var del = delButton(e);
       return [el('div', {class: 'card'}, [el('h3', {text: 'Exam settings'}),
           el('div', {class: 'form'}, [el('label', {}, ['Name', name]), el('label', {}, ['Who can take it', audience]),
             el('label', {}, ['Questions per attempt (pool: ' + e.pool + ')', n]), el('label', {}, ['Pass mark (%)', pass])]),
           pickBox, status, labels, el('div', {class: 'row', style: 'margin-top:16px'}, [save])]),
         el('div', {class: 'card danger-zone'}, [el('h3', {text: 'Delete'}),
-          el('div', {class: 'sub', style: 'margin-bottom:10px', text: 'Removes the exam, its question banks and every member\'s attempts.'}), el('div', {class: 'row'}, [del])])];
+          el('div', {class: 'sub', style: 'margin-bottom:10px', text: 'Removes the exam for everyone: members no longer see it, nor their attempts and results for it.'}), el('div', {class: 'row'}, [del])])];
     }
 
     // Question banks: what the exam has now, + Add question bank (file + key → uploaded, then what it

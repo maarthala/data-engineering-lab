@@ -14,6 +14,9 @@ Questions missing from the new file are retired (out of the pool, still in old r
 attempt holds its question versions: it isn't changed by later uploads. An optional plain
 exam.json gives the provider and domains (and creates the exam when there is none yet).
 
+Deleting an exam is a soft delete: it and every member's attempts and results are hidden, kept in
+the database (delete_exam).
+
 Managers set how many questions an attempt has, the pass mark, who may take it (everyone or chosen
 teams) and whether it is enabled. A disabled exam can't be started; an attempt already in progress
 can't be changed any more, only submitted as it is (and past results stay visible). They see the attempts in progress and can delete them (one or all
@@ -94,6 +97,17 @@ ALTER TABLE exams ADD COLUMN IF NOT EXISTS source text;
 -- (It replaces audience 'off': who may take it is all / chosen teams.)
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT true;
 ALTER TABLE exams ALTER COLUMN audience SET DEFAULT 'all';
+-- deleting an exam is a soft delete (delete_exam): it is renamed <id>--deleted-<time> (its id is free
+-- again) and hidden, its attempts too — kept in the database. Renaming needs the keys to follow.
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+ALTER TABLE exam_attempts ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
+DO $$ DECLARE r record; BEGIN
+  FOR r IN SELECT c.conrelid::regclass AS tbl, c.conname, a.attname FROM pg_constraint c
+           JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+           WHERE c.contype = 'f' AND c.confrelid = 'exams'::regclass AND c.confupdtype <> 'c' LOOP
+    EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I, ADD CONSTRAINT %I FOREIGN KEY (%I) REFERENCES exams '
+                   'ON DELETE CASCADE ON UPDATE CASCADE', r.tbl, r.conname, r.conname, r.attname);
+  END LOOP; END $$;
 UPDATE exams SET enabled = false, audience = 'all' WHERE audience = 'off';
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS show_domain boolean NOT NULL DEFAULT true;
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS show_tags boolean NOT NULL DEFAULT true;
@@ -684,7 +698,8 @@ def upload_meta(meta, by, exam_id=None):
                for d in meta.get("domains") or []]
     count = int((meta.get("exam_format") or {}).get("question_count") or 60)
     e = _q("SELECT id, name FROM exams WHERE id = %s", (exam_id,), one=True) if exam_id else \
-        _q("SELECT id, name FROM exams WHERE cert = %s OR id = %s ORDER BY (id = %s) DESC LIMIT 1", (cert, cert, cert), one=True)
+        _q("SELECT id, name FROM exams WHERE (cert = %s OR id = %s) AND deleted_at IS NULL ORDER BY (id = %s) DESC LIMIT 1",
+           (cert, cert, cert), one=True)
     if not e:
         r = create_exam(meta["name"], by, cert=cert, provider=meta.get("provider"), domains=domains, num_questions=count)
         return dict(r, domains=len(domains), created=True)
@@ -816,7 +831,8 @@ def sync_delab(by):
         # chapter's exam.json was read, so a broken file never deletes an exam
         removed, kept = [], len(seen) < len(chapters)
         if not kept:
-            removed = [e["id"] for e in _q("SELECT id FROM exams WHERE source = 'delab' AND NOT id = ANY(%s)", (sorted(seen),))]
+            removed = [e["id"] for e in _q("SELECT id FROM exams WHERE source = 'delab' AND deleted_at IS NULL AND NOT id = ANY(%s)",
+                                           (sorted(seen),))]
             for eid in removed:
                 delete_exam(eid)
         print(f"[exams] {by}: DE lab sync at {commit[:7]} — {len(out)} chapter(s)"
@@ -868,8 +884,22 @@ def delete_bank(exam_id, bank):
 
 
 def delete_exam(exam_id):
-    """The exam, its questions and every attempt."""
-    return {"deleted": _q("DELETE FROM exams WHERE id = %s", (exam_id,), rows=False)}
+    """Soft delete: the exam and every member's attempts and results are hidden, not erased — the exam
+    is renamed <id>--deleted-<time> (so the id can be used again, e.g. a DE lab chapter coming back)."""
+    import time
+    gone = f"{exam_id}--deleted-{int(time.time())}"
+    c = _conn()
+    try:
+        with c, c.cursor() as cur:
+            cur.execute("UPDATE exam_attempts SET deleted_at = now() WHERE exam_id = %s AND deleted_at IS NULL", (exam_id,))
+            cur.execute("UPDATE exams SET id = %s, deleted_at = now(), enabled = false WHERE id = %s AND deleted_at IS NULL",
+                        (gone, exam_id))
+            n = cur.rowcount
+    finally:
+        c.close()
+    if n:
+        print(f"[exams] deleted {exam_id} (kept as {gone})", flush=True)
+    return {"deleted": n}
 
 
 def discard(exam_id, attempt_id=None):
@@ -921,7 +951,7 @@ def admin_exams():
                "(SELECT count(*) FROM exam_attempts a WHERE a.exam_id = e.id AND finished_at IS NOT NULL) AS attempts, "
                "(SELECT count(DISTINCT member) FROM exam_attempts a WHERE a.exam_id = e.id) AS members, "
                "(SELECT round(avg(score)) FROM exam_attempts a WHERE a.exam_id = e.id AND finished_at IS NOT NULL) AS avg_score "
-               "FROM exams e ORDER BY e.name")
+               "FROM exams e WHERE deleted_at IS NULL ORDER BY e.name")
     banks = _q("SELECT s.exam_id, s.bank, s.questions, s.skipped, s.uploaded_at, s.uploaded_by, "
                "(SELECT count(*) FROM exam_qv q WHERE q.exam_id = s.exam_id AND q.bank = s.bank AND q.version > 1 AND current) AS updated "
                "FROM exam_sources s ORDER BY s.bank")
@@ -965,7 +995,7 @@ def my_exams(member, team, search=None, kind=None, offset=0, limit=20):
     for e in _q("SELECT e.*, (SELECT count(*) FROM exam_qv q WHERE q.exam_id = e.id AND current AND NOT needs_fix) AS pool, "
                 "EXISTS (SELECT 1 FROM exam_attempts a WHERE a.exam_id = e.id AND a.member = %s) AS mine, "
                 "EXISTS (SELECT 1 FROM exam_attempts a WHERE a.exam_id = e.id AND a.member = %s AND finished_at IS NULL) AS going "
-                "FROM exams e ORDER BY name", (member, member)):
+                "FROM exams e WHERE deleted_at IS NULL ORDER BY name", (member, member)):
         if not _allowed(e, team) or not (e["enabled"] and e["pool"] or not e["enabled"] and e["mine"]):
             continue
         if kind in KINDS and not KINDS[kind](e):
@@ -1022,7 +1052,7 @@ def start(exam_id, member, team):
 
 
 def _own(attempt_id, member):
-    a = _q("SELECT * FROM exam_attempts WHERE id = %s AND member = %s", (int(attempt_id), member), one=True)
+    a = _q("SELECT * FROM exam_attempts WHERE id = %s AND member = %s AND deleted_at IS NULL", (int(attempt_id), member), one=True)
     if not a:
         raise PermissionError("no such attempt")
     a["vids"] = [str(v) for v in a["vids"]]
