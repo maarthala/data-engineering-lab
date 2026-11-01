@@ -120,7 +120,8 @@
             var did = [c.new ? c.new + ' new' : '', c.changed ? c.changed + ' updated' : '', c.removed ? c.removed + ' removed' : '',
                        c.banks_removed ? c.banks_removed + ' bank(s) gone' : '', c.banks_disabled ? c.banks_disabled + ' bank(s) disabled at source' : '',
                        c.disabled ? c.disabled + ' question(s) disabled at source' : ''].filter(Boolean).join(', ');
-            return (c.problems.length ? '⚠ ' : '✓ ') + c.name + (c.created ? ' — new exam, open to all members' : '') + ': ' +
+            return (c.problems.length ? '⚠ ' : '✓ ') + c.name + (c.created ? (c.pool ? ' — new exam, open to all members' : ' — new exam') : '') +
+              (c.disabled_now ? ' — disabled: no questions on GitHub' : c.enabled_now ? ' — enabled again' : '') + ': ' +
               (did || 'no changes') + ' · ' + c.pool + ' questions' + (c.skipped ? ' · ' + c.skipped + ' left out (see its upload history)' : '') +
               (c.problems.length ? ' · ' + c.problems.join('; ') : '');
           }).concat(r.removed.length ? ['Removed — no longer on GitHub: ' + r.removed.join(', ')] : [])

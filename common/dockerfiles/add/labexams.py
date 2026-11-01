@@ -38,6 +38,7 @@ DE lab exams (sync_delab()): one exam per course chapter, free banks in a public
 (DE_EXAMS_REPO, a …/tree/<branch>/<folder> link): <folder>/<chapter>/exam.json (id, name, domains)
 and <folder>/<chapter>/questions/*.json. A manager's Sync makes a new chapter an exam open to all
 members and updates the others like an upload (banks whose file hasn't changed are skipped); a
+chapter without usable questions (no bank, or all disabled) is disabled until it has some; a
 bank gone from the folder leaves its exam, a chapter gone from it is deleted (with its attempts). Read at the
 branch's latest commit, so GitHub's cache never serves an old file.
 
@@ -91,6 +92,9 @@ ALTER TABLE exams ADD COLUMN IF NOT EXISTS source text;
 -- (It replaces audience 'off': who may take it is all / chosen teams.)
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS enabled boolean NOT NULL DEFAULT true;
 ALTER TABLE exams ALTER COLUMN audience SET DEFAULT 'all';
+-- sync_off: the DE lab sync disabled it (no usable questions on GitHub) — it enables it again once
+-- there are; a manager's own enable / disable clears it
+ALTER TABLE exams ADD COLUMN IF NOT EXISTS sync_off boolean NOT NULL DEFAULT false;
 UPDATE exams SET enabled = false, audience = 'all' WHERE audience = 'off';
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS show_domain boolean NOT NULL DEFAULT true;
 ALTER TABLE exams ADD COLUMN IF NOT EXISTS show_tags boolean NOT NULL DEFAULT true;
@@ -693,6 +697,19 @@ def upload_meta(meta, by, exam_id=None):
 _syncing = threading.Lock()
 
 
+def _sync_state(eid, pool):
+    """A DE lab chapter without usable questions on GitHub (no bank, or all disabled) is disabled until
+    it has some; the sync enables it again only if it was the sync that disabled it."""
+    st = _q("SELECT enabled, sync_off FROM exams WHERE id = %s", (eid,), one=True)
+    if not pool and st["enabled"]:
+        _q("UPDATE exams SET enabled = false, sync_off = true WHERE id = %s", (eid,), rows=False)
+        return {"disabled_now": True}
+    if pool and st["sync_off"]:
+        _q("UPDATE exams SET enabled = true, sync_off = false WHERE id = %s", (eid,), rows=False)
+        return {"enabled_now": True}
+    return {}
+
+
 def sync_delab(by):
     """DE lab exams from the public GitHub folder (DE_EXAMS_REPO) → per chapter what changed."""
     m = re.fullmatch(r"https://github\.com/([\w.-]+)/([\w.-]+)/tree/([\w./-]+?)/([\w./-]+?)/?", DE_EXAMS_REPO.strip())
@@ -780,6 +797,7 @@ def sync_delab(by):
                         delete_bank(eid, gone)
                         totals["banks_removed"] += 1
                 res.update(totals, pool=pool_size(eid))
+                res.update(_sync_state(eid, res["pool"]))
             except ExamError as x:
                 res["problems"].append(str(x))
         # a chapter gone from GitHub: its exam goes too (with its attempts) — but only when every
@@ -826,7 +844,8 @@ def set_exam(exam_id, by, name=None, num_questions=None, pass_percent=None, audi
     if a == "teams" and not t:
         raise ExamError("pick at least one team (or choose All members)")
     _q("UPDATE exams SET name=%s, num_questions=%s, pass_percent=%s, audience=%s, teams=%s, show_domain=%s, show_tags=%s, "
-       "enabled=%s, updated_at=now(), updated_by=%s WHERE id=%s", (name, n, p, a, t, sd, st, on, by, exam_id), rows=False)
+       "enabled=%s, sync_off = sync_off AND enabled = %s, updated_at=now(), updated_by=%s WHERE id=%s",
+       (name, n, p, a, t, sd, st, on, on, by, exam_id), rows=False)
     return admin_exams()
 
 
