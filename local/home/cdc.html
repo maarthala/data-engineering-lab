@@ -97,7 +97,9 @@
       return s;
     }
     function note(text, cls) { return el('div', {class: 'sub ' + (cls || ''), style: 'margin-top:6px', text: text}); }
-    function inp(v, type, ph) { var i = el('input', {type: type || 'text'}); if (v !== undefined && v !== null) i.value = v; if (ph) i.placeholder = ph; return i; }
+    function inp(v, type, ph) { var i = el('input', {type: type || 'text'}); if (v !== undefined && v !== null) i.value = v; if (ph) i.placeholder = ph;
+      i.autocomplete = type === 'password' ? 'new-password' : 'off';   // no browser autofill of the portal login
+      return i; }
     function card(kids) { return el('div', {class: 'card', style: 'margin-bottom:12px'}, kids); }
     // a task (check / list tables / run) is done by the lab in the background: ask until it ends
     function watch(id, done) {
