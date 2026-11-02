@@ -118,6 +118,10 @@ def overview(member):
             out["mine"] = [{"key": db, "database": db, "host": HOST, "port": PORT, "user": member,
                             "sqlpad": _sqlpad_label(db, member)} for db in _mine(cur, member)]
         out["password"] = _password(member) if out["mine"] else None
+        try:
+            _sqlpad_sync(member, [d["database"] for d in out["mine"]], out["password"])
+        except Exception as e:  # noqa: BLE001 — SQLPad down: the page still works
+            print(f"[labdb] sqlpad sync {member}: {e}", flush=True)
     return out
 
 
@@ -227,6 +231,21 @@ def _sqlpad_connect(db, member, pw):
     if u and u["role"] != "admin":
         lh._sqlpad("POST", "/api/connection-accesses", {"connectionId": conn["id"], "userId": u["id"], "duration": 0})
     return label
+
+
+def _sqlpad_sync(member, dbs, pw):
+    """The SQL editor shows exactly the member's databases: a connection whose database is gone
+    goes (deleted while SQLPad was down…), a missing one is made."""
+    import lakehouse as lh
+    suffix = f" (Postgres) — {member}"
+    have = {c["name"]: c for c in lh._sqlpad("GET", "/api/connections") if c["name"].endswith(suffix)}
+    want = {_sqlpad_label(db, member): db for db in dbs}
+    for name, c in have.items():
+        if name not in want:
+            lh._sqlpad("DELETE", f"/api/connections/{c['id']}")
+    for name, db in want.items():
+        if name not in have and pw:
+            _sqlpad_connect(db, member, pw)
 
 
 def _sqlpad_disconnect(db, member):
