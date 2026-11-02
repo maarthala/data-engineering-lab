@@ -298,7 +298,22 @@ def save_destination(member, body, catalogs):
             raise CdcError("you have a destination with that name")
         did = _q("INSERT INTO cdc_destinations (member, name, catalog, namespace) VALUES (%s, %s, %s, %s) RETURNING id",
                  (member, name, catalog, ns), one=True)["id"]
+    _make_namespace(member, catalog, ns)
     return {"id": did, "task": queue(member, "check_destination", did)}
+
+
+def _make_namespace(member, catalog, ns):
+    """The destination's namespace exists in the catalog straight away (My catalogs shows it), not
+    only after the first run writes a table."""
+    if not ns:
+        return
+    try:
+        import lakehouse
+        lakehouse.create_namespace(member, catalog, ns)
+    except ValueError:
+        pass                                          # there already (or a name Polaris can't take: OLake will say)
+    except Exception as e:  # noqa: BLE001 — the first run makes it anyway
+        print(f"[labcdc] namespace {catalog}.{ns}: {e}", flush=True)
 
 
 def ensure_default_destination(member, catalog):
@@ -310,6 +325,7 @@ def ensure_default_destination(member, catalog):
     if not _q("SELECT 1 FROM cdc_destinations WHERE member = %s", (member,), one=True):
         _q("INSERT INTO cdc_destinations (member, name, catalog, namespace) VALUES (%s, 'My lakehouse', %s, 'cdc') "
            "ON CONFLICT DO NOTHING", (member, catalog), rows=False)
+        _make_namespace(member, catalog, "cdc")
     if not LAB_DB or _q("SELECT 1 FROM cdc_sources WHERE member = %s AND name = 'Lab shop (live)'", (member,), one=True):
         return
     import urllib.parse
