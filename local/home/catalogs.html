@@ -230,14 +230,24 @@
           td.appendChild(el('span', 'car', '▸')); td.appendChild(document.createTextNode(' 📁 ' + n));
           tr.appendChild(td); tbody.appendChild(tr);
           var rows = null;
-          tr.onclick = function () {
+          tr.appendChild(del('namespace ' + n + ' (it must be empty)', '/namespaces', {catalog: name, namespace: n}, function () {
+            (rows || []).forEach(function (x) { x.remove(); }); tr.remove();
+          }));
+          tr.onclick = function (e) {
+            if (e.target.closest('td.r')) return;
             var opening = !tr.classList.contains('open'); tr.classList.toggle('open', opening);
             if (rows) { rows.forEach(function (x) { x.style.display = opening ? '' : 'none'; }); return; }
             var wait = row('Loading…', 'tbl'); tr.after(wait); rows = [wait];
             api('GET', '/tree', {catalog: name, namespace: n}).then(function (r) {
               wait.remove();
               if (!r.ok) { rows = null; tr.classList.remove('open'); return toast(r.body.error, true); }
-              rows = (r.body.length ? r.body.map(function (t) { return row('▦ ' + t, 'tbl'); }) : [row('no tables yet', 'tbl')]);
+              rows = (r.body.length ? r.body.map(function (t) {
+                var x = row('▦ ' + t, 'tbl');
+                x.appendChild(del('table ' + n + '.' + t + ' and its files', '/tables', {catalog: name, namespace: n, table: t}, function () {
+                  x.remove(); rows.splice(rows.indexOf(x), 1);
+                }));
+                return x;
+              }) : [row('no tables yet', 'tbl')]);
               var at = tr; rows.forEach(function (x) { x.style.display = tr.classList.contains('open') ? '' : 'none'; at.after(x); at = x; });
             });
           };
@@ -246,6 +256,27 @@
       shares();
 
       function row(label, cls) { var tr = el('tr', cls); tr.appendChild(el('td', null, label)); return tr; }
+      // 🗑 → "Delete …? Yes / Cancel" in the same cell (no browser popups)
+      function del(what, path, params, gone) {
+        var td = el('td', 'r');
+        function idle() {
+          td.innerHTML = ''; var b = el('button', 'small', '🗑'); b.title = 'Delete'; td.appendChild(b);
+          b.onclick = function () {
+            td.innerHTML = ''; td.appendChild(el('span', 'sub', 'Delete ' + what + '? '));
+            var yes = el('button', 'small danger', 'Yes'), no = el('button', 'small', 'Cancel');
+            td.appendChild(yes); td.appendChild(document.createTextNode(' ')); td.appendChild(no);
+            no.onclick = idle;
+            yes.onclick = function () {
+              yes.disabled = no.disabled = true;
+              api('DELETE', path, params).then(function (r) {
+                if (!r.ok) { idle(); return toast(r.body.error, true); }
+                toast('Deleted ' + what.split(' (')[0].replace(' and its files', '')); nsList = null; gone();
+              });
+            };
+          };
+        }
+        idle(); return td;
+      }
       function invite() {
         if (!who.value.trim()) return who.focus();
         var p = {catalog: name, grantee: who.value.trim(), access: acc.value};

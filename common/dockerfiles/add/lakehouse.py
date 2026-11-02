@@ -875,6 +875,47 @@ def catalog_tree(name, cat, namespace=None):
     return [".".join(ns) for ns in _get(f"/api/catalog/v1/{cat}/namespaces", t)["namespaces"]]
 
 
+def drop_table(name, cat, namespace, table):
+    """Delete a table of a catalog the learner owns: drop it from the catalog, then its files — only
+    those under the catalog's own base location (also when its files were already deleted by hand)."""
+    t = _admin_token()
+    if not _owned(name, cat, t):
+        raise PermissionError("not your catalog")
+    ns = urllib.parse.quote(chr(31).join(namespace.split(".")))
+    path = f"/api/catalog/v1/{cat}/namespaces/{ns}/tables/{urllib.parse.quote(table)}"
+    base = _get(f"{_M}/catalogs/{cat}", t)["properties"].get("default-base-location", "").rstrip("/")
+    st, b = _call("GET", path, token=t)
+    loc = (b or {}).get("metadata", {}).get("location") if st == 200 else None
+    loc = (loc or f"{base}/{'/'.join(namespace.split('.'))}/{table}").rstrip("/")
+    st, _ = _call("DELETE", path, token=t)              # the admin may not purge — the files go below
+    if st == 404:
+        raise ValueError("no such table")
+    if st not in (200, 204):
+        raise RuntimeError(f"drop table: HTTP {st}")
+    n = 0
+    if base.startswith("s3://") and loc.startswith(base + "/"):
+        bucket, prefix = loc[5:].split("/", 1)
+        for k in list_all(bucket, prefix + "/"):
+            delete_object(bucket, k)
+            n += 1
+    return {"dropped": f"{cat}.{namespace}.{table}", "files": n}
+
+
+def drop_namespace(name, cat, namespace):
+    """Delete an empty namespace of a catalog the learner owns."""
+    t = _admin_token()
+    if not _owned(name, cat, t):
+        raise PermissionError("not your catalog")
+    st, _ = _call("DELETE", f"/api/catalog/v1/{cat}/namespaces/" + urllib.parse.quote(chr(31).join(namespace.split("."))), token=t)
+    if st == 409:
+        raise ValueError("this namespace still has tables (or namespaces) — delete them first")
+    if st == 404:
+        raise ValueError("no such namespace")
+    if st not in (200, 204):
+        raise RuntimeError(f"drop namespace: HTTP {st}")
+    return {"dropped": f"{cat}.{namespace}"}
+
+
 def _share_role(grantee, access, namespace, table=None):
     if not namespace:                                   # the whole lake
         return f"share_{grantee}_{access}_c_all"
