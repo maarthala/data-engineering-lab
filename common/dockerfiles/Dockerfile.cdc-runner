@@ -5,7 +5,7 @@
 FROM python:3.10-slim
 RUN pip install --no-cache-dir psycopg2-binary==2.9.10
 COPY --from=ghcr.io/maarthala/de-stack/mc:RELEASE.2025-08-13T08-35-41Z /usr/bin/mc /usr/local/bin/mc
-COPY add/lakehouse.py add/labvault.py add/lab_jobs.py add/labcdc.py add/cdc_runner.py add/cdc_simulator.py /app/
+COPY add/lakehouse.py add/labvault.py add/lab_jobs.py add/labcdc.py add/cdc_runner.py add/cdc_simulator.py add/tidewell_archive.py /app/
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1
 CMD ["python", "/app/cdc_runner.py"]

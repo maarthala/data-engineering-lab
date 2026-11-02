@@ -80,6 +80,7 @@ services:
       CDC_SIM_MAX_S: "10"
     volumes:
       - ../common/dockerfiles/add/cdc_simulator.py:/app/cdc_simulator.py:ro
+      - ../common/dockerfiles/add/tidewell_archive.py:/app/tidewell_archive.py:ro   # the live systems start from it
     depends_on:
       lab-db:
         condition: service_healthy

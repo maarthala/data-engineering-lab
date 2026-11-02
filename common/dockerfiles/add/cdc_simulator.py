@@ -128,10 +128,13 @@ def spelled(email):
 
 # ---- setup -----------------------------------------------------------------------------------
 def setup():
-    """Databases, tables, a first batch of rows, the reader login and the publications — once."""
-    C["shop"] = connect("shop")
-    with cur("shop") as k:
-        for db in DBS[1:]:
+    """Databases, tables, the reader login and the publications — once; then, the first time, the
+    systems as Tidewell's archive left them (tidewell_archive.tail: everyone and everything, plus the
+    archive's last two days of orders, sales and points, with the same ids — the overlap)."""
+    a = psycopg2.connect(url("postgres"), connect_timeout=5)
+    a.autocommit = True                                             # CREATE DATABASE: not in a transaction
+    with a.cursor() as k:
+        for db in DBS:
             k.execute("SELECT 1 FROM pg_database WHERE datname = %s", (db,))
             if not k.fetchone():
                 k.execute(f'CREATE DATABASE "{db}"')
@@ -139,9 +142,9 @@ def setup():
         k.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (user,))
         if not k.fetchone():
             k.execute(f'CREATE ROLE "{user}" LOGIN REPLICATION PASSWORD %s', (pw,))
-    for db in DBS[1:]:
-        C[db] = connect(db)
+    a.close()
     for db in DBS:
+        C[db] = connect(db)
         with cur(db) as k:
             k.execute(SCHEMA[db])
             k.execute(f'GRANT CONNECT ON DATABASE "{db}" TO "{user}"')
@@ -150,42 +153,34 @@ def setup():
             k.execute("SELECT 1 FROM pg_publication WHERE pubname = 'olake_pub'")
             if not k.fetchone():
                 k.execute("CREATE PUBLICATION olake_pub FOR ALL TABLES")
-    with cur("shop") as k:                                         # the web shop first: the others use it
+    with cur("shop") as k:
         k.execute("SELECT count(*) FROM products")
-        if not k.fetchone()[0]:
-            for name, cat, price in PRODUCTS:
-                k.execute("INSERT INTO products (name, category, price) VALUES (%s, %s, %s)", (name, cat, price))
-            for _ in range(60):
-                new_customer(join=False)
-            for _ in range(150):
-                new_order(points=False)
-            print("[cdc-sim] made the web shop: products, customers, orders", flush=True)
-    with cur("loyalty") as k:
-        k.execute("SELECT count(*) FROM members")
-        if not k.fetchone()[0]:
-            with cur("shop") as s:
-                s.execute("SELECT name, email FROM customers")
-                web = s.fetchall()
-            for name, email in random.sample(web, int(len(web) * 0.6)):   # 6 in 10 web customers have a card
-                add_member(name, spelled(email))
-            for _ in range(40):                                            # …and some never shop online
-                f, l = random.choice(FIRST), random.choice(LAST)
-                add_member(f"{f} {l}", random.choice([f"{f.lower()}{l.lower()}{random.randint(1, 99)}@mail.test", None]))
-            print("[cdc-sim] made the loyalty programme: members", flush=True)
-    with cur("store") as k:
-        k.execute("SELECT count(*) FROM stores")
-        if not k.fetchone()[0]:
-            for code, city, country, tz, opened in STORES:
-                k.execute("INSERT INTO stores (code, city, country, timezone, opened_on) VALUES (%s, %s, %s, %s, %s)",
-                          (code, city, country, tz, opened))
-            with cur("shop") as s:
-                s.execute("SELECT product_id, name, category, price FROM products ORDER BY product_id")
-                for pid, name, cat, price in s.fetchall():
-                    k.execute("INSERT INTO items (sku, name, category, price_cents) VALUES (%s, %s, %s, %s)",
-                              (sku(pid), name.upper(), cat, int(price * 100)))
-            for _ in range(200):
-                store_sale(hours_ago=random.uniform(0, 72))
-            print("[cdc-sim] made the stores: stores, items, sales", flush=True)
+        if k.fetchone()[0]:
+            return
+    import tidewell_archive
+    t = tidewell_archive.tail()
+
+    def load(db, table, rows):
+        cols = tidewell_archive.COLUMNS[table]
+        with cur(db) as k:
+            for r in rows:
+                k.execute(f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({', '.join(['%s'] * len(cols))})",
+                          [r[c] for c in cols])
+    for table in ("customers", "products", "orders", "order_items"):
+        load("shop", table, t[table])
+    for table in ("stores", "items", "sales", "sale_lines"):
+        load("store", table, t[table])
+    for table in ("members", "points"):
+        load("loyalty", table, t[table])
+    n = t["next"]                                                   # the live ids carry on after the archive's
+    for db, seq, nxt in (("shop", "customers_customer_id_seq", n["customer_id"]), ("shop", "orders_order_id_seq", n["order_id"]),
+                         ("shop", "products_product_id_seq", len(t["products"]) + 1),
+                         ("store", "stores_store_id_seq", len(t["stores"]) + 1), ("store", "sales_sale_id_seq", n["sale_id"]),
+                         ("loyalty", "members_member_id_seq", n["member_id"]), ("loyalty", "points_txn_id_seq", n["txn_id"])):
+        with cur(db) as k:
+            k.execute("SELECT setval(%s, %s, false)", (seq, nxt))
+    print(f"[cdc-sim] made Tidewell's systems from its archive: {len(t['customers'])} customers, "
+          f"{len(t['members'])} members, the last two days' {len(t['orders'])} orders and {len(t['sales'])} sales", flush=True)
 
 
 # ---- loyalty helpers -------------------------------------------------------------------------

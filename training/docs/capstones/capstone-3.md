@@ -79,6 +79,34 @@ erDiagram
   points }o..o| sales : "ref sale:id"
 ```
 
+## 4 · The archive
+Before the three systems went live, Tidewell ran older ones. When it moved, the old systems
+exported **two years of history**: every day from **2024-11-01** to the cut-off, **2026-10-31**.
+The live systems started from that export: they contain every customer, product, store and
+member, plus the orders, till sales and points of the **last two days before the cut-off**,
+with the same ids. After that, the live ids carry on where the archive stopped.
+
+**[⬇ Download the archive: tidewell-history.zip](../assets/tidewell/tidewell-history.zip)**
+(1.8 MB; 130 CSV files, 7 MB unpacked)
+
+```
+tidewell-history/
+  web/      customers.csv  products.csv  orders/YYYY-MM.csv   order_items/YYYY-MM.csv
+  store/    stores.csv     items.csv     sales/YYYY-MM.csv    sale_lines/YYYY-MM.csv
+  loyalty/  members.csv                  points/YYYY-MM.csv
+```
+
+| | |
+|---|---|
+| Format | CSV, comma-separated, header row, UTF-8; empty field = no value |
+| Columns | the same names as the live tables (section 2) |
+| Rows | each system as it was at the end of the cut-off day: an order's latest status, a member's balance then |
+| Volumes | 1,604 customers · 14,311 orders · 28,758 order lines · 36,943 till sales · 90,963 till lines · 1,073 members · 26,444 points transactions |
+| Times | web and loyalty with a UTC offset (`+00:00`); till `sold_at` in the store's local time, without one |
+
+Your lab's live data begins when the lab was installed, which can be days or months after the
+cut-off. Those days have no sales at all.
+
 ## Problem statement
 Every Tidewell team reports from its own system, in its own units, time zones and keys. Asked
 *"what did we sell yesterday?"*, the web team, the stores and the loyalty team give three
@@ -96,19 +124,25 @@ Build everything in your own lakehouse (`my` in notebooks), with exactly these n
 UTC unless a column says *local*. Money is in currency with two decimals.
 
 ### Bronze: land the sources
-**T1 · CDC pipeline for the web shop.** Land `shop.customers`, `shop.products`, `shop.orders` and
+**T1 · Load the history.** Download the archive, upload it to your bucket, and load every file
+into the namespace `tw_bronze_archive`, one table per source table, named `<system>_<table>`
+(`web_orders`, `store_sale_lines`, `loyalty_points`, …), with the source file's name on every row.
+All 130 files, every row, typed (numbers, dates, timestamps), loaded once: loading the same file
+again changes nothing.
+
+**T2 · CDC pipeline for the web shop.** Land `shop.customers`, `shop.products`, `shop.orders` and
 `shop.order_items` into the namespace `tw_bronze_web`, with change data capture, refreshed at
 least every 15 minutes.
 
-**T2 · CDC pipeline for the store tills.** Land `store.stores`, `store.items`, `store.sales` and
+**T3 · CDC pipeline for the store tills.** Land `store.stores`, `store.items`, `store.sales` and
 `store.sale_lines` into `tw_bronze_store`, with change data capture, refreshed at least every
 15 minutes.
 
-**T3 · CDC pipeline for the loyalty card.** Land `loyalty.members` and `loyalty.points` into
+**T4 · CDC pipeline for the loyalty card.** Land `loyalty.members` and `loyalty.points` into
 `tw_bronze_loyalty`, with change data capture, refreshed at least every 15 minutes.
 
 ### Silver: one company
-**T4 · Create `tw_silver.order_status_history`**: one row per order per status it has been in,
+**T5 · Create `tw_silver.order_status_history`**: one row per order per status it has been in,
 including the moment it was cancelled.
 
 | Column | Meaning |
@@ -119,7 +153,7 @@ including the moment it was cancelled.
 | `valid_to` | when it left it (empty while current) |
 | `is_current` | true for the order's latest status |
 
-**T5 · Create `tw_silver.dim_product`**: every price each product has had, per channel.
+**T6 · Create `tw_silver.dim_product`**: every price each product has had, per channel.
 
 | Column | Meaning |
 |---|---|
@@ -131,10 +165,10 @@ including the moment it was cancelled.
 | `price` | the price in that channel |
 | `valid_from`, `valid_to`, `is_current` | when that price applied |
 
-**T6 · Create `tw_silver.dim_store`**: `store_key`, `store_code`, `city`, `country`, `timezone`,
+**T7 · Create `tw_silver.dim_store`**: `store_key`, `store_code`, `city`, `country`, `timezone`,
 `opened_on`.
 
-**T7 · Create `tw_silver.dim_customer`**: one row per real person across the web shop and the
+**T8 · Create `tw_silver.dim_customer`**: one row per real person across the web shop and the
 loyalty card. A web account and a card member are one person when their emails match once
 cleaned. `customer_key` never changes between runs.
 
@@ -149,8 +183,9 @@ cleaned. `customer_key` never changes between runs.
 | `is_web`, `is_member` | true / false |
 | `first_seen` | earliest account, membership or purchase |
 
-**T8 · Create `tw_silver.fact_sales`**: one row per web order line and per till line. Cancelled
-orders are excluded; returns are negative. Loaded incrementally; re-running a load changes
+**T9 · Create `tw_silver.fact_sales`**: one row per web order line and per till line, from the
+archive **and** the live systems, each line once (where both have it, the live version wins).
+Cancelled orders are excluded; returns are negative. Loaded incrementally; re-running a load changes
 nothing.
 
 | Column | Meaning |
@@ -166,12 +201,13 @@ nothing.
 | `local_date` | the store's local date (web: the UTC date) |
 | `is_return` | true when `qty` is negative |
 
-**T9 · Create `tw_silver.fact_points`**: `txn_id`, `customer_key`, `member_id`, `channel`,
+**T10 · Create `tw_silver.fact_points`**: `txn_id`, `customer_key`, `member_id`, `channel`,
 `ref_type` (`order`, `order_cancelled`, `sale`, `welcome`, `redeem`), `ref_id`, `points`,
 `created_at`.
 
 ### Gold: the answers
-**T10 · Create `tw_gold.daily_sales`**
+**T11 · Create `tw_gold.daily_sales`**: one row per day from 2024-11-01 to today for every
+channel and store, **including days without sales** (zero, not missing).
 
 | Column | Meaning |
 |---|---|
@@ -183,11 +219,11 @@ nothing.
 | `revenue` | net revenue |
 | `returns_amount` | value of returns (positive number) |
 
-**T11 · Create `tw_gold.store_weekly`**: `week_start`, `store_code`, `revenue`, `receipts`,
+**T12 · Create `tw_gold.store_weekly`**: `week_start`, `store_code`, `revenue`, `receipts`,
 `avg_basket`, `return_rate` (returned value ÷ gross sales), `card_share` (share of revenue on
 receipts with a loyalty card).
 
-**T12 · Create `tw_gold.customer_360`**
+**T13 · Create `tw_gold.customer_360`**
 
 | Column | Meaning |
 |---|---|
@@ -201,28 +237,29 @@ receipts with a loyalty card).
 | `ledger_balance` | sum of `fact_points` |
 | `balance_ok` | true when the two balances are equal |
 
-**T13 · Create `tw_gold.loyalty_daily`**: `day`, `new_members`, `points_earned`,
+**T14 · Create `tw_gold.loyalty_daily`**: `day`, `new_members`, `points_earned`,
 `points_redeemed`, `points_reversed` (cancelled orders), `active_members`, `outstanding_points`
 (total balance at the end of the day).
 
-**T14 · Create `tw_gold.data_freshness`**: `system` (`web`, `store`, `loyalty`), `table_name`,
+**T15 · Create `tw_gold.data_freshness`**: `system` (`web`, `store`, `loyalty`), `table_name`,
 `last_change` (newest change landed), `minutes_behind`, refreshed with every run.
 
 ### Run and trust it
-**T15 · Create `tw_gold.dq_results`**: `run_at`, `rule`, `status` (`pass` / `fail`), `failed_rows`,
+**T16 · Create `tw_gold.dq_results`**: `run_at`, `rule`, `status` (`pass` / `fail`), `failed_rows`,
 one row per rule per run. The rules: unique keys in every Silver and Gold table; every fact row
-finds its dimension rows; Silver store revenue equals the source's cents ÷ 100; Silver web revenue
-equals the source's order lines; no `sold_at` in the future; every source within 30 minutes; every
+finds its dimension rows; Silver store revenue equals the archive's and the live source's cents ÷ 100; Silver web revenue
+equals the archive's and the live source's order lines; no line counted twice where the archive
+and the live systems overlap; no day missing from `daily_sales`; no `sold_at` in the future; every source within 30 minutes; every
 `balance_ok` true. When a rule fails, Gold keeps its last good version.
 
-**T16 · Create the Airflow DAG `tidewell_platform`**: every 15 minutes, Silver → Gold → quality
+**T17 · Create the Airflow DAG `tidewell_platform`**: every 15 minutes, Silver → Gold → quality
 rules, in that order; a failed or repeated run never double-counts.
 
-**T17 · Share Gold** read only with one other member (Tidewell's finance team). Bronze and Silver
+**T18 · Share Gold** read only with one other member (Tidewell's finance team). Bronze and Silver
 stay private.
 
 ### Show it
-**T18 · Create the Superset dashboard "Tidewell today"** on `tw_gold`, refreshing every
+**T19 · Create the Superset dashboard "Tidewell today"** on `tw_gold`, refreshing every
 15 minutes, with filters for date range, channel and store, and these reports:
 
 | Report | Shows |
@@ -236,11 +273,11 @@ stay private.
 | **Card members vs others** | average revenue per customer, members against non-members |
 | **Data health** | `data_freshness` and the latest `dq_results` |
 
-**T19 · Hand over**: an architecture diagram of your platform, a runbook (ingestion lags, a rule
+**T20 · Hand over**: an architecture diagram of your platform, a runbook (ingestion lags, a rule
 fails, a replication slot is lost), and one page for management with the five most important
 things the dashboard shows.
 
 ## Done when
-All tables exist with these names and columns, the DAG runs every 15 minutes on live data, the
+The archive is loaded, all tables exist with these names and columns, the DAG runs every 15 minutes on live data, the
 latest `dq_results` are all `pass`, and "Tidewell today" answers the management team's questions
 without anyone opening a notebook.
