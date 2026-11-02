@@ -1,0 +1,16 @@
+{{- if .Values.postgres.enabled }}
+# lab-db — the members' PostgreSQL server: ShopFlow, AdventureWorks (login learner, read only) and,
+# later, the live shop and members' own databases. The course connects to lab-db:5432 on both
+# stacks. Local runs it as a server of its own; here it is, for now, another name for the
+# "postgres" Service (where shopflow and adventureworks live on k8s), until lab-db gets its own.
+apiVersion: v1
+kind: Service
+metadata:
+  name: lab-db
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: postgres.{{ .Release.Namespace }}.svc.cluster.local
+  ports:
+    - { name: pg, port: 5432, targetPort: 5432 }
+{{- end }}

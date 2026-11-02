@@ -1,10 +1,11 @@
 """labdb — "🐘 My databases": the PostgreSQL databases a member can use, in one place.
 
   · the lab's databases (ShopFlow, AdventureWorks, the live shop): read only, a shared login each
-  · the member's own databases on the lab's database server (LABDB_ADMIN_URL, the lab-db Postgres):
-    <member>_<name>, owned by a login named after the member — full access (create tables, write,
-    drop), and only they can connect. The login's password is made once and kept in the vault
-    (admin only, _lab/db/<member>); the page shows it to its owner.
+  · the member's own databases: <member>_<name>, owned by a login named after the member — full
+    access (create tables, write, drop), and only they can connect.
+All of them live on the lab's database server lab-db (LABDB_ADMIN_URL), apart from the platform's
+Postgres. The member's login password is made once and kept in the vault (admin only,
+_lab/db/<member>); the page shows it to its owner.
 Each own database gets a private SQLPad connection "<database> (Postgres) — <member>", so the SQL
 editor can create tables in it. The database server itself is the record: no portal table.
 """
@@ -25,10 +26,10 @@ RESERVED = {"postgres", "reader", "learner", "public"}
 # the lab's own databases: everyone reads them (key → what the page shows; sqlpad = its connection id)
 SHARED = [
     {"key": "shopflow", "title": "ShopFlow", "what": "the course's online shop (orders, customers, products…)",
-     "host": os.environ.get("LABDB_SHOPFLOW_HOST", "postgres"), "port": 5432, "database": "shopflow",
+     "host": HOST, "port": PORT, "database": "shopflow",
      "user": "learner", "password": "learner", "sqlpad": "ShopFlow — OLTP (Postgres)"},
     {"key": "adventureworks", "title": "AdventureWorks", "what": "Microsoft's sample company: sales, production, HR",
-     "host": os.environ.get("LABDB_SHOPFLOW_HOST", "postgres"), "port": 5432, "database": "adventureworks",
+     "host": HOST, "port": PORT, "database": "adventureworks",
      "user": "learner", "password": "learner", "sqlpad": "AdventureWorks — OLTP (Postgres)"},
     {"key": "shop", "title": "Live shop", "what": "changes every few seconds — the source for 📡 Ingestion (CDC)",
      "host": HOST, "port": PORT, "database": "shop", "user": "reader", "password": "reader", "sqlpad": None},

@@ -157,7 +157,7 @@ yet still reports the run "successful" (a common surprise — pick any date betw
 
 !!! note "Local = *authoring & testing*; the stack = *running the real jobs*"
     These commands **execute** the operators. Pure-Python / Bash tasks run offline, but tasks that
-    reach services (Spark, or `postgres:5432` / `storage:9000` / `trino:8080`) need those
+    reach services (Spark, or `lab-db:5432` / `storage:9000` / `trino:8080`) need those
     services reachable — that's the running stack's job. So **validate the DAG's shape locally, run
     the heavy pipeline on the stack.** These same checks are what you put in **CI** to gate a DAG
     before it's merged and git-synced to a remote cluster.

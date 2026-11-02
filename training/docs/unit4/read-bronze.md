@@ -80,7 +80,7 @@ the read in a small helper so we don't repeat the connection details four times:
 def read_pg(table):
     return (
         spark.read.format("jdbc")
-        .option("url", "jdbc:postgresql://postgres:5432/shopflow")
+        .option("url", "jdbc:postgresql://lab-db:5432/shopflow")
         .option("dbtable", table)
         .option("user", "learner")
         .option("password", "learner")
@@ -102,8 +102,8 @@ customers.show(5)
   starts here; the options that follow tell it *where from* and *how*.
 - **`.format("jdbc")`** — read over a database driver rather than from files. (Later you'll see
   `spark.read.parquet(...)` for the file source.)
-- **`.option("url", "jdbc:postgresql://postgres:5432/shopflow")`** — the connection string:
-  connect to the `shopflow` database on host `postgres`, port `5432`.
+- **`.option("url", "jdbc:postgresql://lab-db:5432/shopflow")`** — the connection string:
+  connect to the `shopflow` database on host `lab-db`, port `5432`.
 - **`.option("dbtable", table)`** — *which* table to pull. You pass in `"customers"`, `"orders"`,
   etc. (A later trick: this can also be a `(SELECT …)` subquery — see the Challenge.)
 - **`.option("user"/"password"/"driver", …)`** — credentials plus the exact Java driver class
@@ -289,7 +289,7 @@ from Postgres and appends them.
     # 2. read only newer rows from Postgres via a pushdown query
     new_orders = (
         spark.read.format("jdbc")
-        .option("url", "jdbc:postgresql://postgres:5432/shopflow")
+        .option("url", "jdbc:postgresql://lab-db:5432/shopflow")
         .option("dbtable", f"(SELECT * FROM orders WHERE order_id > {hwm}) AS t")
         .option("user", "learner").option("password", "learner")
         .option("driver", "org.postgresql.Driver")

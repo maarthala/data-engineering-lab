@@ -41,6 +41,7 @@ services:
   # Polaris, the portal…), so members' load, logins and replication slots never touch it:
   #  · the live shop for practising CDC (database shop, login reader / reader — SELECT + REPLICATION,
   #    never writes), kept changing by cdc-sim
+  #  · the course's sample databases ShopFlow and AdventureWorks (login learner / learner, read only)
   #  · members' own databases from 🐘 My databases (<member>_<name>, owned by a login per member)
   # wal_level = logical for CDC; a forgotten slot holds at most max_slot_wal_keep_size of change log.
   lab-db:
@@ -50,12 +51,14 @@ services:
               "-c", "max_slot_wal_keep_size=1GB", "-c", "wal_sender_timeout=0"]
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: lab-db-local-owner          # the simulator only — members use reader
+      POSTGRES_PASSWORD: lab-db-local-owner          # the owner: cdc-sim, simulate_day, My databases — members never
       POSTGRES_DB: shop
     volumes:
       - lab-db-data:/var/lib/postgresql
+      # first start only: ShopFlow + AdventureWorks (read only for members, login learner)
+      - ./init_scripts/lab-db:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d shop"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d shop"]   # TCP: not ready while init scripts run
       interval: 5s
       timeout: 3s
       retries: 20

@@ -21,7 +21,7 @@ def main():
     args = ap.parse_args()
     day = dt.date.fromisoformat(args.date)
 
-    conn = psycopg2.connect(host="postgres", dbname="shopflow", user="postgres", password="postgres")
+    conn = psycopg2.connect(host="lab-db", dbname="shopflow", user="postgres", password="lab-db-local-owner")
     cur = conn.cursor()
     cur.execute("SELECT max(customer_id) FROM customers")
     n_cust = cur.fetchone()[0]

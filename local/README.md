@@ -6,8 +6,8 @@ as [`../k8s/README.md`](../k8s/README.md), just on localhost instead of a cluste
 ## What runs
 RustFS object storage · **Apache Polaris** (governed Iceberg catalog) + web **Console** · Spark
 (master + worker + Connect) · Trino · Superset · Airflow · Jupyter · Postgres · Redis ·
-an nginx landing page. Postgres also hosts the **AdventureWorks** OLTP sample DB
-(see below).
+an nginx landing page. The sample databases (ShopFlow, **AdventureWorks**) live on `lab-db`, the
+members' PostgreSQL server, apart from the platform's own `postgres` (see below).
 
 ## Prerequisites
 - **Docker** + **Docker Compose** v2 (≥ 8 GB RAM for Docker, ~25 GB free disk). Less memory: run
@@ -94,18 +94,18 @@ docker compose up -d --force-recreate jupyter
 
 ## AdventureWorks sample database
 The full **AdventureWorks OLTP** sample (68 tables across `person`, `sales`, `production`,
-`purchasing`, `humanresources`) is loaded into the local Postgres as the `adventureworks`
+`purchasing`, `humanresources`) is loaded into `lab-db` (the members' Postgres) as the `adventureworks`
 database — handy for richer SQL practice than ShopFlow.
 
 **How it's wired:**
 - `make init` downloads the Microsoft OLTP CSVs + the community Postgres port and fixes the
   CSVs (needs **`ruby`** — ships with macOS). Data is staged under
-  `init_scripts/postgres/adventureworks/` (gitignored, ~110 MB).
-- On the **first** `make up`, `init_scripts/postgres/03_adventureworks.sh` creates the
-  `adventureworks` DB and loads it.
+  `init_scripts/lab-db/adventureworks/` (gitignored, ~110 MB).
+- On the **first** `make up`, `init_scripts/lab-db/` creates `shopflow` (02) and
+  `adventureworks` (03) on `lab-db`, and the read-only login `learner` (04).
 - Query it from **Trino / Superset** via the `adventureworks` catalog, or directly:
   ```bash
-  docker exec -it postgres psql -U postgres -d adventureworks -c \
+  docker exec -it lab-db psql -U postgres -d adventureworks -c \
     "select top 5 firstname, lastname from person.person;"    # (or a normal LIMIT query)
   # Trino:
   docker exec -it trino trino --execute "SELECT count(*) FROM adventureworks.sales.salesorderheader"
@@ -136,7 +136,7 @@ straight to the stack (both ports are published to your host):
 
 | Connection | Driver | Host | Port | Database / Catalog | User / Pass |
 |---|---|---|---|---|---|
-| ShopFlow / AdventureWorks (OLTP) | PostgreSQL | `localhost` | `5432` | `shopflow` / `adventureworks` | course login `learner` / `learner` (admin: `postgres` / `postgres`) |
+| ShopFlow / AdventureWorks (OLTP) | PostgreSQL | `lab-db` (in the stack) | `5432` | `shopflow` / `adventureworks` | course login `learner` / `learner` (owner: `postgres` / `lab-db-local-owner`) |
 | Lakehouse (OLAP) | Trino | `localhost` | `8007` | catalog `iceberg` (or `shopflow`) | any user, no password |
 
 ## Notes

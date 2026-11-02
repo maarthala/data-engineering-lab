@@ -27,7 +27,7 @@ services:
       # OLTP — ShopFlow (Postgres)
       SQLPAD_CONNECTIONS__shopflow__name: "ShopFlow — OLTP (Postgres)"
       SQLPAD_CONNECTIONS__shopflow__driver: postgres
-      SQLPAD_CONNECTIONS__shopflow__host: postgres
+      SQLPAD_CONNECTIONS__shopflow__host: lab-db
       SQLPAD_CONNECTIONS__shopflow__port: "5432"
       SQLPAD_CONNECTIONS__shopflow__database: shopflow
       SQLPAD_CONNECTIONS__shopflow__username: learner
@@ -35,7 +35,7 @@ services:
       # OLTP — AdventureWorks (Postgres)
       SQLPAD_CONNECTIONS__adventureworks__name: "AdventureWorks — OLTP (Postgres)"
       SQLPAD_CONNECTIONS__adventureworks__driver: postgres
-      SQLPAD_CONNECTIONS__adventureworks__host: postgres
+      SQLPAD_CONNECTIONS__adventureworks__host: lab-db
       SQLPAD_CONNECTIONS__adventureworks__port: "5432"
       SQLPAD_CONNECTIONS__adventureworks__database: adventureworks
       SQLPAD_CONNECTIONS__adventureworks__username: learner

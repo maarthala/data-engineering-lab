@@ -12,7 +12,7 @@ from pyspark.sql import SparkSession
 
 def read_pg(spark, table):
     return (spark.read.format("jdbc")
-            .option("url", "jdbc:postgresql://postgres:5432/shopflow")
+            .option("url", "jdbc:postgresql://lab-db:5432/shopflow")
             .option("dbtable", table)
             .option("user", "learner").option("password", "learner")   # read-only course login
             .option("driver", "org.postgresql.Driver").load())

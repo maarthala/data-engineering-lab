@@ -45,7 +45,7 @@ ShopFlow database:
 ```python
 from sqlalchemy import create_engine
 
-pg = create_engine("postgresql+psycopg2://learner:learner@postgres:5432/shopflow")
+pg = create_engine("postgresql+psycopg2://learner:learner@lab-db:5432/shopflow")
 
 # Run SQL, get a DataFrame back
 customers = pd.read_sql("SELECT * FROM customers LIMIT 5", pg)
@@ -58,14 +58,16 @@ customers
   **`create_engine`** builds an **engine**: a reusable, lazy connection factory. It doesn't open a
   connection immediately; it opens them on demand and pools them for reuse, so you make the engine
   once and hand it to every query.
-- **`create_engine("postgresql+psycopg2://learner:learner@postgres:5432/shopflow")`** — the
+- **`create_engine("postgresql+psycopg2://learner:learner@lab-db:5432/shopflow")`** — the
   string is a **connection URL**, and its shape is worth learning because you'll write one for
   every database. Read it in pieces:
 
     `postgresql+psycopg2` → *dialect* `postgresql` spoken through the *driver* `psycopg2`
     · `learner:learner` → *username*`:`*password* — the course's database login: it reads the
-      shared ShopFlow / AdventureWorks tables and creates your own, but can't change the shared ones
-    · `@postgres:5432` → *host*`:`*port* (here `postgres` is the service name on our stack)
+      shared ShopFlow / AdventureWorks tables, read only (a database of your own, where you may
+      create tables: 🐘 My databases)
+    · `@lab-db:5432` → *host*`:`*port* (`lab-db` is the lab's database server for members; the
+      platform's own Postgres, with Keycloak, Polaris and the portal, is a separate one)
     · `/shopflow` → the *database* to connect to.
 
 - **`pg = ...`** — store the engine in `pg`. This is now your handle to the ShopFlow database,

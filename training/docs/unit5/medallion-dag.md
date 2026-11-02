@@ -55,7 +55,7 @@ last line wires them with `>>`:
 import pendulum
 from airflow.sdk import dag, task
 
-PG = {"url": "jdbc:postgresql://postgres:5432/shopflow", "user": "learner",
+PG = {"url": "jdbc:postgresql://lab-db:5432/shopflow", "user": "learner",
       "password": "learner", "driver": "org.postgresql.Driver"}
 
 

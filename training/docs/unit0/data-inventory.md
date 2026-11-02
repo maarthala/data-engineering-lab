@@ -5,7 +5,7 @@ three places, each with a different job:
 
 ```mermaid
 flowchart LR
-  PG[(Postgres<br/>OLTP source)] -->|ingest| LAKE
+  PG[(lab-db<br/>OLTP source)] -->|ingest| LAKE
   subgraph LAKE["RustFS — your bucket (demouser-lake)"]
     RAW[files/source<br/>CSV · Parquet]
     ICE[tables/<br/>catalog table files]
@@ -14,12 +14,12 @@ flowchart LR
   POL --> ENG[Trino · Spark · Superset]
 ```
 
-## 1. Postgres — the source database (OLTP)
+## 1. lab-db — the source database (OLTP)
 
 The **live application database**, as ShopFlow's app would have it. This is the *source* your
 pipeline ingests from.
 
-- **Database:** `shopflow`
+- **Server · database:** `lab-db` · `shopflow` (login `learner` / `learner`, read only)
 - **12 tables** (the ShopFlow schema — see [0.6](schema.md) for columns):
 
 | Table | Rows | What |
@@ -35,9 +35,11 @@ pipeline ingests from.
 **Reach it:** Trino catalog **`shopflow`** → `shopflow.public.orders` (SQL), or from a notebook via
 JDBC. Example: `SELECT count(*) FROM shopflow.public.orders` → 40000.
 
-!!! note "Other Postgres databases are platform plumbing"
-    Postgres also hosts `airflow`, `superset`, `metastore`, `polarisdb`, `ucdb`, `hue` — these are
-    **metastores for the tools**, not member data. Only `shopflow` is your source data.
+!!! note "What else lives on lab-db — and what doesn't"
+    `lab-db` also holds `adventureworks` (another sample company), `shop` (the live shop for
+    📡 Ingestion) and members' own databases. 🐘 **My databases** lists them all with their tables.
+    The tools' own databases (`polarisdb`, `keycloak`, `airflow`, `superset`, `portal`) are on a
+    separate server, `postgres`, that members don't use.
 
 ## 2. RustFS — the data lake (object storage)
 
@@ -100,7 +102,7 @@ dashboards, and the Polaris Console — one governed copy, every engine.
 
 | Where | What | How you read it |
 |---|---|---|
-| **Postgres** (`shopflow`) | live OLTP source — 12 tables | Trino `shopflow.*`, JDBC |
+| **lab-db** (`shopflow`) | live OLTP source — 12 tables | Trino `shopflow.*`, JDBC, 🐘 My databases |
 | **RustFS** `demouser-lake/files/source` | practice files + raw history you export | `s3a://…` in Spark, My files |
 | **RustFS** `demouser-lake/tables` | your catalog's table files | via the catalog (not by path) |
 | **Your lakehouse** (Polaris) | *your* Bronze/Silver/Gold tables | `my.*` in notebooks, `demouser_lake.*` in Trino |

@@ -37,7 +37,8 @@ flowchart TB
 
   subgraph DATA["State — storage"]
     MIN[(RustFS<br/>lakehouse + raw files)]
-    PGS[(Postgres<br/>source DB + metastores)]
+    LDB[(lab-db<br/>source databases)]
+    PGS[(Postgres<br/>metastores)]
     RDS[(Redis<br/>Superset cache)]
   end
 
@@ -60,7 +61,8 @@ flowchart TB
   SUP --> PGS & RDS
 ```
 
-Everything points at **two stores** (RustFS for tables, Postgres for the source + metadata),
+Everything points at **three stores** (RustFS for tables, `lab-db` for the source databases, Postgres
+for the tools' own metadata),
 with **Polaris** as the single catalog that every engine consults before touching a table.
 
 ## Components
@@ -69,7 +71,8 @@ with **Polaris** as the single catalog that every engine consults before touchin
 | Service | What it is | Holds |
 |---|---|---|
 | **RustFS** | S3-compatible object store — the lakehouse (in-stack name `storage:9000`) | shared Iceberg tables + raw history (`demo-bucket/…`), and each member's bucket `<user>-lake` (their lakehouse, notebooks, DAGs; 100 MB) |
-| **Postgres** | One relational DB serving several roles | the **`shopflow`** source OLTP data; **metastores** for Polaris (`polarisdb`), Keycloak, Airflow, Superset |
+| **lab-db** | The members' PostgreSQL server | the source databases **`shopflow`** and **`adventureworks`** (login `learner`, read only), the live shop for CDC, and members' own databases (🐘 My databases) |
+| **Postgres** | The platform's PostgreSQL server | **metastores** for Polaris (`polarisdb`), Keycloak, Airflow, Superset, the portal — never member data |
 | **Redis** | In-memory store | **Superset's** cache & async query results (Airflow uses LocalExecutor — no broker needed) |
 
 ### Governance — one catalog for all engines
@@ -132,15 +135,17 @@ single sign-on, register on the home portal) for every tool; see [0.3](../setup/
     with their own lab account, and use PostgreSQL as `learner` / `learner`.
 
 Internal wiring uses service names on a shared network: `polaris:8181`, `storage:9000`,
-`postgres:5432`, `spark://spark-master:7077`, `sc://spark-connect:15002`.
+`postgres:5432` (the platform's databases), `lab-db:5432` (ShopFlow, AdventureWorks, the live
+shop and members' own databases), `spark://spark-master:7077`, `sc://spark-connect:15002`.
 
 ## Persistence
 
 State survives restarts; only a deliberate teardown wipes it.
 
 - **RustFS volume** — all lakehouse tables + raw files + every member's bucket.
-- **Postgres volume** — source data + every metastore (incl. Polaris' `polarisdb`, so the
-  catalog, principals, and grants persist).
+- **lab-db volume** — the source databases and members' own databases.
+- **Postgres volume** — every metastore (incl. Polaris' `polarisdb`, so the catalog,
+  principals, and grants persist).
 - **Each member's Jupyter work volume** (and the Hub's own small database), Spark working dirs,
   and Superset's home.
 
