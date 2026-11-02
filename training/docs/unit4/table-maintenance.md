@@ -111,7 +111,8 @@ SHOW TBLPROPERTIES my.sandbox.orders_maint ('sort-order')
 ```
 
 ### Clean up: `expire_snapshots` + `remove_orphan_files`
-Time travel still works, because every old snapshot's files are still on storage. **Expiring**
+Time travel still works, because every old snapshot's files are still on storage (the recipe
+[Undo a bad load](../recipes/rollback.md) uses that to roll a table back). **Expiring**
 snapshots gives up that history and deletes the files only they used:
 
 ```sql

@@ -214,6 +214,7 @@ nav:
       - "Run on file arrival (event trigger)": recipes/file-trigger.md
       - "Slowly changing dimensions (SCD2)": recipes/scd2.md
       - "Data quality checks & quarantine": recipes/data-quality.md
+      - "Undo a bad load: time travel & rollback": recipes/rollback.md
       - "Reverse-ETL: publish Gold out": recipes/reverse-etl.md
   - "Capstones":
       - "Capstone 1 (easy)": capstones/capstone-1.md
