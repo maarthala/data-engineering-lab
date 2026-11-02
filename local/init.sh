@@ -71,7 +71,7 @@ echo "🎉 All downloads complete. Files saved in $TARGET_DIR"
 # `adventureworks` database on first `make up`. Staged data is gitignored
 # (~110 MB). Skips if already prepared.
 # ---------------------------------------------------------------------------
-AW_DIR="init_scripts/postgres/adventureworks"
+AW_DIR="init_scripts/lab-db/adventureworks"
 if [ -f "$AW_DIR/install.sql" ] && ls "$AW_DIR"/*.csv >/dev/null 2>&1; then
   echo "✅ AdventureWorks sample already prepared in $AW_DIR, skipping."
 elif ! command -v ruby >/dev/null 2>&1; then
