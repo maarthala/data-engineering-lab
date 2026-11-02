@@ -78,6 +78,7 @@
     .dialog p{margin:0 0 12px; color:var(--muted); line-height:1.45; white-space:pre-line}
     .dialog p b{color:var(--ink)}
     .dialog input{width:100%; margin-bottom:12px}
+    .dialog .copyname{font-size:.8rem; padding:2px 8px; margin-left:4px}
     .dialog .row{display:flex; justify-content:flex-end; gap:8px}
     .dialog.warn h3{color:var(--warn-ink)}
     .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--line);
@@ -193,6 +194,14 @@
         $('dialog').className = 'dialog' + (opts.warn ? ' warn' : '');
         var inp = $('d-input'); inp.style.display = opts.typeToConfirm ? 'block' : 'none'; inp.value = '';
         inp.placeholder = opts.typeToConfirm || '';
+        if (opts.typeToConfirm) {                  // ⧉ copies the name to paste into the box
+          var cp = el('button', 'copyname', '⧉ Copy name'); cp.type = 'button';
+          cp.onclick = function () {
+            (navigator.clipboard ? navigator.clipboard.writeText(opts.typeToConfirm) : Promise.reject()).then(
+              function () { cp.textContent = '✓ Copied — paste it below'; inp.focus(); }, function () { toast(opts.typeToConfirm); });
+          };
+          $('d-text').appendChild(document.createTextNode(' ')); $('d-text').appendChild(cp);
+        }
         var ok = $('d-ok'); ok.textContent = opts.ok || 'Delete'; ok.disabled = !!opts.typeToConfirm;
         inp.oninput = function () { ok.disabled = inp.value !== opts.typeToConfirm; };
         $('scrim').style.display = 'flex'; (opts.typeToConfirm ? inp : ok).focus();
