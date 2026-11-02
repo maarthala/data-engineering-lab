@@ -40,6 +40,9 @@
     .expl{margin-top:10px; padding:10px 12px; border-left:3px solid var(--accent); background:var(--panel2); border-radius:6px; font-size:.92rem; line-height:1.55}
     .expl ul{margin:6px 0; padding-left:20px} .expl p{margin:6px 0} .expl a{color:var(--accent)}
     .ask{display:inline-flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 10px; border:1px solid var(--gold); border-radius:9px; background:rgba(226,185,59,.08); font-size:.88rem}
+    .miss{width:100%; border-collapse:collapse; font-size:.9rem} .miss td{padding:7px 8px; border-top:1px solid var(--line); vertical-align:top}
+    .miss tr.go{cursor:pointer} .miss tr.go:hover td{background:var(--panel2)} .miss .qt{max-width:640px} .miss .r{text-align:right; white-space:nowrap}
+    .flagnote{font-size:.8rem; color:var(--danger); margin-left:8px; font-weight:600}
     .nav{display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-top:12px}
     @media (max-width:640px){ .stats{grid-template-columns:repeat(2,1fr)} .dom{grid-template-columns:1fr 70px} .dom .meter{display:none} }
   </style>
@@ -160,13 +163,40 @@
             el('td', {class: a.passed ? 'pass' : 'fail', text: a.passed ? 'passed' : 'not yet'}), el('td', {class: 'muted', text: a.minutes + ' min'}),
             el('td', {class: 'acts'}, [r])]);
         }))])])]);
-      more.addEventListener('click', function () { hist.hidden = !hist.hidden; more.classList.toggle('on', !hist.hidden); });
+      more.addEventListener('click', function () {
+        hist.hidden = !hist.hidden; more.classList.toggle('on', !hist.hidden);
+        if (!hist.hidden && !hist.missed) hist.firstChild.appendChild(hist.missed = missedCard(e.id));
+      });
       return [row, hist];
     }
     function alertCard(msg) { main.insertBefore(el('div', {class: 'card result err'}, [el('div', {text: msg})]), main.firstChild); }
 
-    function openAttempt(id) {
-      api('GET', '/api/exams/attempt?id=' + id).then(function (a) { a.done ? showReview(a) : take(a); }).catch(fail);
+    function openAttempt(id, qid) {
+      api('GET', '/api/exams/attempt?id=' + id).then(function (a) { a.done ? showReview(a, qid) : take(a); }).catch(fail);
+    }
+    // ---- the questions you keep getting wrong in an exam (2+ times over your attempts), most first;
+    // click one → its review in the latest attempt you missed it in (here: jump to it)
+    function missedCard(examId, jump) {
+      var card = el('div', {class: 'card'}, [el('div', {class: 'sub', text: 'Loading the questions you keep missing…'})]);
+      api('GET', '/api/exams/missed?exam=' + encodeURIComponent(examId)).then(function (d) {
+        card.innerHTML = '';
+        card.appendChild(el('h3', {style: 'margin:0 0 4px', text: '🔁 Questions you keep getting wrong' + (d.questions.length ? ' — top ' + d.questions.length : '')}));
+        card.appendChild(el('div', {class: 'sub', text: d.questions.length ? 'Missed 2 or more times over your ' + d.attempts + ' attempts (wrong, partly right or not answered) — click one to review it.'
+                                                        : 'None yet — no question was missed twice over your ' + d.attempts + (d.attempts === 1 ? ' attempt.' : ' attempts.')}));
+        if (!d.questions.length) return;
+        card.appendChild(el('div', {class: 'wrap'}, [el('table', {class: 'miss'}, [el('tbody', {}, d.questions.map(function (q, n) {
+          var text = String(q.question || '').replace(/[#*_`|>]+|-{3,}/g, ' ').replace(/\s+/g, ' ').trim();
+          var r = el('tr', {class: 'go', title: 'Review it'}, [el('td', {class: 'muted', text: String(n + 1)}),
+            el('td', {class: 'qt'}, [el('div', {text: text.length > 180 ? text.slice(0, 180) + '…' : text}),
+              domainOf(d, q) ? el('div', {class: 'sub', style: 'color:var(--accent)', text: domainOf(d, q)}) : null]),
+            el('td', {class: 'r fail', text: q.missed + ' of ' + q.seen + ' missed'}),
+            el('td', {class: 'r ' + (q.last_right ? 'pass' : 'muted'), text: q.last_right ? 'right last time' : 'missed last time'}),
+            el('td', {class: 'r', style: 'color:var(--danger)', text: q.marked ? '⚑ ' + q.marked + '×' : ''})]);
+          r.addEventListener('click', function () { if (!jump || !jump(q.attempt, q.qid)) openAttempt(q.attempt, q.qid); });
+          return r;
+        }))])]));
+      }).catch(function (e) { card.innerHTML = ''; card.appendChild(el('div', {class: 'sub', text: 'Could not load: ' + e.message})); });
+      return card;
     }
 
     // ---- taking an attempt: one question at a time, saved on every change ----------------------
@@ -277,13 +307,14 @@
     }
 
     // ---- the review of a submitted attempt -----------------------------------------------------
-    function showReview(r) {
+    function showReview(r, qid) {
       history.replaceState(null, '', '#attempt=' + r.id);
       main.innerHTML = '';
       var box = el('div'), pal = el('div', {class: 'palette'});
       var parts = r.questions.filter(function (q) { return q.points > 0 && !q.right; }).length;
-      var cur = r.questions.findIndex(function (q) { return !q.right; });   // start at the first wrong one
+      var cur = r.questions.findIndex(function (q) { return qid ? q.qid === qid : !q.right; });   // that question, else the first wrong one
       if (cur < 0) cur = 0;
+      var flags = r.questions.filter(function (q) { return q.marked; }), flagsWrong = flags.filter(function (q) { return !q.right; }).length;
       var back = el('button', {text: '← All exams'}); back.addEventListener('click', function () { list(); });
       var again = el('button', {class: 'primary', text: 'New attempt'});
       again.addEventListener('click', function () { api('POST', '/api/exams/start', {exam: r.exam.id}).then(take).catch(function (e) { alertCard(e.message); }); });
@@ -302,8 +333,14 @@
       var wrong = r.questions.filter(function (q) { return !q.right; }).length;
       var revealAll = el('button', {class: 'small', text: 'Reveal all answers'});
       main.appendChild(el('div', {class: 'card'}, [el('div', {class: 'bar'}, [el('h3', {style: 'margin:0', text: 'Questions — click one to see it'}),
-        el('span', {class: 'row', style: 'gap:10px'}, [el('span', {class: 'sub', text: (r.questions.length - wrong) + ' right · ' + wrong + ' wrong or not answered'}), revealAll])]), pal]));
+        el('span', {class: 'row', style: 'gap:10px'}, [el('span', {class: 'sub', text: (r.questions.length - wrong) + ' right · ' + wrong + ' wrong or not answered' +
+          (flags.length ? ' · ⚑ ' + flags.length + ' marked for review, ' + flagsWrong + ' of them wrong' : '')}), revealAll])]), pal]));
       main.appendChild(box);
+      main.appendChild(missedCard(r.exam.id, function (id, q) {   // in this attempt: just go to it
+        var n = id === r.id ? r.questions.findIndex(function (x) { return x.qid === q; }) : -1;
+        if (n < 0) return false;
+        cur = n; paint(); window.scrollTo({top: box.offsetTop - 80}); return true;
+      }));
       // a question you got wrong hides its answer at first: try again (Check — not marked, your score
       // stays) or Reveal answer; right ones are shown open. Reveal all opens every one.
       var shown = {}, again = {};
@@ -312,8 +349,8 @@
       function paint() {
         pal.innerHTML = '';
         r.questions.forEach(function (q, n) {
-          var b = el('button', {class: (q.right ? 'ok' : q.points > 0 ? 'part' : q.answered ? 'bad' : 'none') + (n === cur ? ' cur' : ''), text: String(n + 1),
-                                title: q.right ? 'right' : q.points > 0 ? 'partly right' : q.answered ? 'wrong' : 'not answered'});
+          var b = el('button', {class: (q.right ? 'ok' : q.points > 0 ? 'part' : q.answered ? 'bad' : 'none') + (q.marked ? ' flag' : '') + (n === cur ? ' cur' : ''), text: String(n + 1),
+                                title: (q.right ? 'right' : q.points > 0 ? 'partly right' : q.answered ? 'wrong' : 'not answered') + (q.marked ? ' · you marked it for review' : '')});
           b.addEventListener('click', function () { cur = n; paint(); });
           pal.appendChild(b);
         });
@@ -325,7 +362,7 @@
         next.addEventListener('click', function () { cur++; paint(); });
         box.innerHTML = '';
         box.appendChild(el('div', {class: 'card'}, [
-            el('div', {class: 'bar'}, [el('div', {}, [el('b', {text: 'Question ' + (cur + 1) + ' of ' + r.questions.length}),
+            el('div', {class: 'bar'}, [el('div', {}, [el('b', {text: 'Question ' + (cur + 1) + ' of ' + r.questions.length}), q.marked ? el('span', {class: 'flagnote', text: '⚑ you marked it for review'}) : null,
               domainOf(r, q) ? el('div', {class: 'sub', style: 'color:var(--accent)', text: domainOf(r, q)}) : null, tagList(q)]), el('span', {class: q.right ? 'pass' : 'fail',
               text: q.right ? '✓ right' : q.points > 0 ? '◐ ' + q.slots.filter(function (s) { return s.right; }).length + ' of ' + q.slots.length + ' right' : (q.answered ? '✗ wrong' + (!q.slots && q.picked.length < q.answer.length ? ' — you picked ' + q.picked.length + ' of ' + q.answer.length : '') : '✗ not answered')})]),
             caseBox(r, q), el('div', {class: 'q md', html: md(q.question)}),
@@ -397,7 +434,7 @@
           el('div', {class: 'row', style: 'margin-top:10px; gap:10px'}, [check, reveal, verdict])]);
       }
       paint();
-      window.scrollTo({top: 0});
+      window.scrollTo({top: qid ? box.offsetTop - 80 : 0});
     }
 
     var m = /attempt=(\d+)/.exec(location.hash);

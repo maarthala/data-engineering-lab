@@ -1186,7 +1186,42 @@ def review(attempt_id, member):
             "by_domain": [{"domain": d, "name": names.get(d, "Unassigned" if d == "-" else f"Domain {d}"),
                            "correct": v[0], "total": v[1]} for d, v in sorted(_by_domain(qs, a["answers"], names).items(),
                                                                  key=lambda x: [(0, int(p)) if p.isdigit() else (1, p) for p in x[0].split(".")])],
-            "cases": _cases(qs), "questions": [_labels(e, _reviewed(q, a["answers"].get(str(q["vid"])))) for q in qs]}
+            "cases": _cases(qs), "questions": [_labels(e, dict(_reviewed(q, a["answers"].get(str(q["vid"]))), marked=str(q["vid"]) in a["marked"]))
+                                               for q in qs]}
+
+
+def missed(exam_id, member, limit=20):
+    """The questions the member keeps getting wrong in this exam: over their submitted attempts (the
+    last 100), each question (bank + its id, any version) missed at least twice — wrong, partly right
+    or not answered — most missed first; with the latest attempt it was missed in, to open its review."""
+    e = _q("SELECT * FROM exams WHERE id = %s AND deleted_at IS NULL", (exam_id,), one=True)
+    if not e:
+        raise ExamError("no such exam")
+    atts = _q("SELECT id, vids, answers, marked, finished_at FROM exam_attempts WHERE exam_id = %s AND member = %s "
+              "AND finished_at IS NOT NULL AND deleted_at IS NULL ORDER BY finished_at DESC LIMIT 100", (exam_id, member))
+    vids = list({str(v) for a in atts for v in a["vids"]})
+    by = {str(r["vid"]): r for r in _q("SELECT * FROM exam_qv WHERE vid = ANY(%s::uuid[])", (vids,))} if vids else {}
+    seen = {}
+    for a in atts:                                    # newest first: the first one seen is the latest
+        for v in map(str, a["vids"]):
+            q = by.get(v)
+            if not q:
+                continue
+            s = seen.setdefault((q["bank"], q["qid"]), {"q": q, "seen": 0, "missed": 0, "marked": 0, "last": None, "at": None})
+            right = _mark(q, a["answers"].get(v))[0] == 1
+            s["seen"] += 1
+            s["missed"] += not right
+            s["marked"] += v in (a["marked"] or [])
+            if s["last"] is None:
+                s["last"] = right
+            if not right and s["at"] is None:
+                s["at"] = {"attempt": a["id"], "qid": v, "finished_at": a["finished_at"].isoformat()}
+                s["ts"] = a["finished_at"].timestamp()
+    top = sorted((s for s in seen.values() if s["missed"] >= 2),
+                 key=lambda s: (-s["missed"], -s["missed"] / s["seen"], -s["ts"]))[:max(1, min(int(limit or 20), 50))]
+    return {"attempts": len(atts), "domains": {d["id"]: d["name"] for d in (e["domains"] or [])}, "questions": [
+        _labels(e, dict(_shown(s["q"]), seen=s["seen"], missed=s["missed"], marked=s["marked"], last_right=s["last"], **s["at"]))
+        for s in top]}
 
 
 def _by_domain(qs, answers, names):
