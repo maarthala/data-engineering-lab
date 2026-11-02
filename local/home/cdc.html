@@ -10,19 +10,41 @@
     .seg{display:inline-flex; gap:4px; flex-wrap:wrap}
     button.on{border-color:var(--accent); color:var(--accent)}
     .ok{color:var(--accent2)} .bad{color:var(--bad-ink)} .run{color:var(--accent)}
+    .crumbs{display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:.9rem; color:var(--muted); margin:0 0 10px}
+    .crumbs a{color:var(--accent); text-decoration:none; cursor:pointer} .crumbs a:hover{text-decoration:underline}
+    .crumbs b{color:var(--ink)}
     .lst td{vertical-align:middle} .lst .acts{white-space:nowrap; text-align:right}
     .lst tr.more > td{background:var(--panel2); padding:8px 14px 12px}
-    .form{display:grid; grid-template-columns:160px minmax(0, 420px); gap:10px 14px; align-items:center; margin:6px 0 12px}
+    a.name{font-weight:600; color:var(--ink); text-decoration:none; cursor:pointer} a.name:hover{color:var(--accent)}
+    dd a, .facts a{color:var(--accent); cursor:pointer}
+    .form{display:grid; grid-template-columns:160px minmax(0, 440px); gap:10px 14px; align-items:center; margin:6px 0 12px}
     .form label{color:var(--muted); font-size:.88rem}
     .form input[type=text], .form input[type=password], .form input[type=number], .form select{width:100%}
-    .tables{display:flex; flex-direction:column; gap:4px; max-height:260px; overflow:auto; padding:6px 8px;
+    .tables{display:flex; flex-direction:column; gap:4px; max-height:320px; overflow:auto; padding:6px 8px;
             border:1px solid var(--line); border-radius:8px; background:var(--panel2)}
     .tables label{display:flex; gap:8px; align-items:center; cursor:pointer}
     pre.log{max-height:420px; overflow:auto; background:var(--panel2); border:1px solid var(--line); border-radius:8px;
             padding:8px 10px; font-size:.78rem; line-height:1.4; white-space:pre-wrap; word-break:break-all; margin:8px 0 0}
     .notes{margin:6px 0 0; padding-left:18px; font-size:.86rem}
     .ask{display:inline-flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 10px; border:1px solid var(--gold); border-radius:9px; background:rgba(226,185,59,.08); font-size:.88rem}
-    @media (max-width:640px){ .form{grid-template-columns:1fr} }
+    /* the New job guide: ① Source → ② Destination → ③ Tables → ④ Schedule & review */
+    .steps{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 14px; padding:0; list-style:none}
+    .steps li{display:flex; align-items:center; gap:8px; padding:6px 12px; border:1px solid var(--line); border-radius:999px;
+              font-size:.88rem; color:var(--muted); background:var(--panel)}
+    .steps li i{font-style:normal; display:inline-flex; width:20px; height:20px; border-radius:50%; align-items:center; justify-content:center;
+                font-size:.75rem; background:var(--panel2); border:1px solid var(--line2)}
+    .steps li.done{cursor:pointer; color:var(--ink)} .steps li.done i{background:var(--accent2); border-color:var(--accent2); color:#fff}
+    .steps li.cur{border-color:var(--accent); color:var(--accent); font-weight:600} .steps li.cur i{background:var(--accent); border-color:var(--accent); color:#fff}
+    .picks{display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:10px; margin:6px 0 10px}
+    .pick{border:1px solid var(--line); border-radius:10px; padding:10px 12px; cursor:pointer; background:var(--panel)}
+    .pick:hover{border-color:var(--accent)} .pick.on{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-bg)}
+    .pick b{display:block; margin-bottom:2px} .pick .sub{font-size:.82rem}
+    .pick.add{display:flex; align-items:center; justify-content:center; color:var(--accent); border-style:dashed; font-weight:600; min-height:58px}
+    .facts{display:grid; grid-template-columns:150px 1fr; gap:6px 14px; font-size:.92rem; margin:4px 0 12px}
+    .facts dt{color:var(--muted)} .facts dd{margin:0}
+    .navbtns{display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-top:14px}
+    .flash{display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between}
+    @media (max-width:640px){ .form, .facts{grid-template-columns:1fr} }
   </style>
 </head>
 <body>
@@ -31,10 +53,12 @@
   <div class="pagebar"><h1>📡 Data sync <span class="dot">·</span> copy tables from your databases into your lakehouse</h1></div>
   <main id="main"><div class="placeholder">Loading…</div></main>
   <script>
-    // 📡 Data sync (CDC) — a SOURCE is a database you can reach (PostgreSQL, MySQL, SQL Server); a DESTINATION is one of your
-    // lakehouse catalogs (+ a namespace); a JOB copies chosen tables from a source to a destination:
-    // a full load, then — with CDC — only the inserts, updates and deletes since the last run, on a
-    // schedule or when you press Run now. The work runs in the lab (OLake's engine), as you.
+    // 📡 Data sync (CDC) — a SOURCE is a database you can reach (PostgreSQL, MySQL, SQL Server); a
+    // DESTINATION is one of your lakehouse catalogs (+ a namespace); a JOB copies chosen tables from a
+    // source to a destination: a full load, then — with CDC — only the inserts, updates and deletes
+    // since the last run, on a schedule or when you press Run now. The work runs in the lab (OLake's
+    // engine), as you. Every screen has its own address (#jobs, #new-job, #job/3, #new-source,
+    // #source/2 …), so the browser's Back button works; New job is a 4-step guide.
     var main = document.getElementById('main');
     function el(tag, attrs, kids) {
       var e = document.createElement(tag);
@@ -62,7 +86,7 @@
       on(y, 'click', function () { box.remove(); btn.hidden = false; yes(btn); });
     }
     function when(iso) { return iso ? new Date(iso).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}) : '—'; }
-    function seg(options, value, onPick) {             // segmented buttons instead of a dropdown
+    function seg(options, value, onPick) {             // segmented buttons
       var s = el('span', {class: 'seg'});
       options.forEach(function (o) {
         var b = on(el('button', {type: 'button', class: 'small' + (o[0] === value ? ' on' : ''), text: o[1]}), 'click', function () {
@@ -73,6 +97,8 @@
       return s;
     }
     function note(text, cls) { return el('div', {class: 'sub ' + (cls || ''), style: 'margin-top:6px', text: text}); }
+    function inp(v, type, ph) { var i = el('input', {type: type || 'text'}); if (v !== undefined && v !== null) i.value = v; if (ph) i.placeholder = ph; return i; }
+    function card(kids) { return el('div', {class: 'card', style: 'margin-bottom:12px'}, kids); }
     // a task (check / list tables / run) is done by the lab in the background: ask until it ends
     function watch(id, done) {
       api('GET', '/api/cdc/task?id=' + id).then(function (t) {
@@ -81,65 +107,118 @@
       }).catch(function (e) { done({status: 'failed', error: e.message}); });
     }
 
-    var TABS = [['jobs', 'Jobs'], ['sources', 'Sources'], ['destinations', 'Destinations']];
     var SCHED = {'': 'Manual', '15m': 'Every 15 min', '1h': 'Hourly', '1d': 'Daily'};
     var MODE = {cdc: 'Full load + CDC', full_refresh: 'Full reload every run'};
-    var tab = (location.hash.slice(1) || 'jobs'), data = null, timer = null, openRuns = {};
+    var data = null, timer = null, busy = {}, flash = null;
+    var wiz = null;          // the New job guide's choices — kept while you add a source / destination on the way
 
+    // ---- navigation ----------------------------------------------------------------------------
+    function route() { var h = location.hash.slice(1) || 'jobs', i = h.indexOf('/'); return i < 0 ? [h, null] : [h.slice(0, i), h.slice(i + 1)]; }
+    function go(hash) { if (location.hash.slice(1) !== hash) history.pushState(null, '', '#' + hash); show(); }
+    window.addEventListener('popstate', show);
+    function link(text, hash, cls) { return on(el('a', {text: text, class: cls || ''}), 'click', function () { go(hash); }); }
+    function crumbs(parts) {                            // Data sync › Jobs › New job
+      var c = el('div', {class: 'crumbs'}, [link('Data sync', 'jobs')]);
+      parts.forEach(function (p, i) { c.appendChild(document.createTextNode('›')); c.appendChild(i === parts.length - 1 ? el('b', {text: p[0]}) : link(p[0], p[1])); });
+      return c;
+    }
     function load() {
       clearTimeout(timer);
-      return api('GET', '/api/cdc').then(function (d) { data = d; render(); }).catch(function (e) {
-        main.innerHTML = ''; main.appendChild(el('div', {class: 'placeholder', text: 'Could not load: ' + e.message}));
+      return api('GET', '/api/cdc').then(function (d) { data = d; }).catch(function (e) {
+        main.innerHTML = ''; main.appendChild(el('div', {class: 'placeholder', text: 'Could not load: ' + e.message})); throw e;
       });
     }
-    function render(form) {
-      history.replaceState(null, '', '#' + tab);
+    function show() { load().then(draw, function () {}); }
+    function draw() {
+      clearTimeout(timer);
+      var r = route(), page = r[0], id = r[1];
       main.innerHTML = '';
-      var tabs = seg(TABS.map(function (t) { return [t[0], t[1] + ' (' + data[t[0]].length + ')']; }), tab, function (k) { tab = k; render(); });
-      var add = on(el('button', {class: 'primary', text: {jobs: '+ New job', sources: '+ New source', destinations: '+ New destination'}[tab]}),
-                   'click', function () { render(tab); });
-      main.appendChild(el('div', {class: 'bar'}, [tabs, add]));
-      if (form === 'jobs') main.appendChild(jobForm());
-      else if (form === 'sources') main.appendChild(sourceForm({kind: 'postgres', cdc: true}));
-      else if (form === 'destinations') main.appendChild(destForm({}));
-      else if (form) main.appendChild(form);
+      if (page === 'new-job') return jobGuide();
+      if (page === 'job') return jobPage(+id);
+      if (page === 'new-source') return sourcePage({kind: 'postgres', cdc: true});
+      if (page === 'source') return sourcePage(byId(data.sources, +id));
+      if (page === 'new-destination') return destPage({});
+      if (page === 'destination') return destPage(byId(data.destinations, +id));
+      listPage(['jobs', 'sources', 'destinations'].indexOf(page) >= 0 ? page : 'jobs');
+    }
+    function byId(list, id) { return list.filter(function (x) { return x.id === id; })[0] || null; }
+    function showFlash() {
+      if (!flash) return;
+      var f = flash; flash = null;
+      main.appendChild(el('div', {class: 'card result', style: 'margin-bottom:12px'}, [el('div', {class: 'flash'}, [el('span', {text: f.text}),
+        f.action ? on(el('button', {class: 'small primary', text: f.action[0]}), 'click', f.action[1]) : null])]));
+    }
+    function alert_(msg) { main.insertBefore(el('div', {class: 'card result err', style: 'margin-bottom:12px'}, [el('div', {text: msg})]), main.firstChild); }
+
+    // ---- the three lists (tabs) ----------------------------------------------------------------
+    function listPage(tab) {
+      var tabs = seg([['jobs', 'Jobs (' + data.jobs.length + ')'], ['sources', 'Sources (' + data.sources.length + ')'],
+                      ['destinations', 'Destinations (' + data.destinations.length + ')']], tab, function (k) { go(k); });
+      var add = {jobs: ['+ New job', function () { wiz = null; go('new-job'); }], sources: ['+ New source', function () { wiz = null; go('new-source'); }],
+                 destinations: ['+ New destination', function () { wiz = null; go('new-destination'); }]}[tab];
+      main.appendChild(el('div', {class: 'bar'}, [tabs, on(el('button', {class: 'primary', text: add[0]}), 'click', add[1])]));
+      showFlash();
       main.appendChild({jobs: jobList, sources: sourceList, destinations: destList}[tab]());
-      // a run in progress: look again in a few seconds
-      if (data.jobs.some(function (j) { return j.busy; }) && !form)
-        timer = setTimeout(load, 4000);
+      if (data.jobs.some(function (j) { return j.busy; }) || Object.keys(busy).length) timer = setTimeout(show, 4000);
+    }
+    function checked(c, isBusy) {
+      if (isBusy) return el('span', {class: 'run', text: '… checking'});
+      if (!c) return el('span', {class: 'muted', text: 'not checked yet'});
+      return el('span', {class: c.ok ? 'ok' : 'bad', title: c.message || '', text: c.ok ? '✓ connected' : '✗ ' + (c.message || 'failed').slice(0, 140)});
+    }
+    function last(j) {
+      var r = j.last;
+      if (j.busy && !(r && r.status === 'running')) return el('span', {class: 'run', text: '… starting'});
+      if (!r) return el('span', {class: 'muted', text: 'not run yet'});
+      if (r.status === 'running') return el('span', {class: 'run', text: '… running since ' + when(r.started_at)});
+      return el('span', {class: r.status === 'ok' ? 'ok' : 'bad', title: r.error || '',
+        text: (r.status === 'ok' ? '✓ ' + (r.records === null ? '' : r.records + ' rows · ') : '✗ failed · ') + when(r.finished_at)});
+    }
+    function table(heads, body) {
+      return el('div', {class: 'wrap'}, [el('table', {class: 'lst'}, [el('thead', {}, [el('tr', {}, heads.map(function (h) { return el('th', {text: h}); }))]), body])]);
+    }
+    function empty(text, btn) { return card([el('div', {class: 'sub', text: text}), btn ? el('div', {style: 'margin-top:10px'}, [btn]) : null]); }
+
+    function jobList() {
+      if (!data.jobs.length) return empty('No jobs yet. A job copies tables from a source to a destination — the guide takes you through it in four steps.',
+        on(el('button', {class: 'primary', text: '+ New job'}), 'click', function () { wiz = null; go('new-job'); }));
+      var body = el('tbody');
+      data.jobs.forEach(function (j) {
+        var runNow = on(el('button', {class: 'small primary', text: 'Run now'}), 'click', function () {
+          runNow.disabled = true;
+          api('POST', '/api/cdc/jobs/run', {id: j.id}).then(function () { setTimeout(show, 1200); }).catch(function (e) { alert_(e.message); runNow.disabled = false; });
+        });
+        runNow.disabled = !!j.busy;
+        body.appendChild(el('tr', {}, [el('td', {}, [link(j.name, 'job/' + j.id, 'name')]),
+          el('td', {text: j.source_name + ' → ' + j.dest_name}),
+          el('td', {title: j.tables.join(', '), text: j.tables.length === 1 ? j.tables[0] : j.tables.length + ' tables'}),
+          el('td', {text: MODE[j.mode]}), el('td', {text: (SCHED[j.schedule] || j.schedule) + (j.schedule && !j.enabled ? ' (paused)' : '')}),
+          el('td', {}, [last(j)]),
+          el('td', {class: 'acts'}, [runNow, ' ', on(el('button', {class: 'small', text: 'Open'}), 'click', function () { go('job/' + j.id); })])]));
+      });
+      return card([table(['Job', 'Source → destination', 'Tables', 'Mode', 'Schedule', 'Last run', ''], body)]);
     }
 
-    // ---- sources -------------------------------------------------------------------------------
-    function checked(c, busy) {
-      if (busy) return el('span', {class: 'run', text: '… checking'});
-      if (!c) return el('span', {class: 'muted', text: 'not checked'});
-      return el('span', {class: c.ok ? 'ok' : 'bad', title: c.message || '', text: c.ok ? '✓ connected' : '✗ ' + (c.message || 'failed').slice(0, 120)});
-    }
-    var busy = {};
     function sourceList() {
-      if (!data.sources.length) return el('div', {class: 'card'}, [el('div', {class: 'sub',
-        text: 'No sources yet. A source is a database you can reach — PostgreSQL, MySQL or SQL Server: its host, database and a login.'})]);
+      if (!data.sources.length) return empty('No sources yet. A source is a database you can reach — PostgreSQL, MySQL or SQL Server: its host, database and a login.',
+        on(el('button', {class: 'primary', text: '+ New source'}), 'click', function () { go('new-source'); }));
       var body = el('tbody');
       data.sources.forEach(function (s) {
         var chk = on(el('button', {class: 'small', text: 'Check'}), 'click', function () {
-          busy['s' + s.id] = 1; render();
-          api('POST', '/api/cdc/sources/check', {id: s.id}).then(function (r) { watch(r.task, function () { delete busy['s' + s.id]; load(); }); })
+          busy['s' + s.id] = 1; draw();
+          api('POST', '/api/cdc/sources/check', {id: s.id}).then(function (r) { watch(r.task, function () { delete busy['s' + s.id]; show(); }); })
             .catch(function (e) { delete busy['s' + s.id]; alert_(e.message); });
         });
-        var edit = on(el('button', {class: 'small', text: 'Edit'}), 'click', function () { render(sourceForm(s)); });
         var more = el('tr', {class: 'more', hidden: ''}, [el('td', {colspan: '6'})]);
         var tbl = on(el('button', {class: 'small', text: 'Tables'}), 'click', function () {
           more.hidden = !more.hidden; tbl.classList.toggle('on', !more.hidden);
-          if (more.hidden) return;
-          var td = more.firstChild; td.innerHTML = ''; td.appendChild(el('div', {class: 'sub run', text: '… reading the tables'}));
-          api('POST', '/api/cdc/sources/tables', {id: s.id}).then(function (r) {
-            watch(r.task, function (t) { td.innerHTML = ''; td.appendChild(tableList(t)); });
-          }).catch(function (e) { td.innerHTML = ''; td.appendChild(note(e.message, 'bad')); });
+          if (!more.hidden) readTables({id: s.id}, '/api/cdc/sources/tables', more.firstChild);
         });
+        var job = on(el('button', {class: 'small primary', text: 'New job'}), 'click', function () { startJob({source: s.id}); });
         var del = on(el('button', {class: 'small', text: 'Delete'}), 'click', function () {
-          ask(del, s.cdc ? 'Delete it (its replication slot is dropped too)?' : 'Delete it?', 'Yes, delete', function () {
+          ask(del, s.cdc && s.slot ? 'Delete it (its replication slot is dropped too)?' : 'Delete it?', 'Yes, delete', function () {
             api('POST', '/api/cdc/sources/delete', {id: s.id}).then(function (r) {
-              if (r.task) watch(r.task, function (t) { if (t.result && t.result.note) alert_(t.result.note, true); load(); }); else load();
+              if (r.task) watch(r.task, function (t) { if (t.result && t.result.note) flash = {text: t.result.note}; show(); }); else show();
             }).catch(function (e) { alert_(e.message); });
           });
         });
@@ -148,18 +227,57 @@
         if (c) (c.prerequisites || []).filter(function (p) { return !p.passed; }).forEach(function (p) {
           info.push((p.required ? '✗ needed: ' : 'tip: ') + p.name + ' is ' + p.current + ' — ' + p.recommended);
         });
-        body.appendChild(el('tr', {}, [el('td', {}, [el('b', {text: s.name})]),
+        body.appendChild(el('tr', {}, [el('td', {}, [link(s.name, 'source/' + s.id, 'name')]),
           el('td', {}, [el('div', {text: s.host + ':' + s.port + ' / ' + s.database}), el('div', {class: 'sub', text: data.kinds[s.kind].name})]),
-          el('td', {text: s.username}),
-          el('td', {text: s.cdc ? 'on' : 'off', title: s.cdc && s.slot ? 'publication ' + s.publication + ' · slot ' + s.slot : ''}),
+          el('td', {text: s.username}), el('td', {text: s.cdc ? 'on' : 'off'}),
           el('td', {}, [checked(c, busy['s' + s.id]), info.length ? el('ul', {class: 'notes'}, info.map(function (x) { return el('li', {text: x}); })) : null]),
-          el('td', {class: 'acts'}, [chk, ' ', tbl, ' ', edit, ' ', del])]));
+          el('td', {class: 'acts'}, [job, ' ', chk, ' ', tbl, ' ', on(el('button', {class: 'small', text: 'Edit'}), 'click', function () { wiz = null; go('source/' + s.id); }), ' ', del])]));
         body.appendChild(more);
       });
-      return el('div', {class: 'card'}, [el('div', {class: 'wrap'}, [el('table', {class: 'lst'}, [el('thead', {}, [el('tr', {},
-        ['Source', 'Database', 'User', 'CDC', 'Status', ''].map(function (h) { return el('th', {text: h}); }))]), body])])]);
+      return card([table(['Source', 'Database', 'User', 'CDC', 'Status', ''], body)]);
     }
-    function sourceForm(s) {
+
+    function destList() {
+      var body = el('tbody');
+      data.destinations.forEach(function (d) {
+        var chk = on(el('button', {class: 'small', text: 'Check'}), 'click', function () {
+          busy['d' + d.id] = 1; draw();
+          api('POST', '/api/cdc/destinations/check', {id: d.id}).then(function (r) { watch(r.task, function () { delete busy['d' + d.id]; show(); }); })
+            .catch(function (e) { delete busy['d' + d.id]; alert_(e.message); });
+        });
+        var del = on(el('button', {class: 'small', text: 'Delete'}), 'click', function () {
+          ask(del, 'Delete it? (the tables stay in your lakehouse)', 'Yes, delete', function () {
+            api('POST', '/api/cdc/destinations/delete', {id: d.id}).then(show).catch(function (e) { alert_(e.message); });
+          });
+        });
+        body.appendChild(el('tr', {}, [el('td', {}, [link(d.name, 'destination/' + d.id, 'name')]), el('td', {text: d.catalog}),
+          el('td', {text: d.namespace || '(the source\'s database_schema)'}), el('td', {}, [checked(d.checked, busy['d' + d.id])]),
+          el('td', {class: 'acts'}, [chk, ' ', on(el('button', {class: 'small', text: 'Edit'}), 'click', function () { wiz = null; go('destination/' + d.id); }), ' ', del])]));
+      });
+      return card([table(['Destination', 'Lakehouse', 'Namespace', 'Status', ''], body),
+        el('div', {class: 'sub', style: 'margin-top:8px', text: 'Tables land as Iceberg tables in that lakehouse and namespace — query them in SQL, notebooks or Superset. The lab writes them as you: no keys to type.'})]);
+    }
+    // the tables of a source (saved: its id · or a form) → read-only list in `box`
+    function readTables(body, path, box) {
+      box.innerHTML = ''; box.appendChild(el('div', {class: 'sub run', text: '… reading the tables'}));
+      api('POST', path, body).then(function (r) { watch(r.task, function (t) { box.innerHTML = ''; box.appendChild(tableList(t)); }); })
+        .catch(function (e) { box.innerHTML = ''; box.appendChild(note(e.message, 'bad')); });
+    }
+    function tableList(t) {
+      if (t.status !== 'done') return note('✗ ' + (t.error || 'failed'), 'bad');
+      var tb = t.result.tables;
+      if (!tb.length) return note('No tables found.');
+      return el('div', {style: 'margin-top:8px'}, [el('div', {class: 'sub', text: tb.length + (tb.length === 1 ? ' table' : ' tables')}),
+        el('div', {class: 'tables'}, tb.map(function (x) {
+          return el('div', {}, [el('span', {text: x.table}), el('span', {class: 'muted', text: ' · ' + x.columns + ' columns'})]);
+        }))]);
+    }
+
+    // ---- a source: new or edit (its own page) ----------------------------------------------------
+    function sourcePage(s) {
+      if (!s) return go('sources');
+      var back = wiz ? ['New job', 'new-job'] : ['Sources', 'sources'];
+      main.appendChild(crumbs([back, [s.id ? s.name : 'New source']]));
       var kind = s.kind || 'postgres';
       var f = {name: inp(s.name), host: inp(s.host), port: inp(s.port || data.kinds[kind].port, 'number'), database: inp(s.database), username: inp(s.username),
                password: inp('', 'password', s.id ? 'unchanged' : ''), schemas: inp((s.schemas || []).join(', '), 'text', 'all — or e.g. public, sales')};
@@ -178,8 +296,7 @@
                 username: f.username.value, password: f.password.value, cdc: cdc,
                 schemas: f.schemas.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean)};
       }
-      var save = el('button', {class: 'primary', text: s.id ? 'Save & check' : 'Add & check'}), msg = el('div');
-      // Test connection / Browse tables: the form as it is, before saving it
+      var msg = el('div');
       var test = on(el('button', {type: 'button', text: 'Test connection'}), 'click', function () {
         test.disabled = true; msg.innerHTML = ''; msg.appendChild(el('div', {class: 'sub run', text: '… connecting'}));
         api('POST', '/api/cdc/sources/test', form()).then(function (r) {
@@ -190,128 +307,217 @@
           });
         }).catch(function (e) { test.disabled = false; msg.innerHTML = ''; msg.appendChild(note(e.message, 'bad')); });
       });
-      var browse = on(el('button', {type: 'button', text: 'Browse tables'}), 'click', function () {
-        browse.disabled = true; msg.innerHTML = ''; msg.appendChild(el('div', {class: 'sub run', text: '… reading the tables'}));
-        api('POST', '/api/cdc/sources/browse', form()).then(function (r) {
-          watch(r.task, function (t) { browse.disabled = false; msg.innerHTML = ''; msg.appendChild(tableList(t)); });
-        }).catch(function (e) { browse.disabled = false; msg.innerHTML = ''; msg.appendChild(note(e.message, 'bad')); });
-      });
-      on(save, 'click', function () {
+      var browse = on(el('button', {type: 'button', text: 'Browse tables'}), 'click', function () { readTables(form(), '/api/cdc/sources/browse', msg); });
+      var save = on(el('button', {class: 'primary', text: s.id ? 'Save' : 'Save source'}), 'click', function () {
         save.disabled = true; msg.innerHTML = ''; msg.appendChild(note('Saving…'));
-        api('POST', '/api/cdc/sources', form())
-          .then(function (r) { tab = 'sources'; busy['s' + r.id] = 1; load(); watch(r.task, function () { delete busy['s' + r.id]; load(); }); })
-          .catch(function (e) { save.disabled = false; msg.innerHTML = ''; msg.appendChild(note(e.message, 'bad')); });
+        api('POST', '/api/cdc/sources', form()).then(function (r) {
+          busy['s' + r.id] = 1; watch(r.task, function () { delete busy['s' + r.id]; });
+          if (wiz) { wiz.source = r.id; wiz.found = null; wiz.picked = null; wiz.step = 2; return go('new-job'); }   // back to the guide
+          flash = {text: '✓ Source "' + f.name.value + '" saved — the lab is checking the connection.',
+                   action: ['Create a job from it →', function () { startJob({source: r.id}); }]};
+          go('sources');
+        }).catch(function (e) { save.disabled = false; msg.innerHTML = ''; msg.appendChild(note(e.message, 'bad')); });
       });
       kindChanged();
-      return el('div', {class: 'card'}, [el('h3', {text: s.id ? 'Edit source ' + s.name : 'New source — a database you can reach'}),
+      main.appendChild(card([el('h3', {text: s.id ? 'Edit source ' + s.name : 'New source — a database you can reach'}),
         el('div', {class: 'form'}, [
           el('label', {text: 'Database type'}), kinds, el('label', {text: 'Name'}), f.name, el('label', {text: 'Host'}), f.host, el('label', {text: 'Port'}), f.port,
           el('label', {text: 'Database'}), f.database, el('label', {text: 'User'}), f.username, el('label', {text: 'Password'}), f.password,
           schemaLabel, f.schemas,
           el('label', {text: 'Change data capture'}), seg([[true, 'On — copy inserts, updates, deletes'], [false, 'Off — full reloads only']], cdc, function (v) { cdc = v; })]),
         hint,
-        el('div', {class: 'row', style: 'margin-top:10px'}, [test, browse, save, on(el('button', {text: 'Cancel'}), 'click', function () { render(); })]), msg]);
+        el('div', {class: 'navbtns'}, [el('span', {class: 'row'}, [on(el('button', {text: '← ' + back[0]}), 'click', function () { go(back[1]); }), test, browse]), save]),
+        msg]));
     }
-    // a finished table-list task → the tables (read only), or why it failed
-    function tableList(t) {
-      if (t.status !== 'done') return note('✗ ' + (t.error || 'failed'), 'bad');
-      var tb = t.result.tables;
-      if (!tb.length) return note('No tables found.');
-      return el('div', {style: 'margin-top:8px'}, [el('div', {class: 'sub', text: tb.length + (tb.length === 1 ? ' table' : ' tables')}),
-        el('div', {class: 'tables'}, tb.map(function (x) {
-          return el('div', {}, [el('span', {text: x.table}), el('span', {class: 'muted', text: ' · ' + x.columns + ' columns'})]);
-        }))]);
-    }
-    function inp(v, type, ph) { var i = el('input', {type: type || 'text'}); if (v !== undefined && v !== null) i.value = v; if (ph) i.placeholder = ph; return i; }
 
-    // ---- destinations --------------------------------------------------------------------------
-    function destList() {
-      var body = el('tbody');
-      data.destinations.forEach(function (d) {
-        var chk = on(el('button', {class: 'small', text: 'Check'}), 'click', function () {
-          busy['d' + d.id] = 1; render();
-          api('POST', '/api/cdc/destinations/check', {id: d.id}).then(function (r) { watch(r.task, function () { delete busy['d' + d.id]; load(); }); })
-            .catch(function (e) { delete busy['d' + d.id]; alert_(e.message); });
-        });
-        var edit = on(el('button', {class: 'small', text: 'Edit'}), 'click', function () { render(destForm(d)); });
-        var del = on(el('button', {class: 'small', text: 'Delete'}), 'click', function () {
-          ask(del, 'Delete it? (the tables stay in your lakehouse)', 'Yes, delete', function () {
-            api('POST', '/api/cdc/destinations/delete', {id: d.id}).then(load).catch(function (e) { alert_(e.message); });
-          });
-        });
-        body.appendChild(el('tr', {}, [el('td', {}, [el('b', {text: d.name})]), el('td', {text: d.catalog}),
-          el('td', {text: d.namespace || '(the source\'s database_schema)'}), el('td', {}, [checked(d.checked, busy['d' + d.id])]),
-          el('td', {class: 'acts'}, [chk, ' ', edit, ' ', del])]));
-      });
-      return el('div', {class: 'card'}, [el('div', {class: 'wrap'}, [el('table', {class: 'lst'}, [el('thead', {}, [el('tr', {},
-        ['Destination', 'Lakehouse', 'Namespace', 'Status', ''].map(function (h) { return el('th', {text: h}); }))]), body])]),
-        el('div', {class: 'sub', style: 'margin-top:8px', text: 'Tables land as Iceberg tables in that lakehouse and namespace — query them in SQL, notebooks or Superset. The lab writes them as you: no keys to type.'})]);
-    }
-    function destForm(d) {
-      var name = inp(d.name), ns = inp(d.namespace, 'text', 'e.g. bronze_cdc — empty: <database>_<schema>'), cat = d.catalog || data.catalogs[0];
-      var save = el('button', {class: 'primary', text: d.id ? 'Save & check' : 'Add & check'}), msg = el('div');
-      on(save, 'click', function () {
+    // ---- a destination: new or edit -------------------------------------------------------------
+    function destPage(d) {
+      if (!d) return go('destinations');
+      var back = wiz ? ['New job', 'new-job'] : ['Destinations', 'destinations'];
+      main.appendChild(crumbs([back, [d.id ? d.name : 'New destination']]));
+      var name = inp(d.name), ns = inp(d.namespace, 'text', 'e.g. bronze_cdc — empty: <database>_<schema>'), cat = d.catalog || data.catalogs[0], msg = el('div');
+      var save = on(el('button', {class: 'primary', text: d.id ? 'Save' : 'Save destination'}), 'click', function () {
         save.disabled = true;
-        api('POST', '/api/cdc/destinations', {id: d.id, name: name.value, catalog: cat, namespace: ns.value})
-          .then(function (r) { tab = 'destinations'; busy['d' + r.id] = 1; load(); watch(r.task, function () { delete busy['d' + r.id]; load(); }); })
-          .catch(function (e) { save.disabled = false; msg.innerHTML = ''; msg.appendChild(note(e.message, 'bad')); });
+        api('POST', '/api/cdc/destinations', {id: d.id, name: name.value, catalog: cat, namespace: ns.value}).then(function (r) {
+          busy['d' + r.id] = 1; watch(r.task, function () { delete busy['d' + r.id]; });
+          if (wiz) { wiz.dest = r.id; wiz.step = 3; return go('new-job'); }
+          flash = {text: '✓ Destination "' + name.value + '" saved.'};
+          go('destinations');
+        }).catch(function (e) { save.disabled = false; msg.innerHTML = ''; msg.appendChild(note(e.message, 'bad')); });
       });
-      return el('div', {class: 'card'}, [el('h3', {text: d.id ? 'Edit destination ' + d.name : 'New destination — one of your lakehouses'}),
+      main.appendChild(card([el('h3', {text: d.id ? 'Edit destination ' + d.name : 'New destination — one of your lakehouses'}),
         el('div', {class: 'form'}, [el('label', {text: 'Name'}), name,
           el('label', {text: 'Lakehouse'}), seg(data.catalogs.map(function (c) { return [c, c]; }), cat, function (v) { cat = v; }),
           el('label', {text: 'Namespace'}), ns]),
-        el('div', {class: 'row'}, [save, on(el('button', {text: 'Cancel'}), 'click', function () { render(); })]), msg]);
+        el('div', {class: 'sub', text: 'Each table lands as <lakehouse>.<namespace>.<table>. Two jobs can\'t write the same table into one namespace.'}),
+        el('div', {class: 'navbtns'}, [on(el('button', {text: '← ' + back[0]}), 'click', function () { go(back[1]); }), save]), msg]));
     }
 
-    // ---- jobs ----------------------------------------------------------------------------------
-    function last(j) {
-      var r = j.last;
-      if (j.busy && !(r && r.status === 'running')) return el('span', {class: 'run', text: '… starting'});
-      if (!r) return el('span', {class: 'muted', text: 'not run yet'});
-      if (r.status === 'running') return el('span', {class: 'run', text: '… running since ' + when(r.started_at)});
-      return el('span', {class: r.status === 'ok' ? 'ok' : 'bad', title: r.error || '',
-        text: (r.status === 'ok' ? '✓ ' + (r.records === null ? '' : r.records + ' rows · ') : '✗ failed · ') + when(r.finished_at)});
-    }
-    function jobList() {
-      if (!data.jobs.length) return el('div', {class: 'card'}, [el('div', {class: 'sub',
-        text: data.sources.length ? 'No jobs yet — + New job copies tables from a source to a destination.' : 'Add a source first (Sources), then a job.'})]);
-      var body = el('tbody');
-      data.jobs.forEach(function (j) {
-        var runNow = on(el('button', {class: 'small primary', text: 'Run now'}), 'click', function () {
-          runNow.disabled = true;
-          api('POST', '/api/cdc/jobs/run', {id: j.id}).then(function () { setTimeout(load, 1500); }).catch(function (e) { alert_(e.message); runNow.disabled = false; });
-        });
-        runNow.disabled = !!j.busy;
-        var pause = on(el('button', {class: 'small', text: j.enabled ? 'Pause' : 'Resume'}), 'click', function () {
-          api('POST', '/api/cdc/jobs/set', {id: j.id, enabled: !j.enabled}).then(load).catch(function (e) { alert_(e.message); });
-        });
-        pause.hidden = !j.schedule;
-        var runsB = el('button', {class: 'small' + (openRuns[j.id] ? ' on' : ''), text: 'Runs'});
-        var del = on(el('button', {class: 'small', text: 'Delete'}), 'click', function () {
-          ask(del, 'Delete the job? (its tables stay in your lakehouse)', 'Yes, delete', function () {
-            api('POST', '/api/cdc/jobs/delete', {id: j.id}).then(load).catch(function (e) { alert_(e.message); });
-          });
-        });
-        var more = el('tr', {class: 'more'}, [el('td', {colspan: '7'})]);
-        more.hidden = !openRuns[j.id];
-        on(runsB, 'click', function () { openRuns[j.id] = !openRuns[j.id]; more.hidden = !openRuns[j.id]; runsB.classList.toggle('on'); if (openRuns[j.id]) showRuns(j, more.firstChild); });
-        if (openRuns[j.id]) showRuns(j, more.firstChild);
-        body.appendChild(el('tr', {}, [el('td', {}, [el('b', {text: j.name})]),
-          el('td', {text: j.source_name + ' → ' + j.dest_name}), el('td', {title: j.tables.join(', '), text: j.tables.length === 1 ? j.tables[0] : j.tables.length + ' tables'}),
-          el('td', {text: MODE[j.mode]}), el('td', {text: (SCHED[j.schedule] || j.schedule) + (j.schedule && !j.enabled ? ' (paused)' : '')}),
-          el('td', {}, [last(j)]), el('td', {class: 'acts'}, [runNow, ' ', pause, ' ', runsB, ' ', del])]));
-        body.appendChild(more);
+    // ---- New job: the 4-step guide --------------------------------------------------------------
+    var STEPS = ['Source', 'Destination', 'Tables', 'Schedule & review'];
+    function startJob(pre) { wiz = {step: pre.source ? 2 : 1, source: pre.source || null, dest: null}; go('new-job'); }
+    function jobGuide() {
+      if (!wiz) wiz = {step: 1, source: null, dest: null};
+      if (wiz.source && !byId(data.sources, wiz.source)) { wiz.source = null; wiz.step = 1; }
+      if (!wiz.dest && data.destinations.length === 1) wiz.dest = data.destinations[0].id;
+      main.appendChild(crumbs([['Jobs', 'jobs'], ['New job']]));
+      var ok = [!!wiz.source, !!wiz.dest, !!(wiz.picked && chosen().length)];
+      main.appendChild(el('ol', {class: 'steps'}, STEPS.map(function (s, i) {
+        var n = i + 1, done = n !== wiz.step && ok.slice(0, n - 1).every(Boolean);    // a step you can go (back) to
+        var li = el('li', {class: n === wiz.step ? 'cur' : done ? 'done' : ''}, [el('i', {text: n < wiz.step ? '✓' : String(n)}), s]);
+        if (done) on(li, 'click', function () { wiz.step = n; draw(); });
+        return li;
+      })));
+      var body = el('div'), next = el('button', {class: 'primary', text: wiz.step === 4 ? 'Create & run' : 'Next →'});
+      var backB = on(el('button', {text: wiz.step === 1 ? 'Cancel' : '← Back'}), 'click', function () {
+        if (wiz.step === 1) { wiz = null; return go('jobs'); }
+        wiz.step--; draw();
       });
-      return el('div', {class: 'card'}, [el('div', {class: 'wrap'}, [el('table', {class: 'lst'}, [el('thead', {}, [el('tr', {},
-        ['Job', 'Source → destination', 'Tables', 'Mode', 'Schedule', 'Last run', ''].map(function (h) { return el('th', {text: h}); }))]), body])])]);
+      var msg = el('div');
+      main.appendChild(card([body, el('div', {class: 'navbtns'}, [backB, next]), msg]));
+      [stepSource, stepDest, stepTables, stepReview][wiz.step - 1](body, next, msg);
     }
-    function showRuns(j, td) {
-      td.innerHTML = ''; td.appendChild(note('Loading…'));
+    // a source's change stream feeds one CDC job (one replication slot): that job, if any
+    function cdcJob(sid) { return data.jobs.filter(function (j) { return j.source === sid && j.mode === 'cdc'; })[0] || null; }
+    function chosen() { return (wiz.found || []).map(function (x) { return x.table; }).filter(function (k) { return (wiz.picked || {})[k]; }); }
+    function picks(items, current, onPick, addText, onAdd) {     // cards to choose one, + "add new"
+      var g = el('div', {class: 'picks'});
+      items.forEach(function (it) {
+        g.appendChild(on(el('div', {class: 'pick' + (it.id === current ? ' on' : '')},
+          [el('b', {text: (it.id === current ? '● ' : '') + it.title})].concat(it.lines.map(function (l) { return el('div', {class: 'sub', text: l}); }))),
+          'click', function () { onPick(it.id); }));
+      });
+      g.appendChild(on(el('div', {class: 'pick add', text: addText}), 'click', onAdd));
+      return g;
+    }
+    function stepSource(body, next) {
+      body.appendChild(el('h3', {text: '① Which database do you copy from?'}));
+      body.appendChild(picks(data.sources.map(function (s) {
+        return {id: s.id, title: s.name, lines: [data.kinds[s.kind].name + ' · ' + s.host + ' / ' + s.database,
+          (s.cdc ? (cdcJob(s.id) ? 'CDC used by job ' + cdcJob(s.id).name + ' — full reloads only' : 'CDC on') : 'CDC off') + ' · ' +
+          (s.checked ? (s.checked.ok ? '✓ connected' : '✗ last check failed') : 'not checked yet')]};
+      }), wiz.source, function (id) { if (wiz.source !== id) { wiz.found = null; wiz.picked = null; } wiz.source = id; draw(); },
+        '+ New source', function () { go('new-source'); }));
+      next.disabled = !wiz.source;
+      on(next, 'click', function () { wiz.step = 2; draw(); });
+    }
+    function stepDest(body, next) {
+      body.appendChild(el('h3', {text: '② Where do the tables land?'}));
+      body.appendChild(picks(data.destinations.map(function (d) {
+        return {id: d.id, title: d.name, lines: [d.catalog + '.' + (d.namespace || '<database>_<schema>'), d.checked ? (d.checked.ok ? '✓ ready' : '✗ last check failed') : 'not checked yet']};
+      }), wiz.dest, function (id) { wiz.dest = id; draw(); }, '+ New destination', function () { go('new-destination'); }));
+      next.disabled = !wiz.dest;
+      on(next, 'click', function () { wiz.step = 3; draw(); });
+    }
+    function stepTables(body, next) {
+      var s = byId(data.sources, wiz.source);
+      body.appendChild(el('h3', {text: '③ Which tables of ' + s.name + '?'}));
+      var list = el('div', {class: 'tables'}), count = el('span', {class: 'sub'});
+      var bulk = el('span', {class: 'row'}, [count,
+        on(el('button', {type: 'button', class: 'small', text: 'Select all'}), 'click', function () { wiz.found.forEach(function (x) { wiz.picked[x.table] = true; }); paint(); }),
+        on(el('button', {type: 'button', class: 'small', text: 'None'}), 'click', function () { wiz.picked = {}; paint(); }),
+        on(el('button', {type: 'button', class: 'small', text: '↻ Reload'}), 'click', function () { wiz.found = null; read(); })]);
+      body.appendChild(el('div', {class: 'row', style: 'margin-bottom:6px'}, [bulk]));
+      body.appendChild(list);
+      function paint() {
+        bulk.hidden = !wiz.found;
+        list.innerHTML = '';
+        if (!wiz.found) return;
+        if (!wiz.found.length) return list.appendChild(el('span', {class: 'muted', text: 'No tables found.'}));
+        wiz.found.forEach(function (x) {
+          var cb = on(el('input', {type: 'checkbox'}), 'change', function () { wiz.picked[x.table] = cb.checked; counted(); });
+          cb.checked = !!wiz.picked[x.table];
+          list.appendChild(el('label', {}, [cb, el('span', {text: x.table}), el('span', {class: 'muted', text: '· ' + x.columns + ' columns'})]));
+        });
+        counted();
+      }
+      function counted() { var n = chosen().length; count.textContent = n + ' of ' + wiz.found.length + ' selected'; next.disabled = !n; }
+      function read() {
+        bulk.hidden = true; next.disabled = true; list.innerHTML = ''; list.appendChild(el('span', {class: 'run', text: '… reading the tables of ' + s.name}));
+        api('POST', '/api/cdc/sources/tables', {id: s.id}).then(function (r) {
+          watch(r.task, function (t) {
+            if (t.status !== 'done') { list.innerHTML = ''; return list.appendChild(el('span', {class: 'bad', text: '✗ ' + (t.error || 'failed') + ' — check the source (Sources)'})); }
+            wiz.disc = t.id; wiz.found = t.result.tables; wiz.picked = wiz.picked || {}; paint();
+          });
+        }).catch(function (e) { list.innerHTML = ''; list.appendChild(el('span', {class: 'bad', text: e.message})); });
+      }
+      next.disabled = true;
+      if (wiz.found) paint(); else read();
+      on(next, 'click', function () { wiz.step = 4; draw(); });
+    }
+    function stepReview(body, next, msg) {
+      var s = byId(data.sources, wiz.source), d = byId(data.destinations, wiz.dest), tables = chosen(), taken = cdcJob(s.id);
+      var canCdc = s.cdc && !taken;
+      if (!canCdc) wiz.mode = 'full_refresh';
+      wiz.mode = wiz.mode || (canCdc ? 'cdc' : 'full_refresh');
+      wiz.sched = wiz.sched || '';
+      var name = inp(wiz.name || (s.name + ' to ' + d.name).replace(/[^A-Za-z0-9 _.-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60));
+      on(name, 'input', function () { wiz.name = name.value; });
+      body.appendChild(el('h3', {text: '④ How often, and a last look'}));
+      body.appendChild(el('div', {class: 'form'}, [el('label', {text: 'Job name'}), name,
+        el('label', {text: 'Mode'}), el('div', {}, [seg(canCdc ? [['cdc', MODE.cdc], ['full_refresh', MODE.full_refresh]] : [['full_refresh', MODE.full_refresh]], wiz.mode, function (v) { wiz.mode = v; draw(); }),
+          taken ? el('div', {class: 'sub', style: 'margin-top:4px'}, ['CDC on ' + s.name + ' is used by job ', link(taken.name, 'job/' + taken.id),
+            ' (a source\'s change stream feeds one job) — add these tables to that job, or copy them here with full reloads.']) : null]),
+        el('label', {text: 'Schedule'}), seg(Object.keys(SCHED).map(function (k) { return [k, SCHED[k]]; }), wiz.sched, function (v) { wiz.sched = v; })]));
+      body.appendChild(el('dl', {class: 'facts'}, [
+        el('dt', {text: 'From'}), el('dd', {text: s.name + ' — ' + data.kinds[s.kind].name + ', ' + s.host + ' / ' + s.database}),
+        el('dt', {text: 'To'}), el('dd', {text: d.name + ' — ' + d.catalog + '.' + (d.namespace || '<database>_<schema>')}),
+        el('dt', {text: 'Tables (' + tables.length + ')'}), el('dd', {text: tables.join(', ')})]));
+      body.appendChild(el('div', {class: 'sub', text: wiz.mode === 'cdc' ? 'Full load + CDC: the first run copies everything, later runs only the inserts, updates and deletes since the run before (deleted rows stay as _op_type = \'d\'). The first run starts as soon as you create the job.'
+                                                         : 'Full reload: every run copies the chosen tables again. The first run starts as soon as you create the job.'}));
+      on(next, 'click', function () {
+        next.disabled = true; msg.innerHTML = '';
+        api('POST', '/api/cdc/jobs', {name: name.value, source: s.id, destination: d.id, discover: wiz.disc, tables: tables, mode: wiz.mode, schedule: wiz.sched})
+          .then(function (r) { wiz = null; flash = {text: '✓ Job created — its first run is starting.'}; go('job/' + r.id); })
+          .catch(function (e) { next.disabled = false; msg.appendChild(note(e.message, 'bad')); });
+      });
+    }
+
+    // ---- a job's own page: what it copies, its settings, actions, runs ---------------------------
+    function jobPage(id) {
+      var j = byId(data.jobs, id);
+      if (!j) return go('jobs');
+      main.appendChild(crumbs([['Jobs', 'jobs'], [j.name]]));
+      showFlash();
+      var runNow = on(el('button', {class: 'primary', text: 'Run now'}), 'click', function () {
+        runNow.disabled = true;
+        api('POST', '/api/cdc/jobs/run', {id: j.id}).then(function () { setTimeout(show, 1200); }).catch(function (e) { alert_(e.message); runNow.disabled = false; });
+      });
+      runNow.disabled = !!j.busy;
+      var pause = on(el('button', {text: j.enabled ? 'Pause schedule' : 'Resume schedule'}), 'click', function () {
+        api('POST', '/api/cdc/jobs/set', {id: j.id, enabled: !j.enabled}).then(show).catch(function (e) { alert_(e.message); });
+      });
+      pause.hidden = !j.schedule;
+      var del = on(el('button', {class: 'danger', text: 'Delete job'}), 'click', function () {
+        ask(del, 'Delete the job? (its tables stay in your lakehouse)', 'Yes, delete', function () {
+          api('POST', '/api/cdc/jobs/delete', {id: j.id}).then(function () { flash = {text: 'Job "' + j.name + '" deleted.'}; go('jobs'); })
+            .catch(function (e) { alert_(e.message); });
+        });
+      });
+      var d = byId(data.destinations, j.destination);
+      main.appendChild(card([el('div', {class: 'bar'}, [el('h3', {style: 'margin:0', text: j.name}), el('span', {class: 'row'}, [runNow, pause, del])]),
+        el('dl', {class: 'facts'}, [
+          el('dt', {text: 'Last run'}), el('dd', {}, [last(j)]),
+          el('dt', {text: 'From'}), el('dd', {}, [link(j.source_name, 'source/' + j.source)]),
+          el('dt', {text: 'To'}), el('dd', {}, [link(j.dest_name, 'destination/' + j.destination),
+            document.createTextNode(d ? ' — ' + d.catalog + '.' + (d.namespace || '<database>_<schema>') : '')]),
+          el('dt', {text: 'Tables (' + j.tables.length + ')'}), el('dd', {text: j.tables.join(', ')}),
+          el('dt', {text: 'Mode'}), el('dd', {text: MODE[j.mode]}),
+          el('dt', {text: 'Schedule'}), el('dd', {}, [seg(Object.keys(SCHED).map(function (k) { return [k, SCHED[k]]; }), j.schedule, function (v) {
+            api('POST', '/api/cdc/jobs/set', {id: j.id, schedule: v}).then(show).catch(function (e) { alert_(e.message); });
+          }), j.schedule && !j.enabled ? el('span', {class: 'sub', text: '  paused'}) : null])])]));
+      var runsBox = el('div');
+      main.appendChild(card([el('h3', {text: 'Runs'}), runsBox]));
+      showRuns(j, runsBox);
+      if (j.busy) timer = setTimeout(show, 4000);
+    }
+    function showRuns(j, box) {
+      box.appendChild(note('Loading…'));
       api('GET', '/api/cdc/runs?job=' + j.id).then(function (d) {
-        td.innerHTML = '';
-        if (!d.runs.length) return td.appendChild(note('No runs yet.'));
+        box.innerHTML = '';
+        if (!d.runs.length) return box.appendChild(note('No runs yet.'));
         var logBox = el('div');
-        td.appendChild(el('table', {}, [el('thead', {}, [el('tr', {}, ['Started', 'Took', 'Result', 'Rows', 'Why', ''].map(function (h) { return el('th', {text: h}); }))]),
+        box.appendChild(el('div', {class: 'wrap'}, [el('table', {}, [el('thead', {}, [el('tr', {}, ['Started', 'Took', 'Result', 'Rows', 'Why', ''].map(function (h) { return el('th', {text: h}); }))]),
           el('tbody', {}, d.runs.map(function (r) {
             var took = r.finished_at ? Math.max(1, Math.round((new Date(r.finished_at) - new Date(r.started_at)) / 1000)) + ' s' : '…';
             var lg = on(el('button', {class: 'small', text: 'Log'}), 'click', function () {
@@ -323,74 +529,12 @@
               el('td', {class: r.status === 'ok' ? 'ok' : r.status === 'running' ? 'run' : 'bad', title: r.error || '',
                         text: r.status === 'ok' ? '✓ ok' : r.status === 'running' ? '… running' : '✗ ' + (r.error || 'failed').slice(0, 100)}),
               el('td', {text: r.records === null ? '—' : String(r.records)}), el('td', {class: 'muted', text: r.trigger || ''}), el('td', {}, [lg])]);
-          }))]));
-        td.appendChild(logBox);
-      }).catch(function (e) { td.innerHTML = ''; td.appendChild(note(e.message, 'bad')); });
+          }))])]));
+        box.appendChild(logBox);
+      }).catch(function (e) { box.innerHTML = ''; box.appendChild(note(e.message, 'bad')); });
     }
-    function jobForm() {
-      if (!data.sources.length) return el('div', {class: 'card'}, [note('Add a source first — Sources → + New source.')]);
-      var name = inp(''), src = data.sources[0].id, dst = (data.destinations[0] || {}).id, mode = data.sources[0].cdc ? 'cdc' : 'full_refresh', sched = '';
-      var pick = el('select', {}, data.sources.map(function (s) { var o = el('option', {value: s.id, text: s.name + (s.cdc ? ' (CDC)' : '')}); return o; }));
-      var dpick = el('select', {}, data.destinations.map(function (d) { return el('option', {value: d.id, text: d.name + ' — ' + d.catalog + (d.namespace ? '.' + d.namespace : '')}); }));
-      // the source's tables, each with a tick box — read as soon as the form opens / the source changes
-      var list = el('div', {class: 'tables'}), disc = null, picked = {}, found = [], count = el('span', {class: 'sub'});
-      var bulk = el('span', {class: 'row'}, [count,
-        on(el('button', {type: 'button', class: 'small', text: 'Select all'}), 'click', function () { found.forEach(function (x) { picked[x.table] = true; }); showTables(); }),
-        on(el('button', {type: 'button', class: 'small', text: 'None'}), 'click', function () { picked = {}; showTables(); })]);
-      function chosen() { return found.map(function (x) { return x.table; }).filter(function (k) { return picked[k]; }); }
-      function counted() { count.textContent = chosen().length + ' of ' + found.length + ' selected'; }
-      function showTables() {
-        bulk.hidden = !found.length;
-        if (!found.length) return;
-        list.innerHTML = '';
-        found.forEach(function (x) {
-          var cb = on(el('input', {type: 'checkbox'}), 'change', function () { picked[x.table] = cb.checked; counted(); });
-          cb.checked = !!picked[x.table];
-          list.appendChild(el('label', {}, [cb, el('span', {text: x.table}), el('span', {class: 'muted', text: '· ' + x.columns + ' columns'})]));
-        });
-        counted();
-      }
-      var lt = el('button', {type: 'button', class: 'small', text: '↻ Reload tables'}), modeBox = el('span'), msg = el('div');
-      function modes() {
-        var s = data.sources.filter(function (x) { return x.id == src; })[0];
-        if (!s.cdc) mode = 'full_refresh';
-        modeBox.innerHTML = '';
-        modeBox.appendChild(seg(s.cdc ? [['cdc', MODE.cdc], ['full_refresh', MODE.full_refresh]] : [['full_refresh', MODE.full_refresh]], mode, function (v) { mode = v; }));
-      }
-      on(pick, 'change', function () { src = pick.value; disc = null; picked = {}; found = []; modes(); listTables(); });
-      on(dpick, 'change', function () { dst = dpick.value; });
-      on(lt, 'click', listTables);
-      function listTables() {
-        lt.disabled = true; bulk.hidden = true; list.innerHTML = ''; list.appendChild(el('span', {class: 'run', text: '… reading the source\'s tables'}));
-        api('POST', '/api/cdc/sources/tables', {id: src}).then(function (r) {
-          watch(r.task, function (t) {
-            lt.disabled = false; list.innerHTML = '';
-            if (t.status !== 'done') return list.appendChild(el('span', {class: 'bad', text: '✗ ' + (t.error || 'failed')}));
-            disc = t.id; found = t.result.tables;
-            if (!found.length) return list.appendChild(el('span', {class: 'muted', text: 'No tables found.'}));
-            showTables();
-          });
-        }).catch(function (e) { lt.disabled = false; list.innerHTML = ''; list.appendChild(el('span', {class: 'bad', text: e.message})); });
-      }
-      modes(); listTables();
-      var create = on(el('button', {class: 'primary', text: 'Create & run'}), 'click', function () {
-        var tables = chosen();
-        create.disabled = true; msg.innerHTML = '';
-        api('POST', '/api/cdc/jobs', {name: name.value, source: +src, destination: +dst, discover: disc, tables: tables, mode: mode, schedule: sched})
-          .then(function () { tab = 'jobs'; load(); })
-          .catch(function (e) { create.disabled = false; msg.appendChild(note(e.message, 'bad')); });
-      });
-      return el('div', {class: 'card'}, [el('h3', {text: 'New job — copy tables from a source to a destination'}),
-        el('div', {class: 'form'}, [el('label', {text: 'Name'}), name, el('label', {text: 'Source'}), pick, el('label', {text: 'Destination'}), dpick,
-          el('label', {text: 'Tables'}), el('div', {}, [el('div', {class: 'row', style: 'margin-bottom:6px'}, [bulk, lt]), list]),
-          el('label', {text: 'Mode'}), modeBox,
-          el('label', {text: 'Schedule'}), seg(Object.keys(SCHED).map(function (k) { return [k, SCHED[k]]; }), sched, function (v) { sched = v; })]),
-        el('div', {class: 'sub', text: 'Full load + CDC: the first run copies everything, later runs only the inserts, updates and deletes since the run before (deleted rows stay as _op_type = \'d\'). The first run starts as soon as you create the job.'}),
-        el('div', {class: 'row', style: 'margin-top:10px'}, [create, on(el('button', {text: 'Cancel'}), 'click', function () { render(); })]), msg]);
-    }
-    function alert_(msg, ok) { main.insertBefore(el('div', {class: 'card result' + (ok ? '' : ' err')}, [el('div', {text: msg})]), main.children[1] || null); }
 
-    load();
+    show();
   </script>
 </body>
 </html>
