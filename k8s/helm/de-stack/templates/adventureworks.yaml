@@ -23,9 +23,9 @@ spec:
           image: {{ .Values.adventureworks.loaderImage }}
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           env:
-            - { name: PGHOST, value: "postgres" }
-            - { name: PGUSER, value: "{{ .Values.postgres.user }}" }
-            - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: postgres-password } } }
+            - { name: PGHOST, value: "lab-db" }            # the members' database server
+            - { name: PGUSER, value: postgres }
+            - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: lab-db-password } } }
           command: ["/bin/bash", "-c"]
           args:
             - |
@@ -34,7 +34,7 @@ spec:
               echo "installing tools (curl, unzip, postgresql-client)..."
               apt-get update -qq && apt-get install -y -qq --no-install-recommends \
                 curl ca-certificates unzip postgresql-client >/dev/null
-              echo "waiting for postgres..."
+              echo "waiting for lab-db..."
               until pg_isready -h "$PGHOST" -U "$PGUSER" >/dev/null 2>&1; do sleep 3; done
               if psql -h "$PGHOST" -tAc "SELECT 1 FROM pg_database WHERE datname='adventureworks'" | grep -q 1; then
                 echo "adventureworks already loaded — nothing to do"; exit 0
@@ -67,7 +67,7 @@ spec:
                 LOOP EXECUTE format('ALTER TABLE %I.%I ALTER COLUMN %I TYPE numeric(38,6)', r.table_schema, r.table_name, r.column_name); END LOOP;
               END $$;
               SQL
-              # the course's database login (learner, created by the postgres init) reads it all
+              # the course's database login (learner, created by the lab-db init) reads it all
               echo "granting read to learner..."
               psql -h "$PGHOST" -v ON_ERROR_STOP=1 -d adventureworks >/dev/null <<'SQL'
               GRANT CONNECT ON DATABASE adventureworks TO learner;

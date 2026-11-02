@@ -1,16 +1,85 @@
-{{- if .Values.postgres.enabled }}
-# lab-db — the members' PostgreSQL server: ShopFlow, AdventureWorks (login learner, read only) and,
-# later, the live shop and members' own databases. The course connects to lab-db:5432 on both
-# stacks. Local runs it as a server of its own; here it is, for now, another name for the
-# "postgres" Service (where shopflow and adventureworks live on k8s), until lab-db gets its own.
+{{- if .Values.labDb.enabled }}
+# lab-db — the members' PostgreSQL server, apart from the platform's own (postgres: Keycloak,
+# Polaris, the portal…), so members' load, logins and replication slots never touch it:
+#  · ShopFlow (seeded here on first start) and AdventureWorks (the adventureworks Job) — login
+#    learner / learner, read only
+#  · Tidewell's three live systems — shop, store, loyalty (cdc-sim makes and changes them; login
+#    reader / reader) — the sources for 📡 Ingestion and Capstone 3
+#  · members' own databases from 🐘 My databases (<member>_<name>, a login per member)
+# wal_level = logical for CDC; a forgotten replication slot holds at most max_slot_wal_keep_size.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lab-db-init
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+data:
+{{- range $path, $_ := .Files.Glob "files/lab-db/*.{sql,sh}" }}
+  {{ base $path }}: |
+{{ $.Files.Get $path | indent 4 }}
+{{- end }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: lab-db-data
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: {{ .Values.global.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.labDb.storage }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lab-db
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {{- include "de-stack.selector" (dict "app" "lab-db") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "de-stack.selector" (dict "app" "lab-db") | nindent 8 }}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.labDb.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          args: ["-c", "wal_level=logical", "-c", "max_replication_slots=100", "-c", "max_wal_senders=100",
+                 "-c", "max_slot_wal_keep_size=1GB", "-c", "wal_sender_timeout=0"]
+          env:
+            - { name: POSTGRES_USER, value: postgres }
+            - { name: POSTGRES_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: lab-db-password } } }
+            - { name: POSTGRES_DB, value: shop }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d }
+          readinessProbe:      # TCP: not ready while the init scripts run on a socket-only server
+            exec: { command: ["pg_isready", "-h", "127.0.0.1", "-U", "postgres"] }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec: { command: ["pg_isready", "-h", "127.0.0.1", "-U", "postgres"] }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+      volumes:
+        - { name: data, persistentVolumeClaim: { claimName: lab-db-data } }
+        - { name: init, configMap: { name: lab-db-init } }
+---
 apiVersion: v1
 kind: Service
 metadata:
   name: lab-db
   labels: {{- include "de-stack.labels" . | nindent 4 }}
 spec:
-  type: ExternalName
-  externalName: postgres.{{ .Release.Namespace }}.svc.cluster.local
+  selector: {{- include "de-stack.selector" (dict "app" "lab-db") | nindent 4 }}
   ports:
     - { name: pg, port: 5432, targetPort: 5432 }
 {{- end }}

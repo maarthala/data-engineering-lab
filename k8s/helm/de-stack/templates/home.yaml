@@ -22,6 +22,10 @@ data:
 {{ .Files.Get "files/home/files.html" | indent 4 }}
   catalogs.html: |
 {{ .Files.Get "files/home/catalogs.html" | indent 4 }}
+  databases.html: |
+{{ .Files.Get "files/home/databases.html" | indent 4 }}
+  cdc.html: |
+{{ .Files.Get "files/home/cdc.html" | indent 4 }}
   manage.html: |
 {{ .Files.Get "files/home/manage.html" | indent 4 }}
   teams.html: |
@@ -78,6 +82,8 @@ spec:
             - { name: html, mountPath: /usr/share/nginx/html/index.html, subPath: index.html }
             - { name: html, mountPath: /usr/share/nginx/html/files.html, subPath: files.html }
             - { name: html, mountPath: /usr/share/nginx/html/catalogs.html, subPath: catalogs.html }
+            - { name: html, mountPath: /usr/share/nginx/html/databases.html, subPath: databases.html }
+            - { name: html, mountPath: /usr/share/nginx/html/cdc.html, subPath: cdc.html }
             - { name: html, mountPath: /usr/share/nginx/html/manage.html, subPath: manage.html }
             - { name: html, mountPath: /usr/share/nginx/html/teams.html, subPath: teams.html }
             - { name: html, mountPath: /usr/share/nginx/html/activity.html, subPath: activity.html }
@@ -221,6 +227,12 @@ spec:
             # "📝 Mock exams" — the portal's own database (the portal-db init container makes it)
             - { name: PG_PORTAL_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: pg-portal-password } } }
             - { name: PORTAL_DB_URL, value: "postgresql://portal:$(PG_PORTAL_PASSWORD)@postgres:5432/portal" }
+            {{- if .Values.labDb.enabled }}
+            # "🐘 My databases" (members' own databases on lab-db) and "📡 Ingestion" (the live shop source)
+            - { name: LAB_DB_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: lab-db-password } } }
+            - { name: LABDB_ADMIN_URL, value: "postgresql://postgres:$(LAB_DB_PASSWORD)@lab-db:5432/postgres" }
+            - { name: CDC_LAB_DB, value: "postgresql://reader:reader@lab-db:5432/shop" }
+            {{- end }}
           ports:
             - { name: http, containerPort: 8000 }
           readinessProbe:
@@ -231,6 +243,8 @@ spec:
             - { name: lab-code, mountPath: /app/labadmin.py, subPath: labadmin.py }
             - { name: lab-code, mountPath: /app/labvault.py, subPath: labvault.py }
             - { name: lab-code, mountPath: /app/labexams.py, subPath: labexams.py }
+            - { name: lab-code, mountPath: /app/labcdc.py, subPath: labcdc.py }
+            - { name: lab-code, mountPath: /app/labdb.py, subPath: labdb.py }
             - { name: lab-code, mountPath: /app/exam_demo.json, subPath: exam_demo.json }
             - { name: lab-seed, mountPath: /app/seed }
       volumes:

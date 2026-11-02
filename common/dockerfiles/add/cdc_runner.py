@@ -11,6 +11,8 @@ member input only ever becomes OLake's JSON config, never a command line. A cont
 config as files (copied in before it starts), the stack's network and a memory limit; state and
 discovered tables are copied out after it ends.
   local: Docker, through the mounted socket (CDC_EXECUTOR=docker)
+  k8s:   a Pod in the runner's namespace (CDC_EXECUTOR=k8s; its service account may make pods and
+         secrets): the config files come in as a Secret, the files to keep come back in the pod's log
 """
 import http.client
 import io
@@ -18,11 +20,14 @@ import json
 import os
 import re
 import socket
+import ssl
 import tarfile
 import threading
 import time
 import traceback
 import urllib.parse
+import urllib.error
+import urllib.request
 
 import labcdc
 from labcdc import _q
@@ -36,6 +41,8 @@ WORKERS = int(os.environ.get("CDC_WORKERS", "2"))
 TIMEOUT = int(os.environ.get("CDC_TIMEOUT_S", "1800"))       # a sync longer than this is stopped
 CDC_WAIT = 120                                                # OLake: idle seconds before a CDC run ends
 CFG = "/mnt/config"
+EXECUTOR = os.environ.get("CDC_EXECUTOR", "docker")
+SA = "/var/run/secrets/kubernetes.io/serviceaccount"
 SYSTEM_TABLES = {("dbo", "systranschemas")}
 LOG_LINES = 400
 
@@ -109,8 +116,10 @@ def _read(cid, name):
 
 
 def olake(kind, label, args, files, read=(), timeout=TIMEOUT):
-    """One OLake engine container for a `kind` of source: files → /mnt/config, run `args`, wait.
+    """One OLake engine run for a `kind` of source: files → /mnt/config, run `args`, wait.
     → (exit code, log, {read file})."""
+    if EXECUTOR == "k8s":
+        return _olake_pod(kind, label, args, files, read, timeout)
     image = _image(kind)
     _pull(image)
     cid = json.loads(_docker("POST", f"/containers/create?name=cdc-{label}-{int(time.time() * 1000)}", {
@@ -130,6 +139,77 @@ def olake(kind, label, args, files, read=(), timeout=TIMEOUT):
             _docker("DELETE", f"/containers/{cid}?force=1")
         except RuntimeError:
             pass
+
+
+# ---- Kubernetes: one Pod per run ------------------------------------------------------------
+def _k8s(method, path, body=None, timeout=60, text=False):
+    token = open(f"{SA}/token").read().strip()
+    req = urllib.request.Request("https://kubernetes.default.svc" + path, method=method,
+                                 data=json.dumps(body).encode() if body is not None else None,
+                                 headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+    ctx = ssl.create_default_context(cafile=f"{SA}/ca.crt")
+    try:
+        with urllib.request.urlopen(req, context=ctx, timeout=timeout) as r:
+            raw = r.read()
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"k8s {method} {path.split('?')[0]}: HTTP {e.code} {e.read()[:200]!r}") from None
+    return raw.decode("utf-8", "replace") if text else (json.loads(raw) if raw else None)
+
+
+MARK = "@@CDC-FILE "
+
+
+def _olake_pod(kind, label, args, files, read, timeout):
+    ns = os.environ.get("CDC_NAMESPACE") or open(f"{SA}/namespace").read().strip()
+    name = re.sub(r"[^a-z0-9-]", "-", f"cdc-{label}-{int(time.time() * 1000)}".lower())[:63].rstrip("-")
+    # OLake runs as usual; then the files to keep are printed (base64) after a marker each
+    keep = " ".join(read)
+    script = (f'cp /mnt/in/* {CFG}/ && cd /home && ./olake "$@"; code=$?; '
+              f'for f in {keep}; do echo; echo "{MARK}$f"; [ -f {CFG}/$f ] && base64 -w0 {CFG}/$f; echo; done; exit $code')
+    _k8s("POST", f"/api/v1/namespaces/{ns}/secrets", {
+        "metadata": {"name": name, "labels": {"lab.cdc": "run"}},
+        "stringData": {n: json.dumps(c) for n, c in files.items()}})
+    try:
+        _k8s("POST", f"/api/v1/namespaces/{ns}/pods", {
+            "metadata": {"name": name, "labels": {"lab.cdc": "run"}},
+            "spec": {"restartPolicy": "Never", "automountServiceAccountToken": False,
+                     "containers": [{"name": "olake", "image": _image(kind), "imagePullPolicy": "IfNotPresent",
+                                     "command": ["sh", "-c", script, "olake"], "args": args,
+                                     "resources": {"limits": {"memory": str(MEM)}, "requests": {"memory": "256Mi"}},
+                                     "volumeMounts": [{"name": "in", "mountPath": "/mnt/in", "readOnly": True},
+                                                      {"name": "config", "mountPath": CFG}]}],
+                     "volumes": [{"name": "in", "secret": {"secretName": name}}, {"name": "config", "emptyDir": {}}]}})
+        code, end = None, time.time() + timeout
+        while time.time() < end:
+            st = _k8s("GET", f"/api/v1/namespaces/{ns}/pods/{name}")["status"]
+            for c in st.get("containerStatuses") or []:
+                w = (c.get("state") or {}).get("waiting") or {}
+                if w.get("reason") in ("ErrImagePull", "ImagePullBackOff", "InvalidImageName"):
+                    return 1, f"can't start OLake ({_image(kind)}): {w.get('reason')} {w.get('message', '')}", {}
+                t = (c.get("state") or {}).get("terminated")
+                if t:
+                    code = t.get("exitCode", 1)
+            if code is not None:
+                break
+            time.sleep(2)
+        if code is None:
+            return -1, "stopped: it ran longer than the time limit", {}
+        log = _k8s("GET", f"/api/v1/namespaces/{ns}/pods/{name}/log?container=olake", text=True, timeout=120)
+        out, parts = {}, log.split("\n" + MARK)
+        for part in parts[1:]:
+            fname, _, body = part.partition("\n")
+            body = body.strip().split("\n")[0]
+            try:
+                out[fname.strip()] = json.loads(__import__("base64").b64decode(body) or b"null") if body else None
+            except ValueError:
+                out[fname.strip()] = None
+        return code, parts[0], out
+    finally:
+        for kind_ in ("pods", "secrets"):
+            try:
+                _k8s("DELETE", f"/api/v1/namespaces/{ns}/{kind_}/{name}")
+            except RuntimeError:
+                pass
 
 
 # ---- config files: member input → OLake's JSON ---------------------------------------------
@@ -394,7 +474,7 @@ def main():
        rows=False)
     _q("UPDATE cdc_runs SET status = 'failed', error = 'cdc-runner restarted', finished_at = now() WHERE status = 'running'",
        rows=False)
-    print(f"[cdc] runner up: OLake {VERSION} on {NETWORK}, {WORKERS} at a time", flush=True)
+    print(f"[cdc] runner up: OLake {VERSION}, {EXECUTOR} ({NETWORK if EXECUTOR == 'docker' else 'pods'}), {WORKERS} at a time", flush=True)
     busy, last_due = [], 0
     while True:
         try:

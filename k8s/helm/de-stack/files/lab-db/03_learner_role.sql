@@ -2,8 +2,8 @@
 -- that data engineers may query but never change:
 --   * reads every table in shopflow and adventureworks (the shared OLTP sources)
 --   * can't insert, update, delete or create anything (writes go to the member's lakehouse)
---   * can't open the platform databases (Polaris, Keycloak, Airflow, Superset …) — the
---     superuser `postgres` is for the platform only.
+--   * can't open the other databases on this server (members' own, postgres) — the live shop
+--     `shop` has its own login, reader.
 -- Idempotent: also run against an existing stack (psql -U postgres -f …).
 
 DO $$ BEGIN
@@ -17,7 +17,7 @@ ALTER ROLE learner SET default_transaction_read_only = on;
 -- platform databases: only their own service user (the owner) may connect
 DO $$ DECLARE d text; BEGIN
   FOR d IN SELECT datname FROM pg_database
-           WHERE NOT datistemplate AND datname NOT IN ('shopflow', 'adventureworks') LOOP
+           WHERE NOT datistemplate AND datname NOT IN ('shopflow', 'adventureworks', 'shop') LOOP
     EXECUTE format('REVOKE CONNECT ON DATABASE %I FROM PUBLIC', d);
   END LOOP;
 END $$;

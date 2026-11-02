@@ -1,4 +1,4 @@
-// The portal's frame — the same on every page: the left menu (Workspace · Tools · Manage) and the top
+// The portal's frame — the same on every page: the left menu (Workspace · Tools · Extras · Manage) and the top
 // bar (where you are, who's signed in, Log out). A page puts <header id="lab-top"></header> first in
 // <body>, loads /admin.css and this script. /api/me (home-api, behind the Keycloak login) also creates
 // the learner's lakehouse on first call; pages that need the same data listen for the "lab:me" event.
@@ -8,6 +8,7 @@
   var host = location.hostname, k8s = /(^|\.)de\.lan$/.test(host);
   function url(sub, unusedPort, path) { return 'http://' + sub + '.' + location.host + (path || ''); }
   var TOOLS = window.LAB_TOOLS = {
+    sync:       {name: 'Ingestion', what: 'Copy tables from your databases (CDC, OLake)', page: '/cdc.html'},   // a portal page
     jupyter:    {name: 'Notebooks', what: 'Jupyter', svc: 'jupyter', url: url('jupyter', 8008)},
     sqlpad:     {name: 'SQL editor', what: 'SQLPad', svc: 'sqlpad', url: url('sqlpad', 8003, '/auth/oidc')},
     airflow:    {name: 'Pipelines', what: 'Airflow', svc: 'airflow', url: url('airflow', 8001)},
@@ -23,6 +24,8 @@
     files: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     catalogs: '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
     secrets: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>',
+    databases: '<ellipse cx="12" cy="5.5" rx="7.5" ry="2.5"/><path d="M4.5 5.5v13c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5v-13M4.5 12c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5"/>',
+    sync: '<path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/>',
     exams: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 11l2 2 4-4M9 17h6"/>',
     jupyter: '<path d="M4 5a1 1 0 0 1 1-1h11l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M8 13l2 2-2 2M12 17h4"/>',
     sqlpad: '<path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 6l-3 12"/>',
@@ -41,7 +44,9 @@
   function svg(k) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (I[k] || '') + '</svg>'; }
 
   var WORK = [['/', 'home', 'Home'], ['/files.html', 'files', 'My files'], ['/catalogs.html', 'catalogs', 'My catalogs'],
-              ['/secrets.html', 'secrets', 'My secrets'], ['/exams.html', 'exams', 'Mock exams']];
+              ['/databases.html', 'databases', 'My databases'],
+              ['/secrets.html', 'secrets', 'My secrets']];
+  var EXTRAS = [['/exams.html', 'exams', 'Mock exams']];
   var MANAGE = [['/manage.html', 'members', 'Members'], ['/teams.html', 'teams', 'Teams'], ['/activity.html', 'activity', 'Activity'],
                 ['/exams-admin.html', 'exams', 'Exams'], ['/settings.html', 'settings', 'Settings']];
   var path = location.pathname.replace(/\/+$/, '') || '/';
@@ -53,8 +58,12 @@
   }
   function title() {
     if (tool && TOOLS[tool]) return ['Tools', TOOLS[tool].name];
+    var p = Object.keys(TOOLS).filter(function (k) { return TOOLS[k].page === path; })[0];
+    if (p) return ['Tools', TOOLS[p].name];
     var w = WORK.filter(function (x) { return x[0] === path; })[0];
     if (w) return ['Workspace', w[2]];
+    var x = EXTRAS.filter(function (e) { return e[0] === path; })[0];
+    if (x) return ['Extras', x[2]];
     var m = MANAGE.filter(function (x) { return x[0] === path; })[0];
     return m ? ['Manage', m[2]] : ['', document.title.split(' — ')[0]];
   }
@@ -67,9 +76,11 @@
     '<div class="grp"><h6>Workspace</h6>' + WORK.map(function (x) { return item(x[0], x[1], x[2], x[0] === path); }).join('') + '</div>' +
     '<div class="grp"><h6>Tools</h6>' + Object.keys(TOOLS).map(function (k) {
       var t = TOOLS[k];
-      return item(t.external ? t.url : '/tool.html#' + k, k, t.name + (t.external ? ' <span class="ext">↗</span>' : ''), tool === k,
+      return item(t.page || (t.external ? t.url : '/tool.html#' + k), k, t.name + (t.external ? ' <span class="ext">↗</span>' : ''),
+                  tool === k || t.page === path,
                   ' data-tool="' + k + '"' + (t.managers ? ' data-mgr hidden' : '') + (t.external ? ' target="_blank" rel="noopener"' : '') + ' title="' + t.what + '"');
     }).join('') + '</div>' +
+    '<div class="grp"><h6>Extras</h6>' + EXTRAS.map(function (x) { return item(x[0], x[1], x[2], x[0] === path); }).join('') + '</div>' +
     '<div class="grp" id="lab-nav-manage" hidden><h6>Manage</h6>' + MANAGE.map(function (x) { return item(x[0], x[1], x[2], x[0] === path); }).join('') + '</div>' +
     '<div class="foot"><a href="https://maarthala.github.io/data-engineering-lab/" target="_blank" rel="noopener">Course ↗</a> · ' +
     '<a href="https://github.com/maarthala/data-engineering-lab#readme" target="_blank" rel="noopener">Docs ↗</a>' +

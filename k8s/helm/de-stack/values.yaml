@@ -112,6 +112,22 @@ trino:
 # AdventureWorks OLTP sample DB — loaded into the in-cluster Postgres by a one-shot
 # Job (downloads the MS CSVs + the community Postgres port, ruby-fixes, loads), and
 # exposed as a Trino catalog. Query it from Trino/SQLPad/Superset.
+# lab-db — the members' PostgreSQL server: ShopFlow, AdventureWorks, Tidewell's live systems and
+# members' own databases (🐘 My databases); owner password: secret key lab-db-password
+labDb:
+  enabled: true
+  image: postgres:18
+  storage: 5Gi
+
+# 📡 Ingestion (CDC): the runner (OLake engine pods) and Tidewell's simulator. The OLake images
+# (olakego/source-postgres|mysql|mssql:<olakeVersion>) are imported to the node, not pulled.
+cdc:
+  enabled: true
+  image: ghcr.io/maarthala/de-stack/cdc-runner:20261102
+  olakeVersion: v1.1.1
+  memGb: "1.5"
+  workers: "2"
+
 adventureworks:
   enabled: true
   loaderImage: ruby:3.3-slim   # has ruby; the Job apt-installs curl/unzip/postgresql-client

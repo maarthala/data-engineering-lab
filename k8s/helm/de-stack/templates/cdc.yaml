@@ -1,0 +1,112 @@
+{{- if .Values.cdc.enabled }}
+# 📡 Ingestion (CDC) — members copy tables from a database into their lakehouse (labcdc.py keeps
+# their sources, destinations and jobs in the portal database; the portal page is cdc.html).
+#  cdc-runner  does the work: every check, table list and sync is one OLake engine Pod
+#              (olakego/source-<postgres|mysql|mssql>) in this namespace — it may make pods and
+#              secrets here, nothing else
+#  cdc-sim     keeps Tidewell's three live systems on lab-db changing (shop, store, loyalty)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cdc-runner
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cdc-runner
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "secrets"]
+    verbs: ["create", "get", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cdc-runner
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: cdc-runner }
+subjects:
+  - { kind: ServiceAccount, name: cdc-runner }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cdc-runner
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {{- include "de-stack.selector" (dict "app" "cdc-runner") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "de-stack.selector" (dict "app" "cdc-runner") | nindent 8 }}
+    spec:
+      serviceAccountName: cdc-runner
+      containers:
+        - name: cdc-runner
+          image: {{ .Values.cdc.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            - { name: CDC_EXECUTOR, value: k8s }
+            - { name: CDC_VERSION, value: {{ .Values.cdc.olakeVersion | quote }} }
+            - { name: CDC_MEM_GB, value: {{ .Values.cdc.memGb | quote }} }
+            - { name: CDC_WORKERS, value: {{ .Values.cdc.workers | quote }} }
+            - { name: POLARIS_URL, value: "http://polaris:8181" }
+            - { name: LAKE_S3_ENDPOINT, value: "http://storage:9000" }
+            # a member's job login is minted from these (lab_jobs) — like Airflow's
+            - { name: AWS_ACCESS_KEY_ID, value: {{ .Values.storage.rootUser | quote }} }
+            - { name: AWS_SECRET_ACCESS_KEY, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: storage-root-password } } }
+            - { name: POLARIS_ROOT_SECRET, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: polaris-root-secret } } }
+            - { name: POLARIS_ADMIN, value: "root:$(POLARIS_ROOT_SECRET)" }
+            - { name: VAULT_ADDR, value: http://vault:8200 }
+            - { name: VAULT_ADMIN_TOKEN, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: vault-admin-token } } }
+            - { name: PG_PORTAL_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: pg-portal-password } } }
+            - { name: PORTAL_DB_URL, value: "postgresql://portal:$(PG_PORTAL_PASSWORD)@postgres:5432/portal" }
+          resources:
+            requests: { memory: 64Mi }
+            limits: { memory: 256Mi }
+          volumeMounts:
+{{- range list "lakehouse.py" "labvault.py" "lab_jobs.py" "labcdc.py" "cdc_runner.py" }}
+            - { name: lab-code, mountPath: /app/{{ . }}, subPath: {{ . }} }
+{{- end }}
+      volumes:
+        - { name: lab-code, configMap: { name: lab-code } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cdc-sim
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {{- include "de-stack.selector" (dict "app" "cdc-sim") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "de-stack.selector" (dict "app" "cdc-sim") | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: cdc-sim
+          image: {{ .Values.cdc.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          command: ["python", "/app/cdc_simulator.py"]
+          env:
+            - { name: LAB_DB_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: lab-db-password } } }
+            - { name: CDC_DB_URL, value: "postgresql://postgres:$(LAB_DB_PASSWORD)@lab-db:5432/shop" }
+            - { name: CDC_READER, value: "reader:reader" }
+          resources:
+            requests: { memory: 64Mi }
+            limits: { memory: 256Mi }
+          volumeMounts:
+{{- range list "cdc_simulator.py" "tidewell_archive.py" }}
+            - { name: lab-code, mountPath: /app/{{ . }}, subPath: {{ . }} }
+{{- end }}
+      volumes:
+        - { name: lab-code, configMap: { name: lab-code } }
+{{- end }}

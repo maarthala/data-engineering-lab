@@ -25,7 +25,10 @@
     td.r{text-align:right; white-space:nowrap}
     .ns td:first-child{font-weight:600; cursor:pointer; user-select:none} .ns:hover td{background:rgba(109,139,255,.06)}
     .ns .car{display:inline-block; width:14px; color:var(--muted); transition:transform .15s} .ns.open .car{transform:rotate(90deg)}
-    .tbl td:first-child{padding-left:38px; color:var(--muted)}
+    .tbl td:first-child{padding-left:38px; color:var(--muted)} .tbl .full{font-family:ui-monospace,Menlo,monospace; font-size:.8rem; margin-left:10px; opacity:.7}
+    td.r button + button{margin-left:4px}
+    .helpbtn{float:right} .helpbox{margin-top:12px; padding:12px; border:1px dashed var(--line); border-radius:9px; background:var(--panel2)}
+    .helpbox pre{margin-bottom:8px}
     .cardhead{display:flex; align-items:center; justify-content:space-between; gap:8px} .cardhead h3{margin:0}
     .invite{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:8px}
     .invite input{width:240px} .invite select{max-width:100%}
@@ -39,13 +42,12 @@
     .toast.err{border-color:var(--danger); color:var(--bad-ink)}
     .placeholder{color:var(--muted); padding:40px; text-align:center}
     @media (max-width:760px){ .app{grid-template-columns:1fr} aside{max-height:35vh; border-right:0; border-bottom:1px solid var(--line)} }
-    .plink{display:inline-block;margin-top:8px;font-size:.88rem;color:var(--accent);font-weight:600}
 </style>
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=12"></script>
-  <div class="pagebar"><h1>🗂️ My catalogs <span class="dot">·</span> Polaris</h1></div>
+  <script src="/lab-header.js?v=16"></script>
+  <div class="pagebar"><h1>🗂️ My catalogs <span class="dot">·</span> your namespaces, tables and who you share them with</h1></div>
   <div class="app">
     <aside>
       <div class="title"><span>My catalogs</span><button class="small" id="new">＋ New</button></div>
@@ -64,13 +66,6 @@
     // enforces what each learner may read or write.
     var $ = function (id) { return document.getElementById(id); };
     var state = {data: null, sel: null, user: ''};
-    // The Polaris Console can't LIST catalogs for learners (only its admin role may), but it
-    // opens a catalog you own directly by name.
-    var POLARIS_UI = /(^|\.)de\.lan$/.test(location.hostname) ? 'http://polaris-console.' + location.hostname : 'http://localhost:8189';
-    function polarisLink(name) {
-      var a = el('a', 'plink', 'Open in Polaris Console ↗'); a.href = POLARIS_UI + '/catalogs/' + encodeURIComponent(name);
-      a.target = '_blank'; a.rel = 'noopener'; return a;
-    }
     function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
     function toast(m, err) { var t = $('toast'); t.textContent = m; t.className = 'toast' + (err ? ' err' : ''); t.style.display = 'block';
       clearTimeout(t._h); t._h = setTimeout(function () { t.style.display = 'none'; }, 3500); }
@@ -93,11 +88,21 @@
       return pre;
     }
 
+    // "ⓘ How to use it" in a catalog's header card: the notebook / SQL hint, closed until asked for
+    function help(head, nodes) {
+      var b = el('button', 'small helpbtn', 'ⓘ How to use it'), box = el('div', 'helpbox'); box.hidden = true;
+      nodes.forEach(function (x) { box.appendChild(x); });
+      b.onclick = function () { box.hidden = !box.hidden; b.textContent = box.hidden ? 'ⓘ How to use it' : '✕ Hide help'; };
+      head.insertBefore(b, head.firstChild); head.appendChild(box);
+    }
     function load(keep) {
       return api('GET', '').then(function (r) {
         if (!r.ok) return toast(r.body.error || 'could not load catalogs', true);
         state.data = r.body; sidebar();
-        if (keep && state.sel) open(state.sel.name, state.sel.kind);
+        if (keep && state.sel) return open(state.sel.name, state.sel.kind);
+        var want = decodeURIComponent(location.hash.slice(1)), all = state.data.owned.concat(state.data.shared);
+        var c = all.filter(function (x) { return x.name === want; })[0] || state.data.owned.filter(function (x) { return x.default; })[0];
+        if (c) open(c.name, state.data.shared.indexOf(c) >= 0 ? 'shared' : 'owned');
       });
     }
     function sidebar() {
@@ -125,12 +130,12 @@
 
     function open(name, kind) {
       state.sel = {name: name, kind: kind}; highlight();
+      history.replaceState(null, '', '#' + encodeURIComponent(name));
       var m = $('main'); m.innerHTML = '';
       if (kind === 'shared') {
         var c = state.data.shared.filter(function (x) { return x.name === name; })[0];
         var card = el('div', 'card'); card.appendChild(el('h2', null, '🤝 ' + name));
         card.appendChild(el('div', 'sub', 'Shared with you by ' + name.split('_')[0] + '.'));
-        card.appendChild(polarisLink(name));
         m.appendChild(card);
         var acc = el('div', 'card'); acc.appendChild(el('h3', null, 'What you can access'));
         var t = el('table'); t.innerHTML = '<tr><th>What</th><th>Access</th></tr>';
@@ -142,27 +147,24 @@
         if (/_lake$/.test(name) && c.shares.some(function (s) { return s.scope === 'lake' || !s.namespace; }))
           acc.appendChild(el('div', 'sub', 'Their files come with the lake: 📁 My files → 🤝 Shared with me.'));
         m.appendChild(acc);
-        var nb = el('div', 'card'); nb.appendChild(el('h3', null, 'Use it in a notebook'));
-        nb.appendChild(snippet(name, c.shares[0].namespace, c.shares[0].table)); m.appendChild(nb);
+        help(card, [snippet(name, c.shares[0].namespace, c.shares[0].table)]);
         return;
       }
       var info = state.data.owned.filter(function (x) { return x.name === name; })[0];
       var head = el('div', 'card'); head.appendChild(el('h2', null, '🗂️ ' + name));
       if (info.team) {          // the team's: every member reads and writes it, nothing to share
         head.appendChild(el('div', 'sub', 'Your team\'s lakehouse — every member of the team reads and writes it, by its name ' + name + ' in notebooks, SQLPad and Superset · stored in ' + info.location));
-        head.appendChild(polarisLink(name)); m.appendChild(head);
-        var tnb = el('div', 'card'); tnb.appendChild(el('h3', null, 'Use it'));
+        m.appendChild(head);
         var tp = el('pre'); tp.textContent = '# notebooks: already set up\nspark.sql("SHOW TABLES IN ' + name + '.bronze").show()\n\n-- SQLPad\nSELECT * FROM ' + name + '.bronze.<table>;';
-        tnb.appendChild(tp); m.appendChild(tnb);
+        help(head, [tp]);
         return;
       }
       head.appendChild(el('div', 'sub', (info.default ? 'Your main lakehouse (`my` in your notebooks)' : 'Your catalog') + ' · stored in ' + info.location));
-      head.appendChild(polarisLink(name));
       m.appendChild(head);
       // 🤝 Invite: closed until asked for; its namespace list is fetched when it opens
       var inv = el('div', 'card'), ihead = el('div', 'cardhead');
-      ihead.appendChild(el('h3', null, '🤝 Invite a member'));
-      var iopen = el('button', 'small', 'Invite…'); ihead.appendChild(iopen); inv.appendChild(ihead);
+      ihead.appendChild(el('h3', null, '🤝 Sharing'));
+      var iopen = el('button', 'small', '＋ Invite a member'); ihead.appendChild(iopen); inv.appendChild(ihead);
       var ibody = el('div'); ibody.style.display = 'none'; ibody.style.marginTop = '10px';
       var who = el('input'); who.type = 'text'; who.placeholder = 'member username (type 3+ letters)'; who.autocomplete = 'off';
       // lookup: from 3 letters, the matching members in a list under the box (↑ ↓ Enter, or click)
@@ -196,24 +198,43 @@
       ibody.appendChild(el('div', 'sub', 'The whole lake: every namespace and its tables, also ones you make later (read + write: they can also create and drop tables)' +
         (info.default ? ', and your files (files/ in your bucket, under 📁 My files → 🤝 Shared with me for them)' : '') +
         '. Or one namespace (e.g. bronze) and all its tables. They find it under Shared with me.'));
-      inv.appendChild(ibody); m.appendChild(inv);
+      inv.appendChild(ibody);
       var scoped = false;
       iopen.onclick = function () {
         var show = ibody.style.display === 'none';
-        ibody.style.display = show ? '' : 'none'; iopen.textContent = show ? 'Close' : 'Invite…';
+        ibody.style.display = show ? '' : 'none'; iopen.textContent = show ? 'Close' : '＋ Invite a member';
         if (show) who.focus();
         if (show && !scoped) { scoped = true; namespaces().then(function (list) {
           list.forEach(function (n) { scope.appendChild(el('option', null, 'namespace ' + n)).value = n; }); }); }
       };
-      var sh = el('div', 'card'); sh.appendChild(el('h3', null, 'Shared with')); var stab = el('table'); sh.appendChild(stab); m.appendChild(sh);
+      var stab = el('table'); stab.style.marginTop = '8px'; inv.appendChild(stab);
       // Namespaces & tables: namespaces closed; a namespace's tables load when it's opened
-      var tree = el('div', 'card'); tree.appendChild(el('h3', null, 'Namespaces & tables'));
-      var tbody = el('table'); tree.appendChild(tbody); m.appendChild(tree);
+      var tree = el('div', 'card'), thead = el('div', 'cardhead'), nsNew = el('button', 'small', '＋ New namespace');
+      thead.appendChild(el('h3', null, 'Namespaces & tables')); thead.appendChild(nsNew); tree.appendChild(thead);
+      var nsBox = el('div', 'invite'); nsBox.hidden = true; tree.appendChild(nsBox);
+      nsNew.onclick = function () {             // name + Create / Cancel, in place
+        if (!nsBox.hidden) return nsBox.querySelector('input').focus();
+        nsBox.innerHTML = ''; nsBox.hidden = false;
+        var inp = el('input'); inp.type = 'text'; inp.placeholder = 'e.g. bronze'; inp.autocomplete = 'off';
+        var ok = el('button', 'small primary', 'Create'), no = el('button', 'small', 'Cancel');
+        [inp, ok, no].forEach(function (x) { nsBox.appendChild(x); }); inp.focus();
+        function close() { nsBox.hidden = true; nsBox.innerHTML = ''; }
+        function create() {
+          var n = inp.value.trim().toLowerCase(); if (!n) return inp.focus();
+          ok.disabled = true;
+          api('POST', '/namespaces', {catalog: name, namespace: n}).then(function (r) {
+            ok.disabled = false;
+            if (!r.ok) return toast(r.body.error, true);
+            toast('Created namespace ' + n); close(); open(name, 'owned');
+          });
+        }
+        ok.onclick = create; no.onclick = close;
+        inp.onkeydown = function (e) { if (e.key === 'Enter') create(); if (e.key === 'Escape') close(); };
+      };
+      var tbody = el('table'); tree.appendChild(tbody); m.appendChild(tree); m.appendChild(inv);
       tbody.innerHTML = '<tr><td class="sub">Loading…</td></tr>';
-      var nb = el('div', 'card'); nb.appendChild(el('h3', null, 'Use it in a notebook'));
-      nb.appendChild(info.default ? (function () { var p = el('pre'); p.textContent = '# already set up as `my`\nspark.sql("SHOW NAMESPACES IN my").show()'; return p; })() : snippet(name));
-      nb.appendChild(el('div', 'sub', 'Create namespaces & tables from Spark, e.g. spark.sql("CREATE NAMESPACE ' + (info.default ? 'my' : name) + '.sales")'));
-      m.appendChild(nb);
+      help(head, [info.default ? (function () { var p = el('pre'); p.textContent = '# notebooks: already set up as `my`\nspark.sql("SHOW NAMESPACES IN my").show()\n\n-- SQL editor\nSELECT * FROM ' + name + '.<namespace>.<table>;'; return p; })() : snippet(name),
+        el('div', 'sub', 'Tables are made by code (e.g. df.writeTo("' + (info.default ? 'my' : name) + '.bronze.orders").create()) or by 📡 Ingestion. ⧉ next to a table copies its full name.')]);
 
       var nsList;
       function namespaces() {
@@ -224,20 +245,31 @@
       }
       namespaces().then(function (list) {
         tbody.innerHTML = '';
-        if (!list.length) { var e = el('tr'); var td = el('td', 'sub', 'No namespaces yet — create one from a notebook (see below).'); e.appendChild(td); tbody.appendChild(e); }
+        if (!list.length) { var e = el('tr'); var td = el('td', 'sub', 'No namespaces yet — click ＋ New namespace.'); e.appendChild(td); tbody.appendChild(e); }
         list.forEach(function (n) {
           var tr = el('tr', 'ns'), td = el('td');
           td.appendChild(el('span', 'car', '▸')); td.appendChild(document.createTextNode(' 📁 ' + n));
           tr.appendChild(td); tbody.appendChild(tr);
           var rows = null;
-          tr.onclick = function () {
+          tr.appendChild(del('namespace ' + n + ' (it must be empty)', '/namespaces', {catalog: name, namespace: n}, function () {
+            (rows || []).forEach(function (x) { x.remove(); }); tr.remove();
+          }));
+          tr.onclick = function (e) {
+            if (e.target.closest('td.r')) return;
             var opening = !tr.classList.contains('open'); tr.classList.toggle('open', opening);
             if (rows) { rows.forEach(function (x) { x.style.display = opening ? '' : 'none'; }); return; }
             var wait = row('Loading…', 'tbl'); tr.after(wait); rows = [wait];
             api('GET', '/tree', {catalog: name, namespace: n}).then(function (r) {
               wait.remove();
               if (!r.ok) { rows = null; tr.classList.remove('open'); return toast(r.body.error, true); }
-              rows = (r.body.length ? r.body.map(function (t) { return row('▦ ' + t, 'tbl'); }) : [row('no tables yet', 'tbl')]);
+              rows = (r.body.length ? r.body.map(function (t) {
+                var x = row('▦ ' + t, 'tbl'), full = name + '.' + n + '.' + t;
+                x.firstChild.appendChild(el('span', 'full', full));
+                x.appendChild(del('table ' + n + '.' + t + ' and its files', '/tables', {catalog: name, namespace: n, table: t}, function () {
+                  x.remove(); rows.splice(rows.indexOf(x), 1);
+                }, full));
+                return x;
+              }) : [row('no tables yet — write one from a notebook, or with 📡 Ingestion', 'tbl')]);
               var at = tr; rows.forEach(function (x) { x.style.display = tr.classList.contains('open') ? '' : 'none'; at.after(x); at = x; });
             });
           };
@@ -246,6 +278,35 @@
       shares();
 
       function row(label, cls) { var tr = el('tr', cls); tr.appendChild(el('td', null, label)); return tr; }
+      // 🗑 → "Delete …? Yes / Cancel" in the same cell (no browser popups)
+      function del(what, path, params, gone, copy, label) {
+        var td = el('td', 'r');
+        function idle() {
+          td.innerHTML = '';
+          if (copy) {                                // ⧉ the table's full name, for SQL
+            var c = el('button', 'small', '⧉'); c.title = 'Copy ' + copy; td.appendChild(c);
+            c.onclick = function () {
+              (navigator.clipboard ? navigator.clipboard.writeText(copy) : Promise.reject()).then(
+                function () { toast('Copied ' + copy); }, function () { toast(copy); });
+            };
+          }
+          var b = el('button', label ? 'small danger' : 'small', label || '🗑'); b.title = label || 'Delete'; td.appendChild(b);
+          b.onclick = function () {
+            td.innerHTML = ''; td.appendChild(el('span', 'sub', 'Delete ' + what + '? '));
+            var yes = el('button', 'small danger', 'Yes'), no = el('button', 'small', 'Cancel');
+            td.appendChild(yes); td.appendChild(document.createTextNode(' ')); td.appendChild(no);
+            no.onclick = idle;
+            yes.onclick = function () {
+              yes.disabled = no.disabled = true;
+              api('DELETE', path, params).then(function (r) {
+                if (!r.ok) { idle(); return toast(r.body.error, true); }
+                toast((label ? label + 'd: ' : 'Deleted ') + what.split(' (')[0].replace(' and its files', '')); nsList = null; gone();
+              });
+            };
+          };
+        }
+        idle(); return td;
+      }
       function invite() {
         if (!who.value.trim()) return who.focus();
         var p = {catalog: name, grantee: who.value.trim(), access: acc.value};
@@ -269,15 +330,13 @@
         api('GET', '/shares', {catalog: name}).then(function (r) {
           stab.innerHTML = '';
           if (!r.ok) return toast(r.body.error, true);
-          if (!r.body.length) { var e = el('tr'); e.appendChild(el('td', 'sub', 'No one yet.')); stab.appendChild(e); return; }
+          if (!r.body.length) { var e = el('tr'); e.appendChild(el('td', 'sub', 'Not shared with anyone yet.')); stab.appendChild(e); return; }
           stab.innerHTML = '<tr><th>Member</th><th>What</th><th>Access</th><th></th></tr>';
           r.body.forEach(function (s) {
             var tr = el('tr'); tr.appendChild(el('td', null, s.grantees.join(', ')));
             tr.appendChild(el('td', null, what(s) + (info.default && (s.scope === 'lake' || !s.namespace) ? ' + your files' : '')));
             var a = el('td'); a.appendChild(el('span', 'tag ' + s.access, s.access === 'write' ? 'read + write' : 'read')); tr.appendChild(a);
-            var td = el('td', 'r'), b = el('button', 'small danger', 'Revoke'); td.appendChild(b); tr.appendChild(td);
-            b.onclick = function () { api('DELETE', '/shares', {catalog: name, role: s.role}).then(function (x) {
-              x.ok ? (toast('Revoked'), shares()) : toast(x.body.error, true); }); };
+            tr.appendChild(del(s.grantees.join(', ') + '\'s access', '/shares', {catalog: name, role: s.role}, shares, null, 'Revoke'));
             stab.appendChild(tr);
           });
         });

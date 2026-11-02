@@ -56,7 +56,7 @@ spec:
             # OLTP — ShopFlow (Postgres)
             - { name: SQLPAD_CONNECTIONS__shopflow__name,     value: "ShopFlow — OLTP (Postgres)" }
             - { name: SQLPAD_CONNECTIONS__shopflow__driver,   value: "postgres" }
-            - { name: SQLPAD_CONNECTIONS__shopflow__host,     value: "postgres" }
+            - { name: SQLPAD_CONNECTIONS__shopflow__host,     value: "lab-db" }
             - { name: SQLPAD_CONNECTIONS__shopflow__port,     value: "5432" }
             - { name: SQLPAD_CONNECTIONS__shopflow__database, value: "shopflow" }
             - { name: SQLPAD_CONNECTIONS__shopflow__username, value: "learner" }
@@ -64,11 +64,35 @@ spec:
             # OLTP — AdventureWorks (Postgres)
             - { name: SQLPAD_CONNECTIONS__adventureworks__name,     value: "AdventureWorks — OLTP (Postgres)" }
             - { name: SQLPAD_CONNECTIONS__adventureworks__driver,   value: "postgres" }
-            - { name: SQLPAD_CONNECTIONS__adventureworks__host,     value: "postgres" }
+            - { name: SQLPAD_CONNECTIONS__adventureworks__host,     value: "lab-db" }
             - { name: SQLPAD_CONNECTIONS__adventureworks__port,     value: "5432" }
             - { name: SQLPAD_CONNECTIONS__adventureworks__database, value: "adventureworks" }
             - { name: SQLPAD_CONNECTIONS__adventureworks__username, value: "learner" }
             - { name: SQLPAD_CONNECTIONS__adventureworks__password, value: "learner" }
+{{- if .Values.labDb.enabled }}
+            # Tidewell's live systems (lab-db, kept changing by cdc-sim; read only) — Capstone 3
+            - { name: SQLPAD_CONNECTIONS__liveshop__name, value: "Tidewell web shop (Postgres)" }
+            - { name: SQLPAD_CONNECTIONS__liveshop__driver, value: "postgres" }
+            - { name: SQLPAD_CONNECTIONS__liveshop__host, value: "lab-db" }
+            - { name: SQLPAD_CONNECTIONS__liveshop__port, value: "5432" }
+            - { name: SQLPAD_CONNECTIONS__liveshop__database, value: "shop" }
+            - { name: SQLPAD_CONNECTIONS__liveshop__username, value: "reader" }
+            - { name: SQLPAD_CONNECTIONS__liveshop__password, value: "reader" }
+            - { name: SQLPAD_CONNECTIONS__livestore__name, value: "Tidewell stores (Postgres)" }
+            - { name: SQLPAD_CONNECTIONS__livestore__driver, value: "postgres" }
+            - { name: SQLPAD_CONNECTIONS__livestore__host, value: "lab-db" }
+            - { name: SQLPAD_CONNECTIONS__livestore__port, value: "5432" }
+            - { name: SQLPAD_CONNECTIONS__livestore__database, value: "store" }
+            - { name: SQLPAD_CONNECTIONS__livestore__username, value: "reader" }
+            - { name: SQLPAD_CONNECTIONS__livestore__password, value: "reader" }
+            - { name: SQLPAD_CONNECTIONS__liveloyalty__name, value: "Tidewell loyalty (Postgres)" }
+            - { name: SQLPAD_CONNECTIONS__liveloyalty__driver, value: "postgres" }
+            - { name: SQLPAD_CONNECTIONS__liveloyalty__host, value: "lab-db" }
+            - { name: SQLPAD_CONNECTIONS__liveloyalty__port, value: "5432" }
+            - { name: SQLPAD_CONNECTIONS__liveloyalty__database, value: "loyalty" }
+            - { name: SQLPAD_CONNECTIONS__liveloyalty__username, value: "reader" }
+            - { name: SQLPAD_CONNECTIONS__liveloyalty__password, value: "reader" }
+{{- end }}
             # OLAP — Lakehouse (Trino / Iceberg)
           ports:
             - { name: http, containerPort: 3000 }
