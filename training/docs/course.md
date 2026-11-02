@@ -127,17 +127,9 @@ platform already knowing *why* things work — not just which buttons to press.
 
     ---
 
-    Prove it end to end — two projects, easy and medium.
+    Prove it end to end — three projects: easy, medium, and hard (Tidewell's data platform, on live data).
 
     [{count:capstones/capstone-1.md} projects →](capstones/capstone-1.md)
-
--   🌊 **Unit {unit:project/index.md} · Project: Tidewell's data platform**
-
-    ---
-
-    Be a retailer's first data engineer: three live systems that disagree (web shop, store tills, loyalty card) → CDC → one company in Silver → Gold, scheduled, on a dashboard, with checks. No answer key.
-
-    [{count:project/index.md} milestones →](project/index.md)
 
 -   🏛️ **Unit {unit:datavault/what-is-data-vault.md} · Data Vault 2.0**
 

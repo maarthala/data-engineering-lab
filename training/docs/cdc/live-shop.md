@@ -31,7 +31,7 @@ with it, read with the same `reader` / `reader` login and ready for CDC:
 
 A web order by a card member earns points in `loyalty`, and so does a store sale with a card.
 Joining the three into one view of customers and sales is classic data engineering: matching
-keys, units and time zones. That's the [Tidewell project](../project/index.md): the three systems
+keys, units and time zones. That's [Capstone 3](../capstones/capstone-3.md): the three systems
 belong to a retailer called Tidewell. 🐘 **My databases** shows all three with their tables.
 
 ## Lab
