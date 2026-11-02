@@ -64,6 +64,14 @@ platform already knowing *why* things work — not just which buttons to press.
 
     [{count:unit5/basics.md} lessons →](unit5/basics.md)
 
+-   📡 **Unit {unit:cdc/what-is-cdc.md} · Change data capture (Ingestion)**
+
+    ---
+
+    Copy a live database into the lake with CDC — snapshot, inserts, updates, deletes — and build Silver and Gold on it.
+
+    [{count:cdc/what-is-cdc.md} lessons →](cdc/what-is-cdc.md)
+
 -   🧱 **Unit {unit:dbt/why-dbt.md} · Transform with dbt**
 
     ---

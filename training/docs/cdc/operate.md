@@ -1,0 +1,96 @@
+# Run it for real: schedules, costs and clean-up
+
+## Concept
+A sync you click by hand is a demo. A sync that runs by itself, that you can trust and that
+cleans up after itself is a pipeline. This lesson covers the decisions that make the difference.
+
+### CDC or full reload?
+| Use **Full load + CDC** when… | Use **Full reload** when… |
+|---|---|
+| tables are big and change a little at a time | tables are small (a few thousand rows) |
+| you need deletes to reach the lake | the database can't do CDC (`wal_level` isn't `logical`, or the login can't replicate) |
+| the source should feel as little load as possible | the source's CDC is already used by another job |
+| you want the lake minutes behind the source | once a day is fresh enough |
+
+### What a replication slot costs
+A slot makes Postgres **keep** the change log until the slot's reader has read it. That is
+what makes CDC lossless, and also its main risk:
+
+- A job that **runs** often keeps its slot near the end of the log: little is kept.
+- A job that is **paused**, failing or deleted *without* its source keeps the slot standing
+  still, and the log piles up on the database server's disk.
+- The lab's shop caps this with `max_slot_wal_keep_size = 1GB`. Past that, Postgres drops the
+  oldest log, and the slot can no longer continue where it stopped: the job has to start again
+  with a full load.
+
+On a real production database, a forgotten slot that fills the disk is a well-known way to
+take the database down. That's why the database team watches slots, and why you tidy up.
+
+## Lab
+### 1 · Put the job on a schedule
+On your job's page, set **Schedule** to **Every 15 min**. That's all: the lab runs it every
+15 minutes from now on. Other choices are **Hourly** and **Daily**; **Manual** means only
+**Run now**.
+
+After half an hour, look at **Runs**: two scheduled runs (trigger *schedule*), each a few hundred
+records at most. Rebuild Silver from the last lesson and the gap to the shop is never more
+than one schedule interval.
+
+- **Pause schedule** stops the scheduled runs; **Run now** still works. Remember the slot keeps
+  the log while you pause. Pause for hours, not weeks.
+- Ingestion's schedule only copies. If Silver and Gold should be rebuilt after each copy,
+  that's a job for [Airflow](../unit5/basics.md): one DAG that runs the notebook steps on its
+  own schedule, after the copy.
+
+### 2 · When a run fails
+Open the run's **Log**. The usual causes:
+
+| In the log | Cause | Fix |
+|---|---|---|
+| `password authentication failed` | the source's password changed | **Sources → Edit**, type the new password, **Save** |
+| `wal_level is not 'logical'` | the database can't do CDC | make the job a **Full reload**, or ask for `wal_level = logical` |
+| an error about the **replication slot** | the slot was dropped, or lost its log (the 1 GB cap) | **Check** the source (it makes a new slot), then recreate the job |
+| `this job is running already` (on **Run now**) | a run is still busy | wait; one run at a time per job |
+
+### 3 · Clean up in the right order
+Each piece you made leaves something behind. Delete them in this order:
+
+1. **The job** (**Delete job** on its page). Its runs go with it. Its **tables stay** in your
+   lakehouse: they're your data now.
+2. **The source**, if you no longer need it. Deleting a CDC source **drops its replication
+   slot** in the shop, so the shop stops keeping log for you.
+3. **The destination**, if you no longer need it. Only the setting goes; it holds no data.
+4. **The tables**, if you don't want them: **My catalogs → your lakehouse → `shop_cdc`** →
+   🗑 next to each table (it deletes the table and its files), then 🗑 on the empty namespace.
+   Or in SQL: `DROP TABLE my.shop_cdc.orders PURGE`.
+
+!!! warning "Don't delete the files by hand"
+    Deleting a table's folder in **My files** removes the files but leaves the table registered
+    in the catalog, broken. Always drop tables through the catalog (🗑 in My catalogs, or
+    `DROP TABLE`).
+
+## Challenge
+The shop's manager wants a small **"orders today"** report that is never more than 15 minutes
+old.
+
+1. Make sure your job runs **Every 15 min**.
+2. Build a Gold table `my.gold.shop_orders_today` with one row per status: the number of orders
+   **created today** and their total value. Build it from Silver, not from Bronze.
+3. Add a column `as_of`: the latest `_olake_timestamp` in Bronze `orders`. That's the moment
+   the data is from, which is not the same as the moment you ran the query.
+4. Run the job, rebuild Silver and Gold, and compare `placed` with the shop's own count of
+   today's placed orders. Explain the difference.
+5. Bonus: find one order that was **cancelled today** using only the lake. (Hint: tombstones
+   keep the key and `_cdc_timestamp`.)
+
+??? tip "Hints"
+    - `to_date(created_at) = current_date()` keeps today's orders.
+    - `max(_olake_timestamp)` from `my.shop_cdc.orders` gives `as_of`. `CROSS JOIN` that one-row
+      result onto your status counts.
+    - Cancelled today: `_op_type = 'd' AND to_date(_cdc_timestamp) = current_date()`.
+
+## You can now…
+- choose between CDC and full reload for a source;
+- explain what a replication slot costs and why paused or forgotten slots are dangerous;
+- schedule a job, read a failed run, and clean up job, source, destination and tables in the
+  right order.
