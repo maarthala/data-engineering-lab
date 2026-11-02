@@ -38,8 +38,6 @@ JDBC. Example: `SELECT count(*) FROM shopflow.public.orders` → 40000.
 !!! note "What else lives on lab-db — and what doesn't"
     `lab-db` also holds `adventureworks` (another sample company), `shop` (the live shop for
     📡 Ingestion) and members' own databases. 🐘 **My databases** lists them all with their tables.
-    The tools' own databases (`polarisdb`, `keycloak`, `airflow`, `superset`, `portal`) are on a
-    separate server, `postgres`, that members don't use.
 
 ## 2. RustFS — the data lake (object storage)
 

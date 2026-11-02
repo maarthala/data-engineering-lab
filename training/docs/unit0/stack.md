@@ -38,7 +38,6 @@ flowchart TB
   subgraph DATA["State — storage"]
     MIN[(RustFS<br/>lakehouse + raw files)]
     LDB[(lab-db<br/>source databases)]
-    PGS[(Postgres<br/>metastores)]
     RDS[(Redis<br/>Superset cache)]
   end
 
@@ -51,18 +50,15 @@ flowchart TB
   JUP --> SC
   SUP -->|SQL| TR
 
-  POL -->|persist| PGS
   POL -->|vends S3 creds for| MIN
   TR --> MIN
   SM --> MIN
   SC --> MIN
-  TR -->|source| PGS
-  AF --> PGS
-  SUP --> PGS & RDS
+  TR -->|source| LDB
+  SUP --> RDS
 ```
 
-Everything points at **three stores** (RustFS for tables, `lab-db` for the source databases, Postgres
-for the tools' own metadata),
+Everything points at **two stores** (RustFS for tables, `lab-db` for the source databases),
 with **Polaris** as the single catalog that every engine consults before touching a table.
 
 ## Components
@@ -72,16 +68,15 @@ with **Polaris** as the single catalog that every engine consults before touchin
 |---|---|---|
 | **RustFS** | S3-compatible object store — the lakehouse (in-stack name `storage:9000`) | shared Iceberg tables + raw history (`demo-bucket/…`), and each member's bucket `<user>-lake` (their lakehouse, notebooks, DAGs; 100 MB) |
 | **lab-db** | The members' PostgreSQL server | the source databases **`shopflow`** and **`adventureworks`** (login `learner`, read only), the live shop for CDC, and members' own databases (🐘 My databases) |
-| **Postgres** | The platform's PostgreSQL server | **metastores** for Polaris (`polarisdb`), Keycloak, Airflow, Superset, the portal — never member data |
 | **Redis** | In-memory store | **Superset's** cache & async query results (Airflow uses LocalExecutor — no broker needed) |
 
 ### Governance — one catalog for all engines
 | Service | What it is |
 |---|---|
-| **Apache Polaris** | The Iceberg **REST catalog** + **RBAC**. Engines ask it "does this principal may read/write this table?", and it **vends short-lived storage credentials** for the ones allowed. Accepts Polaris client id/secret logins *and* lab-account (Keycloak) tokens. Metadata persists to Postgres (`polarisdb`). |
+| **Apache Polaris** | The Iceberg **REST catalog** + **RBAC**. Engines ask it "does this principal may read/write this table?", and it **vends short-lived storage credentials** for the ones allowed. Accepts Polaris client id/secret logins *and* lab-account (Keycloak) tokens. Keeps its catalog in its own database. |
 | **polaris-console** | The catalog's **web UI** (a single-page app) — browse catalogs/namespaces/tables, manage principals, roles, and grants. |
 | **polaris-proxy** | A tiny nginx front that serves the Console at `/` and proxies the API at `/api` on **one origin** (`:8189`), so the browser makes no cross-origin calls. *(On k8s the ingress does this same-origin routing instead.)* |
-| **polaris-bootstrap** | A **one-shot** job that creates Polaris's schema + realm in Postgres on first start. Runs once, then exits. |
+| **polaris-bootstrap** | A **one-shot** job that creates Polaris's schema + realm on first start. Runs once, then exits. |
 
 ### Accounts & your workspace
 | Service | What it is |
@@ -94,7 +89,7 @@ with **Polaris** as the single catalog that every engine consults before touchin
 ### Engines — SQL and Spark
 | Service | What it is |
 |---|---|
-| **Trino** | Distributed **SQL engine**. Catalogs: **`iceberg`** (→ Polaris, the lakehouse), **`shopflow`** (→ Postgres source), `system`. Connects to Polaris as admin — it's the broad-access engine for the SQL units. |
+| **Trino** | Distributed **SQL engine**. Catalogs: **`iceberg`** (→ Polaris, the lakehouse), **`shopflow`** and **`adventureworks`** (→ `lab-db` sources), `system`. Connects to Polaris as admin — it's the broad-access engine for the SQL units. |
 | **spark-master** | Standalone Spark **cluster manager** — schedules jobs onto workers. |
 | **spark-worker** | The **executor** — runs the actual Spark tasks. |
 | **spark-connect** | A long-running **Spark Connect** server so notebooks/clients get a remote Spark session without bundling Spark themselves. |
@@ -102,9 +97,9 @@ with **Polaris** as the single catalog that every engine consults before touchin
 ### Orchestration & work
 | Service | What it is |
 |---|---|
-| **Airflow** | **Schedules** the pipeline (the `shopflow_medallion` DAG runs Bronze→Silver→Gold via `spark-submit`). Three processes: **apiserver** (UI/API), **scheduler**, **dag-processor**. Metadata in Postgres; **LocalExecutor**. On k8s, DAGs + shared `src/` arrive by **git-sync**. |
+| **Airflow** | **Schedules** the pipeline (the `shopflow_medallion` DAG runs Bronze→Silver→Gold via `spark-submit`). Three processes: **apiserver** (UI/API), **scheduler**, **dag-processor**. **LocalExecutor**. On k8s, DAGs + shared `src/` arrive by **git-sync**. |
 | **Jupyter** | **Notebooks** for exploration and the Spark labs — wired to Spark Connect and the `my` catalog. |
-| **Superset** | **BI dashboards** on the Gold layer — queries via Trino, caches in Redis, stores its own metadata in Postgres. |
+| **Superset** | **BI dashboards** on the Gold layer — queries via Trino, caches in Redis. |
 | **home** | The **landing portal** (nginx) — one page linking every UI. Start here. |
 
 ## Access & ports
@@ -135,8 +130,7 @@ single sign-on, register on the home portal) for every tool; see [0.3](../setup/
     with their own lab account, and use PostgreSQL as `learner` / `learner`.
 
 Internal wiring uses service names on a shared network: `polaris:8181`, `storage:9000`,
-`postgres:5432` (the platform's databases), `lab-db:5432` (ShopFlow, AdventureWorks, the live
-shop and members' own databases), `spark://spark-master:7077`, `sc://spark-connect:15002`.
+`lab-db:5432` (ShopFlow, AdventureWorks, the live shop and members' own databases), `spark://spark-master:7077`, `sc://spark-connect:15002`.
 
 ## Persistence
 
@@ -144,8 +138,8 @@ State survives restarts; only a deliberate teardown wipes it.
 
 - **RustFS volume** — all lakehouse tables + raw files + every member's bucket.
 - **lab-db volume** — the source databases and members' own databases.
-- **Postgres volume** — every metastore (incl. Polaris' `polarisdb`, so the catalog,
-  principals, and grants persist).
+- **The tools' own settings** (Polaris's catalog, principals and grants, Airflow, Superset) —
+  kept by the platform, not something members connect to.
 - **Each member's Jupyter work volume** (and the Hub's own small database), Spark working dirs,
   and Superset's home.
 
@@ -161,7 +155,7 @@ On Compose these are named Docker volumes; on k8s they're PersistentVolumeClaims
 | Code/DAGs | bind-mounted from `local/code` | **git-sync** of the shared repo (DAGs + `src/`) |
 | Images | built/pulled locally | imported to the node (`microk8s images import`) |
 | Config | compose files + `configs/` | Helm chart `de-stack` (values + templates) |
-| Postgres | a stack container | in-cluster Postgres |
+| lab-db | a stack container | a service in the cluster |
 
 Pick your setup on the [deploy page](../setup/deploy/index.md) — the
 lakehouse, the catalog, and the lessons are identical either way.
@@ -179,5 +173,5 @@ but disabled by default (re-enable if a lesson needs them):
 ## You can now…
 - Name **every service** in the stack and what it's responsible for
 - Explain how engines reach data: **catalog via Polaris**, **bytes via RustFS**, gated by **grants**
-- Say **where state lives** (RustFS + Postgres) and what survives a restart
+- Say **where state lives** (RustFS + lab-db) and what survives a restart
 - Describe how the **same stack** maps from Docker Compose to Kubernetes

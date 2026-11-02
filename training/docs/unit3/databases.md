@@ -66,8 +66,7 @@ customers
     · `learner:learner` → *username*`:`*password* — the course's database login: it reads the
       shared ShopFlow / AdventureWorks tables, read only (a database of your own, where you may
       create tables: 🐘 My databases)
-    · `@lab-db:5432` → *host*`:`*port* (`lab-db` is the lab's database server for members; the
-      platform's own Postgres, with Keycloak, Polaris and the portal, is a separate one)
+    · `@lab-db:5432` → *host*`:`*port* (`lab-db` is the lab's database server for members)
     · `/shopflow` → the *database* to connect to.
 
 - **`pg = ...`** — store the engine in `pg`. This is now your handle to the ShopFlow database,
