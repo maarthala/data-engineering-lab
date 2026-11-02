@@ -64,6 +64,7 @@ integration-level updates (like AdventureWorks or SQLPad) get an entry.
 
 | Date | Release / integration | What it adds | Scope |
 |---|---|---|---|
+| 2026-11-02 | **Ingestion: history mode (v1.7.0)** | A third job mode, *Full load + every change (history)*: every insert, update and delete lands as its own row (OLake append mode), the source for SCD2 in Silver; destinations create their namespace straight away | local · k8s |
 | 2026-11-02 | **Ingestion (CDC), My databases, Tidewell (v1.6.0)** | 📡 Ingestion: copy Postgres / MySQL / SQL Server tables into your lakehouse with OLake (full load + CDC, schedules); `lab-db`, the members' own Postgres: ShopFlow, AdventureWorks, Tidewell's three live systems (web shop, store tills, loyalty) and 🐘 My databases (your own databases, SQL editor connection); course unit Change data capture and Capstone 3 (Tidewell, with a 2-year archive download); My catalogs: create / delete namespaces and tables | local · k8s |
 | 2026-11-01 | **Mock exams: DE lab exams (v1.5.0)** | ⟳ Sync DE exams loads the course chapters' free banks from GitHub; enable / disable and soft delete exams; mark for review; domains and tags; search and lazy loading | local · k8s |
 | 2026-10-30 | **Mock exams: question banks (v1.4.0)** | Exams hold several banks; re-uploads update questions with versions; add by encrypted file, link or own file (template); upload checks with reasons; second try in the review | local · k8s |
