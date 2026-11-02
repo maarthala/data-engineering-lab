@@ -1,4 +1,4 @@
-"""labcdc — "📡 Data sync (CDC)": a member copies tables from their own database (Postgres, MySQL or
+"""labcdc — "📡 Ingestion (CDC)": a member copies tables from their own database (Postgres, MySQL or
 SQL Server) into their lakehouse
 — a full load, then every insert / update / delete (change data capture) on a schedule.
 

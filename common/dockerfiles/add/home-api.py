@@ -62,7 +62,7 @@ go (leaving = pause), the review comes after submitting. Changes need the X-Lab-
   POST   /api/exams/answer {"attempt", "qid", "keys" | "slots", "position"}   save one answer
                          {"attempt", "qid", "mark": true | false}           mark it for review (or not)
   POST   /api/exams/submit {"attempt"}                   mark it → the review
-"📡 Data sync (CDC)" — a member's own Postgres → their lakehouse (labcdc.py; cdc-runner does the work):
+"📡 Ingestion (CDC)" — a member's own Postgres → their lakehouse (labcdc.py; cdc-runner does the work):
   GET    /api/cdc                                        my sources, destinations, jobs (+ last run), my catalogs
   POST   /api/cdc/sources {"id"?, "name", "host", "port", "database", "username", "password", "schemas", "cdc"}
          …/sources/check · …/sources/tables · …/sources/delete {"id"}      → a task (check / list tables)
@@ -384,7 +384,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(500, {"error": str(e)})
 
     def _cdc(self, method):
-        """📡 Data sync (CDC) — /api/cdc*, always the logged-in member's own sources, destinations
+        """📡 Ingestion (CDC) — /api/cdc*, always the logged-in member's own sources, destinations
         and jobs (labcdc.py); the work itself is done by cdc-runner."""
         path, q = self._route()
         user = self._user()

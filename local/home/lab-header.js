@@ -8,6 +8,7 @@
   var host = location.hostname, k8s = /(^|\.)de\.lan$/.test(host);
   function url(sub, unusedPort, path) { return 'http://' + sub + '.' + location.host + (path || ''); }
   var TOOLS = window.LAB_TOOLS = {
+    sync:       {name: 'Ingestion', what: 'Copy tables from your databases (CDC, OLake)', page: '/cdc.html'},   // a portal page
     jupyter:    {name: 'Notebooks', what: 'Jupyter', svc: 'jupyter', url: url('jupyter', 8008)},
     sqlpad:     {name: 'SQL editor', what: 'SQLPad', svc: 'sqlpad', url: url('sqlpad', 8003, '/auth/oidc')},
     airflow:    {name: 'Pipelines', what: 'Airflow', svc: 'airflow', url: url('airflow', 8001)},
@@ -42,8 +43,7 @@
   function svg(k) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (I[k] || '') + '</svg>'; }
 
   var WORK = [['/', 'home', 'Home'], ['/files.html', 'files', 'My files'], ['/catalogs.html', 'catalogs', 'My catalogs'],
-              ['/secrets.html', 'secrets', 'My secrets'], ['/exams.html', 'exams', 'Mock exams'],
-              ['/cdc.html', 'sync', 'Data sync']];
+              ['/secrets.html', 'secrets', 'My secrets'], ['/exams.html', 'exams', 'Mock exams']];
   var MANAGE = [['/manage.html', 'members', 'Members'], ['/teams.html', 'teams', 'Teams'], ['/activity.html', 'activity', 'Activity'],
                 ['/exams-admin.html', 'exams', 'Exams'], ['/settings.html', 'settings', 'Settings']];
   var path = location.pathname.replace(/\/+$/, '') || '/';
@@ -55,6 +55,8 @@
   }
   function title() {
     if (tool && TOOLS[tool]) return ['Tools', TOOLS[tool].name];
+    var p = Object.keys(TOOLS).filter(function (k) { return TOOLS[k].page === path; })[0];
+    if (p) return ['Tools', TOOLS[p].name];
     var w = WORK.filter(function (x) { return x[0] === path; })[0];
     if (w) return ['Workspace', w[2]];
     var m = MANAGE.filter(function (x) { return x[0] === path; })[0];
@@ -69,7 +71,8 @@
     '<div class="grp"><h6>Workspace</h6>' + WORK.map(function (x) { return item(x[0], x[1], x[2], x[0] === path); }).join('') + '</div>' +
     '<div class="grp"><h6>Tools</h6>' + Object.keys(TOOLS).map(function (k) {
       var t = TOOLS[k];
-      return item(t.external ? t.url : '/tool.html#' + k, k, t.name + (t.external ? ' <span class="ext">↗</span>' : ''), tool === k,
+      return item(t.page || (t.external ? t.url : '/tool.html#' + k), k, t.name + (t.external ? ' <span class="ext">↗</span>' : ''),
+                  tool === k || t.page === path,
                   ' data-tool="' + k + '"' + (t.managers ? ' data-mgr hidden' : '') + (t.external ? ' target="_blank" rel="noopener"' : '') + ' title="' + t.what + '"');
     }).join('') + '</div>' +
     '<div class="grp" id="lab-nav-manage" hidden><h6>Manage</h6>' + MANAGE.map(function (x) { return item(x[0], x[1], x[2], x[0] === path); }).join('') + '</div>' +

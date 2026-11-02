@@ -1,4 +1,4 @@
-"""cdc-runner — does the work of "📡 Data sync (CDC)" (labcdc.py): picks up cdc_tasks rows and starts
+"""cdc-runner — does the work of "📡 Ingestion (CDC)" (labcdc.py): picks up cdc_tasks rows and starts
 the due scheduled jobs, each as one OLake engine container (olakego/source-<postgres|mysql|mssql>):
   check_source       the connection (+ what CDC still needs); Postgres with CDC on: first makes the
                      publication + replication slot

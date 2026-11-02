@@ -1,5 +1,5 @@
 """cdc-sim — keeps the lab's live shop database (cdc-db) changing, so members can watch change data
-capture at work in "📡 Data sync": every few seconds (random) one change, like a small web shop —
+capture at work in "📡 Ingestion": every few seconds (random) one change, like a small web shop —
   a new customer · a new order (+ items) · an order moves on (placed → paid → shipped → delivered)
   · an order is cancelled (deleted, with its items) · a price changes · a customer changes tier
 It keeps the tables small (the oldest delivered orders go), so the database doesn't grow for ever.

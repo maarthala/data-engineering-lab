@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Data sync — Epireum's Data Engineering Lab</title>
+  <title>Ingestion — Epireum's Data Engineering Lab</title>
   <link rel="stylesheet" href="/admin.css?v=8">
   <style>
     main{max-width:none}
@@ -49,11 +49,11 @@
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=13"></script>
-  <div class="pagebar"><h1>📡 Data sync <span class="dot">·</span> copy tables from your databases into your lakehouse</h1></div>
+  <script src="/lab-header.js?v=14"></script>
+  <div class="pagebar"><h1>📡 Ingestion <span class="dot">·</span> copy tables from your databases into your lakehouse</h1></div>
   <main id="main"><div class="placeholder">Loading…</div></main>
   <script>
-    // 📡 Data sync (CDC) — a SOURCE is a database you can reach (PostgreSQL, MySQL, SQL Server); a
+    // 📡 Ingestion (CDC) — a SOURCE is a database you can reach (PostgreSQL, MySQL, SQL Server); a
     // DESTINATION is one of your lakehouse catalogs (+ a namespace); a JOB copies chosen tables from a
     // source to a destination: a full load, then — with CDC — only the inserts, updates and deletes
     // since the last run, on a schedule or when you press Run now. The work runs in the lab (OLake's
@@ -119,8 +119,8 @@
     function go(hash) { if (location.hash.slice(1) !== hash) history.pushState(null, '', '#' + hash); show(); }
     window.addEventListener('popstate', show);
     function link(text, hash, cls) { return on(el('a', {text: text, class: cls || ''}), 'click', function () { go(hash); }); }
-    function crumbs(parts) {                            // Data sync › Jobs › New job
-      var c = el('div', {class: 'crumbs'}, [link('Data sync', 'jobs')]);
+    function crumbs(parts) {                            // Ingestion › Jobs › New job
+      var c = el('div', {class: 'crumbs'}, [link('Ingestion', 'jobs')]);
       parts.forEach(function (p, i) { c.appendChild(document.createTextNode('›')); c.appendChild(i === parts.length - 1 ? el('b', {text: p[0]}) : link(p[0], p[1])); });
       return c;
     }
