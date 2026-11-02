@@ -44,6 +44,7 @@ markdown_extensions:
   - pymdownx.snippets
   - attr_list
   - md_in_html
+  - pymdownx.tasklist: { custom_checkbox: true }
   - tables
   - toc: { permalink: true }
 
@@ -227,7 +228,7 @@ nav:
       - "Capstone 1 (easy)": capstones/capstone-1.md
       - "Capstone 2 (medium)": capstones/capstone-2.md
   - "Project: Tidewell's data platform":
-      - "The brief": project/index.md
+      - "Tidewell: the company and your assignment": project/index.md
       - "Land the three systems": project/ingest.md
       - "One company in Silver": project/silver.md
       - "Gold marts": project/gold.md
