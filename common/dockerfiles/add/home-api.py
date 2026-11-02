@@ -62,6 +62,14 @@ go (leaving = pause), the review comes after submitting. Changes need the X-Lab-
   POST   /api/exams/answer {"attempt", "qid", "keys" | "slots", "position"}   save one answer
                          {"attempt", "qid", "mark": true | false}           mark it for review (or not)
   POST   /api/exams/submit {"attempt"}                   mark it → the review
+"📡 Data sync (CDC)" — a member's own Postgres → their lakehouse (labcdc.py; cdc-runner does the work):
+  GET    /api/cdc                                        my sources, destinations, jobs (+ last run), my catalogs
+  POST   /api/cdc/sources {"id"?, "name", "host", "port", "database", "username", "password", "schemas", "cdc"}
+         …/sources/check · …/sources/tables · …/sources/delete {"id"}      → a task (check / list tables)
+  POST   /api/cdc/destinations {"id"?, "name", "catalog", "namespace"} · …/check · …/delete {"id"}
+  POST   /api/cdc/jobs {"name", "source", "destination", "discover", "tables", "mode", "schedule"}
+         …/jobs/run · …/jobs/delete {"id"} · …/jobs/set {"id", "enabled"?, "schedule"?}
+  GET    /api/cdc/task?id=… · /api/cdc/runs?job=… · /api/cdc/run?id=… (its log)
 Managers (/api/admin/exams…, X-Lab-Admin): create an exam; add encrypted banks + their key to it
 (decrypted here, the key isn't kept), a link or a plain file, or a plain exam.json; set
 questions / pass mark / who may take it; delete.
@@ -107,6 +115,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import labadmin
+import labcdc
 import labexams
 import lakehouse as lh
 import labvault
@@ -372,6 +381,54 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(404 if e.code == 404 else 502, {"error": f"storage: HTTP {e.code}"})
         except Exception as e:                       # show it on the page, don't crash
             return self._json(500, {"error": str(e)})
+
+    def _cdc(self, method):
+        """📡 Data sync (CDC) — /api/cdc*, always the logged-in member's own sources, destinations
+        and jobs (labcdc.py); the work itself is done by cdc-runner."""
+        path, q = self._route()
+        user = self._user()
+        if not user:
+            return self._json(401, {"error": "not logged in"})
+        name = lake_name(user)
+        try:
+            self._ensure(name)
+            cats = [c["name"] for c in lh.my_catalogs(name)["owned"]] if path in ("/api/cdc", "/api/cdc/destinations") else []
+            if method == "GET":
+                if path == "/api/cdc":
+                    labcdc.ensure_default_destination(name, f"{name}_lake")
+                    return self._json(200, labcdc.overview(name, cats))
+                if path == "/api/cdc/task":
+                    return self._json(200, labcdc.task(name, q.get("id", "0")))
+                if path == "/api/cdc/runs":
+                    return self._json(200, labcdc.runs(name, q.get("job", "0")))
+                if path == "/api/cdc/run":
+                    return self._json(200, labcdc.run_log(name, q.get("id", "0")))
+                return self._json(404, {"error": "not found"})
+            if method != "POST":
+                return self._json(404, {"error": "not found"})
+            if self.headers.get("X-Lab-Request") != "1":
+                return self._json(403, {"error": "missing X-Lab-Request header"})
+            b = self._body()
+            calls = {
+                "/api/cdc/sources": lambda: labcdc.save_source(name, b),
+                "/api/cdc/sources/delete": lambda: labcdc.delete_source(name, b.get("id", 0)),
+                "/api/cdc/sources/check": lambda: {"task": labcdc.queue(name, "check_source", labcdc._own("cdc_sources", name, b.get("id", 0))["id"])},
+                "/api/cdc/sources/tables": lambda: labcdc.discover(name, b.get("id", 0)),
+                "/api/cdc/destinations": lambda: labcdc.save_destination(name, b, cats),
+                "/api/cdc/destinations/delete": lambda: labcdc.delete_destination(name, b.get("id", 0)),
+                "/api/cdc/destinations/check": lambda: {"task": labcdc.queue(name, "check_destination", labcdc._own("cdc_destinations", name, b.get("id", 0))["id"])},
+                "/api/cdc/jobs": lambda: labcdc.create_job(name, b),
+                "/api/cdc/jobs/run": lambda: labcdc.run_job(name, b.get("id", 0)),
+                "/api/cdc/jobs/set": lambda: labcdc.set_job(name, b.get("id", 0), b.get("enabled"), b.get("schedule")),
+                "/api/cdc/jobs/delete": lambda: labcdc.delete_job(name, b.get("id", 0)),
+            }
+            if path not in calls:
+                return self._json(404, {"error": "not found"})
+            return self._json(200, calls[path]())
+        except PermissionError as e:
+            return self._json(403, {"error": str(e)})
+        except (labcdc.CdcError, ValueError, TypeError) as e:
+            return self._json(400, {"error": str(e)})
 
     def _catalogs(self, method):
         """All /api/catalogs* calls — always on behalf of the logged-in learner."""
@@ -726,6 +783,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._env(method)
         if self.path.startswith("/api/exams"):
             return self._exams(method)
+        if self.path.startswith("/api/cdc"):
+            return self._cdc(method)
         if self.path.startswith("/api/notebook"):
             return self._notebook(method)
         return self._files(method)
@@ -752,6 +811,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._env("GET")
         if self.path.startswith("/api/exams"):
             return self._exams("GET")
+        if self.path.startswith("/api/cdc"):
+            return self._cdc("GET")
         if self.path == "/api/notebook":
             return self._notebook("GET")
         if self.path == "/api/home":                     # 🏠 Home: the member's own overview

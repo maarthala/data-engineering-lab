@@ -1,0 +1,2 @@
+# Build context for Dockerfile.cdc-runner: it needs only add/ — not tmp/ (the jars from `make init`).
+tmp/

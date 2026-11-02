@@ -23,6 +23,7 @@
     files: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     catalogs: '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
     secrets: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>',
+    sync: '<path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/>',
     exams: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 11l2 2 4-4M9 17h6"/>',
     jupyter: '<path d="M4 5a1 1 0 0 1 1-1h11l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M8 13l2 2-2 2M12 17h4"/>',
     sqlpad: '<path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 6l-3 12"/>',
@@ -41,7 +42,8 @@
   function svg(k) { return '<svg viewBox="0 0 24 24" aria-hidden="true">' + (I[k] || '') + '</svg>'; }
 
   var WORK = [['/', 'home', 'Home'], ['/files.html', 'files', 'My files'], ['/catalogs.html', 'catalogs', 'My catalogs'],
-              ['/secrets.html', 'secrets', 'My secrets'], ['/exams.html', 'exams', 'Mock exams']];
+              ['/secrets.html', 'secrets', 'My secrets'], ['/exams.html', 'exams', 'Mock exams'],
+              ['/cdc.html', 'sync', 'Data sync']];
   var MANAGE = [['/manage.html', 'members', 'Members'], ['/teams.html', 'teams', 'Teams'], ['/activity.html', 'activity', 'Activity'],
                 ['/exams-admin.html', 'exams', 'Exams'], ['/settings.html', 'settings', 'Settings']];
   var path = location.pathname.replace(/\/+$/, '') || '/';

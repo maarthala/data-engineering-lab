@@ -676,6 +676,11 @@ def delete(user):
         labexams.forget_member(user)
     except Exception as e:  # noqa: BLE001 — no portal database (yet)
         print(f"[labadmin] exams {user}: {e}", flush=True)
+    try:                                                 # their data-sync sources, jobs, passwords
+        import labcdc
+        labcdc.forget(name)
+    except Exception as e:  # noqa: BLE001
+        print(f"[labadmin] cdc {user}: {e}", flush=True)
     try:                                                 # folders they shared / were shared
         lh.forget_folder_shares(name)
     except Exception as e:  # noqa: BLE001

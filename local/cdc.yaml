@@ -1,0 +1,38 @@
+services:
+  # 📡 Data sync (CDC) — members copy tables from their own Postgres into their lakehouse (full load,
+  # then inserts / updates / deletes). The portal page (cdc.html) and home-api keep the sources,
+  # destinations and jobs; this runner does the work: each check, table list and sync is one OLake
+  # engine container (olakego/source-postgres) on the stack's network, started through the Docker
+  # socket — a single-machine test stack, like Airflow running member tasks here.
+  cdc-runner:
+    build:
+      context: ../common/dockerfiles
+      dockerfile: Dockerfile.cdc-runner
+    container_name: cdc-runner
+    user: root                                   # the Docker socket
+    environment:
+      PORTAL_DB_URL: postgresql://portal:portal@postgres:5432/portal
+      POLARIS_URL: http://polaris:8181
+      LAKE_S3_ENDPOINT: http://storage:9000
+      AWS_ACCESS_KEY_ID: admin                   # mints a member's own storage key (lab_jobs)
+      AWS_SECRET_ACCESS_KEY: admin123
+      VAULT_ADDR: http://vault:8200
+      VAULT_ADMIN_TOKEN: ${VAULT_ADMIN_TOKEN:-lab-vault-admin-local-token}
+      CDC_IMAGE: olakego/source-postgres:v1.1.1
+      CDC_NETWORK: ${COMPOSE_PROJECT_NAME:-local}_sparknet
+      CDC_MEM_GB: "1.5"
+      CDC_WORKERS: "2"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # lab code mounted over the image's copies — edits need only a restart
+      - ../common/dockerfiles/add/lakehouse.py:/app/lakehouse.py:ro
+      - ../common/dockerfiles/add/labvault.py:/app/labvault.py:ro
+      - ../common/dockerfiles/add/lab_jobs.py:/app/lab_jobs.py:ro
+      - ../common/dockerfiles/add/labcdc.py:/app/labcdc.py:ro
+      - ../common/dockerfiles/add/cdc_runner.py:/app/cdc_runner.py:ro
+    depends_on:
+      portal-db:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - sparknet
