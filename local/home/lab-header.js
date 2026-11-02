@@ -1,4 +1,4 @@
-// The portal's frame — the same on every page: the left menu (Workspace · Tools · Manage) and the top
+// The portal's frame — the same on every page: the left menu (Workspace · Tools · Extras · Manage) and the top
 // bar (where you are, who's signed in, Log out). A page puts <header id="lab-top"></header> first in
 // <body>, loads /admin.css and this script. /api/me (home-api, behind the Keycloak login) also creates
 // the learner's lakehouse on first call; pages that need the same data listen for the "lab:me" event.
@@ -45,7 +45,8 @@
 
   var WORK = [['/', 'home', 'Home'], ['/files.html', 'files', 'My files'], ['/catalogs.html', 'catalogs', 'My catalogs'],
               ['/databases.html', 'databases', 'My databases'],
-              ['/secrets.html', 'secrets', 'My secrets'], ['/exams.html', 'exams', 'Mock exams']];
+              ['/secrets.html', 'secrets', 'My secrets']];
+  var EXTRAS = [['/exams.html', 'exams', 'Mock exams']];
   var MANAGE = [['/manage.html', 'members', 'Members'], ['/teams.html', 'teams', 'Teams'], ['/activity.html', 'activity', 'Activity'],
                 ['/exams-admin.html', 'exams', 'Exams'], ['/settings.html', 'settings', 'Settings']];
   var path = location.pathname.replace(/\/+$/, '') || '/';
@@ -61,6 +62,8 @@
     if (p) return ['Tools', TOOLS[p].name];
     var w = WORK.filter(function (x) { return x[0] === path; })[0];
     if (w) return ['Workspace', w[2]];
+    var x = EXTRAS.filter(function (e) { return e[0] === path; })[0];
+    if (x) return ['Extras', x[2]];
     var m = MANAGE.filter(function (x) { return x[0] === path; })[0];
     return m ? ['Manage', m[2]] : ['', document.title.split(' — ')[0]];
   }
@@ -77,6 +80,7 @@
                   tool === k || t.page === path,
                   ' data-tool="' + k + '"' + (t.managers ? ' data-mgr hidden' : '') + (t.external ? ' target="_blank" rel="noopener"' : '') + ' title="' + t.what + '"');
     }).join('') + '</div>' +
+    '<div class="grp"><h6>Extras</h6>' + EXTRAS.map(function (x) { return item(x[0], x[1], x[2], x[0] === path); }).join('') + '</div>' +
     '<div class="grp" id="lab-nav-manage" hidden><h6>Manage</h6>' + MANAGE.map(function (x) { return item(x[0], x[1], x[2], x[0] === path); }).join('') + '</div>' +
     '<div class="foot"><a href="https://maarthala.github.io/data-engineering-lab/" target="_blank" rel="noopener">Course ↗</a> · ' +
     '<a href="https://github.com/maarthala/data-engineering-lab#readme" target="_blank" rel="noopener">Docs ↗</a>' +
