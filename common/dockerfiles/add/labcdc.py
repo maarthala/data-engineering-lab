@@ -302,23 +302,18 @@ def save_destination(member, body, catalogs):
 
 
 def ensure_default_destination(member, catalog):
-    """Every member starts with one: "My lakehouse" → their own catalog, namespace cdc."""
+    """A member's first visit only: "My lakehouse" (their own catalog, namespace cdc) and the lab's live
+    shop as a source, CDC on (its replication slot is made by the first check or run, not before — no
+    slot for members who never use it). Once only, so deleting them sticks."""
+    if not _q("INSERT INTO portal_cdc_seen (member) VALUES (%s) ON CONFLICT DO NOTHING RETURNING member", (member,), one=True):
+        return
     if not _q("SELECT 1 FROM cdc_destinations WHERE member = %s", (member,), one=True):
         _q("INSERT INTO cdc_destinations (member, name, catalog, namespace) VALUES (%s, 'My lakehouse', %s, 'cdc') "
            "ON CONFLICT DO NOTHING", (member, catalog), rows=False)
-    ensure_lab_source(member)
-
-
-def ensure_lab_source(member):
-    """…and with the lab's live shop as a source, CDC on (its replication slot is made by the first
-    check or run, not before — no slot for members who never use it)."""
-    if not LAB_DB or _q("SELECT 1 FROM portal_cdc_seen WHERE member = %s", (member,), one=True):
+    if not LAB_DB or _q("SELECT 1 FROM cdc_sources WHERE member = %s AND name = 'Lab shop (live)'", (member,), one=True):
         return
     import urllib.parse
     u = urllib.parse.urlparse(LAB_DB)
-    _q("INSERT INTO portal_cdc_seen (member) VALUES (%s) ON CONFLICT DO NOTHING", (member,), rows=False)
-    if _q("SELECT 1 FROM cdc_sources WHERE member = %s AND name = 'Lab shop (live)'", (member,), one=True):
-        return
     sid = _q("INSERT INTO cdc_sources (member, name, kind, host, port, dbname, username, schemas, cdc, publication) "
              "VALUES (%s, 'Lab shop (live)', 'postgres', %s, %s, %s, %s, '{public}', true, 'olake_pub') RETURNING id",
              (member, u.hostname, u.port or 5432, u.path.lstrip("/"), urllib.parse.unquote(u.username or "")), one=True)["id"]
