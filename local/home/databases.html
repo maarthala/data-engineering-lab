@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My databases — Epireum's Data Engineering Lab</title>
+  <link rel="stylesheet" href="/admin.css?v=8">
+  <style>
+    body{display:flex; flex-direction:column; min-height:100vh}
+    a{color:inherit; text-decoration:none}
+    .app{flex:1; display:grid; grid-template-columns:290px 1fr; min-height:0}
+    aside{border-right:1px solid var(--line); background:var(--panel2); overflow:auto; padding:12px 10px}
+    .title{font-size:.75rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); padding:10px 8px 6px; display:flex; justify-content:space-between; align-items:center}
+    .db{display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:8px; cursor:pointer; color:var(--muted); font-size:.93rem}
+    .db:hover{background:rgba(109,139,255,.08); color:var(--ink)}
+    .db.active{background:rgba(109,139,255,.16); color:var(--ink); font-weight:600}
+    .tag{font-size:.68rem; padding:1px 7px; border-radius:999px; border:1px solid var(--line); color:var(--muted); margin-left:auto; white-space:nowrap}
+    .tag.read{border-color:rgba(57,208,196,.5); color:var(--accent2)} .tag.write{border-color:rgba(226,185,59,.55); color:var(--warn-ink)}
+    .newdb{display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:6px 8px} .newdb input{flex:1; min-width:90px}
+    .empty{color:var(--muted); padding:10px 9px; font-size:.88rem}
+    main{overflow:auto; padding:18px 22px; display:flex; flex-direction:column; gap:14px}
+    .card h2{margin:0 0 4px; font-size:1.15rem} .card h3{margin:0 0 10px; font-size:.95rem; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em}
+    .sub{color:var(--muted); font-size:.88rem}
+    .cardhead{display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap} .cardhead h3{margin:0}
+    .conn td:first-child{color:var(--muted); width:110px} .conn code{font-size:.88rem}
+    td.r{text-align:right; white-space:nowrap} td.r button + button{margin-left:4px}
+    td.num{text-align:right; color:var(--muted); font-variant-numeric:tabular-nums}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.86rem}
+    .acts{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; align-items:center}
+    .helpbtn{float:right} .helpbox{margin-top:12px; padding:12px; border:1px dashed var(--line); border-radius:9px; background:var(--panel2)}
+    .helpbox ol{margin:6px 0 10px 18px; padding:0} .helpbox li{margin:3px 0}
+    pre{margin:0 0 8px; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; overflow:auto; font-size:.86rem}
+    .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--panel2); border:1px solid var(--line);
+           padding:10px 16px; border-radius:10px; box-shadow:var(--shadow); display:none; z-index:10}
+    .toast.err{border-color:var(--danger); color:var(--bad-ink)}
+    .placeholder{color:var(--muted); padding:40px; text-align:center}
+    @media (max-width:760px){ .app{grid-template-columns:1fr} aside{max-height:35vh; border-right:0; border-bottom:1px solid var(--line)} }
+  </style>
+</head>
+<body>
+  <header id="lab-top"></header>
+  <script src="/lab-header.js?v=15"></script>
+  <div class="pagebar"><h1>🐘 My databases <span class="dot">·</span> the PostgreSQL databases you can use, and your own</h1></div>
+  <div class="app">
+    <aside>
+      <div class="title"><span>My databases</span><button class="small" id="new">＋ New</button></div>
+      <div id="newrow"></div>
+      <div id="mine"><div class="empty">Loading…</div></div>
+      <div class="title"><span>Lab databases</span></div>
+      <div id="shared"></div>
+    </aside>
+    <main id="main"><div class="placeholder">Loading…</div></main>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // Everything goes through /api/databases (home-api, labdb.py). The lab's databases are read only
+    // (a shared login each); yours are <you>_<name> on the lab's database server, owned by your own
+    // login — only you can connect, and the SQL editor gets a private connection to each.
+    var $ = function (id) { return document.getElementById(id); };
+    var state = {data: null, sel: null};
+    function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+    function toast(m, err) { var t = $('toast'); t.textContent = m; t.className = 'toast' + (err ? ' err' : ''); t.style.display = 'block';
+      clearTimeout(t._h); t._h = setTimeout(function () { t.style.display = 'none'; }, 3500); }
+    function api(method, path, body) {
+      return fetch('/api/databases' + path, {method: method, credentials: 'same-origin',
+          headers: body ? {'Content-Type': 'application/json', 'X-Lab-Request': '1'} : {},
+          body: body ? JSON.stringify(body) : undefined})
+        .then(function (r) { return r.json().then(function (j) { return {ok: r.ok, body: j}; }); });
+    }
+    function copyBtn(text, what) {
+      var b = el('button', 'small', '⧉'); b.title = 'Copy ' + (what || text);
+      b.onclick = function () {
+        (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(
+          function () { toast('Copied ' + (what || text)); }, function () { toast(text); });
+      };
+      return b;
+    }
+    function sqlEditor() { var b = el('button', 'primary small', 'Open SQL editor'); b.onclick = function () { location.href = '/tool.html#sqlpad'; }; return b; }
+
+    function load(select) {
+      return api('GET', '').then(function (r) {
+        if (!r.ok) { $('main').innerHTML = ''; return toast(r.body.error || 'could not load', true); }
+        state.data = r.body; sidebar();
+        var all = state.data.mine.concat(state.data.shared), want = select || decodeURIComponent(location.hash.slice(1));
+        var d = all.filter(function (x) { return x.key === want; })[0] || state.data.mine[0] || state.data.shared[0];
+        open(d.key);
+      });
+    }
+    function sidebar() {
+      var m = $('mine'); m.innerHTML = '';
+      if (!state.data.enabled) m.appendChild(el('div', 'empty', 'Own databases aren\'t set up on this lab.'));
+      else if (!state.data.mine.length) m.appendChild(el('div', 'empty', 'None yet — click ＋ New to make one (up to ' + state.data.limit + ').'));
+      state.data.mine.forEach(function (d) { m.appendChild(item(d, '🐘 ' + d.database, 'full access', 'write')); });
+      $('new').hidden = !state.data.enabled;
+      var s = $('shared'); s.innerHTML = '';
+      state.data.shared.forEach(function (d) { s.appendChild(item(d, '📚 ' + d.title, 'read only', 'read')); });
+    }
+    function item(d, label, tag, cls) {
+      var x = el('div', 'db'); x.appendChild(el('span', null, label)); x.appendChild(el('span', 'tag ' + cls, tag));
+      x.dataset.key = d.key; x.onclick = function () { open(d.key); }; return x;
+    }
+
+    function open(key) {
+      var mine = state.data.mine.filter(function (x) { return x.key === key; })[0];
+      var d = mine || state.data.shared.filter(function (x) { return x.key === key; })[0];
+      state.sel = key; history.replaceState(null, '', '#' + encodeURIComponent(key));
+      Array.prototype.forEach.call(document.querySelectorAll('.db'), function (x) { x.classList.toggle('active', x.dataset.key === key); });
+      var m = $('main'); m.innerHTML = '';
+
+      // header: what it is, how to connect, what you may do
+      var head = el('div', 'card');
+      head.appendChild(el('h2', null, (mine ? '🐘 ' + d.database : '📚 ' + d.title)));
+      head.appendChild(el('div', 'sub', mine ? 'Your own database — full access: create tables, write, drop. Only you can connect.'
+                                             : d.what + ' · read only (shared by everyone)'));
+      var pw = mine ? state.data.password : d.password;
+      var t = el('table', 'conn');
+      [['Host', d.host], ['Port', String(d.port)], ['Database', d.database], ['User', d.user], ['Password', pw]].forEach(function (r) {
+        var tr = el('tr'), v = el('td'), code = el('code', null, r[0] === 'Password' && mine ? '••••••••••' : r[1]);
+        v.appendChild(code); v.appendChild(document.createTextNode(' '));
+        if (r[0] === 'Password' && mine) {
+          var eye = el('button', 'small', '👁'); eye.title = 'Show';
+          eye.onclick = function () { var hid = code.textContent !== r[1]; code.textContent = hid ? r[1] : '••••••••••'; eye.textContent = hid ? '🙈' : '👁'; };
+          v.appendChild(eye); v.appendChild(document.createTextNode(' '));
+        }
+        v.appendChild(copyBtn(r[1], r[0] === 'Password' ? 'the password' : r[1]));
+        tr.appendChild(el('td', null, r[0])); tr.appendChild(v); t.appendChild(tr);
+      });
+      head.appendChild(t);
+      var acts = el('div', 'acts'); acts.appendChild(sqlEditor());
+      var conn = d.sqlpad;
+      acts.appendChild(el('span', 'sub', conn ? 'then choose the connection “' + conn + '”' : 'not in the SQL editor — use it from a notebook or 📡 Ingestion'));
+      head.appendChild(acts);
+      help(head, mine, d);
+      m.appendChild(head);
+
+      // tables
+      var tc = el('div', 'card'), th = el('div', 'cardhead'), re = el('button', 'small', '↻ Refresh');
+      th.appendChild(el('h3', null, 'Tables')); th.appendChild(re); tc.appendChild(th);
+      var tt = el('table'); tc.appendChild(tt); m.appendChild(tc);
+      function tables() {
+        tt.innerHTML = '<tr><td class="sub">Loading…</td></tr>';
+        api('GET', '/tables?db=' + encodeURIComponent(key)).then(function (r) {
+          tt.innerHTML = '';
+          if (!r.ok) return tt.appendChild(row([el('td', 'sub', r.body.error)]));
+          if (!r.body.length) return tt.appendChild(row([el('td', 'sub', mine ? 'No tables yet — create one in the SQL editor (ⓘ How to use it).' : 'No tables.')]));
+          tt.innerHTML = '<tr><th>Table</th><th>Kind</th><th class="num">≈ rows</th><th></th></tr>';
+          r.body.forEach(function (x) {
+            var full = x.schema + '.' + x.table, c = el('td', 'r'); c.appendChild(copyBtn(full));
+            tt.appendChild(row([el('td', 'mono', full), el('td', 'sub', x.kind), el('td', 'num', x.kind === 'table' ? x.rows.toLocaleString() : ''), c]));
+          });
+        });
+      }
+      re.onclick = tables; tables();
+
+      // delete (yours only): Yes / Cancel in place
+      if (mine) {
+        var dc = el('div', 'card'), dh = el('div', 'cardhead'), db = el('button', 'small danger', 'Delete database');
+        dh.appendChild(el('div', 'sub', 'Deleting removes the database and every table in it. This cannot be undone.')); dh.appendChild(db); dc.appendChild(dh);
+        db.onclick = function () {
+          dh.innerHTML = ''; dh.appendChild(el('div', 'sub', 'Delete ' + d.database + ' and all its tables?'));
+          var g = el('div'), yes = el('button', 'small danger', 'Yes, delete'), no = el('button', 'small', 'Cancel');
+          g.appendChild(yes); g.appendChild(document.createTextNode(' ')); g.appendChild(no); dh.appendChild(g);
+          no.onclick = function () { open(key); };
+          yes.onclick = function () {
+            yes.disabled = no.disabled = true;
+            api('POST', '/delete', {database: d.database}).then(function (r) {
+              if (!r.ok) { toast(r.body.error, true); return open(key); }
+              toast('Deleted ' + d.database); history.replaceState(null, '', '#'); load();
+            });
+          };
+        };
+        m.appendChild(dc);
+      }
+    }
+    function row(cells) { var tr = el('tr'); cells.forEach(function (c) { tr.appendChild(c); }); return tr; }
+
+    // ⓘ How to use it — closed until asked for
+    function help(head, mine, d) {
+      var b = el('button', 'small helpbtn', 'ⓘ How to use it'), box = el('div', 'helpbox'); box.hidden = true;
+      if (mine) {
+        box.appendChild(el('div', null, 'Create a table in the SQL editor:'));
+        var ol = el('ol');
+        ['Open SQL editor (button above).', 'Choose the connection “' + d.sqlpad + '”.', 'Run a CREATE TABLE, then INSERT rows, e.g.:']
+          .forEach(function (s) { ol.appendChild(el('li', null, s)); });
+        box.appendChild(ol);
+        var p = el('pre'); p.textContent = 'CREATE TABLE customers (\n  customer_id serial PRIMARY KEY,\n  name        text NOT NULL,\n  country     text\n);\nINSERT INTO customers (name, country) VALUES (\'Asha\', \'IN\'), (\'Ben\', \'UK\');\nSELECT * FROM customers;';
+        box.appendChild(p);
+      } else if (d.sqlpad) {
+        box.appendChild(el('div', null, 'Open SQL editor and choose “' + d.sqlpad + '”. It\'s read only: SELECT, not CREATE or INSERT.'));
+      }
+      box.appendChild(el('div', null, 'From a notebook (pandas):'));
+      var n = el('pre'); n.textContent = 'import pandas as pd\nfrom sqlalchemy import create_engine\ndb = create_engine("postgresql+psycopg2://' + d.user + ':<password>@' + d.host + ':' + d.port + '/' + d.database + '")\npd.read_sql("SELECT * FROM information_schema.tables WHERE table_schema = \'public\'", db)';
+      box.appendChild(n);
+      box.appendChild(el('div', 'sub', 'Copy the lake into it or out of it: 📡 Ingestion can use this database as a source (Host, Port, Database, User and Password above).'));
+      b.onclick = function () { box.hidden = !box.hidden; b.textContent = box.hidden ? 'ⓘ How to use it' : '✕ Hide help'; };
+      head.insertBefore(b, head.firstChild); head.appendChild(box);
+    }
+
+    // ＋ New: <you>_ + a name, Create / Cancel in place
+    $('new').onclick = function () {
+      var box = $('newrow'); if (box.firstChild) { box.innerHTML = ''; return; }
+      var r = el('div', 'newdb'), inp = el('input'); inp.type = 'text'; inp.placeholder = 'name, e.g. sales'; inp.autocomplete = 'off';
+      var ok = el('button', 'primary small', 'Create'), cancel = el('button', 'small', 'Cancel');
+      r.appendChild(el('span', 'sub', state.data.user + '_')); r.appendChild(inp); r.appendChild(ok); r.appendChild(cancel);
+      box.appendChild(r); inp.focus();
+      cancel.onclick = function () { box.innerHTML = ''; };
+      function create() {
+        var n = inp.value.trim().toLowerCase(); if (!n) return inp.focus();
+        ok.disabled = true; ok.textContent = 'Creating…';
+        api('POST', '', {name: n}).then(function (x) {
+          ok.disabled = false; ok.textContent = 'Create';
+          if (!x.ok) return toast(x.body.error, true);
+          toast('Created ' + x.body.created); box.innerHTML = ''; load(x.body.created);
+        });
+      }
+      ok.onclick = create; inp.onkeydown = function (e) { if (e.key === 'Enter') create(); if (e.key === 'Escape') box.innerHTML = ''; };
+    };
+    load();
+  </script>
+</body>
+</html>

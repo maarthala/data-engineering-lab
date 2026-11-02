@@ -65,6 +65,11 @@ go (leaving = pause), the review comes after submitting. Changes need the X-Lab-
   POST   /api/exams/answer {"attempt", "qid", "keys" | "slots", "position"}   save one answer
                          {"attempt", "qid", "mark": true | false}           mark it for review (or not)
   POST   /api/exams/submit {"attempt"}                   mark it → the review
+"🐘 My databases" — the lab's PostgreSQL databases + the member's own (labdb.py):
+  GET    /api/databases                                  the lab's databases, mine (+ my login), the limit
+  GET    /api/databases/tables?db=…                      a database's tables (lab's or mine) with a row estimate
+  POST   /api/databases {"name"}                         create <me>_<name>, owned by my login (+ a SQLPad connection)
+  POST   /api/databases/delete {"database"}              drop one of mine
 "📡 Ingestion (CDC)" — a member's own Postgres → their lakehouse (labcdc.py; cdc-runner does the work):
   GET    /api/cdc                                        my sources, destinations, jobs (+ last run), my catalogs
   POST   /api/cdc/sources {"id"?, "name", "host", "port", "database", "username", "password", "schemas", "cdc"}
@@ -120,6 +125,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import labadmin
 import labcdc
+import labdb
 import labexams
 import lakehouse as lh
 import labvault
@@ -435,6 +441,35 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(403, {"error": str(e)})
         except (labcdc.CdcError, ValueError, TypeError) as e:
             return self._json(400, {"error": str(e)})
+
+    def _databases(self, method):
+        """🐘 My databases — /api/databases*, always the logged-in member's own (labdb.py)."""
+        path, q = self._route()
+        user = self._user()
+        if not user:
+            return self._json(401, {"error": "not logged in"})
+        name = lake_name(user)
+        try:
+            if method == "GET" and path == "/api/databases":
+                return self._json(200, labdb.overview(name))
+            if method == "GET" and path == "/api/databases/tables":
+                return self._json(200, labdb.tables(name, q.get("db", "")))
+            if method != "POST":
+                return self._json(404, {"error": "not found"})
+            if self.headers.get("X-Lab-Request") != "1":
+                return self._json(403, {"error": "missing X-Lab-Request header"})
+            b = self._body()
+            if path == "/api/databases":
+                return self._json(200, labdb.create(name, b.get("name")))
+            if path == "/api/databases/delete":
+                return self._json(200, labdb.delete(name, str(b.get("database") or "")))
+            return self._json(404, {"error": "not found"})
+        except PermissionError as e:
+            return self._json(403, {"error": str(e)})
+        except labdb.DbError as e:
+            return self._json(400, {"error": str(e)})
+        except Exception as e:                       # e.g. a database that can't be reached: show it
+            return self._json(500, {"error": str(e).strip().splitlines()[0] if str(e).strip() else type(e).__name__})
 
     def _catalogs(self, method):
         """All /api/catalogs* calls — always on behalf of the logged-in learner."""
@@ -797,6 +832,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._exams(method)
         if self.path.startswith("/api/cdc"):
             return self._cdc(method)
+        if self.path.startswith("/api/databases"):
+            return self._databases(method)
         if self.path.startswith("/api/notebook"):
             return self._notebook(method)
         return self._files(method)
@@ -825,6 +862,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._exams("GET")
         if self.path.startswith("/api/cdc"):
             return self._cdc("GET")
+        if self.path.startswith("/api/databases"):
+            return self._databases("GET")
         if self.path == "/api/notebook":
             return self._notebook("GET")
         if self.path == "/api/home":                     # 🏠 Home: the member's own overview

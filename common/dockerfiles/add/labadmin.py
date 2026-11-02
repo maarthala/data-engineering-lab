@@ -681,6 +681,11 @@ def delete(user):
         labcdc.forget(name)
     except Exception as e:  # noqa: BLE001
         print(f"[labadmin] cdc {user}: {e}", flush=True)
+    try:                                                 # their own PostgreSQL databases and login
+        import labdb
+        labdb.forget(name)
+    except Exception as e:  # noqa: BLE001
+        print(f"[labadmin] databases {user}: {e}", flush=True)
     try:                                                 # folders they shared / were shared
         lh.forget_folder_shares(name)
     except Exception as e:  # noqa: BLE001

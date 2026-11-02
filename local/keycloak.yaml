@@ -67,6 +67,7 @@ services:
       PORTAL_DB_URL: postgresql://portal:portal@postgres:5432/portal
       # 📡 Data sync: the lab's live shop database (cdc.yaml) — every member's ready-made CDC source
       CDC_LAB_DB: postgresql://reader:reader@cdc-db:5432/shop
+      LABDB_ADMIN_URL: postgresql://postgres:cdc-db-local-owner@cdc-db:5432/postgres   # 🐘 members' own databases
       # the realm file's sign-in addresses → the live Keycloak at start (it imports the file only once)
       LAB_REALM_FILE: /app/de-lab-realm.json
     volumes:
@@ -78,6 +79,7 @@ services:
       - ../common/dockerfiles/add/labvault.py:/app/labvault.py:ro
       - ../common/dockerfiles/add/labexams.py:/app/labexams.py:ro
       - ../common/dockerfiles/add/labcdc.py:/app/labcdc.py:ro
+      - ../common/dockerfiles/add/labdb.py:/app/labdb.py:ro
       - ../common/dockerfiles/add/exam_demo.json:/app/exam_demo.json:ro
       - ../common/keycloak/de-lab-realm.json:/app/de-lab-realm.json:ro
     depends_on:                      # it provisions in all three: wait for them (a stopped one has no DNS name)
