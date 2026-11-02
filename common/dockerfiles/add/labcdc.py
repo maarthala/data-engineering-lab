@@ -33,7 +33,10 @@ KINDS = {"postgres": {"name": "PostgreSQL", "port": 5432,
                    "cdc": "CDC switched on for the database (EXEC sys.sp_cdc_enable_db) and each table "
                           "(sys.sp_cdc_enable_table), and SQL Server Agent running"}}
 SCHEDULES = {"": None, "15m": 15 * 60, "1h": 3600, "1d": 86400}
-MODES = {"cdc": "full load, then changes (CDC)", "full_refresh": "full reload every run"}
+MODES = {"cdc": "full load, then changes (CDC)",                 # one row per key: the latest (upsert)
+         "append": "full load, then every change as a new row",  # the history: build SCD2 from it
+         "full_refresh": "full reload every run"}
+STREAMING = ("cdc", "append")                                    # modes that read the change stream
 NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.-]{0,59}$")
 IDENT = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
 HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}$")
@@ -355,9 +358,9 @@ def create_job(member, body):
     mode, schedule = str(body.get("mode") or "cdc"), str(body.get("schedule") or "")
     if mode not in MODES or schedule not in SCHEDULES:
         raise CdcError("unknown mode or schedule")
-    if mode == "cdc" and not s["cdc"]:
+    if mode in STREAMING and not s["cdc"]:
         raise CdcError("this source has CDC off — turn it on, or choose a full reload")
-    if mode == "cdc" and _q("SELECT name FROM cdc_jobs WHERE source_id = %s AND mode = 'cdc'", (s["id"],), one=True):
+    if mode in STREAMING and _q("SELECT name FROM cdc_jobs WHERE source_id = %s AND mode IN ('cdc', 'append')", (s["id"],), one=True):
         raise CdcError("a CDC job already reads this source (one change stream = one job)")
     t = _q("SELECT * FROM cdc_tasks WHERE id = %s AND member = %s AND kind = 'discover' AND ref = %s AND status = 'done'",
            (int(body.get("discover") or 0), member, s["id"]), one=True)
@@ -394,13 +397,14 @@ def streams_for(discovered, tables, mode, namespace):
         key = f"{st['namespace']}.{st['name']}"
         if key not in keep:
             continue
-        st = dict(st, sync_mode=mode if mode in st.get("supported_sync_modes", [mode]) else "full_refresh")
+        sync = "cdc" if mode in STREAMING else mode
+        st = dict(st, sync_mode=sync if sync in st.get("supported_sync_modes", [sync]) else "full_refresh")
         if namespace:
             st["destination_database"] = namespace
         streams.append(dict(x, stream=st))
-        selected.setdefault(st["namespace"], []).append(
-            next((s for s in discovered.get("selected_streams", {}).get(st["namespace"], []) if s["stream_name"] == st["name"]),
-                 {"stream_name": st["name"], "partition_regex": "", "normalization": True}))
+        sel = next((s for s in discovered.get("selected_streams", {}).get(st["namespace"], []) if s["stream_name"] == st["name"]),
+                   {"stream_name": st["name"], "partition_regex": "", "normalization": True})
+        selected.setdefault(st["namespace"], []).append(dict(sel, append_mode=mode == "append"))   # append: every change a row
     return {"selected_streams": selected, "streams": streams}
 
 

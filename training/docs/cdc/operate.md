@@ -12,6 +12,19 @@ cleans up after itself is a pipeline. This lesson covers the decisions that make
 | the source should feel as little load as possible | the source's CDC is already used by another job |
 | you want the lake minutes behind the source | once a day is fresh enough |
 
+### Current state or history?
+Both CDC modes read the same change stream. They differ in what they keep:
+
+| Mode | The table keeps | Use it for |
+|---|---|---|
+| **Full load + CDC** | one row per key: the **latest** version (deleted rows as tombstones) | "the shop as it is now" |
+| **Full load + every change (history)** | **every** insert, update and delete as its own row (`_op_type` c / u / d, `_cdc_timestamp`); nothing is overwritten | history: what an order looked like at 10:00, how often a price changed, SCD2 |
+
+In history mode, order 15010 has one row as *shipped* (from the full load) and a second as
+*delivered* (the update), where *Full load + CDC* keeps only *delivered*. Ingestion never builds
+SCD2 tables itself: you build them in Silver from the history, with `MERGE`
+([Slowly changing dimensions](../recipes/scd2.md)).
+
 ### What a replication slot costs
 A slot makes Postgres **keep** the change log until the slot's reader has read it. That is
 what makes CDC lossless, and also its main risk:

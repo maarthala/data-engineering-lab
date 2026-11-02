@@ -75,7 +75,8 @@ a step is filled in, and **← Back** (or a finished step at the top) takes you 
    `public.customers`, `public.order_items`, `public.orders`, `public.products`.
 4. **④ How often, and a last look:**
     - **Job name**: `Shop to lake`
-    - **Mode**: **Full load + CDC**. The first run copies everything, later runs only the
+    - **Mode**: **Full load + CDC** (the third choice, *every change (history)*, comes in
+      [Run it for real](operate.md)). The first run copies everything, later runs only the
       inserts, updates and deletes since the run before.
     - **Schedule**: **Manual** for now (you'll switch it on in the last lesson).
     - Check the summary (From / To / Tables) and click **Create & run**.

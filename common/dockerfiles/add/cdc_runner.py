@@ -378,7 +378,7 @@ def run(t):
     _q("UPDATE cdc_jobs SET last_run_at = now() WHERE id = %s", (j["id"],), rows=False)
     status, records, err, log = "failed", None, None, ""
     try:
-        if s["cdc"] and j["mode"] == "cdc" and s["kind"] == "postgres":
+        if s["cdc"] and j["mode"] in labcdc.STREAMING and s["kind"] == "postgres":
             notes = [n for n in prepare_cdc(s) if n.startswith(("can't", "couldn't", "wal_level"))]
             if notes:
                 raise RuntimeError("; ".join(notes))

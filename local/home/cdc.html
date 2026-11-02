@@ -110,7 +110,7 @@
     }
 
     var SCHED = {'': 'Manual', '15m': 'Every 15 min', '1h': 'Hourly', '1d': 'Daily'};
-    var MODE = {cdc: 'Full load + CDC', full_refresh: 'Full reload every run'};
+    var MODE = {cdc: 'Full load + CDC', append: 'Full load + every change (history)', full_refresh: 'Full reload every run'};
     var data = null, timer = null, busy = {}, flash = null;
     var wiz = null;          // the New job guide's choices — kept while you add a source / destination on the way
 
@@ -380,7 +380,7 @@
       [stepSource, stepDest, stepTables, stepReview][wiz.step - 1](body, next, msg);
     }
     // a source's change stream feeds one CDC job (one replication slot): that job, if any
-    function cdcJob(sid) { return data.jobs.filter(function (j) { return j.source === sid && j.mode === 'cdc'; })[0] || null; }
+    function cdcJob(sid) { return data.jobs.filter(function (j) { return j.source === sid && (j.mode === 'cdc' || j.mode === 'append'); })[0] || null; }
     function chosen() { return (wiz.found || []).map(function (x) { return x.table; }).filter(function (k) { return (wiz.picked || {})[k]; }); }
     function picks(items, current, onPick, addText, onAdd) {     // cards to choose one, + "add new"
       var g = el('div', {class: 'picks'});
@@ -457,16 +457,18 @@
       on(name, 'input', function () { wiz.name = name.value; });
       body.appendChild(el('h3', {text: '④ How often, and a last look'}));
       body.appendChild(el('div', {class: 'form'}, [el('label', {text: 'Job name'}), name,
-        el('label', {text: 'Mode'}), el('div', {}, [seg(canCdc ? [['cdc', MODE.cdc], ['full_refresh', MODE.full_refresh]] : [['full_refresh', MODE.full_refresh]], wiz.mode, function (v) { wiz.mode = v; draw(); }),
+        el('label', {text: 'Mode'}), el('div', {}, [seg(canCdc ? [['cdc', MODE.cdc], ['append', MODE.append], ['full_refresh', MODE.full_refresh]] : [['full_refresh', MODE.full_refresh]], wiz.mode, function (v) { wiz.mode = v; draw(); }),
           taken ? el('div', {class: 'sub', style: 'margin-top:4px'}, ['CDC on ' + s.name + ' is used by job ', link(taken.name, 'job/' + taken.id),
-            ' (a source\'s change stream feeds one job) — add these tables to that job, or copy them here with full reloads.']) : null]),
+            ' (a source\'s change stream feeds one job) — copy these tables with full reloads, or delete that job and make one with all the tables.']) : null]),
         el('label', {text: 'Schedule'}), seg(Object.keys(SCHED).map(function (k) { return [k, SCHED[k]]; }), wiz.sched, function (v) { wiz.sched = v; })]));
       body.appendChild(el('dl', {class: 'facts'}, [
         el('dt', {text: 'From'}), el('dd', {text: s.name + ' — ' + data.kinds[s.kind].name + ', ' + s.host + ' / ' + s.database}),
         el('dt', {text: 'To'}), el('dd', {text: d.name + ' — ' + d.catalog + '.' + (d.namespace || '<database>_<schema>')}),
         el('dt', {text: 'Tables (' + tables.length + ')'}), el('dd', {text: tables.join(', ')})]));
-      body.appendChild(el('div', {class: 'sub', text: wiz.mode === 'cdc' ? 'Full load + CDC: the first run copies everything, later runs only the inserts, updates and deletes since the run before (deleted rows stay as _op_type = \'d\'). The first run starts as soon as you create the job.'
-                                                         : 'Full reload: every run copies the chosen tables again. The first run starts as soon as you create the job.'}));
+      body.appendChild(el('div', {class: 'sub', text: {
+        cdc: 'Full load + CDC: the first run copies everything, later runs only the inserts, updates and deletes since the run before. Each table keeps one row per key, the latest (deleted rows stay as _op_type = \'d\').',
+        append: 'Full load + every change (history): the first run copies everything, then every insert, update and delete is added as a new row (_op_type c / u / d, _cdc_timestamp), nothing is overwritten — the raw material for history and SCD2.',
+        full_refresh: 'Full reload: every run copies the chosen tables again.'}[wiz.mode] + ' The first run starts as soon as you create the job.'}));
       on(next, 'click', function () {
         next.disabled = true; msg.innerHTML = '';
         api('POST', '/api/cdc/jobs', {name: name.value, source: s.id, destination: d.id, discover: wiz.disc, tables: tables, mode: wiz.mode, schedule: wiz.sched})
