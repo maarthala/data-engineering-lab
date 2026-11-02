@@ -1061,8 +1061,30 @@ def _own(attempt_id, member):
 
 def _questions(vids):
     """The question versions, in the attempt's order."""
-    by = {str(r["vid"]): r for r in _q("SELECT * FROM exam_qv WHERE vid = ANY(%s::uuid[])", (list(vids),))}
+    by = {str(r["vid"]): r for r in _labelled(_q("SELECT * FROM exam_qv WHERE vid = ANY(%s::uuid[])", (list(vids),)))}
     return [by[v] for v in vids if v in by]
+
+
+LABELS = ("domain", "domain_name", "subdomain_name", "tags")
+
+
+def _labelled(rows):
+    """Older versions (an attempt keeps the ones it was marked on) take their labels — domain, its
+    names, tags — from the question's newest version: a bank that gained domains later labels the
+    old attempts too; the question, answers and marking stay as they were."""
+    old = [r for r in rows if not r["current"]]
+    if not old:
+        return rows
+    new = {(r["exam_id"], r["bank"], r["qid"]): r for r in _q(
+        "SELECT DISTINCT ON (exam_id, bank, qid) exam_id, bank, qid, " + ", ".join(LABELS) + " FROM exam_qv "
+        "WHERE (exam_id, bank, qid) IN (SELECT * FROM unnest(%s::text[], %s::text[], %s::text[])) "
+        "ORDER BY exam_id, bank, qid, current DESC, version DESC",
+        ([r["exam_id"] for r in old], [r["bank"] for r in old], [r["qid"] for r in old]))}
+    for r in old:
+        n = new.get((r["exam_id"], r["bank"], r["qid"]))
+        if n and n["domain"]:
+            r.update({k: n[k] for k in LABELS})
+    return rows
 
 
 def attempt(attempt_id, member, team):
@@ -1200,7 +1222,7 @@ def missed(exam_id, member, limit=20):
     atts = _q("SELECT id, vids, answers, marked, finished_at FROM exam_attempts WHERE exam_id = %s AND member = %s "
               "AND finished_at IS NOT NULL AND deleted_at IS NULL ORDER BY finished_at DESC LIMIT 100", (exam_id, member))
     vids = list({str(v) for a in atts for v in a["vids"]})
-    by = {str(r["vid"]): r for r in _q("SELECT * FROM exam_qv WHERE vid = ANY(%s::uuid[])", (vids,))} if vids else {}
+    by = {str(r["vid"]): r for r in _labelled(_q("SELECT * FROM exam_qv WHERE vid = ANY(%s::uuid[])", (vids,)))} if vids else {}
     seen = {}
     for a in atts:                                    # newest first: the first one seen is the latest
         for v in map(str, a["vids"]):
