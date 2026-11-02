@@ -92,86 +92,155 @@ in a dashboard for the management team.
 You know the tools and the techniques. How you build it is up to you.
 
 ## Tasks
-Each task says **what** must be true when it's done. Not how.
+Build everything in your own lakehouse (`my` in notebooks), with exactly these names. Times are
+UTC unless a column says *local*. Money is in currency with two decimals.
 
-### T1 · Source profile and data contract
-A written contract for all ten source tables: grain, keys, how each table changes (insert, update,
-delete), the cross-system links, and every data-quality issue you find, each backed by a query
-and its result.
+### Bronze: land the sources
+**T1 · CDC pipeline for the web shop.** Land `shop.customers`, `shop.products`, `shop.orders` and
+`shop.order_items` into the namespace `tw_bronze_web`, with change data capture, refreshed at
+least every 15 minutes.
 
-### T2 · Continuous ingestion
-All ten tables land in Bronze in your lakehouse and keep landing, at most 15 minutes behind the
-sources. After the first load, no run copies whole tables again.
+**T2 · CDC pipeline for the store tills.** Land `store.stores`, `store.items`, `store.sales` and
+`store.sale_lines` into `tw_bronze_store`, with change data capture, refreshed at least every
+15 minutes.
 
-### T3 · Full change history
-Bronze keeps the current state, but the business also needs the past. Make every version of every
-source row queryable, including deleted rows and when they were deleted, so that questions like
-*"what was the status of order X at 10:00 yesterday?"* and *"how many orders were cancelled
-yesterday?"* can be answered from the lake.
+**T3 · CDC pipeline for the loyalty card.** Land `loyalty.members` and `loyalty.points` into
+`tw_bronze_loyalty`, with change data capture, refreshed at least every 15 minutes.
 
-### T4 · Product dimension with price history
-One product dimension that joins the web catalogue and the till items, with the web price and the
-store price **over time**: every price each product has had, in each channel, and from when to
-when it was valid.
+### Silver: one company
+**T4 · Create `tw_silver.order_status_history`**: one row per order per status it has been in,
+including the moment it was cancelled.
 
-### T5 · Customer identity
-One row per real person across the web shop and the loyalty programme. A web account and a card
-member are the same person when their emails match after cleaning. People without a match stay,
-as web-only or card-only. Each person has a key of yours that **doesn't change** between runs,
-and existing keys survive new customers, new members and edited emails.
+| Column | Meaning |
+|---|---|
+| `order_id` | the web order |
+| `status` | `placed`, `paid`, `shipped`, `delivered` or `cancelled` |
+| `valid_from` | when the order entered this status |
+| `valid_to` | when it left it (empty while current) |
+| `is_current` | true for the order's latest status |
 
-### T6 · Unified sales fact
-Every web order line and every till line in one fact table, at line grain: one currency (two
-decimals), UTC time **and** the store's local day, product and customer keys, channel and store.
-Returns are negative. Cancelled orders are not revenue. The fact is updated **incrementally**
-(only what changed since the last run), and running it twice gives the same result.
+**T5 · Create `tw_silver.dim_product`**: every price each product has had, per channel.
 
-### T7 · Loyalty ledger
-A points ledger that ties every transaction to its customer and, where it has one, to the order or
-receipt that caused it. It reconciles with each member's `points_balance`; every member whose
-ledger and balance disagree is reported, with the difference.
+| Column | Meaning |
+|---|---|
+| `product_key` | your key for one product in one channel and price period |
+| `product_id` | the web shop's id |
+| `sku` | the tills' code |
+| `name`, `category` | from the web catalogue |
+| `channel` | `web` or `store` |
+| `price` | the price in that channel |
+| `valid_from`, `valid_to`, `is_current` | when that price applied |
 
-### T8 · Gold marts
-At least these, built only from your Silver layer:
+**T6 · Create `tw_silver.dim_store`**: `store_key`, `store_code`, `city`, `country`, `timezone`,
+`opened_on`.
 
-- **daily sales** by day, channel and store, in UTC days and in each store's local days;
-- **store performance** per store and week: revenue, receipts, average basket, return rate;
-- **customer 360**: per person, spend online and in stores, first and last purchase, points
-  balance, which channels they use;
-- **loyalty health** per day: new members, points earned, redeemed and taken back, active members,
-  and the share of store revenue made with a card.
+**T7 · Create `tw_silver.dim_customer`**: one row per real person across the web shop and the
+loyalty card. A web account and a card member are one person when their emails match once
+cleaned. `customer_key` never changes between runs.
 
-### T9 · Data quality gate
-Automated rules that run with every load: unique keys at every layer, no orphans between facts and
-dimensions, Silver revenue reconciling with the sources to the cent, no timestamps in the future,
-freshness within 30 minutes, and the ledger check from T7. When a rule fails, Gold is **not**
-updated, and the failure is visible with the rule and the offending rows.
+| Column | Meaning |
+|---|---|
+| `customer_key` | your stable key for the person |
+| `web_customer_id` | empty if they never shopped online |
+| `member_id`, `card_number` | empty if they have no card |
+| `name`, `country` | best known values |
+| `email_hash` | SHA-256 of the cleaned email (no clear-text email) |
+| `web_tier`, `card_tier` | tier in each system |
+| `is_web`, `is_member` | true / false |
+| `first_seen` | earliest account, membership or purchase |
 
-### T10 · Orchestration
-The whole chain runs by itself every 15 minutes in the right order, survives a failed run and a
-restart without double-counting, and can rebuild Silver and Gold from Bronze for any past period.
+**T8 · Create `tw_silver.fact_sales`**: one row per web order line and per till line. Cancelled
+orders are excluded; returns are negative. Loaded incrementally; re-running a load changes
+nothing.
 
-### T11 · Access and privacy
-Gold is shared **read only** with one other member (Tidewell's "finance" team); Bronze and
-Silver stay private to you. Gold contains no email addresses or phone numbers in clear text.
+| Column | Meaning |
+|---|---|
+| `sale_line_key` | unique per line, e.g. `web-1234-1`, `store-567-2` |
+| `channel` | `web` or `store` |
+| `sale_ref`, `line` | order id or receipt id, and line number |
+| `product_key` | the `dim_product` row valid at the time of sale |
+| `customer_key` | empty for store sales without a card |
+| `store_key` | empty for web |
+| `qty`, `unit_price`, `amount` | `amount = qty × unit_price` |
+| `sold_at` | UTC |
+| `local_date` | the store's local date (web: the UTC date) |
+| `is_return` | true when `qty` is negative |
 
-### T12 · Final visualization: "Tidewell today"
-A Superset dashboard for the management team, refreshing at least every 15 minutes, with filters
-for date range, channel and store, showing at least:
+**T9 · Create `tw_silver.fact_points`**: `txn_id`, `customer_key`, `member_id`, `channel`,
+`ref_type` (`order`, `order_cancelled`, `sale`, `welcome`, `redeem`), `ref_id`, `points`,
+`created_at`.
 
-- today's revenue, web against stores, compared with the same weekday last week;
-- revenue per store per local day over the last 14 days;
-- return rate per store;
-- the top 20 customers by total spend, with their channels and card tier;
-- points earned against redeemed per day, and the outstanding points balance;
-- data freshness: when each system was last loaded.
+### Gold: the answers
+**T10 · Create `tw_gold.daily_sales`**
 
-### T13 · Hand-over
-A short package for whoever runs the platform after you: an architecture diagram, a runbook (what
-to do when ingestion lags, a check fails, or a replication slot is lost), the data contract from
-T1, and one page for management with the five most important things the data shows.
+| Column | Meaning |
+|---|---|
+| `sales_date` | the day |
+| `date_basis` | `utc` or `local` (both are stored) |
+| `channel`, `store_code` | `store_code` empty for web |
+| `receipts` | distinct orders or till receipts |
+| `items` | units sold, returns netted |
+| `revenue` | net revenue |
+| `returns_amount` | value of returns (positive number) |
+
+**T11 · Create `tw_gold.store_weekly`**: `week_start`, `store_code`, `revenue`, `receipts`,
+`avg_basket`, `return_rate` (returned value ÷ gross sales), `card_share` (share of revenue on
+receipts with a loyalty card).
+
+**T12 · Create `tw_gold.customer_360`**
+
+| Column | Meaning |
+|---|---|
+| `customer_key`, `name`, `country` | who |
+| `channels` | `web`, `store`, `both` or `none` |
+| `card_tier` | empty without a card |
+| `web_revenue`, `store_revenue`, `total_revenue` | net spend |
+| `orders`, `receipts` | counts |
+| `first_purchase`, `last_purchase` | UTC |
+| `points_balance` | from the loyalty system |
+| `ledger_balance` | sum of `fact_points` |
+| `balance_ok` | true when the two balances are equal |
+
+**T13 · Create `tw_gold.loyalty_daily`**: `day`, `new_members`, `points_earned`,
+`points_redeemed`, `points_reversed` (cancelled orders), `active_members`, `outstanding_points`
+(total balance at the end of the day).
+
+**T14 · Create `tw_gold.data_freshness`**: `system` (`web`, `store`, `loyalty`), `table_name`,
+`last_change` (newest change landed), `minutes_behind`, refreshed with every run.
+
+### Run and trust it
+**T15 · Create `tw_gold.dq_results`**: `run_at`, `rule`, `status` (`pass` / `fail`), `failed_rows`,
+one row per rule per run. The rules: unique keys in every Silver and Gold table; every fact row
+finds its dimension rows; Silver store revenue equals the source's cents ÷ 100; Silver web revenue
+equals the source's order lines; no `sold_at` in the future; every source within 30 minutes; every
+`balance_ok` true. When a rule fails, Gold keeps its last good version.
+
+**T16 · Create the Airflow DAG `tidewell_platform`**: every 15 minutes, Silver → Gold → quality
+rules, in that order; a failed or repeated run never double-counts.
+
+**T17 · Share Gold** read only with one other member (Tidewell's finance team). Bronze and Silver
+stay private.
+
+### Show it
+**T18 · Create the Superset dashboard "Tidewell today"** on `tw_gold`, refreshing every
+15 minutes, with filters for date range, channel and store, and these reports:
+
+| Report | Shows |
+|---|---|
+| **Revenue today** | today's revenue, web and stores, against the same weekday last week |
+| **Revenue by store** | revenue per store per local day, last 14 days |
+| **Channel mix** | share of revenue web against stores, per week |
+| **Return rate** | return rate per store per week |
+| **Top customers** | top 20 customers by total revenue, with channels and card tier |
+| **Loyalty** | points earned, redeemed and reversed per day, and outstanding points |
+| **Card members vs others** | average revenue per customer, members against non-members |
+| **Data health** | `data_freshness` and the latest `dq_results` |
+
+**T19 · Hand over**: an architecture diagram of your platform, a runbook (ingestion lags, a rule
+fails, a replication slot is lost), and one page for management with the five most important
+things the dashboard shows.
 
 ## Done when
-All thirteen tasks are met **on live data**, the quality gate is green, and the dashboard answers
-the management team's questions without anyone opening a notebook. There's no answer key: the
-systems never stop changing, so your numbers are yours alone.
+All tables exist with these names and columns, the DAG runs every 15 minutes on live data, the
+latest `dq_results` are all `pass`, and "Tidewell today" answers the management team's questions
+without anyone opening a notebook.
