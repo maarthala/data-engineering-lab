@@ -36,8 +36,9 @@ pipeline ingests from.
 JDBC. Example: `SELECT count(*) FROM shopflow.public.orders` → 40000.
 
 !!! note "What else lives on lab-db — and what doesn't"
-    `lab-db` also holds `adventureworks` (another sample company), `shop` (the live shop for
-    📡 Ingestion) and members' own databases. 🐘 **My databases** lists them all with their tables.
+    `lab-db` also holds `adventureworks` (another sample company), three live systems of one
+    company for 📡 Ingestion — `shop` (web shop), `store` (the stores' tills), `loyalty` (the
+    loyalty card) — and members' own databases. 🐘 **My databases** lists them all with their tables.
 
 ## 2. RustFS — the data lake (object storage)
 

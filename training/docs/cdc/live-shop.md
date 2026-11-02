@@ -20,6 +20,19 @@ A small program keeps it busy, one change every 2–10 seconds:
 | an order is cancelled | `DELETE` from `orders` (its items go too) |
 | a new customer · a customer changes tier · a price changes | `INSERT` / `UPDATE` |
 
+### The company's other systems
+The web shop isn't the company's only system. Two more live databases on `lab-db` keep changing
+with it, read with the same `reader` / `reader` login and ready for CDC:
+
+| Database | System | Tables | What doesn't match the web shop |
+|---|---|---|---|
+| `store` | the stores' tills | `stores`, `items`, `sales`, `sale_lines` | products by **SKU** (`SKU-0001` = web product 1) · money in **cents** · `sold_at` in the store's **local time, without a time zone** · returns are lines with a **negative** `qty` |
+| `loyalty` | the loyalty card | `members`, `points` | a member's **email** is the web customer's in another spelling (case, spaces) · some members never shopped online · a store sale knows only the **card number** |
+
+A web order by a card member earns points in `loyalty`, and so does a store sale with a card.
+Joining the three into one view of customers and sales is classic data engineering: matching
+keys, units and time zones. 🐘 **My databases** shows all three with their tables.
+
 ## Lab
 Open a notebook. You connect the same way as in
 [SQL from Python](../unit3/databases.md): SQLAlchemy's `create_engine` plus pandas'

@@ -58,7 +58,7 @@ every query of this unit.
 ### What the lab gives you
 | Piece | What it is |
 |---|---|
-| **The live shop** (`lab-db`) | A Postgres database `shop` with `customers`, `products`, `orders`, `order_items`. A small program changes it every 2–10 seconds, like a real shop. Everyone reads it with the login `reader` / `reader`, which can read but never write. |
+| **The live shop** (`lab-db`) | A Postgres database `shop` with `customers`, `products`, `orders`, `order_items`. A small program changes it every 2–10 seconds, like a real shop, together with the company's two other systems, `store` (tills) and `loyalty` (loyalty card). Everyone reads them with the login `reader` / `reader`, which can read but never write. |
 | **📡 Ingestion** (in Tools) | Where you add a **source** (a database), a **destination** (your lakehouse + a namespace) and a **job** (which tables, full load + CDC or full reload, how often). |
 | **OLake** | The open-source engine that does the copying. Each check, table list and sync runs as one short-lived OLake container. You never start it yourself. |
 | **Your lakehouse** | The tables land as Iceberg tables, e.g. `my.shop_cdc.orders`. Query them with Spark, the SQL editor or Superset like any other table. |

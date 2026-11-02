@@ -1,17 +1,30 @@
-"""cdc-sim — keeps the lab's live shop database (lab-db) changing, so members can watch change data
-capture at work in "📡 Ingestion": every few seconds (random) one change, like a small web shop —
-  a new customer · a new order (+ items) · an order moves on (placed → paid → shipped → delivered)
-  · an order is cancelled (deleted, with its items) · a price changes · a customer changes tier
-It keeps the tables small (the oldest delivered orders go), so the database doesn't grow for ever.
+"""cdc-sim — keeps the lab's three live databases (on lab-db) changing, like one company's systems,
+so members can practise change data capture and joining sources in "📡 Ingestion":
 
-On start it sets the database up once (idempotent): the tables + a first batch of rows, the login
-members use (reader / reader: SELECT on everything + REPLICATION, so each member's job can have its
-own replication slot — never writes) and the publication olake_pub for all tables.
-Standard library + psycopg2. CDC_DB_URL: the database's owner login.
+  shop     the web shop      customers · products · orders · order_items
+  store    the stores' tills stores · items · sales · sale_lines
+  loyalty  the loyalty card  members · points
+
+Every few seconds (random) one thing happens somewhere —
+  web:     a new order (+ items) · an order moves on (placed → paid → shipped → delivered) · an order
+           is cancelled (deleted, with its items) · a new customer · a price or a tier changes
+  store:   a sale (some with a loyalty card) · a return (negative quantities) · a till price changes
+  loyalty: points for a web order or a card sale · points redeemed · someone joins at a till ·
+           a member's details change
+The systems disagree the way real ones do: the stores know products by SKU (SKU-0001 ↔ product 1),
+count money in cents and write local time without a time zone; loyalty members' emails are the web
+shop's in another spelling (case, spaces), and some members never shopped online.
+Old rows go (oldest delivered orders, sales, points), so the databases don't grow for ever.
+
+On start it sets each database up once (idempotent): tables + a first batch of rows, the login
+members use (reader / reader: SELECT + REPLICATION, so each member's job can have its own
+replication slot — never writes) and a publication olake_pub for all tables.
+Standard library + psycopg2. CDC_DB_URL: the owner login, on the shop database.
 """
 import os
 import random
 import time
+import urllib.parse
 
 import psycopg2
 
@@ -19,8 +32,12 @@ DB_URL = os.environ.get("CDC_DB_URL", "postgresql://postgres:postgres@lab-db:543
 READER = os.environ.get("CDC_READER", "reader:reader")
 MIN_S, MAX_S = float(os.environ.get("CDC_SIM_MIN_S", "2")), float(os.environ.get("CDC_SIM_MAX_S", "10"))
 MAX_ORDERS = int(os.environ.get("CDC_SIM_MAX_ORDERS", "3000"))
+MAX_SALES = int(os.environ.get("CDC_SIM_MAX_SALES", "4000"))
+MAX_POINTS = int(os.environ.get("CDC_SIM_MAX_POINTS", "8000"))
+DBS = ("shop", "store", "loyalty")
 
-SCHEMA = """
+SCHEMA = {
+    "shop": """
 CREATE TABLE IF NOT EXISTS customers (
   customer_id serial PRIMARY KEY, name text NOT NULL, email text NOT NULL, country text NOT NULL,
   tier text NOT NULL DEFAULT 'bronze', created_at timestamptz NOT NULL DEFAULT now(),
@@ -35,147 +52,369 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS order_items (
   order_id int NOT NULL REFERENCES orders ON DELETE CASCADE, line int NOT NULL, product_id int NOT NULL REFERENCES products,
   quantity int NOT NULL, price numeric(10,2) NOT NULL, PRIMARY KEY (order_id, line));
-"""
+""",
+    "store": """
+CREATE TABLE IF NOT EXISTS stores (
+  store_id serial PRIMARY KEY, code text NOT NULL UNIQUE, city text NOT NULL, country text NOT NULL,
+  timezone text NOT NULL, opened_on date NOT NULL);
+CREATE TABLE IF NOT EXISTS items (
+  sku text PRIMARY KEY, name text NOT NULL, category text NOT NULL, price_cents int NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS sales (
+  sale_id bigserial PRIMARY KEY, store_id int NOT NULL REFERENCES stores,
+  sold_at timestamp NOT NULL,                       -- the store's local time, no time zone
+  card_number text, payment text NOT NULL, total_cents int NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS sale_lines (
+  sale_id bigint NOT NULL REFERENCES sales ON DELETE CASCADE, line int NOT NULL, sku text NOT NULL REFERENCES items,
+  qty int NOT NULL, unit_price_cents int NOT NULL, PRIMARY KEY (sale_id, line));
+""",
+    "loyalty": """
+CREATE TABLE IF NOT EXISTS members (
+  member_id serial PRIMARY KEY, card_number text NOT NULL UNIQUE, full_name text NOT NULL, email text,
+  phone text, tier text NOT NULL DEFAULT 'blue', points_balance int NOT NULL DEFAULT 0,
+  joined_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS points (
+  txn_id bigserial PRIMARY KEY, member_id int NOT NULL REFERENCES members ON DELETE CASCADE,
+  channel text NOT NULL, ref text, points int NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+""",
+}
 FIRST = ["Asha", "Ben", "Chen", "Dara", "Eli", "Fatima", "Goran", "Hana", "Ivan", "Jia", "Kofi", "Lena", "Mateo",
          "Nora", "Omar", "Priya", "Quinn", "Ravi", "Sara", "Tomas", "Uma", "Vik", "Wen", "Yara", "Zoe"]
 LAST = ["Smith", "Garcia", "Khan", "Li", "Okafor", "Novak", "Rossi", "Silva", "Tanaka", "Weber", "Patel", "Nguyen"]
 COUNTRIES = ["US", "UK", "DE", "IN", "FR", "NL", "SG", "BR", "JP", "AU"]
 TIERS = ["bronze", "silver", "gold"]
+CARD_TIERS = ["blue", "silver", "gold"]
 PRODUCTS = [("Laptop", "electronics", 899), ("Headphones", "electronics", 129), ("Phone case", "accessories", 19),
             ("Desk lamp", "home", 39), ("Coffee mug", "home", 12), ("Backpack", "accessories", 59),
             ("Monitor", "electronics", 249), ("Keyboard", "electronics", 79), ("Notebook", "office", 6),
             ("Water bottle", "accessories", 18), ("Office chair", "home", 189), ("USB cable", "electronics", 9),
             ("Plant pot", "home", 15), ("Pen set", "office", 11), ("Running shoes", "sports", 99),
             ("Yoga mat", "sports", 35), ("Tea sampler", "food", 22), ("Chocolate box", "food", 14)]
+STORES = [("AMS-01", "Amsterdam", "NL", "Europe/Amsterdam", "2019-03-01"), ("LON-01", "London", "UK", "Europe/London", "2020-06-15"),
+          ("BLR-01", "Bengaluru", "IN", "Asia/Kolkata", "2021-01-10"), ("NYC-01", "New York", "US", "America/New_York", "2018-09-01"),
+          ("SIN-01", "Singapore", "SG", "Asia/Singapore", "2022-04-20")]
 NEXT = {"placed": "paid", "paid": "shipped", "shipped": "delivered"}
+C = {}                                            # database → connection (autocommit)
 
 
-def connect():
+def url(db):
+    u = urllib.parse.urlparse(DB_URL)
+    return urllib.parse.urlunparse(u._replace(path="/" + db))
+
+
+def connect(db):
     while True:
         try:
-            c = psycopg2.connect(DB_URL, connect_timeout=5)
+            c = psycopg2.connect(url(db), connect_timeout=5)
             c.autocommit = True
             return c
         except psycopg2.Error as e:
-            print(f"[cdc-sim] waiting for the database: {str(e).strip().splitlines()[0]}", flush=True)
+            print(f"[cdc-sim] waiting for {db}: {str(e).strip().splitlines()[0]}", flush=True)
             time.sleep(3)
 
 
-def setup(cur):
-    """Tables, a first batch of rows, the reader login and the publication — once (idempotent)."""
-    cur.execute(SCHEMA)
-    cur.execute("SELECT count(*) FROM products")
-    if not cur.fetchone()[0]:
-        for name, cat, price in PRODUCTS:
-            cur.execute("INSERT INTO products (name, category, price) VALUES (%s, %s, %s)", (name, cat, price))
-        for _ in range(60):
-            new_customer(cur)
-        for _ in range(150):
-            new_order(cur)
-        print("[cdc-sim] made the shop: products, customers, orders", flush=True)
-    user, pw = READER.split(":", 1)
-    cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (user,))
-    if not cur.fetchone():
-        cur.execute(f'CREATE ROLE "{user}" LOGIN REPLICATION PASSWORD %s', (pw,))
-    cur.execute(f'GRANT SELECT ON ALL TABLES IN SCHEMA public TO "{user}"')
-    cur.execute(f'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO "{user}"')
-    cur.execute("SELECT 1 FROM pg_publication WHERE pubname = 'olake_pub'")
-    if not cur.fetchone():
-        cur.execute("CREATE PUBLICATION olake_pub FOR ALL TABLES")
+def cur(db):
+    return C[db].cursor()
 
 
-def new_customer(cur):
+def sku(product_id):
+    return f"SKU-{product_id:04d}"
+
+
+def spelled(email):
+    """The same email as another system types it."""
+    return random.choice([email, email, email.upper(), email.title(), f" {email}", f"{email} "])
+
+
+# ---- setup -----------------------------------------------------------------------------------
+def setup():
+    """Databases, tables, a first batch of rows, the reader login and the publications — once."""
+    C["shop"] = connect("shop")
+    with cur("shop") as k:
+        for db in DBS[1:]:
+            k.execute("SELECT 1 FROM pg_database WHERE datname = %s", (db,))
+            if not k.fetchone():
+                k.execute(f'CREATE DATABASE "{db}"')
+        user, pw = READER.split(":", 1)
+        k.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (user,))
+        if not k.fetchone():
+            k.execute(f'CREATE ROLE "{user}" LOGIN REPLICATION PASSWORD %s', (pw,))
+    for db in DBS[1:]:
+        C[db] = connect(db)
+    for db in DBS:
+        with cur(db) as k:
+            k.execute(SCHEMA[db])
+            k.execute(f'GRANT CONNECT ON DATABASE "{db}" TO "{user}"')
+            k.execute(f'GRANT SELECT ON ALL TABLES IN SCHEMA public TO "{user}"')
+            k.execute(f'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO "{user}"')
+            k.execute("SELECT 1 FROM pg_publication WHERE pubname = 'olake_pub'")
+            if not k.fetchone():
+                k.execute("CREATE PUBLICATION olake_pub FOR ALL TABLES")
+    with cur("shop") as k:                                         # the web shop first: the others use it
+        k.execute("SELECT count(*) FROM products")
+        if not k.fetchone()[0]:
+            for name, cat, price in PRODUCTS:
+                k.execute("INSERT INTO products (name, category, price) VALUES (%s, %s, %s)", (name, cat, price))
+            for _ in range(60):
+                new_customer(join=False)
+            for _ in range(150):
+                new_order(points=False)
+            print("[cdc-sim] made the web shop: products, customers, orders", flush=True)
+    with cur("loyalty") as k:
+        k.execute("SELECT count(*) FROM members")
+        if not k.fetchone()[0]:
+            with cur("shop") as s:
+                s.execute("SELECT name, email FROM customers")
+                web = s.fetchall()
+            for name, email in random.sample(web, int(len(web) * 0.6)):   # 6 in 10 web customers have a card
+                add_member(name, spelled(email))
+            for _ in range(40):                                            # …and some never shop online
+                f, l = random.choice(FIRST), random.choice(LAST)
+                add_member(f"{f} {l}", random.choice([f"{f.lower()}{l.lower()}{random.randint(1, 99)}@mail.test", None]))
+            print("[cdc-sim] made the loyalty programme: members", flush=True)
+    with cur("store") as k:
+        k.execute("SELECT count(*) FROM stores")
+        if not k.fetchone()[0]:
+            for code, city, country, tz, opened in STORES:
+                k.execute("INSERT INTO stores (code, city, country, timezone, opened_on) VALUES (%s, %s, %s, %s, %s)",
+                          (code, city, country, tz, opened))
+            with cur("shop") as s:
+                s.execute("SELECT product_id, name, category, price FROM products ORDER BY product_id")
+                for pid, name, cat, price in s.fetchall():
+                    k.execute("INSERT INTO items (sku, name, category, price_cents) VALUES (%s, %s, %s, %s)",
+                              (sku(pid), name.upper(), cat, int(price * 100)))
+            for _ in range(200):
+                store_sale(hours_ago=random.uniform(0, 72))
+            print("[cdc-sim] made the stores: stores, items, sales", flush=True)
+
+
+# ---- loyalty helpers -------------------------------------------------------------------------
+def add_member(name, email):
+    with cur("loyalty") as k:
+        k.execute("INSERT INTO members (card_number, full_name, email, phone, tier) VALUES (%s, %s, %s, %s, %s) "
+                  "ON CONFLICT (card_number) DO NOTHING RETURNING member_id",
+                  (f"LC{random.randint(10_000_000, 99_999_999)}", name, email,
+                   random.choice([None, f"+{random.randint(1, 99)} {random.randint(100_000_000, 999_999_999)}"]),
+                   random.choices(CARD_TIERS, [6, 3, 1])[0]))
+        row = k.fetchone()
+        return row[0] if row else None
+
+
+def earn(member_id, channel, ref, pts):
+    if not member_id or not pts:
+        return
+    with cur("loyalty") as k:
+        k.execute("INSERT INTO points (member_id, channel, ref, points) VALUES (%s, %s, %s, %s)", (member_id, channel, ref, pts))
+        k.execute("UPDATE members SET points_balance = points_balance + %s, updated_at = now() WHERE member_id = %s",
+                  (pts, member_id))
+
+
+def member_by_email(email):
+    with cur("loyalty") as k:
+        k.execute("SELECT member_id FROM members WHERE lower(trim(email)) = lower(%s) LIMIT 1", (email,))
+        row = k.fetchone()
+        return row[0] if row else None
+
+
+# ---- web shop --------------------------------------------------------------------------------
+def new_customer(join=True):
     f, l = random.choice(FIRST), random.choice(LAST)
-    cur.execute("INSERT INTO customers (name, email, country, tier) VALUES (%s, %s, %s, %s) RETURNING customer_id",
-                (f"{f} {l}", f"{f.lower()}.{l.lower()}{random.randint(1, 999)}@example.com", random.choice(COUNTRIES),
-                 random.choices(TIERS, [6, 3, 1])[0]))
-    return f"new customer {cur.fetchone()[0]}"
+    email = f"{f.lower()}.{l.lower()}{random.randint(1, 999)}@example.com"
+    with cur("shop") as k:
+        k.execute("INSERT INTO customers (name, email, country, tier) VALUES (%s, %s, %s, %s) RETURNING customer_id",
+                  (f"{f} {l}", email, random.choice(COUNTRIES), random.choices(TIERS, [6, 3, 1])[0]))
+        cid = k.fetchone()[0]
+    if join and random.random() < 0.4:
+        add_member(f"{f} {l}", spelled(email))
+        return f"new web customer {cid} (+ loyalty card)"
+    return f"new web customer {cid}"
 
 
-def new_order(cur):
-    cur.execute("SELECT customer_id FROM customers ORDER BY random() LIMIT 1")
-    cust = cur.fetchone()[0]
-    cur.execute("INSERT INTO orders (customer_id) VALUES (%s) RETURNING order_id", (cust,))
-    oid = cur.fetchone()[0]
-    cur.execute("SELECT product_id, price FROM products ORDER BY random() LIMIT %s", (random.randint(1, 3),))
-    total = 0
-    for line, (pid, price) in enumerate(cur.fetchall(), 1):
-        q = random.randint(1, 3)
-        cur.execute("INSERT INTO order_items (order_id, line, product_id, quantity, price) VALUES (%s, %s, %s, %s, %s)",
-                    (oid, line, pid, q, price))
-        total += q * price
-    cur.execute("UPDATE orders SET total = %s WHERE order_id = %s", (total, oid))
-    return f"new order {oid}"
+def new_order(points=True):
+    with cur("shop") as k:
+        k.execute("SELECT customer_id, email FROM customers ORDER BY random() LIMIT 1")
+        cust, email = k.fetchone()
+        k.execute("INSERT INTO orders (customer_id) VALUES (%s) RETURNING order_id", (cust,))
+        oid = k.fetchone()[0]
+        k.execute("SELECT product_id, price FROM products ORDER BY random() LIMIT %s", (random.randint(1, 3),))
+        total = 0
+        for line, (pid, price) in enumerate(k.fetchall(), 1):
+            q = random.randint(1, 3)
+            k.execute("INSERT INTO order_items (order_id, line, product_id, quantity, price) VALUES (%s, %s, %s, %s, %s)",
+                      (oid, line, pid, q, price))
+            total += q * price
+        k.execute("UPDATE orders SET total = %s WHERE order_id = %s", (total, oid))
+    if points:
+        earn(member_by_email(email), "web", f"order:{oid}", int(total))
+    return f"new web order {oid}"
 
 
-def move_order(cur):
-    cur.execute("SELECT order_id, status FROM orders WHERE status <> 'delivered' ORDER BY random() LIMIT 1")
-    row = cur.fetchone()
+def move_order():
+    with cur("shop") as k:
+        k.execute("SELECT order_id, status FROM orders WHERE status <> 'delivered' ORDER BY random() LIMIT 1")
+        row = k.fetchone()
+        if not row:
+            return new_order()
+        k.execute("UPDATE orders SET status = %s, updated_at = now() WHERE order_id = %s", (NEXT[row[1]], row[0]))
+    return f"web order {row[0]} {row[1]} → {NEXT[row[1]]}"
+
+
+def cancel_order():
+    with cur("shop") as k:
+        k.execute("SELECT o.order_id, c.email, o.total FROM orders o JOIN customers c USING (customer_id) "
+                  "WHERE o.status IN ('placed', 'paid') ORDER BY random() LIMIT 1")
+        row = k.fetchone()
+        if not row:
+            return new_order()
+        k.execute("DELETE FROM orders WHERE order_id = %s", (row[0],))            # its items go with it (cascade)
+    earn(member_by_email(row[1]), "web", f"order:{row[0]}:cancelled", -int(row[2]))  # the points go back
+    return f"web order {row[0]} cancelled (deleted)"
+
+
+def change_price():
+    with cur("shop") as k:
+        k.execute("UPDATE products SET price = round(price * %s, 2), updated_at = now() WHERE product_id = "
+                  "(SELECT product_id FROM products ORDER BY random() LIMIT 1) RETURNING product_id, price",
+                  (random.choice([0.9, 0.95, 1.05, 1.1]),))
+        pid, price = k.fetchone()
+    return f"web price: product {pid} now {price}"
+
+
+def change_tier():
+    with cur("shop") as k:
+        k.execute("UPDATE customers SET tier = %s, updated_at = now() WHERE customer_id = "
+                  "(SELECT customer_id FROM customers ORDER BY random() LIMIT 1) RETURNING customer_id, tier",
+                  (random.choice(TIERS),))
+        cid, tier = k.fetchone()
+    return f"web customer {cid} is {tier}"
+
+
+# ---- stores ----------------------------------------------------------------------------------
+def store_sale(hours_ago=0.0, returns=False):
+    with cur("store") as k:
+        k.execute("SELECT store_id, timezone FROM stores ORDER BY random() LIMIT 1")
+        store, tz = k.fetchone()
+        card = None
+        if random.random() < 0.5:                                    # half the customers show a card
+            with cur("loyalty") as m:
+                m.execute("SELECT card_number FROM members ORDER BY random() LIMIT 1")
+                card = m.fetchone()[0]
+        k.execute("INSERT INTO sales (store_id, sold_at, card_number, payment) "
+                  "VALUES (%s, (now() - make_interval(secs => %s)) AT TIME ZONE %s, %s, %s) RETURNING sale_id",
+                  (store, hours_ago * 3600, tz, card, random.choices(["card", "cash", "mobile"], [6, 2, 2])[0]))
+        sid = k.fetchone()[0]
+        k.execute("SELECT sku, price_cents FROM items ORDER BY random() LIMIT %s", (random.randint(1, 4),))
+        total = 0
+        for line, (s, cents) in enumerate(k.fetchall(), 1):
+            q = -1 if returns else random.randint(1, 3)
+            k.execute("INSERT INTO sale_lines (sale_id, line, sku, qty, unit_price_cents) VALUES (%s, %s, %s, %s, %s)",
+                      (sid, line, s, q, cents))
+            total += q * cents
+            if returns:
+                break                                               # a return: one item back
+        k.execute("UPDATE sales SET total_cents = %s WHERE sale_id = %s", (total, sid))
+    if card:
+        with cur("loyalty") as m:
+            m.execute("SELECT member_id FROM members WHERE card_number = %s", (card,))
+            row = m.fetchone()
+        earn(row and row[0], "store", f"sale:{sid}", total // 100)
+    return f"store {'return' if returns else 'sale'} {sid}"
+
+
+def store_return():
+    return store_sale(returns=True)
+
+
+def store_price():
+    with cur("store") as k:
+        k.execute("UPDATE items SET price_cents = (price_cents * %s)::int, updated_at = now() WHERE sku = "
+                  "(SELECT sku FROM items ORDER BY random() LIMIT 1) RETURNING sku, price_cents",
+                  (random.choice([0.9, 0.95, 1.05, 1.1]),))
+        s, cents = k.fetchone()
+    return f"store price: {s} now {cents} cents"
+
+
+# ---- loyalty ---------------------------------------------------------------------------------
+def join_at_till():
+    f, l = random.choice(FIRST), random.choice(LAST)
+    mid = add_member(f"{f} {l}", random.choice([f"{f.lower()}{l.lower()}{random.randint(1, 99)}@mail.test", None]))
+    earn(mid, "bonus", "welcome", 50)
+    return f"loyalty: new member {mid}"
+
+
+def redeem():
+    with cur("loyalty") as k:
+        k.execute("SELECT member_id, points_balance FROM members WHERE points_balance >= 100 ORDER BY random() LIMIT 1")
+        row = k.fetchone()
     if not row:
-        return new_order(cur)
-    cur.execute("UPDATE orders SET status = %s, updated_at = now() WHERE order_id = %s", (NEXT[row[1]], row[0]))
-    return f"order {row[0]} {row[1]} → {NEXT[row[1]]}"
+        return join_at_till()
+    earn(row[0], "redeem", None, -random.choice([100, 200, 500]) if row[1] >= 500 else -100)
+    return f"loyalty: member {row[0]} redeemed points"
 
 
-def cancel_order(cur):
-    cur.execute("SELECT order_id FROM orders WHERE status IN ('placed', 'paid') ORDER BY random() LIMIT 1")
-    row = cur.fetchone()
-    if not row:
-        return new_order(cur)
-    cur.execute("DELETE FROM orders WHERE order_id = %s", row)            # its items go with it (cascade)
-    return f"order {row[0]} cancelled (deleted)"
+def member_update():
+    with cur("loyalty") as k:
+        what = random.choice(["phone", "email", "tier"])
+        if what == "phone":
+            k.execute("UPDATE members SET phone = %s, updated_at = now() WHERE member_id = "
+                      "(SELECT member_id FROM members ORDER BY random() LIMIT 1) RETURNING member_id",
+                      (f"+{random.randint(1, 99)} {random.randint(100_000_000, 999_999_999)}",))
+        elif what == "email":                                       # someone tidies up their email
+            k.execute("UPDATE members SET email = lower(trim(email)), updated_at = now() WHERE member_id = "
+                      "(SELECT member_id FROM members WHERE email IS NOT NULL ORDER BY random() LIMIT 1) RETURNING member_id")
+        else:
+            k.execute("UPDATE members SET tier = %s, updated_at = now() WHERE member_id = "
+                      "(SELECT member_id FROM members ORDER BY random() LIMIT 1) RETURNING member_id",
+                      (random.choice(CARD_TIERS),))
+        row = k.fetchone()
+    return f"loyalty: member {row[0] if row else '?'} changed {what}"
 
 
-def change_price(cur):
-    cur.execute("UPDATE products SET price = round(price * %s, 2), updated_at = now() WHERE product_id = "
-                "(SELECT product_id FROM products ORDER BY random() LIMIT 1) RETURNING product_id, price",
-                (random.choice([0.9, 0.95, 1.05, 1.1]),))
-    pid, price = cur.fetchone()
-    return f"product {pid} now {price}"
+def tidy():
+    """Keep them small: the oldest delivered orders, sales and points go (deletes, too)."""
+    with cur("shop") as k:
+        k.execute("SELECT count(*) FROM orders")
+        extra = k.fetchone()[0] - MAX_ORDERS
+        if extra > 0:
+            k.execute("DELETE FROM orders WHERE order_id IN (SELECT order_id FROM orders WHERE status = 'delivered' "
+                      "ORDER BY created_at LIMIT %s)", (extra,))
+    with cur("store") as k:
+        k.execute("DELETE FROM sales WHERE sale_id IN (SELECT sale_id FROM sales ORDER BY sale_id "
+                  "LIMIT greatest((SELECT count(*) FROM sales) - %s, 0))", (MAX_SALES,))
+    with cur("loyalty") as k:
+        k.execute("DELETE FROM points WHERE txn_id IN (SELECT txn_id FROM points ORDER BY txn_id "
+                  "LIMIT greatest((SELECT count(*) FROM points) - %s, 0))", (MAX_POINTS,))
 
 
-def change_tier(cur):
-    cur.execute("UPDATE customers SET tier = %s, updated_at = now() WHERE customer_id = "
-                "(SELECT customer_id FROM customers ORDER BY random() LIMIT 1) RETURNING customer_id, tier",
-                (random.choice(TIERS),))
-    cid, tier = cur.fetchone()
-    return f"customer {cid} is {tier}"
+ACTIONS = [(new_order, 25), (move_order, 18), (new_customer, 5), (cancel_order, 5), (change_price, 4), (change_tier, 4),
+           (store_sale, 25), (store_return, 3), (store_price, 2),
+           (join_at_till, 3), (redeem, 3), (member_update, 4)]
 
 
-def tidy(cur):
-    """Keep it small: past MAX_ORDERS, the oldest delivered orders go (deletes, too)."""
-    cur.execute("SELECT count(*) FROM orders")
-    extra = cur.fetchone()[0] - MAX_ORDERS
-    if extra > 0:
-        cur.execute("DELETE FROM orders WHERE order_id IN (SELECT order_id FROM orders WHERE status = 'delivered' "
-                    "ORDER BY created_at LIMIT %s)", (extra,))
-
-
-ACTIONS = [(new_order, 40), (move_order, 30), (new_customer, 8), (cancel_order, 7), (change_price, 8), (change_tier, 7)]
+def reconnect():
+    for db in list(C):
+        try:
+            C[db].close()
+        except psycopg2.Error:
+            pass
+        C[db] = connect(db)
 
 
 def main():
-    c = connect()
-    with c.cursor() as cur:
-        setup(cur)
-    print(f"[cdc-sim] changing the shop every {MIN_S:g}–{MAX_S:g} s", flush=True)
+    setup()
+    print(f"[cdc-sim] changing shop, store and loyalty every {MIN_S:g}–{MAX_S:g} s", flush=True)
     n = 0
     while True:
         time.sleep(random.uniform(MIN_S, MAX_S))
         try:
-            with c.cursor() as cur:
-                what = random.choices([a for a, _ in ACTIONS], [w for _, w in ACTIONS])[0](cur)
-                n += 1
-                if n % 50 == 0:
-                    tidy(cur)
-                    print(f"[cdc-sim] {n} changes so far — last: {what}", flush=True)
+            what = random.choices([a for a, _ in ACTIONS], [w for _, w in ACTIONS])[0]()
+            n += 1
+            if n % 50 == 0:
+                tidy()
+                print(f"[cdc-sim] {n} changes so far — last: {what}", flush=True)
         except psycopg2.Error as e:
             print(f"[cdc-sim] {str(e).strip().splitlines()[0]} — reconnecting", flush=True)
-            try:
-                c.close()
-            except psycopg2.Error:
-                pass
-            c = connect()
+            reconnect()
 
 
 if __name__ == "__main__":

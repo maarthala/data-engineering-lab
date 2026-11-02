@@ -39,8 +39,8 @@ services:
 
   # lab-db — the members' PostgreSQL server, apart from the platform's own (postgres: Keycloak,
   # Polaris, the portal…), so members' load, logins and replication slots never touch it:
-  #  · the live shop for practising CDC (database shop, login reader / reader — SELECT + REPLICATION,
-  #    never writes), kept changing by cdc-sim
+  #  · one company's three live systems for practising CDC — shop (web shop), store (tills), loyalty
+  #    (loyalty card); login reader / reader (SELECT + REPLICATION, never writes); kept changing by cdc-sim
   #  · the course's sample databases ShopFlow and AdventureWorks (login learner / learner, read only)
   #  · members' own databases from 🐘 My databases (<member>_<name>, owned by a login per member)
   # wal_level = logical for CDC; a forgotten slot holds at most max_slot_wal_keep_size of change log.
@@ -66,7 +66,7 @@ services:
     networks:
       - sparknet
 
-  # Keeps the shop changing at random intervals: orders, status changes, prices, cancellations.
+  # Keeps shop, store and loyalty changing at random intervals: orders, sales, returns, points, prices…
   cdc-sim:
     build:
       context: ../common/dockerfiles

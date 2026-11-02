@@ -40,7 +40,8 @@ QUOTA_MB = int(os.environ.get("LEARNER_QUOTA_MB", "100"))      # per-learner buc
 TEAM_QUOTA_MB = int(os.environ.get("TEAM_QUOTA_MB", "500"))    # per-team bucket, hard limit
 SQLPAD = os.environ.get("SQLPAD_URL", "http://sqlpad:3000")
 SQLPAD_ADMIN = os.environ.get("SQLPAD_ADMIN", "admin@de.local:admin1234")
-SQLPAD_SHARED_CONNECTIONS = ("shopflow", "adventureworks")         # OLTP, PostgreSQL login `learner`
+SQLPAD_SHARED_CONNECTIONS = ("shopflow", "adventureworks",          # OLTP, PostgreSQL login `learner`
+                             "liveshop", "livestore", "liveloyalty")  # live systems, login `reader`
 TRINO_HOST = os.environ.get("TRINO_HOST", "trino")
 # k8s injects TRINO_PORT=tcp://<ip>:8080 for the `trino` Service — keep only the number
 TRINO_PORT = os.environ.get("TRINO_PORT", "8080").rsplit(":", 1)[-1]
