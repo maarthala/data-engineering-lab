@@ -901,6 +901,21 @@ def drop_table(name, cat, namespace, table):
     return {"dropped": f"{cat}.{namespace}.{table}", "files": n}
 
 
+def create_namespace(name, cat, namespace):
+    """A new namespace in a catalog the learner owns (one level: letters, digits, _)."""
+    if not re.fullmatch(r"[a-z][a-z0-9_]{0,62}", namespace or ""):
+        raise ValueError("namespace name: lower-case letters, digits and _, starting with a letter")
+    t = _admin_token()
+    if not _owned(name, cat, t):
+        raise PermissionError("not your catalog")
+    st, _ = _call("POST", f"/api/catalog/v1/{cat}/namespaces", {"namespace": [namespace]}, token=t)
+    if st == 409:
+        raise ValueError(f"namespace {namespace} already exists")
+    if st not in (200, 201):
+        raise RuntimeError(f"create namespace: HTTP {st}")
+    return {"created": f"{cat}.{namespace}"}
+
+
 def drop_namespace(name, cat, namespace):
     """Delete an empty namespace of a catalog the learner owns."""
     t = _admin_token()

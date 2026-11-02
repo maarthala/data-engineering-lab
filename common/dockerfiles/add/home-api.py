@@ -27,6 +27,7 @@ from the browser can point at another bucket.
   GET    /api/catalogs/members?q=…                       usernames containing q (3+ characters), for invites
   GET    /api/catalogs/tree?catalog=…[&namespace=…]     namespaces, or one namespace's tables (owner)
   DELETE /api/catalogs/tables?catalog&namespace&table    drop a table + its files (owner)
+  POST   /api/catalogs/namespaces?catalog&namespace      create a namespace (owner)
   DELETE /api/catalogs/namespaces?catalog&namespace      drop an empty namespace (owner)
   GET    /api/catalogs/shares?catalog=…                  who has what (owner)
   POST   /api/catalogs/shares?catalog&grantee&access[&namespace]  (no namespace: the whole lake)
@@ -456,6 +457,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, lh.catalog_tree(name, q.get("catalog", ""), q.get("namespace") or None))
             if method == "DELETE" and path == "/api/catalogs/tables":
                 return self._json(200, lh.drop_table(name, q.get("catalog", ""), q.get("namespace", ""), q.get("table", "")))
+            if method == "POST" and path == "/api/catalogs/namespaces":
+                return self._json(200, lh.create_namespace(name, q.get("catalog", ""), (q.get("namespace") or "").strip().lower()))
             if method == "DELETE" and path == "/api/catalogs/namespaces":
                 return self._json(200, lh.drop_namespace(name, q.get("catalog", ""), q.get("namespace", "")))
             if method == "GET" and path == "/api/catalogs/shares":
