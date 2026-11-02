@@ -71,7 +71,7 @@ from the shop itself:
 ```python
 import pandas as pd
 from sqlalchemy import create_engine
-shop = create_engine("postgresql+psycopg2://reader:reader@cdc-db:5432/shop")
+shop = create_engine("postgresql+psycopg2://reader:reader@lab-db:5432/shop")
 
 spark.sql("""SELECT status, count(*) AS orders FROM my.silver.shop_orders
              GROUP BY status ORDER BY orders DESC""").show()

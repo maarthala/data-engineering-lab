@@ -1,7 +1,7 @@
 """labdb — "🐘 My databases": the PostgreSQL databases a member can use, in one place.
 
   · the lab's databases (ShopFlow, AdventureWorks, the live shop): read only, a shared login each
-  · the member's own databases on the lab's database server (LABDB_ADMIN_URL, the cdc-db Postgres):
+  · the member's own databases on the lab's database server (LABDB_ADMIN_URL, the lab-db Postgres):
     <member>_<name>, owned by a login named after the member — full access (create tables, write,
     drop), and only they can connect. The login's password is made once and kept in the vault
     (admin only, _lab/db/<member>); the page shows it to its owner.
@@ -17,7 +17,7 @@ import psycopg2
 from psycopg2 import sql
 
 ADMIN_URL = os.environ.get("LABDB_ADMIN_URL", "")          # owner login of the members' database server
-HOST, PORT = os.environ.get("LABDB_HOST", "cdc-db"), int(os.environ.get("LABDB_PORT", "5432"))
+HOST, PORT = os.environ.get("LABDB_HOST", "lab-db"), int(os.environ.get("LABDB_PORT", "5432"))
 LIMIT = int(os.environ.get("LABDB_LIMIT", "3"))
 VAULT_PATH = "_lab/db"
 NAME = re.compile(r"^[a-z][a-z0-9_]{0,29}$")

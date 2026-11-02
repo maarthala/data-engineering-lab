@@ -6,7 +6,7 @@ whether it is ready for CDC. Here that database is the lab's **live shop**:
 
 | | |
 |---|---|
-| Host · port | `cdc-db` · `5432` |
+| Host · port | `lab-db` · `5432` |
 | Database | `shop` |
 | Login | `reader` / `reader` (read only, plus the right to replicate) |
 | Tables | `customers`, `products`, `orders`, `order_items` (schema `public`) |
@@ -30,7 +30,7 @@ Open a notebook. You connect the same way as in
 import pandas as pd
 from sqlalchemy import create_engine
 
-shop = create_engine("postgresql+psycopg2://reader:reader@cdc-db:5432/shop")
+shop = create_engine("postgresql+psycopg2://reader:reader@lab-db:5432/shop")
 
 pd.read_sql("""SELECT 'customers' AS table_name, count(*) AS rows FROM customers
                UNION ALL SELECT 'products', count(*) FROM products

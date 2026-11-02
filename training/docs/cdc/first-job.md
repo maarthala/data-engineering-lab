@@ -25,7 +25,7 @@ settings from [the previous lesson](live-shop.md). If you deleted it, add it aga
 |---|---|
 | Database type | PostgreSQL |
 | Name | Lab shop (live) |
-| Host · Port | `cdc-db` · `5432` |
+| Host · Port | `lab-db` · `5432` |
 | Database | `shop` |
 | User · Password | `reader` · `reader` |
 | Schemas | `public` |
@@ -49,7 +49,7 @@ query from the last lesson again and you'll see it.
     | Message | Meaning |
     |---|---|
     | `password authentication failed for user "reader"` | wrong password, or your browser filled in your portal login. Type `reader` again. |
-    | `database "cdc-db" does not exist` | `cdc-db` is the **host**. The database is `shop`. |
+    | `database "lab-db" does not exist` | `lab-db` is the **host**. The database is `shop`. |
     | `wal_level is not 'logical'` | this database can't do CDC. Use **Full reload** for it, or ask its owner to turn it on. |
 
 ### 2 · The destination
@@ -110,13 +110,13 @@ That's CDC paying off. On a real database the difference is millions of rows aga
 thousand.
 
 ## Check yourself
-1. Why can't you use `cdc-db` as the database name?
+1. Why can't you use `lab-db` as the database name?
 2. The second run copied 29 records. What would a **Full reload** job have copied?
 3. You want a second job that copies only `products` from the same shop with CDC. Why does the
    guide refuse, and what can you do instead?
 
 ??? success "Answers"
-    1. `cdc-db` is the server (host). The database on that server is called `shop`.
+    1. `lab-db` is the server (host). The database on that server is called `shop`.
     2. Every row of the chosen tables again, about 1,900 or more, on every run.
     3. The source's change stream is already read by `Shop to lake` (one slot, one reader).
        Recreate `Shop to lake` with every table you need, or make the second job a

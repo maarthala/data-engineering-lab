@@ -37,21 +37,23 @@ services:
     networks:
       - sparknet
 
-  # The lab's live shop database for practising CDC: one database for all members (login
-  # reader / reader — SELECT + REPLICATION, never writes), kept changing by cdc-sim. A Postgres of its
-  # own with wal_level = logical, so members' replication slots never touch the platform's database;
-  # a forgotten slot holds at most max_slot_wal_keep_size of change log.
-  cdc-db:
+  # lab-db — the members' PostgreSQL server, apart from the platform's own (postgres: Keycloak,
+  # Polaris, the portal…), so members' load, logins and replication slots never touch it:
+  #  · the live shop for practising CDC (database shop, login reader / reader — SELECT + REPLICATION,
+  #    never writes), kept changing by cdc-sim
+  #  · members' own databases from 🐘 My databases (<member>_<name>, owned by a login per member)
+  # wal_level = logical for CDC; a forgotten slot holds at most max_slot_wal_keep_size of change log.
+  lab-db:
     image: postgres:18
-    container_name: cdc-db
+    container_name: lab-db
     command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=100", "-c", "max_wal_senders=100",
               "-c", "max_slot_wal_keep_size=1GB", "-c", "wal_sender_timeout=0"]
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: cdc-db-local-owner          # the simulator only — members use reader
+      POSTGRES_PASSWORD: lab-db-local-owner          # the simulator only — members use reader
       POSTGRES_DB: shop
     volumes:
-      - cdc-db-data:/var/lib/postgresql
+      - lab-db-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d shop"]
       interval: 5s
@@ -69,18 +71,18 @@ services:
     container_name: cdc-sim
     command: ["python", "/app/cdc_simulator.py"]
     environment:
-      CDC_DB_URL: postgresql://postgres:cdc-db-local-owner@cdc-db:5432/shop
+      CDC_DB_URL: postgresql://postgres:lab-db-local-owner@lab-db:5432/shop
       CDC_READER: reader:reader
       CDC_SIM_MIN_S: "2"
       CDC_SIM_MAX_S: "10"
     volumes:
       - ../common/dockerfiles/add/cdc_simulator.py:/app/cdc_simulator.py:ro
     depends_on:
-      cdc-db:
+      lab-db:
         condition: service_healthy
     restart: unless-stopped
     networks:
       - sparknet
 
 volumes:
-  cdc-db-data:
+  lab-db-data:

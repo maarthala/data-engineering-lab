@@ -38,8 +38,8 @@ NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.-]{0,59}$")
 IDENT = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
 HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}$")
 LIMITS = {"sources": 10, "destinations": 10, "jobs": 10}
-# the lab's live shop database (cdc-db, kept changing by cdc-sim): every member starts with it as a source
-LAB_DB = os.environ.get("CDC_LAB_DB", "")                    # postgresql://reader:reader@cdc-db:5432/shop
+# the lab's live shop database (lab-db, kept changing by cdc-sim): every member starts with it as a source
+LAB_DB = os.environ.get("CDC_LAB_DB", "")                    # postgresql://reader:reader@lab-db:5432/shop
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS cdc_sources (

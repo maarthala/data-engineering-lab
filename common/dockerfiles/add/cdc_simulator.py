@@ -1,4 +1,4 @@
-"""cdc-sim — keeps the lab's live shop database (cdc-db) changing, so members can watch change data
+"""cdc-sim — keeps the lab's live shop database (lab-db) changing, so members can watch change data
 capture at work in "📡 Ingestion": every few seconds (random) one change, like a small web shop —
   a new customer · a new order (+ items) · an order moves on (placed → paid → shipped → delivered)
   · an order is cancelled (deleted, with its items) · a price changes · a customer changes tier
@@ -15,7 +15,7 @@ import time
 
 import psycopg2
 
-DB_URL = os.environ.get("CDC_DB_URL", "postgresql://postgres:postgres@cdc-db:5432/shop")
+DB_URL = os.environ.get("CDC_DB_URL", "postgresql://postgres:postgres@lab-db:5432/shop")
 READER = os.environ.get("CDC_READER", "reader:reader")
 MIN_S, MAX_S = float(os.environ.get("CDC_SIM_MIN_S", "2")), float(os.environ.get("CDC_SIM_MAX_S", "10"))
 MAX_ORDERS = int(os.environ.get("CDC_SIM_MAX_ORDERS", "3000"))
