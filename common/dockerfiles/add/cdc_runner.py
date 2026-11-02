@@ -1,8 +1,10 @@
 """cdc-runner — does the work of "📡 Data sync (CDC)" (labcdc.py): picks up cdc_tasks rows and starts
-the due scheduled jobs, each as one OLake engine container (olakego/source-postgres):
-  check_source       the connection; with CDC on, first makes the publication + replication slot
+the due scheduled jobs, each as one OLake engine container (olakego/source-<postgres|mysql|mssql>):
+  check_source       the connection (+ what CDC still needs); Postgres with CDC on: first makes the
+                     publication + replication slot
   check_destination  the member's lakehouse catalog, signed in as their job login
   discover           the source's tables → the task's result (the page lists them)
+  test_source / browse   Test connection / Browse tables on a source form, saved or not
   run                a sync: full load / changes since the saved state; the run's status, rows, log
 TRUSTED code: it holds the platform's admin logins (lab_jobs mints each member's job login), so
 member input only ever becomes OLake's JSON config, never a command line. A container gets the
@@ -25,7 +27,7 @@ import urllib.parse
 import labcdc
 from labcdc import _q
 
-IMAGE = os.environ.get("CDC_IMAGE", "olakego/source-postgres:v1.1.1")
+VERSION = os.environ.get("CDC_VERSION", "v1.1.1")           # OLake's engine: olakego/source-<kind>:<version>
 NETWORK = os.environ.get("CDC_NETWORK", "local_sparknet")
 POLARIS = os.environ.get("POLARIS_URL", "http://polaris:8181").rstrip("/")
 S3_ENDPOINT = os.environ.get("LAKE_S3_ENDPOINT", "http://storage:9000")
@@ -34,6 +36,7 @@ WORKERS = int(os.environ.get("CDC_WORKERS", "2"))
 TIMEOUT = int(os.environ.get("CDC_TIMEOUT_S", "1800"))       # a sync longer than this is stopped
 CDC_WAIT = 120                                                # OLake: idle seconds before a CDC run ends
 CFG = "/mnt/config"
+SYSTEM_TABLES = {("dbo", "systranschemas")}
 LOG_LINES = 400
 
 
@@ -60,10 +63,14 @@ def _docker(method, path, body=None, raw=None, timeout=60, ctype="application/js
     return out
 
 
-def _pull():
-    name, tag = IMAGE.rsplit(":", 1)
+def _image(kind):
+    return f"olakego/source-{kind}:{VERSION}"
+
+
+def _pull(image):
+    name, tag = image.rsplit(":", 1)
     try:
-        _docker("GET", f"/images/{urllib.parse.quote(IMAGE, safe='')}/json")
+        _docker("GET", f"/images/{urllib.parse.quote(image, safe='')}/json")
     except RuntimeError:
         _docker("POST", f"/images/create?fromImage={urllib.parse.quote(name)}&tag={tag}", timeout=900)
 
@@ -101,11 +108,13 @@ def _read(cid, name):
         return json.loads(t.extractfile(m).read() or b"null")
 
 
-def olake(label, args, files, read=(), timeout=TIMEOUT):
-    """One OLake engine container: files → /mnt/config, run `args`, wait. → (exit code, log, {read file})."""
-    _pull()
+def olake(kind, label, args, files, read=(), timeout=TIMEOUT):
+    """One OLake engine container for a `kind` of source: files → /mnt/config, run `args`, wait.
+    → (exit code, log, {read file})."""
+    image = _image(kind)
+    _pull(image)
     cid = json.loads(_docker("POST", f"/containers/create?name=cdc-{label}-{int(time.time() * 1000)}", {
-        "Image": IMAGE, "Cmd": args, "Labels": {"lab.cdc": label},
+        "Image": image, "Cmd": args, "Labels": {"lab.cdc": label},
         "HostConfig": {"NetworkMode": NETWORK, "Memory": MEM, "AutoRemove": False}}))["Id"]
     try:
         _docker("PUT", f"/containers/{cid}/archive?path=/", raw=_tar(files), ctype="application/x-tar")
@@ -143,13 +152,23 @@ def _status(log):
 
 
 def source_config(s):
-    cfg = {"host": s["host"], "port": s["port"], "database": s["dbname"], "username": s["username"],
-           "password": labcdc.password(s["member"], s["id"]), "ssl": {"mode": "disable"}, "max_threads": 2}
-    if s["schemas"]:
-        cfg["schemas"] = s["schemas"]
-    if s["cdc"]:
-        cfg["update_method"] = {"type": "CDC", "replication_slot": s["slot"], "publication": s["publication"],
-                                "initial_wait_time": CDC_WAIT}
+    """OLake's source config for the kind of database (field names differ a little between them)."""
+    cfg = {"port": s["port"], "database": s["dbname"], "username": s["username"],
+           "password": s.get("password") or labcdc.password(s["member"], s["id"]), "max_threads": 2}
+    if s["kind"] == "postgres":
+        cfg.update(host=s["host"], ssl={"mode": "disable"})
+        if s["schemas"]:
+            cfg["schemas"] = s["schemas"]
+        if s["cdc"] and s.get("slot"):
+            cfg["update_method"] = {"type": "CDC", "replication_slot": s["slot"], "publication": s["publication"],
+                                    "initial_wait_time": CDC_WAIT}
+    elif s["kind"] == "mysql":
+        cfg["hosts"] = s["host"]
+        if s["cdc"]:
+            cfg["update_method"] = {"type": "CDC", "initial_wait_time": CDC_WAIT}
+    elif s["kind"] == "mssql":
+        cfg["host"] = s["host"]
+        cfg["update_method"] = {"type": "CDC" if s["cdc"] else "Standalone"}
     return cfg
 
 
@@ -166,7 +185,7 @@ def dest_config(member, d):
 
 
 def prepare_cdc(s):
-    """CDC needs a publication and a logical replication slot in the source — made with the
+    """Postgres: CDC needs a publication and a logical replication slot in the source — made with the
     source's own login if missing (it needs the rights to; otherwise the message says what to run)."""
     import psycopg2
     try:
@@ -206,8 +225,8 @@ def prepare_cdc(s):
 # ---- the tasks -----------------------------------------------------------------------------
 def check_source(t):
     s = _q("SELECT * FROM cdc_sources WHERE id = %s", (t["ref"],), one=True)
-    notes = prepare_cdc(s) if s["cdc"] else []
-    code, log, _ = olake(f"check-src-{s['id']}", ["check", "--config", f"{CFG}/source.json"],
+    notes = prepare_cdc(s) if s["cdc"] and s["kind"] == "postgres" else []
+    code, log, _ = olake(s["kind"], f"check-src-{s['id']}", ["check", "--config", f"{CFG}/source.json"],
                          {"source.json": source_config(s)}, timeout=180)
     ok, msg, pre = _status(log)
     checked = {"ok": ok, "message": msg, "notes": notes, "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -219,7 +238,7 @@ def check_source(t):
 
 def check_destination(t):
     d = _q("SELECT * FROM cdc_destinations WHERE id = %s", (t["ref"],), one=True)
-    code, log, _ = olake(f"check-dst-{d['id']}", ["check", "--destination", f"{CFG}/destination.json"],
+    code, log, _ = olake("postgres", f"check-dst-{d['id']}", ["check", "--destination", f"{CFG}/destination.json"],
                          {"destination.json": dest_config(d["member"], d)}, timeout=180)
     ok, msg, _ = _status(log)
     checked = {"ok": ok, "message": msg, "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
@@ -227,13 +246,40 @@ def check_destination(t):
     return checked
 
 
+def _form(t):
+    """Test connection / Browse tables: the form in the task (a saved source's password when it's left
+    empty; CDC isn't set up — that's the saved source's check)."""
+    f = dict(t["payload"], member=t["member"], id=t["ref"], slot=None)
+    if not f["password"]:
+        f["password"] = labcdc.password(t["member"], t["ref"])
+    return f
+
+
+def test_source(t):
+    s = _form(t)
+    code, log, _ = olake(s["kind"], f"test-src-{t['id']}", ["check", "--config", f"{CFG}/source.json"],
+                         {"source.json": source_config(dict(s, cdc=False))}, timeout=180)
+    ok, msg, _ = _status(log)
+    return {"ok": ok, "message": msg}
+
+
+def browse(t):
+    return {"tables": _discover(_form(t), f"browse-{t['id']}")["tables"]}
+
+
 def discover(t):
     s = _q("SELECT * FROM cdc_sources WHERE id = %s", (t["ref"],), one=True)
-    code, log, out = olake(f"discover-{s['id']}", ["discover", "--config", f"{CFG}/source.json"],
+    return _discover(s, f"discover-{s['id']}")
+
+
+def _discover(s, label):
+    code, log, out = olake(s["kind"], label, ["discover", "--config", f"{CFG}/source.json"],
                            {"source.json": source_config(s)}, read=("streams.json",), timeout=300)
     streams = out.get("streams.json")
     if code or not streams:
         raise RuntimeError(_status(log)[1])
+    # SQL Server's own CDC bookkeeping table isn't data (and has no change stream of its own)
+    streams["streams"] = [x for x in streams["streams"] if (x["stream"]["namespace"], x["stream"]["name"]) not in SYSTEM_TABLES]
     tables = [{"table": f"{x['stream']['namespace']}.{x['stream']['name']}",
                "columns": len([c for c, v in (x["stream"].get("type_schema", {}).get("properties") or {}).items()
                                if not v.get("olake_column")]),
@@ -252,13 +298,13 @@ def run(t):
     _q("UPDATE cdc_jobs SET last_run_at = now() WHERE id = %s", (j["id"],), rows=False)
     status, records, err, log = "failed", None, None, ""
     try:
-        if s["cdc"] and j["mode"] == "cdc":
+        if s["cdc"] and j["mode"] == "cdc" and s["kind"] == "postgres":
             notes = [n for n in prepare_cdc(s) if n.startswith(("can't", "couldn't", "wal_level"))]
             if notes:
                 raise RuntimeError("; ".join(notes))
         files = {"source.json": source_config(s), "destination.json": dest_config(j["member"], d),
                  "streams.json": j["streams"], "state.json": j["state"] or {}}
-        code, log, out = olake(f"run-{j['id']}", ["sync", "--config", f"{CFG}/source.json", "--destination",
+        code, log, out = olake(s["kind"], f"run-{j['id']}", ["sync", "--config", f"{CFG}/source.json", "--destination",
                                                   f"{CFG}/destination.json", "--catalog", f"{CFG}/streams.json",
                                                   "--state", f"{CFG}/state.json"], files, read=("state.json",))
         m = re.findall(r"Total records read: (\d+)", log)
@@ -284,6 +330,9 @@ def drop_source(t):
     s = _q("SELECT * FROM cdc_sources WHERE id = %s", (t["ref"],), one=True)
     if not s:
         return {}
+    if not s["slot"]:
+        labcdc.drop_source(s)
+        return {}
     note = None
     try:
         import psycopg2
@@ -302,7 +351,7 @@ def drop_source(t):
     return {"note": note}
 
 
-KINDS = {"drop_source": drop_source, "check_source": check_source, "check_destination": check_destination, "discover": discover, "run": run}
+KINDS = {"test_source": test_source, "browse": browse, "drop_source": drop_source, "check_source": check_source, "check_destination": check_destination, "discover": discover, "run": run}
 
 
 # ---- the loop ------------------------------------------------------------------------------
@@ -322,6 +371,8 @@ def _work(t):
             traceback.print_exc()
         _q("UPDATE cdc_tasks SET status = 'failed', error = %s, finished_at = now() WHERE id = %s",
            (str(e)[:2000], t["id"]), rows=False)
+    finally:                                             # a form's password isn't kept
+        _q("UPDATE cdc_tasks SET payload = payload - 'password' WHERE id = %s AND payload ? 'password'", (t["id"],), rows=False)
 
 
 def _due():
@@ -343,7 +394,7 @@ def main():
        rows=False)
     _q("UPDATE cdc_runs SET status = 'failed', error = 'cdc-runner restarted', finished_at = now() WHERE status = 'running'",
        rows=False)
-    print(f"[cdc] runner up: {IMAGE} on {NETWORK}, {WORKERS} at a time", flush=True)
+    print(f"[cdc] runner up: OLake {VERSION} on {NETWORK}, {WORKERS} at a time", flush=True)
     busy, last_due = [], 0
     while True:
         try:

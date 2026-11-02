@@ -1,8 +1,9 @@
-"""labcdc — "📡 Data sync (CDC)": a member copies tables from their own Postgres into their lakehouse
+"""labcdc — "📡 Data sync (CDC)": a member copies tables from their own database (Postgres, MySQL or
+SQL Server) into their lakehouse
 — a full load, then every insert / update / delete (change data capture) on a schedule.
 
 Members keep, each only their own (portal database, like 📝 Mock exams):
-  sources       a Postgres they reach (host, port, database, user; the password is kept in the
+  sources       a database they reach (KINDS) (host, port, database, user; the password is kept in the
                 vault's admin-only _lab/cdc/<member>/<id>, never shown again), with CDC on or off
                 (on: a publication + a logical replication slot, made by the first check)
   destinations  one of their lakehouse catalogs (+ an optional namespace) — no keys to type: a sync
@@ -10,7 +11,7 @@ Members keep, each only their own (portal database, like 📝 Mock exams):
   jobs          source → destination: the tables, full load + CDC or a full reload every run, a
                 schedule (manual / 15 min / hourly / daily); each run's status, rows and log
 The work itself — check a connection, list a source's tables, run a sync — is OLake's engine
-(olakego/source-postgres, `check` / `discover` / `sync`) in a container per call, started by the
+(olakego/source-<kind>, `check` / `discover` / `sync`) in a container per call, started by the
 cdc-runner service (cdc_runner.py), which picks up cdc_tasks rows. Nothing here talks to OLake.
 """
 import json
@@ -20,6 +21,16 @@ import threading
 
 DB_URL = os.environ.get("PORTAL_DB_URL", "postgresql://portal:portal@postgres:5432/portal")
 VAULT_PATH = "_lab/cdc"                       # vault (admin only): <member>/<source id> → {password}
+# what CDC needs in each kind of database (the page shows it; Postgres's publication + slot are made
+# by the first check, the others are server settings an admin of that database switches on)
+KINDS = {"postgres": {"name": "PostgreSQL", "port": 5432,
+                      "cdc": "wal_level = logical; the check makes a publication and a replication slot"},
+         "mysql": {"name": "MySQL", "port": 3306,
+                   "cdc": "the binary log on with binlog_format = ROW (and binlog_row_image = FULL); a login with "
+                          "REPLICATION SLAVE, REPLICATION CLIENT and SELECT"},
+         "mssql": {"name": "SQL Server", "port": 1433,
+                   "cdc": "CDC switched on for the database (EXEC sys.sp_cdc_enable_db) and each table "
+                          "(sys.sp_cdc_enable_table), and SQL Server Agent running"}}
 SCHEDULES = {"": None, "15m": 15 * 60, "1h": 3600, "1d": 86400}
 MODES = {"cdc": "full load, then changes (CDC)", "full_refresh": "full reload every run"}
 NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.-]{0,59}$")
@@ -33,6 +44,7 @@ CREATE TABLE IF NOT EXISTS cdc_sources (
   dbname text NOT NULL, username text NOT NULL, schemas text[] NOT NULL DEFAULT '{}', cdc boolean NOT NULL,
   publication text, slot text, password text, checked jsonb, created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (member, name));
+ALTER TABLE cdc_sources ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'postgres';
 CREATE TABLE IF NOT EXISTS cdc_destinations (
   id bigserial PRIMARY KEY, member text NOT NULL, name text NOT NULL, catalog text NOT NULL, namespace text,
   checked jsonb, created_at timestamptz NOT NULL DEFAULT now(), UNIQUE (member, name));
@@ -123,7 +135,7 @@ def _drop_password(member, sid):
 
 # ---- what the page shows -------------------------------------------------------------------
 def _source_out(s):
-    return {"id": s["id"], "name": s["name"], "host": s["host"], "port": s["port"], "database": s["dbname"],
+    return {"id": s["id"], "name": s["name"], "kind": s["kind"], "host": s["host"], "port": s["port"], "database": s["dbname"],
             "username": s["username"], "schemas": s["schemas"], "cdc": s["cdc"], "publication": s["publication"],
             "slot": s["slot"], "checked": s["checked"], "created_at": _iso(s["created_at"])}
 
@@ -145,7 +157,7 @@ def overview(member, catalogs=()):
                       "destination": j["dest_id"], "dest_name": j["dest_name"], "catalog": j["catalog"],
                       "tables": j["tables"], "mode": j["mode"], "schedule": j["schedule"], "enabled": j["enabled"],
                       "created_at": _iso(j["created_at"]), "last": j["last"], "busy": j["busy"]} for j in jobs],
-            "catalogs": list(catalogs), "schedules": list(SCHEDULES), "modes": MODES}
+            "catalogs": list(catalogs), "schedules": list(SCHEDULES), "modes": MODES, "kinds": KINDS}
 
 
 def _own(table, member, oid):
@@ -173,13 +185,16 @@ def _slot_name(member, sid):
 
 
 # ---- sources -------------------------------------------------------------------------------
-def save_source(member, body):
-    """New source (no id) or a change to one (id; an empty password keeps the old one). → a check task."""
+def _fields(body):
+    """The connection fields of a source form, checked → (kind, host, port, database, user, schemas, cdc)."""
+    kind = str(body.get("kind") or "postgres")
+    if kind not in KINDS:
+        raise CdcError("database type: " + ", ".join(k["name"] for k in KINDS.values()))
     host = str(body.get("host") or "").strip()
     if not HOST.fullmatch(host):
         raise CdcError("host: a name or address")
     try:
-        port = int(body.get("port") or 5432)
+        port = int(body.get("port") or KINDS[kind]["port"])
     except ValueError:
         raise CdcError("port: a number") from None
     if not 0 < port < 65536:
@@ -187,10 +202,29 @@ def save_source(member, body):
     db, user = str(body.get("database") or "").strip(), str(body.get("username") or "").strip()
     if not db or not user or len(db) > 63 or len(user) > 63:
         raise CdcError("database and user are needed")
-    schemas = [s.strip() for s in (body.get("schemas") or []) if str(s).strip()]
+    schemas = [s.strip() for s in (body.get("schemas") or []) if str(s).strip()] if kind == "postgres" else []
     if any(not IDENT.fullmatch(s) for s in schemas):
         raise CdcError("schemas: lower-case names, e.g. public")
-    cdc = bool(body.get("cdc"))
+    return kind, host, port, db, user, schemas, bool(body.get("cdc"))
+
+
+def try_source(member, body, kind_of_task):
+    """Test connection / Browse tables on the form as it is — saved or not: a task whose payload is
+    the form (its password, or the saved source's when left empty), wiped once the task is done."""
+    kind, host, port, db, user, schemas, cdc = _fields(body)
+    pw, sid = str(body.get("password") or ""), None
+    if body.get("id"):
+        sid = _own("cdc_sources", member, body["id"])["id"]
+    elif not pw:
+        raise CdcError("password is needed")
+    return {"task": queue(member, kind_of_task, sid, {"kind": kind, "host": host, "port": port, "dbname": db,
+                                                       "username": user, "schemas": schemas, "cdc": cdc, "password": pw})}
+
+
+def save_source(member, body):
+    """New source (no id) or a change to one (id; an empty password keeps the old one). → a check task."""
+    kind, host, port, db, user, schemas, cdc = _fields(body)
+    pg = kind == "postgres"                              # Postgres: a publication + a slot of its own
     pub = str(body.get("publication") or "").strip() or None
     if cdc and pub and not IDENT.fullmatch(pub):
         raise CdcError("publication: a lower-case name")
@@ -199,10 +233,12 @@ def save_source(member, body):
         s = _own("cdc_sources", member, body["id"])
         if _q("SELECT 1 FROM cdc_sources WHERE member = %s AND name = %s AND id <> %s", (member, name, s["id"]), one=True):
             raise CdcError("you have a source with that name")
+        if s["kind"] != kind:
+            raise CdcError("the database type can't change — add a new source")
         _q("UPDATE cdc_sources SET name = %s, host = %s, port = %s, dbname = %s, username = %s, schemas = %s, cdc = %s, "
            "publication = %s, slot = %s, checked = NULL WHERE id = %s",
-           (name, host, port, db, user, schemas, cdc, (pub or "olake_pub") if cdc else None,
-            _slot_name(member, s["id"]) if cdc else None, s["id"]), rows=False)
+           (name, host, port, db, user, schemas, cdc, (pub or "olake_pub") if cdc and pg else None,
+            _slot_name(member, s["id"]) if cdc and pg else None, s["id"]), rows=False)
         sid = s["id"]
     else:
         if not pw:
@@ -210,10 +246,11 @@ def save_source(member, body):
         _limit("sources", member)
         if _q("SELECT 1 FROM cdc_sources WHERE member = %s AND name = %s", (member, name), one=True):
             raise CdcError("you have a source with that name")
-        sid = _q("INSERT INTO cdc_sources (member, name, host, port, dbname, username, schemas, cdc, publication) "
-                 "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
-                 (member, name, host, port, db, user, schemas, cdc, (pub or "olake_pub") if cdc else None), one=True)["id"]
-        if cdc:
+        sid = _q("INSERT INTO cdc_sources (member, name, kind, host, port, dbname, username, schemas, cdc, publication) "
+                 "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+                 (member, name, kind, host, port, db, user, schemas, cdc, (pub or "olake_pub") if cdc and pg else None),
+                 one=True)["id"]
+        if cdc and pg:
             _q("UPDATE cdc_sources SET slot = %s WHERE id = %s", (_slot_name(member, sid), sid), rows=False)
     if pw:
         save_password(member, sid, pw)
@@ -287,7 +324,7 @@ def create_job(member, body):
     if mode == "cdc" and not s["cdc"]:
         raise CdcError("this source has CDC off — turn it on, or choose a full reload")
     if mode == "cdc" and _q("SELECT name FROM cdc_jobs WHERE source_id = %s AND mode = 'cdc'", (s["id"],), one=True):
-        raise CdcError("a CDC job already reads this source (one replication slot = one job)")
+        raise CdcError("a CDC job already reads this source (one change stream = one job)")
     t = _q("SELECT * FROM cdc_tasks WHERE id = %s AND member = %s AND kind = 'discover' AND ref = %s AND status = 'done'",
            (int(body.get("discover") or 0), member, s["id"]), one=True)
     if not t:
@@ -299,6 +336,14 @@ def create_job(member, body):
     _limit("jobs", member)
     if _q("SELECT 1 FROM cdc_jobs WHERE member = %s AND name = %s", (member, name), one=True):
         raise CdcError("you have a job with that name")
+    if d["namespace"]:                   # two jobs writing one Iceberg table would mix their rows
+        mine = {x.split(".", 1)[1] for x in tables}
+        for o in _q("SELECT name, tables FROM cdc_jobs WHERE dest_id IN (SELECT id FROM cdc_destinations WHERE "
+                    "member = %s AND catalog = %s AND namespace = %s)", (member, d["catalog"], d["namespace"])):
+            same = sorted(mine & {x.split(".", 1)[1] for x in o["tables"]})
+            if same:
+                raise CdcError(f"job {o['name']} already writes {', '.join(same)} into {d['catalog']}.{d['namespace']} — "
+                               "choose a destination with another namespace")
     jid = _q("INSERT INTO cdc_jobs (member, name, source_id, dest_id, tables, mode, schedule, streams) "
              "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
              (member, name, s["id"], d["id"], tables, mode, schedule,
@@ -385,7 +430,7 @@ def task(member, tid):
     if not t:
         raise CdcError("not found")
     out = dict(t, created_at=_iso(t["created_at"]), finished_at=_iso(t["finished_at"]))
-    if t["kind"] == "discover" and t["result"]:          # the page needs the tables, not OLake's whole file
+    if t["kind"] in ("discover", "browse") and t["result"]:          # the page needs the tables, not OLake's whole file
         out["result"] = {"tables": t["result"].get("tables", [])}
     return out
 

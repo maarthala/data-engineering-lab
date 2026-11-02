@@ -28,10 +28,10 @@
 <body>
   <header id="lab-top"></header>
   <script src="/lab-header.js?v=13"></script>
-  <div class="pagebar"><h1>📡 Data sync <span class="dot">·</span> copy tables from your Postgres into your lakehouse</h1></div>
+  <div class="pagebar"><h1>📡 Data sync <span class="dot">·</span> copy tables from your databases into your lakehouse</h1></div>
   <main id="main"><div class="placeholder">Loading…</div></main>
   <script>
-    // 📡 Data sync (CDC) — a SOURCE is a Postgres you can reach; a DESTINATION is one of your
+    // 📡 Data sync (CDC) — a SOURCE is a database you can reach (PostgreSQL, MySQL, SQL Server); a DESTINATION is one of your
     // lakehouse catalogs (+ a namespace); a JOB copies chosen tables from a source to a destination:
     // a full load, then — with CDC — only the inserts, updates and deletes since the last run, on a
     // schedule or when you press Run now. The work runs in the lab (OLake's engine), as you.
@@ -100,7 +100,7 @@
                    'click', function () { render(tab); });
       main.appendChild(el('div', {class: 'bar'}, [tabs, add]));
       if (form === 'jobs') main.appendChild(jobForm());
-      else if (form === 'sources') main.appendChild(sourceForm({port: 5432, cdc: true}));
+      else if (form === 'sources') main.appendChild(sourceForm({kind: 'postgres', cdc: true}));
       else if (form === 'destinations') main.appendChild(destForm({}));
       else if (form) main.appendChild(form);
       main.appendChild({jobs: jobList, sources: sourceList, destinations: destList}[tab]());
@@ -118,7 +118,7 @@
     var busy = {};
     function sourceList() {
       if (!data.sources.length) return el('div', {class: 'card'}, [el('div', {class: 'sub',
-        text: 'No sources yet. A source is a Postgres database you can reach — its host, database and a login. With CDC on, the database needs wal_level = logical.'})]);
+        text: 'No sources yet. A source is a database you can reach — PostgreSQL, MySQL or SQL Server: its host, database and a login.'})]);
       var body = el('tbody');
       data.sources.forEach(function (s) {
         var chk = on(el('button', {class: 'small', text: 'Check'}), 'click', function () {
@@ -127,6 +127,15 @@
             .catch(function (e) { delete busy['s' + s.id]; alert_(e.message); });
         });
         var edit = on(el('button', {class: 'small', text: 'Edit'}), 'click', function () { render(sourceForm(s)); });
+        var more = el('tr', {class: 'more', hidden: ''}, [el('td', {colspan: '6'})]);
+        var tbl = on(el('button', {class: 'small', text: 'Tables'}), 'click', function () {
+          more.hidden = !more.hidden; tbl.classList.toggle('on', !more.hidden);
+          if (more.hidden) return;
+          var td = more.firstChild; td.innerHTML = ''; td.appendChild(el('div', {class: 'sub run', text: '… reading the tables'}));
+          api('POST', '/api/cdc/sources/tables', {id: s.id}).then(function (r) {
+            watch(r.task, function (t) { td.innerHTML = ''; td.appendChild(tableList(t)); });
+          }).catch(function (e) { td.innerHTML = ''; td.appendChild(note(e.message, 'bad')); });
+        });
         var del = on(el('button', {class: 'small', text: 'Delete'}), 'click', function () {
           ask(del, s.cdc ? 'Delete it (its replication slot is dropped too)?' : 'Delete it?', 'Yes, delete', function () {
             api('POST', '/api/cdc/sources/delete', {id: s.id}).then(function (r) {
@@ -140,35 +149,78 @@
           info.push((p.required ? '✗ needed: ' : 'tip: ') + p.name + ' is ' + p.current + ' — ' + p.recommended);
         });
         body.appendChild(el('tr', {}, [el('td', {}, [el('b', {text: s.name})]),
-          el('td', {text: s.host + ':' + s.port + ' / ' + s.database}), el('td', {text: s.username}),
-          el('td', {text: s.cdc ? 'on' : 'off', title: s.cdc ? 'publication ' + s.publication + ' · slot ' + s.slot : ''}),
+          el('td', {}, [el('div', {text: s.host + ':' + s.port + ' / ' + s.database}), el('div', {class: 'sub', text: data.kinds[s.kind].name})]),
+          el('td', {text: s.username}),
+          el('td', {text: s.cdc ? 'on' : 'off', title: s.cdc && s.slot ? 'publication ' + s.publication + ' · slot ' + s.slot : ''}),
           el('td', {}, [checked(c, busy['s' + s.id]), info.length ? el('ul', {class: 'notes'}, info.map(function (x) { return el('li', {text: x}); })) : null]),
-          el('td', {class: 'acts'}, [chk, ' ', edit, ' ', del])]));
+          el('td', {class: 'acts'}, [chk, ' ', tbl, ' ', edit, ' ', del])]));
+        body.appendChild(more);
       });
       return el('div', {class: 'card'}, [el('div', {class: 'wrap'}, [el('table', {class: 'lst'}, [el('thead', {}, [el('tr', {},
         ['Source', 'Database', 'User', 'CDC', 'Status', ''].map(function (h) { return el('th', {text: h}); }))]), body])])]);
     }
     function sourceForm(s) {
-      var f = {name: inp(s.name), host: inp(s.host), port: inp(s.port, 'number'), database: inp(s.database), username: inp(s.username),
+      var kind = s.kind || 'postgres';
+      var f = {name: inp(s.name), host: inp(s.host), port: inp(s.port || data.kinds[kind].port, 'number'), database: inp(s.database), username: inp(s.username),
                password: inp('', 'password', s.id ? 'unchanged' : ''), schemas: inp((s.schemas || []).join(', '), 'text', 'all — or e.g. public, sales')};
-      var cdc = !!s.cdc;
+      var cdc = !!s.cdc, schemaLabel = el('label', {text: 'Schemas'}), hint = el('div', {class: 'sub'});
+      function kindChanged() {                          // the type's port, schemas (Postgres only), what CDC needs
+        var k = data.kinds[kind], ports = Object.keys(data.kinds).map(function (x) { return String(data.kinds[x].port); });
+        if (!f.port.value || ports.indexOf(f.port.value) >= 0) f.port.value = k.port;
+        schemaLabel.hidden = f.schemas.hidden = kind !== 'postgres';
+        hint.textContent = 'CDC reads the database\'s change log. ' + k.name + ' needs: ' + k.cdc + '.';
+      }
+      var kinds = el('select', {}, Object.keys(data.kinds).map(function (k) { return el('option', {value: k, text: data.kinds[k].name}); }));
+      kinds.value = kind; kinds.disabled = !!s.id;      // a saved source keeps its type
+      on(kinds, 'change', function () { kind = kinds.value; kindChanged(); });
+      function form() {
+        return {id: s.id, kind: kind, name: f.name.value, host: f.host.value, port: f.port.value, database: f.database.value,
+                username: f.username.value, password: f.password.value, cdc: cdc,
+                schemas: f.schemas.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean)};
+      }
       var save = el('button', {class: 'primary', text: s.id ? 'Save & check' : 'Add & check'}), msg = el('div');
+      // Test connection / Browse tables: the form as it is, before saving it
+      var test = on(el('button', {type: 'button', text: 'Test connection'}), 'click', function () {
+        test.disabled = true; msg.innerHTML = ''; msg.appendChild(el('div', {class: 'sub run', text: '… connecting'}));
+        api('POST', '/api/cdc/sources/test', form()).then(function (r) {
+          watch(r.task, function (t) {
+            test.disabled = false; msg.innerHTML = '';
+            var ok = t.status === 'done' && t.result && t.result.ok;
+            msg.appendChild(note(ok ? '✓ Connected' : '✗ ' + ((t.result && t.result.message) || t.error || 'failed'), ok ? 'ok' : 'bad'));
+          });
+        }).catch(function (e) { test.disabled = false; msg.innerHTML = ''; msg.appendChild(note(e.message, 'bad')); });
+      });
+      var browse = on(el('button', {type: 'button', text: 'Browse tables'}), 'click', function () {
+        browse.disabled = true; msg.innerHTML = ''; msg.appendChild(el('div', {class: 'sub run', text: '… reading the tables'}));
+        api('POST', '/api/cdc/sources/browse', form()).then(function (r) {
+          watch(r.task, function (t) { browse.disabled = false; msg.innerHTML = ''; msg.appendChild(tableList(t)); });
+        }).catch(function (e) { browse.disabled = false; msg.innerHTML = ''; msg.appendChild(note(e.message, 'bad')); });
+      });
       on(save, 'click', function () {
         save.disabled = true; msg.innerHTML = ''; msg.appendChild(note('Saving…'));
-        api('POST', '/api/cdc/sources', {id: s.id, name: f.name.value, host: f.host.value, port: f.port.value, database: f.database.value,
-          username: f.username.value, password: f.password.value, cdc: cdc,
-          schemas: f.schemas.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean)})
+        api('POST', '/api/cdc/sources', form())
           .then(function (r) { tab = 'sources'; busy['s' + r.id] = 1; load(); watch(r.task, function () { delete busy['s' + r.id]; load(); }); })
           .catch(function (e) { save.disabled = false; msg.innerHTML = ''; msg.appendChild(note(e.message, 'bad')); });
       });
-      return el('div', {class: 'card'}, [el('h3', {text: s.id ? 'Edit source ' + s.name : 'New source — a Postgres database'}),
+      kindChanged();
+      return el('div', {class: 'card'}, [el('h3', {text: s.id ? 'Edit source ' + s.name : 'New source — a database you can reach'}),
         el('div', {class: 'form'}, [
-          el('label', {text: 'Name'}), f.name, el('label', {text: 'Host'}), f.host, el('label', {text: 'Port'}), f.port,
+          el('label', {text: 'Database type'}), kinds, el('label', {text: 'Name'}), f.name, el('label', {text: 'Host'}), f.host, el('label', {text: 'Port'}), f.port,
           el('label', {text: 'Database'}), f.database, el('label', {text: 'User'}), f.username, el('label', {text: 'Password'}), f.password,
-          el('label', {text: 'Schemas'}), f.schemas,
+          schemaLabel, f.schemas,
           el('label', {text: 'Change data capture'}), seg([[true, 'On — copy inserts, updates, deletes'], [false, 'Off — full reloads only']], cdc, function (v) { cdc = v; })]),
-        el('div', {class: 'sub', text: 'CDC reads the database\'s change log: it needs wal_level = logical, and a login allowed to make a publication and a replication slot — the check makes both.'}),
-        el('div', {class: 'row', style: 'margin-top:10px'}, [save, on(el('button', {text: 'Cancel'}), 'click', function () { render(); })]), msg]);
+        hint,
+        el('div', {class: 'row', style: 'margin-top:10px'}, [test, browse, save, on(el('button', {text: 'Cancel'}), 'click', function () { render(); })]), msg]);
+    }
+    // a finished table-list task → the tables (read only), or why it failed
+    function tableList(t) {
+      if (t.status !== 'done') return note('✗ ' + (t.error || 'failed'), 'bad');
+      var tb = t.result.tables;
+      if (!tb.length) return note('No tables found.');
+      return el('div', {style: 'margin-top:8px'}, [el('div', {class: 'sub', text: tb.length + (tb.length === 1 ? ' table' : ' tables')}),
+        el('div', {class: 'tables'}, tb.map(function (x) {
+          return el('div', {}, [el('span', {text: x.table}), el('span', {class: 'muted', text: ' · ' + x.columns + ' columns'})]);
+        }))]);
     }
     function inp(v, type, ph) { var i = el('input', {type: type || 'text'}); if (v !== undefined && v !== null) i.value = v; if (ph) i.placeholder = ph; return i; }
 
@@ -280,7 +332,22 @@
       var name = inp(''), src = data.sources[0].id, dst = (data.destinations[0] || {}).id, mode = data.sources[0].cdc ? 'cdc' : 'full_refresh', sched = '';
       var pick = el('select', {}, data.sources.map(function (s) { var o = el('option', {value: s.id, text: s.name + (s.cdc ? ' (CDC)' : '')}); return o; }));
       var dpick = el('select', {}, data.destinations.map(function (d) { return el('option', {value: d.id, text: d.name + ' — ' + d.catalog + (d.namespace ? '.' + d.namespace : '')}); }));
-      var list = el('div', {class: 'tables'}, [el('span', {class: 'muted', text: 'Press "List tables".'})]), disc = null, picked = {};
+      var list = el('div', {class: 'tables'}, [el('span', {class: 'muted', text: 'Press "List tables".'})]), disc = null, picked = {}, found = [], all = true;
+      var which = seg([[true, 'All tables'], [false, 'Choose tables']], all, function (v) { all = v; showTables(); });
+      var bulk = el('span', {class: 'row'}, [
+        on(el('button', {type: 'button', class: 'small', text: 'Select all'}), 'click', function () { found.forEach(function (x) { picked[x.table] = true; }); showTables(); }),
+        on(el('button', {type: 'button', class: 'small', text: 'None'}), 'click', function () { picked = {}; showTables(); })]);
+      bulk.hidden = true;
+      function showTables() {                           // All: every table listed · Choose: tick them
+        bulk.hidden = all || !found.length;
+        if (!found.length) return;
+        list.innerHTML = '';
+        found.forEach(function (x) {
+          var cb = on(el('input', {type: 'checkbox'}), 'change', function () { picked[x.table] = cb.checked; });
+          cb.checked = all || !!picked[x.table]; cb.disabled = all;
+          list.appendChild(el('label', {}, [cb, el('span', {text: x.table}), el('span', {class: 'muted', text: '· ' + x.columns + ' columns'})]));
+        });
+      }
       var lt = el('button', {type: 'button', class: 'small', text: 'List tables'}), modeBox = el('span'), msg = el('div');
       function modes() {
         var s = data.sources.filter(function (x) { return x.id == src; })[0];
@@ -288,7 +355,7 @@
         modeBox.innerHTML = '';
         modeBox.appendChild(seg(s.cdc ? [['cdc', MODE.cdc], ['full_refresh', MODE.full_refresh]] : [['full_refresh', MODE.full_refresh]], mode, function (v) { mode = v; }));
       }
-      on(pick, 'change', function () { src = pick.value; disc = null; picked = {}; list.innerHTML = ''; list.appendChild(el('span', {class: 'muted', text: 'Press "List tables".'})); modes(); });
+      on(pick, 'change', function () { src = pick.value; disc = null; picked = {}; found = []; bulk.hidden = true; list.innerHTML = ''; list.appendChild(el('span', {class: 'muted', text: 'Press "List tables".'})); modes(); });
       on(dpick, 'change', function () { dst = dpick.value; });
       on(lt, 'click', function () {
         lt.disabled = true; list.innerHTML = ''; list.appendChild(el('span', {class: 'run', text: '… reading the source\'s tables'}));
@@ -296,18 +363,15 @@
           watch(r.task, function (t) {
             lt.disabled = false; list.innerHTML = '';
             if (t.status !== 'done') return list.appendChild(el('span', {class: 'bad', text: '✗ ' + (t.error || 'failed')}));
-            disc = t.id;
-            if (!t.result.tables.length) return list.appendChild(el('span', {class: 'muted', text: 'No tables found.'}));
-            t.result.tables.forEach(function (x) {
-              var cb = on(el('input', {type: 'checkbox'}), 'change', function () { picked[x.table] = cb.checked; });
-              list.appendChild(el('label', {}, [cb, el('span', {text: x.table}), el('span', {class: 'muted', text: '· ' + x.columns + ' columns'})]));
-            });
+            disc = t.id; found = t.result.tables;
+            if (!found.length) return list.appendChild(el('span', {class: 'muted', text: 'No tables found.'}));
+            showTables();
           });
         }).catch(function (e) { lt.disabled = false; list.innerHTML = ''; list.appendChild(el('span', {class: 'bad', text: e.message})); });
       });
       modes();
       var create = on(el('button', {class: 'primary', text: 'Create & run'}), 'click', function () {
-        var tables = Object.keys(picked).filter(function (k) { return picked[k]; });
+        var tables = all ? found.map(function (x) { return x.table; }) : Object.keys(picked).filter(function (k) { return picked[k]; });
         create.disabled = true; msg.innerHTML = '';
         api('POST', '/api/cdc/jobs', {name: name.value, source: +src, destination: +dst, discover: disc, tables: tables, mode: mode, schedule: sched})
           .then(function () { tab = 'jobs'; load(); })
@@ -315,7 +379,7 @@
       });
       return el('div', {class: 'card'}, [el('h3', {text: 'New job — copy tables from a source to a destination'}),
         el('div', {class: 'form'}, [el('label', {text: 'Name'}), name, el('label', {text: 'Source'}), pick, el('label', {text: 'Destination'}), dpick,
-          el('label', {text: 'Tables'}), el('div', {}, [list, el('div', {style: 'margin-top:6px'}, [lt])]),
+          el('label', {text: 'Tables'}), el('div', {}, [which, el('div', {style: 'margin-top:6px'}, [list]), el('div', {class: 'row', style: 'margin-top:6px'}, [lt, bulk])]),
           el('label', {text: 'Mode'}), modeBox,
           el('label', {text: 'Schedule'}), seg(Object.keys(SCHED).map(function (k) { return [k, SCHED[k]]; }), sched, function (v) { sched = v; })]),
         el('div', {class: 'sub', text: 'Full load + CDC: the first run copies everything, later runs only the inserts, updates and deletes since the run before (deleted rows stay as _op_type = \'d\'). The first run starts as soon as you create the job.'}),

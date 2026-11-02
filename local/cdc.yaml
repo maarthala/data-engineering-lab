@@ -1,8 +1,8 @@
 services:
-  # 📡 Data sync (CDC) — members copy tables from their own Postgres into their lakehouse (full load,
+  # 📡 Data sync (CDC) — members copy tables from their own database into their lakehouse (full load,
   # then inserts / updates / deletes). The portal page (cdc.html) and home-api keep the sources,
   # destinations and jobs; this runner does the work: each check, table list and sync is one OLake
-  # engine container (olakego/source-postgres) on the stack's network, started through the Docker
+  # engine container (olakego/source-postgres, -mysql, -mssql) on the stack's network, started through the Docker
   # socket — a single-machine test stack, like Airflow running member tasks here.
   cdc-runner:
     build:
@@ -18,7 +18,7 @@ services:
       AWS_SECRET_ACCESS_KEY: admin123
       VAULT_ADDR: http://vault:8200
       VAULT_ADMIN_TOKEN: ${VAULT_ADMIN_TOKEN:-lab-vault-admin-local-token}
-      CDC_IMAGE: olakego/source-postgres:v1.1.1
+      CDC_VERSION: v1.1.1                        # OLake engine images olakego/source-<kind>
       CDC_NETWORK: ${COMPOSE_PROJECT_NAME:-local}_sparknet
       CDC_MEM_GB: "1.5"
       CDC_WORKERS: "2"

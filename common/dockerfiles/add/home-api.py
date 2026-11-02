@@ -66,6 +66,7 @@ go (leaving = pause), the review comes after submitting. Changes need the X-Lab-
   GET    /api/cdc                                        my sources, destinations, jobs (+ last run), my catalogs
   POST   /api/cdc/sources {"id"?, "name", "host", "port", "database", "username", "password", "schemas", "cdc"}
          …/sources/check · …/sources/tables · …/sources/delete {"id"}      → a task (check / list tables)
+         …/sources/test · …/sources/browse {the form, saved or not}         → Test connection / Browse tables
   POST   /api/cdc/destinations {"id"?, "name", "catalog", "namespace"} · …/check · …/delete {"id"}
   POST   /api/cdc/jobs {"name", "source", "destination", "discover", "tables", "mode", "schedule"}
          …/jobs/run · …/jobs/delete {"id"} · …/jobs/set {"id", "enabled"?, "schedule"?}
@@ -414,6 +415,8 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/cdc/sources/delete": lambda: labcdc.delete_source(name, b.get("id", 0)),
                 "/api/cdc/sources/check": lambda: {"task": labcdc.queue(name, "check_source", labcdc._own("cdc_sources", name, b.get("id", 0))["id"])},
                 "/api/cdc/sources/tables": lambda: labcdc.discover(name, b.get("id", 0)),
+                "/api/cdc/sources/test": lambda: labcdc.try_source(name, b, "test_source"),
+                "/api/cdc/sources/browse": lambda: labcdc.try_source(name, b, "browse"),
                 "/api/cdc/destinations": lambda: labcdc.save_destination(name, b, cats),
                 "/api/cdc/destinations/delete": lambda: labcdc.delete_destination(name, b.get("id", 0)),
                 "/api/cdc/destinations/check": lambda: {"task": labcdc.queue(name, "check_destination", labcdc._own("cdc_destinations", name, b.get("id", 0))["id"])},
