@@ -27,6 +27,8 @@
     .ns .car{display:inline-block; width:14px; color:var(--muted); transition:transform .15s} .ns.open .car{transform:rotate(90deg)}
     .tbl td:first-child{padding-left:38px; color:var(--muted)} .tbl .full{font-family:ui-monospace,Menlo,monospace; font-size:.8rem; margin-left:10px; opacity:.7}
     td.r button + button{margin-left:4px}
+    .helpbtn{float:right} .helpbox{margin-top:12px; padding:12px; border:1px dashed var(--line); border-radius:9px; background:var(--panel2)}
+    .helpbox pre{margin-bottom:8px}
     .cardhead{display:flex; align-items:center; justify-content:space-between; gap:8px} .cardhead h3{margin:0}
     .invite{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:8px}
     .invite input{width:240px} .invite select{max-width:100%}
@@ -86,6 +88,13 @@
       return pre;
     }
 
+    // "ⓘ How to use it" in a catalog's header card: the notebook / SQL hint, closed until asked for
+    function help(head, nodes) {
+      var b = el('button', 'small helpbtn', 'ⓘ How to use it'), box = el('div', 'helpbox'); box.hidden = true;
+      nodes.forEach(function (x) { box.appendChild(x); });
+      b.onclick = function () { box.hidden = !box.hidden; b.textContent = box.hidden ? 'ⓘ How to use it' : '✕ Hide help'; };
+      head.insertBefore(b, head.firstChild); head.appendChild(box);
+    }
     function load(keep) {
       return api('GET', '').then(function (r) {
         if (!r.ok) return toast(r.body.error || 'could not load catalogs', true);
@@ -138,8 +147,7 @@
         if (/_lake$/.test(name) && c.shares.some(function (s) { return s.scope === 'lake' || !s.namespace; }))
           acc.appendChild(el('div', 'sub', 'Their files come with the lake: 📁 My files → 🤝 Shared with me.'));
         m.appendChild(acc);
-        var nb = el('div', 'card'); nb.appendChild(el('h3', null, 'Use it in a notebook'));
-        nb.appendChild(snippet(name, c.shares[0].namespace, c.shares[0].table)); m.appendChild(nb);
+        help(card, [snippet(name, c.shares[0].namespace, c.shares[0].table)]);
         return;
       }
       var info = state.data.owned.filter(function (x) { return x.name === name; })[0];
@@ -147,9 +155,8 @@
       if (info.team) {          // the team's: every member reads and writes it, nothing to share
         head.appendChild(el('div', 'sub', 'Your team\'s lakehouse — every member of the team reads and writes it, by its name ' + name + ' in notebooks, SQLPad and Superset · stored in ' + info.location));
         m.appendChild(head);
-        var tnb = el('div', 'card'); tnb.appendChild(el('h3', null, 'Use it'));
         var tp = el('pre'); tp.textContent = '# notebooks: already set up\nspark.sql("SHOW TABLES IN ' + name + '.bronze").show()\n\n-- SQLPad\nSELECT * FROM ' + name + '.bronze.<table>;';
-        tnb.appendChild(tp); m.appendChild(tnb);
+        help(head, [tp]);
         return;
       }
       head.appendChild(el('div', 'sub', (info.default ? 'Your main lakehouse (`my` in your notebooks)' : 'Your catalog') + ' · stored in ' + info.location));
@@ -226,10 +233,8 @@
       };
       var tbody = el('table'); tree.appendChild(tbody); m.appendChild(tree); m.appendChild(inv);
       tbody.innerHTML = '<tr><td class="sub">Loading…</td></tr>';
-      var nb = el('div', 'card'); nb.appendChild(el('h3', null, 'Use it in a notebook'));
-      nb.appendChild(info.default ? (function () { var p = el('pre'); p.textContent = '# notebooks: already set up as `my`\nspark.sql("SHOW NAMESPACES IN my").show()\n\n-- SQL editor\nSELECT * FROM ' + name + '.<namespace>.<table>;'; return p; })() : snippet(name));
-      nb.appendChild(el('div', 'sub', 'Tables are made by code (e.g. df.writeTo("' + (info.default ? 'my' : name) + '.bronze.orders").create()) or by 📡 Ingestion. ⧉ next to a table copies its full name.'));
-      m.appendChild(nb);
+      help(head, [info.default ? (function () { var p = el('pre'); p.textContent = '# notebooks: already set up as `my`\nspark.sql("SHOW NAMESPACES IN my").show()\n\n-- SQL editor\nSELECT * FROM ' + name + '.<namespace>.<table>;'; return p; })() : snippet(name),
+        el('div', 'sub', 'Tables are made by code (e.g. df.writeTo("' + (info.default ? 'my' : name) + '.bronze.orders").create()) or by 📡 Ingestion. ⧉ next to a table copies its full name.')]);
 
       var nsList;
       function namespaces() {
