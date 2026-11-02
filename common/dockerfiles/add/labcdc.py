@@ -17,6 +17,7 @@ cdc-runner service (cdc_runner.py), which picks up cdc_tasks rows. Nothing here 
 import json
 import os
 import re
+import secrets
 import threading
 
 DB_URL = os.environ.get("PORTAL_DB_URL", "postgresql://portal:portal@postgres:5432/portal")
@@ -183,8 +184,9 @@ def _limit(table, member):
         raise CdcError(f"you have {n} {table} — the most there can be; delete one first")
 
 
-def _slot_name(member, sid):
-    return re.sub(r"[^a-z0-9_]", "_", f"olake_{member}_{sid}".lower())[:63]
+def _slot_name(member):
+    """<member>_<random> — made once per source and kept (an edit doesn't rename it: the old slot would be left over)."""
+    return re.sub(r"[^a-z0-9_]", "_", member.lower())[:54] + "_" + secrets.token_hex(4)
 
 
 # ---- sources -------------------------------------------------------------------------------
@@ -241,7 +243,7 @@ def save_source(member, body):
         _q("UPDATE cdc_sources SET name = %s, host = %s, port = %s, dbname = %s, username = %s, schemas = %s, cdc = %s, "
            "publication = %s, slot = %s, checked = NULL WHERE id = %s",
            (name, host, port, db, user, schemas, cdc, (pub or "olake_pub") if cdc and pg else None,
-            _slot_name(member, s["id"]) if cdc and pg else None, s["id"]), rows=False)
+            (s["slot"] or _slot_name(member)) if cdc and pg else None, s["id"]), rows=False)
         sid = s["id"]
     else:
         if not pw:
@@ -254,7 +256,7 @@ def save_source(member, body):
                  (member, name, kind, host, port, db, user, schemas, cdc, (pub or "olake_pub") if cdc and pg else None),
                  one=True)["id"]
         if cdc and pg:
-            _q("UPDATE cdc_sources SET slot = %s WHERE id = %s", (_slot_name(member, sid), sid), rows=False)
+            _q("UPDATE cdc_sources SET slot = %s WHERE id = %s", (_slot_name(member), sid), rows=False)
     if pw:
         save_password(member, sid, pw)
     return {"id": sid, "task": queue(member, "check_source", sid)}
@@ -320,7 +322,7 @@ def ensure_lab_source(member):
     sid = _q("INSERT INTO cdc_sources (member, name, kind, host, port, dbname, username, schemas, cdc, publication) "
              "VALUES (%s, 'Lab shop (live)', 'postgres', %s, %s, %s, %s, '{public}', true, 'olake_pub') RETURNING id",
              (member, u.hostname, u.port or 5432, u.path.lstrip("/"), urllib.parse.unquote(u.username or "")), one=True)["id"]
-    _q("UPDATE cdc_sources SET slot = %s WHERE id = %s", (_slot_name(member, sid), sid), rows=False)
+    _q("UPDATE cdc_sources SET slot = %s WHERE id = %s", (_slot_name(member), sid), rows=False)
     save_password(member, sid, urllib.parse.unquote(u.password or ""))
 
 
