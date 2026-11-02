@@ -36,3 +36,51 @@ services:
     restart: unless-stopped
     networks:
       - sparknet
+
+  # The lab's live shop database for practising CDC: one database for all members (login
+  # reader / reader — SELECT + REPLICATION, never writes), kept changing by cdc-sim. A Postgres of its
+  # own with wal_level = logical, so members' replication slots never touch the platform's database;
+  # a forgotten slot holds at most max_slot_wal_keep_size of change log.
+  cdc-db:
+    image: postgres:18
+    container_name: cdc-db
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=100", "-c", "max_wal_senders=100",
+              "-c", "max_slot_wal_keep_size=1GB", "-c", "wal_sender_timeout=0"]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: cdc-db-local-owner          # the simulator only — members use reader
+      POSTGRES_DB: shop
+    volumes:
+      - cdc-db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d shop"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - sparknet
+
+  # Keeps the shop changing at random intervals: orders, status changes, prices, cancellations.
+  cdc-sim:
+    build:
+      context: ../common/dockerfiles
+      dockerfile: Dockerfile.cdc-runner
+    container_name: cdc-sim
+    command: ["python", "/app/cdc_simulator.py"]
+    environment:
+      CDC_DB_URL: postgresql://postgres:cdc-db-local-owner@cdc-db:5432/shop
+      CDC_READER: reader:reader
+      CDC_SIM_MIN_S: "2"
+      CDC_SIM_MAX_S: "10"
+    volumes:
+      - ../common/dockerfiles/add/cdc_simulator.py:/app/cdc_simulator.py:ro
+    depends_on:
+      cdc-db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sparknet
+
+volumes:
+  cdc-db-data:

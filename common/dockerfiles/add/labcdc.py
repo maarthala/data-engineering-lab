@@ -37,6 +37,8 @@ NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.-]{0,59}$")
 IDENT = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
 HOST = re.compile(r"^[A-Za-z0-9.-]{1,253}$")
 LIMITS = {"sources": 10, "destinations": 10, "jobs": 10}
+# the lab's live shop database (cdc-db, kept changing by cdc-sim): every member starts with it as a source
+LAB_DB = os.environ.get("CDC_LAB_DB", "")                    # postgresql://reader:reader@cdc-db:5432/shop
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS cdc_sources (
@@ -64,6 +66,7 @@ CREATE TABLE IF NOT EXISTS cdc_tasks (
   status text NOT NULL DEFAULT 'queued', result jsonb, error text,
   created_at timestamptz NOT NULL DEFAULT now(), finished_at timestamptz);
 CREATE INDEX IF NOT EXISTS cdc_tasks_queued ON cdc_tasks (status, id);
+CREATE TABLE IF NOT EXISTS portal_cdc_seen (member text PRIMARY KEY);      -- got the lab source once (deleting it is fine)
 """
 _ready, _lock = False, threading.Lock()
 
@@ -301,6 +304,24 @@ def ensure_default_destination(member, catalog):
     if not _q("SELECT 1 FROM cdc_destinations WHERE member = %s", (member,), one=True):
         _q("INSERT INTO cdc_destinations (member, name, catalog, namespace) VALUES (%s, 'My lakehouse', %s, 'cdc') "
            "ON CONFLICT DO NOTHING", (member, catalog), rows=False)
+    ensure_lab_source(member)
+
+
+def ensure_lab_source(member):
+    """…and with the lab's live shop as a source, CDC on (its replication slot is made by the first
+    check or run, not before — no slot for members who never use it)."""
+    if not LAB_DB or _q("SELECT 1 FROM portal_cdc_seen WHERE member = %s", (member,), one=True):
+        return
+    import urllib.parse
+    u = urllib.parse.urlparse(LAB_DB)
+    _q("INSERT INTO portal_cdc_seen (member) VALUES (%s) ON CONFLICT DO NOTHING", (member,), rows=False)
+    if _q("SELECT 1 FROM cdc_sources WHERE member = %s AND name = 'Lab shop (live)'", (member,), one=True):
+        return
+    sid = _q("INSERT INTO cdc_sources (member, name, kind, host, port, dbname, username, schemas, cdc, publication) "
+             "VALUES (%s, 'Lab shop (live)', 'postgres', %s, %s, %s, %s, '{public}', true, 'olake_pub') RETURNING id",
+             (member, u.hostname, u.port or 5432, u.path.lstrip("/"), urllib.parse.unquote(u.username or "")), one=True)["id"]
+    _q("UPDATE cdc_sources SET slot = %s WHERE id = %s", (_slot_name(member, sid), sid), rows=False)
+    save_password(member, sid, urllib.parse.unquote(u.password or ""))
 
 
 def delete_destination(member, did):
@@ -439,5 +460,5 @@ def forget(member):
     """A member is deleted: their jobs, runs, tasks, destinations, sources and stored passwords."""
     for s in _q("SELECT id FROM cdc_sources WHERE member = %s", (member,)):
         _drop_password(member, s["id"])
-    for t in ("cdc_tasks", "cdc_jobs", "cdc_destinations", "cdc_sources"):
+    for t in ("cdc_tasks", "cdc_jobs", "cdc_destinations", "cdc_sources", "portal_cdc_seen"):
         _q(f"DELETE FROM {t} WHERE member = %s", (member,), rows=False)
