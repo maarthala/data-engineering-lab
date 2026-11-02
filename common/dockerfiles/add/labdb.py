@@ -31,16 +31,16 @@ SHARED = [
     {"key": "adventureworks", "title": "AdventureWorks", "what": "Microsoft's sample company: sales, production, HR",
      "host": HOST, "port": PORT, "database": "adventureworks",
      "user": "learner", "password": "learner", "sqlpad": "AdventureWorks — OLTP (Postgres)"},
-    # one company's three live systems, changing every few seconds — sources for 📡 Ingestion (CDC)
-    {"key": "shop", "title": "Live web shop", "what": "the online shop: customers, products, orders (live)",
+    # Tidewell, one company's three live systems (the course project), changing every few seconds — sources for 📡 Ingestion (CDC)
+    {"key": "shop", "title": "Tidewell web shop", "what": "Tidewell's online shop: customers, products, orders (live)",
      "host": HOST, "port": PORT, "database": "shop", "user": "reader", "password": "reader",
-     "sqlpad": "Live web shop (Postgres)"},
-    {"key": "store", "title": "Live stores", "what": "the stores' tills: sales in local time, cents, SKUs (live)",
+     "sqlpad": "Tidewell web shop (Postgres)"},
+    {"key": "store", "title": "Tidewell stores", "what": "Tidewell's store tills: sales in local time, cents, SKUs (live)",
      "host": HOST, "port": PORT, "database": "store", "user": "reader", "password": "reader",
-     "sqlpad": "Live stores (Postgres)"},
-    {"key": "loyalty", "title": "Live loyalty", "what": "the loyalty card: members and their points (live)",
+     "sqlpad": "Tidewell stores (Postgres)"},
+    {"key": "loyalty", "title": "Tidewell loyalty", "what": "Tidewell's loyalty card: members and their points (live)",
      "host": HOST, "port": PORT, "database": "loyalty", "user": "reader", "password": "reader",
-     "sqlpad": "Live loyalty (Postgres)"},
+     "sqlpad": "Tidewell loyalty (Postgres)"},
 ]
 
 

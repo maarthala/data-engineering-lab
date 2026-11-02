@@ -40,22 +40,22 @@ services:
       SQLPAD_CONNECTIONS__adventureworks__database: adventureworks
       SQLPAD_CONNECTIONS__adventureworks__username: learner
       SQLPAD_CONNECTIONS__adventureworks__password: learner
-      # the company's live systems (lab-db, kept changing by cdc-sim; read only)
-      SQLPAD_CONNECTIONS__liveshop__name: "Live web shop (Postgres)"
+      # Tidewell's live systems — the course project (lab-db, kept changing by cdc-sim; read only)
+      SQLPAD_CONNECTIONS__liveshop__name: "Tidewell web shop (Postgres)"
       SQLPAD_CONNECTIONS__liveshop__driver: postgres
       SQLPAD_CONNECTIONS__liveshop__host: lab-db
       SQLPAD_CONNECTIONS__liveshop__port: "5432"
       SQLPAD_CONNECTIONS__liveshop__database: shop
       SQLPAD_CONNECTIONS__liveshop__username: reader
       SQLPAD_CONNECTIONS__liveshop__password: reader
-      SQLPAD_CONNECTIONS__livestore__name: "Live stores (Postgres)"
+      SQLPAD_CONNECTIONS__livestore__name: "Tidewell stores (Postgres)"
       SQLPAD_CONNECTIONS__livestore__driver: postgres
       SQLPAD_CONNECTIONS__livestore__host: lab-db
       SQLPAD_CONNECTIONS__livestore__port: "5432"
       SQLPAD_CONNECTIONS__livestore__database: store
       SQLPAD_CONNECTIONS__livestore__username: reader
       SQLPAD_CONNECTIONS__livestore__password: reader
-      SQLPAD_CONNECTIONS__liveloyalty__name: "Live loyalty (Postgres)"
+      SQLPAD_CONNECTIONS__liveloyalty__name: "Tidewell loyalty (Postgres)"
       SQLPAD_CONNECTIONS__liveloyalty__driver: postgres
       SQLPAD_CONNECTIONS__liveloyalty__host: lab-db
       SQLPAD_CONNECTIONS__liveloyalty__port: "5432"
