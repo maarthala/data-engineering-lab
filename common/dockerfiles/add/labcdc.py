@@ -210,7 +210,10 @@ def _fields(body):
     db, user = str(body.get("database") or "").strip(), str(body.get("username") or "").strip()
     if not db or not user or len(db) > 63 or len(user) > 63:
         raise CdcError("database and user are needed")
-    schemas = [s.strip() for s in (body.get("schemas") or []) if str(s).strip()] if kind == "postgres" else []
+    raw = body.get("schemas") or []
+    if isinstance(raw, str):                          # "public, sales" as well as ["public", "sales"]
+        raw = raw.split(",")
+    schemas = [str(x).strip() for x in raw if str(x).strip()] if kind == "postgres" else []
     if any(not IDENT.fullmatch(s) for s in schemas):
         raise CdcError("schemas: lower-case names, e.g. public")
     return kind, host, port, db, user, schemas, bool(body.get("cdc"))
