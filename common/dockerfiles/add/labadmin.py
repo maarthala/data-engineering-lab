@@ -867,9 +867,10 @@ def _flink_apply(on=None):
     running = d["spec"].get("replicas", 0) > 0 if on is None else on
     c = d["spec"]["template"]["spec"]["containers"][0]
     mem = f"{lh.flink_memory_mb(slots) + 256}Mi"             # the pod's limit: Flink's own size + room
-    lh._k8s("PATCH", path, {"spec": {"replicas": tms if running else 0, "template": {"spec": {"containers": [{
-        "name": c["name"], "env": [{"name": "FLINK_PROPERTIES", "value": _tm_conf(slots)}],
-        "resources": {"requests": {"memory": mem}, "limits": {"memory": mem}}}]}}}})
+    c.update(env=[{"name": "FLINK_PROPERTIES", "value": _tm_conf(slots)}],
+             resources={"requests": {"memory": mem}, "limits": {"memory": mem}})
+    # a merge patch replaces the list of containers: the whole container goes, changed
+    lh._k8s("PATCH", path, {"spec": {"replicas": tms if running else 0, "template": {"spec": {"containers": [c]}}}})
 
 
 def set_flink(taskmanagers, slots):
