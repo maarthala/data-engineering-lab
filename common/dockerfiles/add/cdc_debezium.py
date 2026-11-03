@@ -593,7 +593,9 @@ def reconcile():
             if want == "RUNNING" or _src(j["id"]) in conns:
                 c = ensure(j, want) if not (_src(j["id"]) in conns and _sink(j["id"]) in conns) else conns
                 if want == "RUNNING" and _failed(c, j["id"]):
-                    write_secrets(j, _rows(j)[0])         # a renewed key: the restarted task reads the files again
+                    s_, d_ = _rows(j)
+                    create_tables(j, s_, d_)              # its tables taken by another tool → SetupError: it stops
+                    write_secrets(j, s_)                  # a renewed key: the restarted task reads the files again
                     for name in (_src(j["id"]), _sink(j["id"])):
                         _rest("POST", f"/connectors/{name}/restart?includeTasks=true&onlyFailed=true")
                 _set_state(j["id"], want, c)
