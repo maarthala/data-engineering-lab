@@ -2,7 +2,7 @@
 connector's ${dir:…} references (passwords, keys); it writes them into the folder it shares with
 Kafka Connect (an emptyDir: never on disk, gone with the pod). Locally the two share a volume and
 this isn't needed. Only cdc-runner may reach it (NetworkPolicy), and every call carries a token.
-  PUT    /<dir>/<name>   body = the value          GET /   → the dirs there (JSON)
+  PUT    /<dir>/<name>   body = the value          (<dir>: cdc-<job> or ps-<stream>)          GET /   → the dirs there (JSON)
   DELETE /<dir>          a deleted job's files
 """
 import http.server
@@ -14,7 +14,7 @@ import shutil
 ROOT = os.environ.get("CDC_SECRETS", "/run/lab-secrets")
 TOKEN = os.environ.get("CDC_SECRETS_TOKEN", "")
 PORT = int(os.environ.get("PORT", "8090"))
-SAFE = re.compile(r"^cdc-\d+$")
+SAFE = re.compile(r"^(cdc|ps)-\d+$")                # a 📡 Ingestion job's, a 📨 Pub/Sub sink's
 KEY = re.compile(r"^[a-z0-9-]{1,40}$")
 
 

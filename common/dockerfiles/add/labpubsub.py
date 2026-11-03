@@ -41,6 +41,45 @@ KINDS = {
                   "fields": ["event_id", "event_type", "event_time", "publish_time", "sku", "store", "qty_change",
                              "reason"]},
 }
+# the Iceberg table a stream lands in (🏞 Land in your lakehouse): its columns, typed — + _kafka (where it came from)
+_ITEM = ("struct", [("product_id", "long"), ("quantity", "int"), ("price", "double")])
+COLUMNS = {
+    "click_events": [("session_id", "string"), ("customer_id", "long"), ("device", "string"), ("page", "string"),
+                     ("product_id", "long"), ("search_term", "string"), ("referrer", "string")],
+    "orders": [("order_id", "string"), ("customer_id", "long"), ("items", ("list", _ITEM)), ("total", "double"),
+               ("currency", "string"), ("country", "string")],
+    "payments": [("payment_id", "string"), ("order_id", "string"), ("customer_id", "long"), ("amount", "double"),
+                 ("currency", "string"), ("method", "string"), ("reason", "string")],
+    "inventory": [("sku", "string"), ("store", "string"), ("qty_change", "int"), ("reason", "string")],
+}
+FIRST = [("event_id", "string"), ("event_type", "string"), ("event_time", "timestamptz"), ("publish_time", "timestamptz")]
+KAFKA = ("_kafka", ("struct", [("topic", "string"), ("partition", "int"), ("offset", "long"), ("timestamp", "timestamptz")]))
+
+
+def iceberg_schema(kind):
+    """The stream's table as an Iceberg REST schema (field ids numbered through the nesting)."""
+    n = [0]
+
+    def nid():
+        n[0] += 1
+        return n[0]
+
+    def typ(t):
+        if isinstance(t, str):
+            return t
+        if t[0] == "list":
+            return {"type": "list", "element-id": nid(), "element-required": False, "element": typ(t[1])}
+        return {"type": "struct", "fields": fields(t[1])}
+
+    def fields(cols):
+        out = []
+        for name, t in cols:
+            fid = nid()
+            out.append({"id": fid, "name": name, "required": False, "type": typ(t)})
+        return out
+    return {"type": "struct", "schema-id": 0, "fields": fields(FIRST + COLUMNS[kind] + [KAFKA])}
+
+
 RATES = (1, 5, 10, 20, 50, 100)                      # events per second; the most a member may pick is a setting
 LATE_PCT = (0, 5, 20)                                # % of events that arrive late
 LATE_MAX = {60: "up to 1 min", 600: "up to 10 min", 3600: "up to 1 h", 86400: "up to 1 day"}
@@ -63,6 +102,13 @@ CREATE TABLE IF NOT EXISTS pubsub_streams (
   sent bigint NOT NULL DEFAULT 0, late bigint NOT NULL DEFAULT 0, last_at timestamptz,
   recent jsonb NOT NULL DEFAULT '[]', UNIQUE (member, name));
 ALTER TABLE pubsub_streams ADD COLUMN IF NOT EXISTS recent_late jsonb NOT NULL DEFAULT '[]';   -- the last late ones
+-- 🏞 landing in the lakehouse: cdc-runner keeps a sink connector ps-<id>-sink for it, and reports sink_status
+ALTER TABLE pubsub_streams ADD COLUMN IF NOT EXISTS sink_catalog text;
+ALTER TABLE pubsub_streams ADD COLUMN IF NOT EXISTS sink_namespace text;
+ALTER TABLE pubsub_streams ADD COLUMN IF NOT EXISTS sink_table text;
+ALTER TABLE pubsub_streams ADD COLUMN IF NOT EXISTS sink_on boolean NOT NULL DEFAULT false;
+ALTER TABLE pubsub_streams ADD COLUMN IF NOT EXISTS sink_status jsonb;
+ALTER TABLE pubsub_streams ADD COLUMN IF NOT EXISTS sink_link text;       -- this link (the table made for it says so)
 CREATE TABLE IF NOT EXISTS pubsub_sim (id int PRIMARY KEY, beat timestamptz NOT NULL);   -- event-sim is alive
 """
 _ready, _lock = False, threading.Lock()
@@ -118,16 +164,18 @@ def sim_alive():
 
 def _out(s, recent=False):
     o = {k: s[k] for k in ("id", "name", "kind", "topic", "rate", "late_pct", "late_max", "late_pattern", "state",
-                           "paused_why", "ready", "error", "sent", "late")}
+                           "paused_why", "ready", "error", "sent", "late", "sink_on", "sink_status")}
+    o["sink"] = ".".join((s["sink_catalog"], s["sink_namespace"], s["sink_table"])) if s["sink_catalog"] else None
     o.update(created_at=_iso(s["created_at"]), resumed_at=_iso(s["resumed_at"]), last_at=_iso(s["last_at"]))
     if recent:
         o["recent"], o["recent_late"] = s["recent"], s["recent_late"]
     return o
 
 
-def overview(member):
+def overview(member, catalogs=()):
     rows = _q("SELECT * FROM pubsub_streams WHERE member = %s AND state <> 'deleted' ORDER BY name", (member,))
-    return {"streams": [_out(s) for s in rows], "kinds": KINDS, "rates": RATES, "late_pct": LATE_PCT,
+    return {"streams": [_out(s) for s in rows], "kinds": KINDS, "catalogs": list(catalogs),
+            "columns": {k: [c for c, _ in FIRST + v] + [KAFKA[0]] for k, v in COLUMNS.items()}, "rates": RATES, "late_pct": LATE_PCT,
             "late_max": LATE_MAX, "patterns": PATTERNS, "late_after_s": LATE_AFTER_S, "auto_pause_h": AUTO_PAUSE_H,
             "retention_h": RETENTION_H, "partitions": PARTITIONS, "limits": _limits(),
             "streaming": sim_alive(), "streaming_how": STREAMING_HOW}
@@ -193,6 +241,45 @@ def update(member, sid, body):
                    "paused_why = CASE WHEN %s = 'paused' THEN 'by you' END, "
                    "resumed_at = CASE WHEN %s THEN now() ELSE resumed_at END WHERE id = %s RETURNING *",
                    (rate, pct, mx, pattern, state, state, resumed, s["id"]), one=True))
+
+
+IDENT = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
+
+
+def land(member, sid, body, catalogs):
+    """🏞 Land the stream in one of the member's catalogs: <catalog>.<namespace>.<table>, from the
+    oldest event the topic still has; cdc-runner makes the table and the sink connector."""
+    s = _own(member, sid)
+    if s["sink_catalog"]:
+        raise PubSubError(f"{s['name']} lands in {s['sink_catalog']}.{s['sink_namespace']}.{s['sink_table']} already — "
+                          f"remove that first to choose another table")
+    cat, ns, tb = body.get("catalog"), (body.get("namespace") or "").strip(), (body.get("table") or "").strip()
+    if cat not in catalogs:
+        raise PubSubError("pick one of your catalogs")
+    if not IDENT.fullmatch(ns) or not IDENT.fullmatch(tb):
+        raise PubSubError("namespace and table: lowercase letters, digits and _, starting with a letter")
+    other = _q("SELECT name FROM pubsub_streams WHERE member = %s AND sink_catalog = %s AND sink_namespace = %s "
+               "AND sink_table = %s AND state <> 'deleted'", (member, cat, ns, tb), one=True)
+    if other:
+        raise PubSubError(f"your stream {other['name']} lands in {cat}.{ns}.{tb} — pick another table")
+    import secrets
+    return _out(_q("UPDATE pubsub_streams SET sink_catalog = %s, sink_namespace = %s, sink_table = %s, sink_on = true, "
+                   "sink_status = NULL, sink_link = %s WHERE id = %s RETURNING *",
+                   (cat, ns, tb, secrets.token_hex(8), s["id"]), one=True))
+
+
+def land_on(member, sid, on):
+    s = _own(member, sid)
+    if not s["sink_catalog"]:
+        raise PubSubError("it doesn't land anywhere yet")
+    return _out(_q("UPDATE pubsub_streams SET sink_on = %s WHERE id = %s RETURNING *", (bool(on), s["id"]), one=True))
+
+
+def unland(member, sid):
+    """Stop landing for good: the sink goes (the table stays)."""
+    s = _own(member, sid)
+    return _out(_q("UPDATE pubsub_streams SET sink_catalog = NULL, sink_namespace = NULL, sink_table = NULL, "
+                   "sink_on = false, sink_status = NULL WHERE id = %s RETURNING *", (s["id"],), one=True))
 
 
 def delete(member, sid):
