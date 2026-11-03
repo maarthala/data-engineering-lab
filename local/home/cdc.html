@@ -527,11 +527,39 @@
       if (!d) return go('destinations');
       var back = wiz ? ['New job', 'new-job'] : ['Destinations', 'destinations'];
       main.appendChild(crumbs([back, [d.id ? d.name : 'New destination']]));
-      var name = inp(d.name, 'text', 'e.g. Shop Bronze'), ns = inp(d.namespace, 'text', 'e.g. bronze_shop'), msg = el('div');
+      var name = inp(d.name, 'text', 'e.g. Shop Bronze'), msg = el('div');
       var cat = select(data.catalogs.map(function (c) { return [c, c]; }), d.catalog || data.catalogs[0]);
+      // the namespace: one the lakehouse has (a list, read when the lakehouse is chosen), a new one, or none
+      var NEW = '\u0001new', NONE = '';
+      var nsSel = el('select'), nsNew = inp('', 'text', 'e.g. bronze_shop'), nsNote = help('');
+      nsNew.hidden = true; nsNew.style.marginTop = '6px';
+      function nsValue() { return nsSel.value === NEW ? nsNew.value.trim() : nsSel.value; }
+      function paintNs() { nsNew.hidden = nsSel.value !== NEW; if (!nsNew.hidden) nsNew.focus(); }
+      function loadNs(keep) {
+        nsSel.replaceChildren(el('option', {value: keep || '', text: '… reading the namespaces of ' + cat.value}));
+        nsSel.disabled = true;
+        api('GET', '/api/catalogs/tree?catalog=' + encodeURIComponent(cat.value)).then(function (list) {
+          var names = list.slice().sort();
+          if (keep && names.indexOf(keep) < 0) names.unshift(keep);          // saved before it was made
+          nsSel.replaceChildren.apply(nsSel, names.map(function (n) { return el('option', {value: n, text: n}); }).concat([
+            el('option', {value: NEW, text: '+ New namespace…'}),
+            el('option', {value: NONE, text: '— none: <database>_<schema> per source (Pub/Sub: events)'})]));
+          nsSel.value = keep !== undefined && keep !== null ? keep : names.length ? names[0] : NEW;
+          nsSel.disabled = false;
+          nsNote.textContent = names.length ? names.length + ' namespace' + (names.length > 1 ? 's' : '') + ' in ' + cat.value + '.' : cat.value + ' has no namespace yet — make one.';
+          paintNs();
+        }).catch(function (e) {                                         // can't list: type it
+          nsSel.replaceChildren(el('option', {value: NEW, text: '+ New namespace…'}));
+          nsSel.value = NEW; nsSel.disabled = false; nsNew.value = keep || ''; nsNote.textContent = e.message; paintNs();
+        });
+      }
+      on(nsSel, 'change', paintNs);
+      on(cat, 'change', function () { loadNs(null); });
+      loadNs(d.id ? (d.namespace || NONE) : null);
       var save = on(el('button', {class: 'primary', text: d.id ? 'Save' : 'Save destination'}), 'click', function () {
+        if (nsSel.value === NEW && !nsNew.value.trim()) { msg.innerHTML = ''; return msg.appendChild(note('Type the new namespace\'s name.', 'bad')); }
         save.disabled = true;
-        api('POST', '/api/cdc/destinations', {id: d.id, name: name.value, catalog: cat.value, namespace: ns.value}).then(function (r) {
+        api('POST', '/api/cdc/destinations', {id: d.id, name: name.value, catalog: cat.value, namespace: nsValue()}).then(function (r) {
           busy['d' + r.id] = 1; watch(r.task, function () { delete busy['d' + r.id]; });
           if (wiz) { wiz.dest = r.id; return go('new-job'); }
           flash = {text: '✓ Destination "' + name.value + '" saved.'};
@@ -541,7 +569,7 @@
       main.appendChild(card([el('h3', {text: d.id ? 'Edit destination — ' + d.name : 'New destination'}),
         el('div', {class: 'form'}, [el('label', {text: 'Name'}), name,
           el('label', {text: 'Lakehouse'}), cat,
-          el('label', {text: 'Namespace'}), el('div', {}, [ns, help('Each table lands as <lakehouse>.<namespace>.<table>. Empty: <database>_<schema>. Two jobs can\'t write the same table into one namespace.')])]),
+          el('label', {text: 'Namespace'}), el('div', {}, [nsSel, nsNew, nsNote, help('Each table lands as <lakehouse>.<namespace>.<table>; a new namespace is made when you save. Two jobs can\'t write the same table into one namespace.')])]),
         el('div', {class: 'navbtns'}, [on(el('button', {text: '← ' + back[0]}), 'click', function () { go(back[1]); }), save]), msg], 'narrow'));
     }
 
