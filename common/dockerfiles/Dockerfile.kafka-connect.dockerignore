@@ -1,0 +1,3 @@
+# Build context for Dockerfile.kafka-connect: only the worker's properties file.
+*
+!add/connect-worker.properties

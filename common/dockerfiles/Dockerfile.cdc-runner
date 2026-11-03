@@ -1,11 +1,12 @@
 # cdc-runner — "📡 Data sync (CDC)" (also cdc-sim, the live shop's change simulator): runs each member's checks, table lists and syncs as OLake engine
-# containers (labcdc.py, cdc_runner.py). psycopg2: the portal database + making a source's CDC
+# containers (labcdc.py, cdc_runner.py) — or, with CDC_ENGINE=debezium, as Kafka Connect connectors (confluent-kafka:
+# how far a job has read). psycopg2: the portal database + making a source's CDC
 # publication / slot; mc: minting a member's own storage key (lab_jobs), like Airflow does.
 #   docker build -f common/dockerfiles/Dockerfile.cdc-runner -t <ref> common/dockerfiles
 FROM python:3.10-slim
-RUN pip install --no-cache-dir psycopg2-binary==2.9.10
+RUN pip install --no-cache-dir psycopg2-binary==2.9.10 confluent-kafka==2.12.2
 COPY --from=ghcr.io/maarthala/de-stack/mc:RELEASE.2025-08-13T08-35-41Z /usr/bin/mc /usr/local/bin/mc
-COPY add/lakehouse.py add/labvault.py add/lab_jobs.py add/labcdc.py add/cdc_runner.py add/cdc_simulator.py add/tidewell_archive.py /app/
+COPY add/lakehouse.py add/labvault.py add/lab_jobs.py add/labcdc.py add/cdc_runner.py add/cdc_debezium.py add/cdc_simulator.py add/tidewell_archive.py /app/
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1
 CMD ["python", "/app/cdc_runner.py"]

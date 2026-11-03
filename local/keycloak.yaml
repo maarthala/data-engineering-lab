@@ -67,6 +67,7 @@ services:
       PORTAL_DB_URL: postgresql://portal:portal@postgres:5432/portal
       # 📡 Data sync: the lab's live shop database (cdc.yaml) — every member's ready-made CDC source
       CDC_LAB_DB: postgresql://reader:reader@lab-db:5432/shop
+      CDC_ENGINE: ${CDC_ENGINE:-debezium}             # debezium: Kafka + Debezium (cdc.yaml) · olake: OLake containers
       LABDB_ADMIN_URL: postgresql://postgres:lab-db-local-owner@lab-db:5432/postgres   # 🐘 members' own databases
       # the realm file's sign-in addresses → the live Keycloak at start (it imports the file only once)
       LAB_REALM_FILE: /app/de-lab-realm.json

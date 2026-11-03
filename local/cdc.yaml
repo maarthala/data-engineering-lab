@@ -22,14 +22,20 @@ services:
       CDC_NETWORK: ${COMPOSE_PROJECT_NAME:-local}_sparknet
       CDC_MEM_GB: "1.5"
       CDC_WORKERS: "2"
+      # debezium: new jobs run as connectors in kafka-connect (OLake's jobs made before still run)
+      CDC_ENGINE: ${CDC_ENGINE:-debezium}
+      CONNECT_URL: http://kafka-connect:8083
+      KAFKA_BOOTSTRAP: kafka:9092
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - lab-secrets:/run/lab-secrets             # a connector's passwords / keys, read by kafka-connect
       # lab code mounted over the image's copies — edits need only a restart
       - ../common/dockerfiles/add/lakehouse.py:/app/lakehouse.py:ro
       - ../common/dockerfiles/add/labvault.py:/app/labvault.py:ro
       - ../common/dockerfiles/add/lab_jobs.py:/app/lab_jobs.py:ro
       - ../common/dockerfiles/add/labcdc.py:/app/labcdc.py:ro
       - ../common/dockerfiles/add/cdc_runner.py:/app/cdc_runner.py:ro
+      - ../common/dockerfiles/add/cdc_debezium.py:/app/cdc_debezium.py:ro
     depends_on:
       portal-db:
         condition: service_completed_successfully
@@ -88,5 +94,54 @@ services:
     networks:
       - sparknet
 
+  # Kafka (one broker, KRaft — no ZooKeeper): the change stream of every Debezium job, kept 7 days
+  kafka:
+    image: apache/kafka:4.3.1
+    container_name: kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - sparknet
+
+  # Kafka Connect: each Debezium job = a Postgres source + an Iceberg sink connector (cdc-runner
+  # makes them, pauses and resumes them — a scheduled run is "resume until caught up, then pause")
+  kafka-connect:
+    build:
+      context: ../common/dockerfiles
+      dockerfile: Dockerfile.kafka-connect
+    container_name: kafka-connect
+    volumes:
+      - lab-secrets:/run/lab-secrets:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sparknet
+
 volumes:
   lab-db-data:
+  kafka-data:
+  lab-secrets:

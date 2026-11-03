@@ -13,6 +13,8 @@ discovered tables are copied out after it ends.
   local: Docker, through the mounted socket (CDC_EXECUTOR=docker)
   k8s:   a Pod in the runner's namespace (CDC_EXECUTOR=k8s; its service account may make pods and
          secrets): the config files come in as a Secret, the files to keep come back in the pod's log
+CDC_ENGINE=debezium: checks and table lists are done here, and a job made then runs as Kafka
+Connect connectors (cdc_debezium.py, kept in step with the jobs every few seconds).
 """
 import http.client
 import io
@@ -303,8 +305,17 @@ def prepare_cdc(s):
 
 
 # ---- the tasks -----------------------------------------------------------------------------
+def _dbz():
+    import cdc_debezium
+    return cdc_debezium
+
+
 def check_source(t):
     s = _q("SELECT * FROM cdc_sources WHERE id = %s", (t["ref"],), one=True)
+    if labcdc.ENGINE == "debezium":
+        checked = _dbz().check_source(s)
+        _q("UPDATE cdc_sources SET checked = %s WHERE id = %s", (json.dumps(checked), s["id"]), rows=False)
+        return checked
     notes = prepare_cdc(s) if s["cdc"] and s["kind"] == "postgres" else []
     code, log, _ = olake(s["kind"], f"check-src-{s['id']}", ["check", "--config", f"{CFG}/source.json"],
                          {"source.json": source_config(s)}, timeout=180)
@@ -318,6 +329,10 @@ def check_source(t):
 
 def check_destination(t):
     d = _q("SELECT * FROM cdc_destinations WHERE id = %s", (t["ref"],), one=True)
+    if labcdc.ENGINE == "debezium":
+        checked = _dbz().check_destination(d["member"], d)
+        _q("UPDATE cdc_destinations SET checked = %s WHERE id = %s", (json.dumps(checked), d["id"]), rows=False)
+        return checked
     code, log, _ = olake("postgres", f"check-dst-{d['id']}", ["check", "--destination", f"{CFG}/destination.json"],
                          {"destination.json": dest_config(d["member"], d)}, timeout=180)
     ok, msg, _ = _status(log)
@@ -337,6 +352,8 @@ def _form(t):
 
 def test_source(t):
     s = _form(t)
+    if labcdc.ENGINE == "debezium":
+        return _dbz().test_source(s)
     code, log, _ = olake(s["kind"], f"test-src-{t['id']}", ["check", "--config", f"{CFG}/source.json"],
                          {"source.json": source_config(dict(s, cdc=False))}, timeout=180)
     ok, msg, _ = _status(log)
@@ -344,11 +361,16 @@ def test_source(t):
 
 
 def browse(t):
+    if labcdc.ENGINE == "debezium":
+        f = _form(t)
+        return {"tables": _dbz().discover(f, f["password"])["tables"]}
     return {"tables": _discover(_form(t), f"browse-{t['id']}")["tables"]}
 
 
 def discover(t):
     s = _q("SELECT * FROM cdc_sources WHERE id = %s", (t["ref"],), one=True)
+    if labcdc.ENGINE == "debezium":
+        return _dbz().discover(s)
     return _discover(s, f"discover-{s['id']}")
 
 
@@ -376,6 +398,8 @@ def run(t):
     rid = _q("INSERT INTO cdc_runs (job_id, member, trigger) VALUES (%s, %s, %s) RETURNING id",
              (j["id"], j["member"], (t["payload"] or {}).get("trigger", "schedule")), one=True)["id"]
     _q("UPDATE cdc_jobs SET last_run_at = now() WHERE id = %s", (j["id"],), rows=False)
+    if j["engine"] == "debezium":
+        return _run_debezium(j, rid)
     status, records, err, log = "failed", None, None, ""
     try:
         if s["cdc"] and j["mode"] in labcdc.STREAMING and s["kind"] == "postgres":
@@ -405,11 +429,33 @@ def run(t):
     return {"run": rid, "records": records}
 
 
+def _run_debezium(j, rid):
+    """A manual / scheduled run of a Debezium job: resume its connectors until caught up, then pause."""
+    lines, status, records, err = [], "failed", None, None
+
+    def log(line):
+        lines.append(time.strftime("%H:%M:%S ") + line)
+        _q("UPDATE cdc_runs SET log = %s WHERE id = %s", ("\n".join(lines), rid), rows=False)
+    try:
+        records = _dbz().run(j, rid, log)
+        status = "ok"
+    except Exception as e:  # noqa: BLE001 — the run's row says what went wrong
+        err = str(e) or repr(e)
+        log("✗ " + err)
+    _q("UPDATE cdc_runs SET finished_at = now(), status = %s, records = %s, error = %s WHERE id = %s",
+       (status, records, err, rid), rows=False)
+    if status != "ok":
+        raise RuntimeError(err or "the run failed")
+    return {"run": rid, "records": records}
+
+
 def drop_source(t):
     """A CDC source is deleted: drop its replication slot (with its own login), then the source."""
     s = _q("SELECT * FROM cdc_sources WHERE id = %s", (t["ref"],), one=True)
     if not s:
         return {}
+    if s["slot"] and labcdc.ENGINE == "debezium":
+        _dbz().reconcile()                             # a deleted job's connector may still hold the slot
     if not s["slot"]:
         labcdc.drop_source(s)
         return {}
@@ -475,13 +521,19 @@ def main():
     _q("UPDATE cdc_runs SET status = 'failed', error = 'cdc-runner restarted', finished_at = now() WHERE status = 'running'",
        rows=False)
     print(f"[cdc] runner up: OLake {VERSION}, {EXECUTOR} ({NETWORK if EXECUTOR == 'docker' else 'pods'}), {WORKERS} at a time", flush=True)
-    busy, last_due = [], 0
+    busy, last_due, last_dbz = [], 0, 0
     while True:
         try:
             busy = [w for w in busy if w.is_alive()]
             if time.time() - last_due > 30:
                 _due()
                 last_due = time.time()
+            if labcdc.ENGINE == "debezium" and time.time() - last_dbz > 10:
+                last_dbz = time.time()
+                try:
+                    _dbz().reconcile()
+                except Exception as e:  # noqa: BLE001 — Kafka Connect may be starting
+                    print(f"[cdc] debezium: {e}", flush=True)
             while len(busy) < WORKERS:
                 t = _claim()
                 if not t:

@@ -1,0 +1,24 @@
+# kafka-connect — "📡 Ingestion" with Debezium (CDC_ENGINE=debezium): one Kafka Connect worker that
+# runs every member's job as two connectors, made and paused / resumed by cdc-runner:
+#   cdc-<job>-src   Debezium's Postgres source: a full load (snapshot), then every change from the
+#                   source's replication slot → topics <member>.j<job>.<schema>.<table>
+#   cdc-<job>-sink  the Iceberg sink (Tabular's, the one that upserts): topics → the member's
+#                   lakehouse, a commit every few seconds, signed in as the member's job login
+# Passwords and keys are never in a connector's config: it names files (${dir:…}) that cdc-runner
+# writes into /run/lab-secrets/<connector>/.
+#   docker build -f common/dockerfiles/Dockerfile.kafka-connect -t <ref> common/dockerfiles
+FROM alpine:3.22 AS plugins
+ARG DEBEZIUM=3.6.0.Final
+ARG ICEBERG_SINK=0.6.19
+RUN apk add --no-cache curl unzip && mkdir -p /plugins \
+ && curl -fsSL https://repo1.maven.org/maven2/io/debezium/debezium-connector-postgres/${DEBEZIUM}/debezium-connector-postgres-${DEBEZIUM}-plugin.tar.gz \
+    | tar -xz -C /plugins \
+ && curl -fsSL -o /tmp/sink.zip https://github.com/tabular-io/iceberg-kafka-connect/releases/download/v${ICEBERG_SINK}/iceberg-kafka-connect-runtime-${ICEBERG_SINK}.zip \
+ && unzip -q /tmp/sink.zip -d /plugins && rm /tmp/sink.zip
+
+FROM apache/kafka:4.3.1
+COPY --from=plugins /plugins /opt/connect-plugins
+COPY add/connect-worker.properties /opt/kafka/config/lab-connect.properties
+ENV KAFKA_HEAP_OPTS="-Xms256m -Xmx768m"
+EXPOSE 8083
+CMD ["/opt/kafka/bin/connect-distributed.sh", "/opt/kafka/config/lab-connect.properties"]

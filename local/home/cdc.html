@@ -56,8 +56,8 @@
     // 📡 Ingestion (CDC) — a SOURCE is a database you can reach (PostgreSQL, MySQL, SQL Server); a
     // DESTINATION is one of your lakehouse catalogs (+ a namespace); a JOB copies chosen tables from a
     // source to a destination: a full load, then — with CDC — only the inserts, updates and deletes
-    // since the last run, on a schedule or when you press Run now. The work runs in the lab (OLake's
-    // engine), as you. Every screen has its own address (#jobs, #new-job, #job/3, #new-source,
+    // since the last run, on a schedule or when you press Run now — or all the time (Continuous, with
+    // Debezium). The work runs in the lab (OLake's engine, or Debezium + Kafka), as you. Every screen has its own address (#jobs, #new-job, #job/3, #new-source,
     // #source/2 …), so the browser's Back button works; New job is a 4-step guide.
     var main = document.getElementById('main');
     function el(tag, attrs, kids) {
@@ -109,7 +109,7 @@
       }).catch(function (e) { done({status: 'failed', error: e.message}); });
     }
 
-    var SCHED = {'': 'Manual', '15m': 'Every 15 min', '1h': 'Hourly', '1d': 'Daily'};
+    var SCHED = {'': 'Manual', '15m': 'Every 15 min', '1h': 'Hourly', '1d': 'Daily', stream: 'Continuous (stream)'};
     var MODE = {cdc: 'Full load + CDC', append: 'Full load + every change (history)', full_refresh: 'Full reload every run'};
     var data = null, timer = null, busy = {}, flash = null;
     var wiz = null;          // the New job guide's choices — kept while you add a source / destination on the way
@@ -161,15 +161,24 @@
       main.appendChild(el('div', {class: 'bar'}, [tabs, on(el('button', {class: 'primary', text: add[0]}), 'click', add[1])]));
       showFlash();
       main.appendChild({jobs: jobList, sources: sourceList, destinations: destList}[tab]());
-      if (data.jobs.some(function (j) { return j.busy; }) || Object.keys(busy).length) timer = setTimeout(show, 4000);
+      if (data.jobs.some(function (j) { return j.busy || streaming(j); }) || Object.keys(busy).length) timer = setTimeout(show, 4000);
     }
     function checked(c, isBusy) {
       if (isBusy) return el('span', {class: 'run', text: '… checking'});
       if (!c) return el('span', {class: 'muted', text: 'not checked yet'});
       return el('span', {class: c.ok ? 'ok' : 'bad', title: c.message || '', text: c.ok ? '✓ connected' : '✗ ' + (c.message || 'failed').slice(0, 140)});
     }
+    function streaming(j) { return j.schedule === 'stream' && j.enabled; }
     function last(j) {
       var r = j.last;
+      if (j.schedule === 'stream') {
+        if (!j.enabled) return el('span', {class: 'muted', text: 'stopped'});
+        if (!r || r.trigger !== 'stream' || r.status !== 'running') return el('span', {class: 'run', text: '… starting the stream'});
+        var behind = (r.meta || {}).behind;
+        return el('span', {}, [el('span', {class: 'ok', text: '● streaming since ' + when(r.started_at) + ' · ' + (r.records || 0) + ' changes'}),
+          behind ? el('span', {class: 'muted', text: ' · ' + behind + ' on the way'}) : null,
+          r.error ? el('div', {class: 'bad', title: r.error, text: '✗ ' + r.error.slice(0, 160) + ' — restarting it'}) : null]);
+      }
       if (j.busy && !(r && r.status === 'running')) return el('span', {class: 'run', text: '… starting'});
       if (!r) return el('span', {class: 'muted', text: 'not run yet'});
       if (r.status === 'running') return el('span', {class: 'run', text: '… running since ' + when(r.started_at)});
@@ -191,6 +200,7 @@
           api('POST', '/api/cdc/jobs/run', {id: j.id}).then(function () { setTimeout(show, 1200); }).catch(function (e) { alert_(e.message); runNow.disabled = false; });
         });
         runNow.disabled = !!j.busy;
+        runNow.hidden = j.schedule === 'stream';
         body.appendChild(el('tr', {}, [el('td', {}, [link(j.name, 'job/' + j.id, 'name')]),
           el('td', {text: j.source_name + ' → ' + j.dest_name}),
           el('td', {title: j.tables.join(', '), text: j.tables.length === 1 ? j.tables[0] : j.tables.length + ' tables'}),
@@ -449,30 +459,38 @@
     }
     function stepReview(body, next, msg) {
       var s = byId(data.sources, wiz.source), d = byId(data.destinations, wiz.dest), tables = chosen(), taken = cdcJob(s.id);
-      var canCdc = s.cdc && !taken;
-      if (!canCdc) wiz.mode = 'full_refresh';
-      wiz.mode = wiz.mode || (canCdc ? 'cdc' : 'full_refresh');
+      var canCdc = s.cdc && !taken, dbz = data.engine === 'debezium';
+      var modes = Object.keys(data.modes).filter(function (k) { return canCdc ? true : k === 'full_refresh'; });
+      if (modes.indexOf(wiz.mode) < 0) wiz.mode = modes[0];
       wiz.sched = wiz.sched || '';
+      if (data.schedules.indexOf(wiz.sched) < 0) wiz.sched = '';
       var name = inp(wiz.name || (s.name + ' to ' + d.name).replace(/[^A-Za-z0-9 _.-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60));
       on(name, 'input', function () { wiz.name = name.value; });
       body.appendChild(el('h3', {text: '④ How often, and a last look'}));
       body.appendChild(el('div', {class: 'form'}, [el('label', {text: 'Job name'}), name,
-        el('label', {text: 'Mode'}), el('div', {}, [seg(canCdc ? [['cdc', MODE.cdc], ['append', MODE.append], ['full_refresh', MODE.full_refresh]] : [['full_refresh', MODE.full_refresh]], wiz.mode, function (v) { wiz.mode = v; draw(); }),
+        el('label', {text: 'Mode'}), el('div', {}, [seg(modes.map(function (k) { return [k, MODE[k]]; }), wiz.mode, function (v) { wiz.mode = v; draw(); }),
           taken ? el('div', {class: 'sub', style: 'margin-top:4px'}, ['CDC on ' + s.name + ' is used by job ', link(taken.name, 'job/' + taken.id),
             ' (a source\'s change stream feeds one job) — copy these tables with full reloads, or delete that job and make one with all the tables.']) : null]),
-        el('label', {text: 'Schedule'}), seg(Object.keys(SCHED).map(function (k) { return [k, SCHED[k]]; }), wiz.sched, function (v) { wiz.sched = v; })]));
+        el('label', {text: 'Schedule'}), seg(data.schedules.map(function (k) { return [k, SCHED[k] || k]; }), wiz.sched, function (v) { wiz.sched = v; draw(); })]));
+      if (!modes.length) body.appendChild(note('CDC is off on ' + s.name + (taken ? ' or used by another job' : '') + ' — with Debezium a job needs CDC on.', 'bad'));
+      next.disabled = !modes.length;
+      next.textContent = wiz.sched === 'stream' ? 'Create & start' : 'Create & run';
       body.appendChild(el('dl', {class: 'facts'}, [
         el('dt', {text: 'From'}), el('dd', {text: s.name + ' — ' + data.kinds[s.kind].name + ', ' + s.host + ' / ' + s.database}),
         el('dt', {text: 'To'}), el('dd', {text: d.name + ' — ' + d.catalog + '.' + (d.namespace || '<database>_<schema>')}),
         el('dt', {text: 'Tables (' + tables.length + ')'}), el('dd', {text: tables.join(', ')})]));
-      body.appendChild(el('div', {class: 'sub', text: {
+      body.appendChild(el('div', {class: 'sub', text: (dbz ? {
+        cdc: 'Full load + CDC: first everything, then the inserts, updates and deletes. Each table keeps one row per key, the latest; a deleted row is removed.',
+        append: 'Full load + every change (history): first everything, then every insert, update and delete is added as a new row (_cdc.op I / U / D, _cdc.ts when it happened), nothing is overwritten — the raw material for history and SCD2.'} : {
         cdc: 'Full load + CDC: the first run copies everything, later runs only the inserts, updates and deletes since the run before. Each table keeps one row per key, the latest (deleted rows stay as _op_type = \'d\').',
         append: 'Full load + every change (history): the first run copies everything, then every insert, update and delete is added as a new row (_op_type c / u / d, _cdc_timestamp), nothing is overwritten — the raw material for history and SCD2.',
-        full_refresh: 'Full reload: every run copies the chosen tables again.'}[wiz.mode] + ' The first run starts as soon as you create the job.'}));
+        full_refresh: 'Full reload: every run copies the chosen tables again.'})[wiz.mode] + (wiz.sched === 'stream'
+          ? ' Continuous: it starts as soon as you create the job and keeps going — the tables stay about 10–30 seconds behind the source.'
+          : ' The first run starts as soon as you create the job.')}));
       on(next, 'click', function () {
         next.disabled = true; msg.innerHTML = '';
         api('POST', '/api/cdc/jobs', {name: name.value, source: s.id, destination: d.id, discover: wiz.disc, tables: tables, mode: wiz.mode, schedule: wiz.sched})
-          .then(function (r) { wiz = null; flash = {text: '✓ Job created — its first run is starting.'}; go('job/' + r.id); })
+          .then(function (r) { wiz = null; flash = {text: r.task ? '✓ Job created — its first run is starting.' : '✓ Job created — its stream is starting.'}; go('job/' + r.id); })
           .catch(function (e) { next.disabled = false; msg.appendChild(note(e.message, 'bad')); });
       });
     }
@@ -488,7 +506,8 @@
         api('POST', '/api/cdc/jobs/run', {id: j.id}).then(function () { setTimeout(show, 1200); }).catch(function (e) { alert_(e.message); runNow.disabled = false; });
       });
       runNow.disabled = !!j.busy;
-      var pause = on(el('button', {text: j.enabled ? 'Pause schedule' : 'Resume schedule'}), 'click', function () {
+      runNow.hidden = j.schedule === 'stream';
+      var pause = on(el('button', {text: j.schedule === 'stream' ? (j.enabled ? 'Stop stream' : 'Start stream') : j.enabled ? 'Pause schedule' : 'Resume schedule'}), 'click', function () {
         api('POST', '/api/cdc/jobs/set', {id: j.id, enabled: !j.enabled}).then(show).catch(function (e) { alert_(e.message); });
       });
       pause.hidden = !j.schedule;
@@ -501,19 +520,20 @@
       var d = byId(data.destinations, j.destination);
       main.appendChild(card([el('div', {class: 'bar'}, [el('h3', {style: 'margin:0', text: j.name}), el('span', {class: 'row'}, [runNow, pause, del])]),
         el('dl', {class: 'facts'}, [
-          el('dt', {text: 'Last run'}), el('dd', {}, [last(j)]),
+          el('dt', {text: j.schedule === 'stream' ? 'Stream' : 'Last run'}), el('dd', {}, [last(j)]),
           el('dt', {text: 'From'}), el('dd', {}, [link(j.source_name, 'source/' + j.source)]),
           el('dt', {text: 'To'}), el('dd', {}, [link(j.dest_name, 'destination/' + j.destination),
             document.createTextNode(d ? ' — ' + d.catalog + '.' + (d.namespace || '<database>_<schema>') : '')]),
           el('dt', {text: 'Tables (' + j.tables.length + ')'}), el('dd', {text: j.tables.join(', ')}),
           el('dt', {text: 'Mode'}), el('dd', {text: MODE[j.mode]}),
-          el('dt', {text: 'Schedule'}), el('dd', {}, [seg(Object.keys(SCHED).map(function (k) { return [k, SCHED[k]]; }), j.schedule, function (v) {
+          el('dt', {text: 'Schedule'}), el('dd', {}, [seg(j.schedules.map(function (k) { return [k, SCHED[k] || k]; }), j.schedule, function (v) {
             api('POST', '/api/cdc/jobs/set', {id: j.id, schedule: v}).then(show).catch(function (e) { alert_(e.message); });
-          }), j.schedule && !j.enabled ? el('span', {class: 'sub', text: '  paused'}) : null])])]));
+          }), j.schedule && !j.enabled ? el('span', {class: 'sub', text: j.schedule === 'stream' ? '  stopped' : '  paused'}) : null]),
+          el('dt', {text: 'Engine'}), el('dd', {class: 'muted', text: j.engine === 'debezium' ? 'Debezium + Kafka' : 'OLake'})])]));
       var runsBox = el('div');
       main.appendChild(card([el('h3', {text: 'Runs'}), runsBox]));
       showRuns(j, runsBox);
-      if (j.busy) timer = setTimeout(show, 4000);
+      if (j.busy || streaming(j)) timer = setTimeout(show, j.busy ? 4000 : 8000);
     }
     function showRuns(j, box) {
       box.appendChild(note('Loading…'));
@@ -531,7 +551,7 @@
             });
             return el('tr', {}, [el('td', {class: 'muted', text: when(r.started_at)}), el('td', {class: 'muted', text: took}),
               el('td', {class: r.status === 'ok' ? 'ok' : r.status === 'running' ? 'run' : 'bad', title: r.error || '',
-                        text: r.status === 'ok' ? '✓ ok' : r.status === 'running' ? '… running' : '✗ ' + (r.error || 'failed').slice(0, 100)}),
+                        text: r.status === 'ok' ? (r.trigger === 'stream' ? '✓ stopped' : '✓ ok') : r.status === 'running' ? (r.trigger === 'stream' ? '● streaming' : '… running') : '✗ ' + (r.error || 'failed').slice(0, 100)}),
               el('td', {text: r.records === null ? '—' : String(r.records)}), el('td', {class: 'muted', text: r.trigger || ''}), el('td', {}, [lg])]);
           }))])]));
         box.appendChild(logBox);

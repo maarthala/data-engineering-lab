@@ -13,6 +13,8 @@ Members keep, each only their own (portal database, like 📝 Mock exams):
 The work itself — check a connection, list a source's tables, run a sync — is OLake's engine
 (olakego/source-<kind>, `check` / `discover` / `sync`) in a container per call, started by the
 cdc-runner service (cdc_runner.py), which picks up cdc_tasks rows. Nothing here talks to OLake.
+CDC_ENGINE=debezium: new jobs are Debezium + Kafka Connect instead (cdc_debezium.py) — PostgreSQL
+sources, and one more schedule, "stream" (always on); each job keeps the engine it was made with.
 """
 import json
 import os
@@ -32,10 +34,11 @@ KINDS = {"postgres": {"name": "PostgreSQL", "port": 5432,
          "mssql": {"name": "SQL Server", "port": 1433,
                    "cdc": "CDC switched on for the database (EXEC sys.sp_cdc_enable_db) and each table "
                           "(sys.sp_cdc_enable_table), and SQL Server Agent running"}}
-SCHEDULES = {"": None, "15m": 15 * 60, "1h": 3600, "1d": 86400}
+ENGINE = os.environ.get("CDC_ENGINE", "olake")              # new jobs: olake | debezium
+SCHEDULES = {"": None, "15m": 15 * 60, "1h": 3600, "1d": 86400, "stream": None}   # stream: debezium only
 MODES = {"cdc": "full load, then changes (CDC)",                 # one row per key: the latest (upsert)
          "append": "full load, then every change as a new row",  # the history: build SCD2 from it
-         "full_refresh": "full reload every run"}
+         "full_refresh": "full reload every run"}                # olake only
 STREAMING = ("cdc", "append")                                    # modes that read the change stream
 NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.-]{0,59}$")
 IDENT = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
@@ -71,6 +74,8 @@ CREATE TABLE IF NOT EXISTS cdc_tasks (
   created_at timestamptz NOT NULL DEFAULT now(), finished_at timestamptz);
 CREATE INDEX IF NOT EXISTS cdc_tasks_queued ON cdc_tasks (status, id);
 CREATE TABLE IF NOT EXISTS portal_cdc_seen (member text PRIMARY KEY);      -- got the lab source once (deleting it is fine)
+ALTER TABLE cdc_jobs ADD COLUMN IF NOT EXISTS engine text NOT NULL DEFAULT 'olake';
+ALTER TABLE cdc_runs ADD COLUMN IF NOT EXISTS meta jsonb;                   -- debezium: a stream's base, how far behind
 """
 _ready, _lock = False, threading.Lock()
 
@@ -147,12 +152,24 @@ def _source_out(s):
             "slot": s["slot"], "checked": s["checked"], "created_at": _iso(s["created_at"])}
 
 
+def schedules(engine):
+    return [k for k in SCHEDULES if engine == "debezium" or k != "stream"]
+
+
+def modes(engine):
+    return {k: v for k, v in MODES.items() if engine == "olake" or k != "full_refresh"}
+
+
+def kinds():
+    return {k: v for k, v in KINDS.items() if ENGINE == "olake" or k == "postgres"}
+
+
 def overview(member, catalogs=()):
     """Everything on the member's page: sources, destinations, jobs (+ last run), their catalogs."""
     src = _q("SELECT * FROM cdc_sources WHERE member = %s ORDER BY name", (member,))
     dst = _q("SELECT * FROM cdc_destinations WHERE member = %s ORDER BY name", (member,))
     jobs = _q("SELECT j.*, s.name AS source_name, d.name AS dest_name, d.catalog, "
-              "(SELECT row_to_json(r) FROM (SELECT id, status, started_at, finished_at, records, error FROM cdc_runs "
+              "(SELECT row_to_json(r) FROM (SELECT id, status, started_at, finished_at, records, error, trigger, meta FROM cdc_runs "
               " WHERE job_id = j.id ORDER BY started_at DESC LIMIT 1) r) AS last, "
               "EXISTS (SELECT 1 FROM cdc_tasks t WHERE t.kind = 'run' AND t.ref = j.id AND t.status IN ('queued', 'running')) AS busy "
               "FROM cdc_jobs j JOIN cdc_sources s ON s.id = j.source_id JOIN cdc_destinations d ON d.id = j.dest_id "
@@ -163,8 +180,10 @@ def overview(member, catalogs=()):
             "jobs": [{"id": j["id"], "name": j["name"], "source": j["source_id"], "source_name": j["source_name"],
                       "destination": j["dest_id"], "dest_name": j["dest_name"], "catalog": j["catalog"],
                       "tables": j["tables"], "mode": j["mode"], "schedule": j["schedule"], "enabled": j["enabled"],
+                      "engine": j["engine"], "schedules": schedules(j["engine"]),
                       "created_at": _iso(j["created_at"]), "last": j["last"], "busy": j["busy"]} for j in jobs],
-            "catalogs": list(catalogs), "schedules": list(SCHEDULES), "modes": MODES, "kinds": KINDS}
+            "catalogs": list(catalogs), "engine": ENGINE, "schedules": schedules(ENGINE), "modes": modes(ENGINE),
+            "kinds": kinds()}
 
 
 def _own(table, member, oid):
@@ -196,8 +215,8 @@ def _slot_name(member):
 def _fields(body):
     """The connection fields of a source form, checked → (kind, host, port, database, user, schemas, cdc)."""
     kind = str(body.get("kind") or "postgres")
-    if kind not in KINDS:
-        raise CdcError("database type: " + ", ".join(k["name"] for k in KINDS.values()))
+    if kind not in kinds():
+        raise CdcError("database type: " + ", ".join(k["name"] for k in kinds().values()))
     host = str(body.get("host") or "").strip()
     if not HOST.fullmatch(host):
         raise CdcError("host: a name or address")
@@ -359,8 +378,10 @@ def create_job(member, body):
     s = _own("cdc_sources", member, body.get("source") or 0)
     d = _own("cdc_destinations", member, body.get("destination") or 0)
     mode, schedule = str(body.get("mode") or "cdc"), str(body.get("schedule") or "")
-    if mode not in MODES or schedule not in SCHEDULES:
+    if mode not in modes(ENGINE) or schedule not in schedules(ENGINE):
         raise CdcError("unknown mode or schedule")
+    if ENGINE == "debezium" and s["kind"] != "postgres":
+        raise CdcError("with Debezium, PostgreSQL sources only (for now)")
     if mode in STREAMING and not s["cdc"]:
         raise CdcError("this source has CDC off — turn it on, or choose a full reload")
     if mode in STREAMING and _q("SELECT name FROM cdc_jobs WHERE source_id = %s AND mode IN ('cdc', 'append')", (s["id"],), one=True):
@@ -373,6 +394,10 @@ def create_job(member, body):
     tables = [x for x in dict.fromkeys(body.get("tables") or []) if x in found]
     if not tables:
         raise CdcError("choose at least one table")
+    if ENGINE == "debezium" and mode == "cdc":         # an upsert needs the row's key
+        nokey = [x for x in tables if not found[x]["stream"].get("source_defined_primary_key")]
+        if nokey:
+            raise CdcError("no primary key: " + ", ".join(nokey) + " — leave them out, or choose every change (history)")
     _limit("jobs", member)
     if _q("SELECT 1 FROM cdc_jobs WHERE member = %s AND name = %s", (member, name), one=True):
         raise CdcError("you have a job with that name")
@@ -384,10 +409,12 @@ def create_job(member, body):
             if same:
                 raise CdcError(f"job {o['name']} already writes {', '.join(same)} into {d['catalog']}.{d['namespace']} — "
                                "choose a destination with another namespace")
-    jid = _q("INSERT INTO cdc_jobs (member, name, source_id, dest_id, tables, mode, schedule, streams) "
-             "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+    jid = _q("INSERT INTO cdc_jobs (member, name, source_id, dest_id, tables, mode, schedule, streams, engine) "
+             "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
              (member, name, s["id"], d["id"], tables, mode, schedule,
-              json.dumps(streams_for(t["result"]["streams"], tables, mode, d["namespace"]))), one=True)["id"]
+              json.dumps(streams_for(t["result"]["streams"], tables, mode, d["namespace"])), ENGINE), one=True)["id"]
+    if schedule == "stream":                       # cdc-runner starts the stream (cdc_debezium.reconcile)
+        return {"id": jid}
     return {"id": jid, "task": queue(member, "run", jid, {"trigger": "first run"})}
 
 
@@ -413,7 +440,7 @@ def streams_for(discovered, tables, mode, namespace):
 
 def set_job(member, jid, enabled=None, schedule=None):
     j = _own("cdc_jobs", member, jid)
-    if schedule is not None and schedule not in SCHEDULES:
+    if schedule is not None and schedule not in schedules(j["engine"]):
         raise CdcError("unknown schedule")
     _q("UPDATE cdc_jobs SET enabled = COALESCE(%s, enabled), schedule = COALESCE(%s, schedule) WHERE id = %s",
        (enabled, schedule, j["id"]), rows=False)
@@ -422,6 +449,8 @@ def set_job(member, jid, enabled=None, schedule=None):
 
 def run_job(member, jid):
     j = _own("cdc_jobs", member, jid)
+    if j["schedule"] == "stream":
+        raise CdcError("this job streams all the time — nothing to run")
     if _busy(j["id"]):
         raise CdcError("this job is running already")
     return {"task": queue(member, "run", j["id"], {"trigger": "run now"})}
@@ -443,7 +472,7 @@ def delete_job(member, jid):
 def runs(member, jid):
     j = _own("cdc_jobs", member, jid)
     return {"job": j["id"], "runs": [dict(r, started_at=_iso(r["started_at"]), finished_at=_iso(r["finished_at"])) for r in _q(
-        "SELECT id, status, started_at, finished_at, records, error, trigger FROM cdc_runs WHERE job_id = %s "
+        "SELECT id, status, started_at, finished_at, records, error, trigger, meta FROM cdc_runs WHERE job_id = %s "
         "ORDER BY started_at DESC LIMIT 20", (j["id"],))]}
 
 
