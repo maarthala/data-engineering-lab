@@ -519,8 +519,8 @@ def main():
     # a restart: what was running then is lost
     _q("UPDATE cdc_tasks SET status = 'failed', error = 'cdc-runner restarted', finished_at = now() WHERE status = 'running'",
        rows=False)
-    _q("UPDATE cdc_runs SET status = 'failed', error = 'cdc-runner restarted', finished_at = now() WHERE status = 'running'",
-       rows=False)
+    _q("UPDATE cdc_runs SET status = 'failed', error = 'cdc-runner restarted', finished_at = now() WHERE status = 'running' "
+       "AND trigger IS DISTINCT FROM 'stream'", rows=False)           # a stream runs in Kafka Connect: it goes on
     print(f"[cdc] runner up: OLake {VERSION}, {EXECUTOR} ({NETWORK if EXECUTOR == 'docker' else 'pods'}), {WORKERS} at a time", flush=True)
     busy, last_due, last_dbz = [], 0, 0
     while True:

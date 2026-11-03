@@ -621,6 +621,15 @@
           .catch(function (e) { save.disabled = false; msg.appendChild(note(e.message, 'bad')); });
       });
       main.appendChild(card([el('h3', {text: 'How it runs'}), picker, el('div', {class: 'navbtns'}, [el('span'), save]), msg], 'narrow'));
+      if (stream && j.last && j.last.trigger === 'stream') {   // the stream's own log, kept up to date by the lab
+        var live = el('pre', {class: 'log', text: 'Loading…'});
+        main.appendChild(card([el('div', {class: 'head', style: 'margin-bottom:0'}, [el('h3', {text: 'Log'}),
+          el('span', {class: 'sub muted', text: streaming(j) ? 'updates every few seconds' : 'the last stream'})]), live]));
+        api('GET', '/api/cdc/run?id=' + j.last.id).then(function (x) {
+          live.textContent = (x.error ? 'Error: ' + x.error + '\n\n' : '') + (x.log || '(nothing yet)');
+          live.scrollTop = live.scrollHeight;
+        }).catch(function (e) { live.textContent = e.message; });
+      }
       var runsBox = el('div');
       main.appendChild(card([el('h3', {text: 'Runs'}), runsBox]));
       showRuns(j, runsBox);
@@ -645,7 +654,7 @@
               : pill('bad', '✗ ' + (r.error || 'failed').slice(0, 80), r.error || '');
             return el('tr', {}, [el('td', {class: 'muted', text: when(r.started_at)}), el('td', {class: 'muted', text: took}), el('td', {}, [res]),
               el('td', {text: r.records === null ? '—' : String(r.records)}), el('td', {class: 'muted', text: r.trigger || ''}),
-              el('td', {class: 'acts'}, [r.trigger === 'stream' ? null : lg])]);
+              el('td', {class: 'acts'}, [lg])]);
           }))])]));
         box.appendChild(logBox);
       }).catch(function (e) { box.innerHTML = ''; box.appendChild(note(e.message, 'bad')); });

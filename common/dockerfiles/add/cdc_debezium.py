@@ -40,6 +40,9 @@ COMMIT_MS = int(os.environ.get("CDC_COMMIT_MS", "10000"))     # the sink's Icebe
 TIMEOUT = int(os.environ.get("CDC_TIMEOUT_S", "1800"))        # a run longer than this is stopped
 IDLE_S = 30                                                   # a quiet source: caught up after this long without news
 CONN = re.compile(r"^cdc-(\d+)-(src|sink)$")
+CONNECT_CONTAINER = os.environ.get("CONNECT_CONTAINER", "kafka-connect")   # local: its log, through the Docker socket
+EVENTS = 60                                                   # a stream's log keeps its last events
+NOTE_S = 300                                                  # … and says how it's doing every 5 minutes
 
 
 class DbzError(RuntimeError):
@@ -75,6 +78,46 @@ def _connectors():
             st = x.get("status") or {}
             out[name] = {"state": (st.get("connector") or {}).get("state"), "tasks": st.get("tasks") or []}
     return out
+
+
+# ---- Kafka Connect's log: the lines about one job's connectors -------------------------------
+# Kafka's own client chatter (group joins, versions, config echoes) — not about the job's data
+NOISE = re.compile(r"\[(Consumer|Producer|AdminClient) clientId=|Kafka (version|commitId|startTimeMs)|These configurations|"
+                   r"brand-new (de)?compressor|GET /connectors|ConsumerConfig values|ProducerConfig values|AdminClientConfig values|"
+                   r"^\s*[a-z0-9_.]+ = ")
+def connect_log(jid, since=None, lines=40):
+    """The last `lines` lines kafka-connect logged about job `jid`'s connectors (since a unix time),
+    without Java stack frames — read through the Docker socket (local); [] where there's none."""
+    import http.client
+    import socket
+
+    class _Sock(http.client.HTTPConnection):
+        def connect(self):
+            self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.sock.settimeout(20)
+            self.sock.connect("/var/run/docker.sock")
+    if not os.path.exists("/var/run/docker.sock"):
+        return []
+    try:
+        c = _Sock("docker", timeout=20)
+        q = "stdout=1&stderr=1&tail=4000" + (f"&since={int(since)}" if since else "")
+        c.request("GET", f"/v1.43/containers/{CONNECT_CONTAINER}/logs?{q}")
+        r = c.getresponse()
+        raw = r.read()
+        c.close()
+        if r.status >= 400:
+            return []
+    except OSError:
+        return []
+    out, i = [], 0
+    while i + 8 <= len(raw):                                   # the stream's 8-byte frame headers
+        n = int.from_bytes(raw[i + 4:i + 8], "big")
+        out.append(raw[i + 8:i + 8 + n])
+        i += 8 + n
+    tag = re.compile(rf"\bcdc-{jid}-(src|sink)\b")
+    keep = [l for l in b"".join(out).decode("utf-8", "replace").splitlines()
+            if tag.search(l) and not l.lstrip().startswith("at ") and not NOISE.search(l)]
+    return [re.sub(r"\s*\([a-zA-Z0-9_.$]+:\d+\)\s*$", "", l)[:400] for l in keep[-lines:]]
 
 
 # ---- names ----------------------------------------------------------------------------------
@@ -510,6 +553,7 @@ def run(j, rid, log):
     s, d = _rows(j)
     _postgres_only(s)
     write_secrets(j, s)                                    # a key may have been renewed since
+    t0 = int(time.time())
     conns = ensure(j, "PAUSED")
     _, target = _slot(s)
     total0, _ = lag(j)
@@ -549,28 +593,55 @@ def run(j, rid, log):
             log("paused the connectors")
         except Exception as e:  # noqa: BLE001
             log(f"couldn't pause: {e}")
+        lines = connect_log(j["id"], since=t0)
+        if lines:
+            log("— Kafka Connect, this job's connectors —\n" + "\n".join(lines))
 
 
 # ---- keep Kafka Connect in step with the jobs ----------------------------------------------
+def _event(meta, text):
+    meta["events"] = (meta.get("events") or [])[-(EVENTS - 1):] + [time.strftime("%H:%M:%S ") + text]
+
+
+def _stream_log(jid, meta):
+    lines = connect_log(jid, since=meta.get("t0"))
+    return "\n".join((meta.get("events") or []) + (["", "— Kafka Connect, this job's connectors (latest lines) —"] + lines if lines else []))
+
+
 def _stream_run(j, conns):
-    """A streaming job has one 'running' run row while it streams: its changes so far, how far behind."""
+    """A streaming job has one 'running' run row while it streams: its changes so far, how far behind,
+    and its log — what happened (started, errors, restarts, how it's doing) + Kafka Connect's lines."""
     r = _q("SELECT id, meta FROM cdc_runs WHERE job_id = %s AND trigger = 'stream' AND status = 'running' ORDER BY id DESC LIMIT 1",
            (j["id"],), one=True)
     streaming = j["schedule"] == "stream" and j["enabled"]
     if not streaming:
         if r:
-            _q("UPDATE cdc_runs SET status = 'ok', finished_at = now() WHERE id = %s", (r["id"],), rows=False)
+            meta = dict(r["meta"] or {})
+            _event(meta, "■ stopped")
+            _q("UPDATE cdc_runs SET status = 'ok', finished_at = now(), meta = %s, log = %s WHERE id = %s",
+               (json.dumps(meta), _stream_log(j["id"], meta), r["id"]), rows=False)
         return
     total, behind = lag(j)
     err = _failed(conns, j["id"])
     if not r:
-        _q("INSERT INTO cdc_runs (job_id, member, trigger, records, meta) VALUES (%s, %s, 'stream', 0, %s)",
-           (j["id"], j["member"], json.dumps({"base": total, "behind": behind})), rows=False)
+        meta = {"base": total, "behind": behind, "t0": int(time.time()), "noted": time.time()}
+        _event(meta, f"▶ stream started — the topics hold {total} changes")
+        _q("INSERT INTO cdc_runs (job_id, member, trigger, records, meta, log) VALUES (%s, %s, 'stream', 0, %s, %s)",
+           (j["id"], j["member"], json.dumps(meta), "\n".join(meta["events"])), rows=False)
         _q("UPDATE cdc_jobs SET last_run_at = now() WHERE id = %s", (j["id"],), rows=False)
         return
     meta = dict(r["meta"] or {}, behind=behind, at=_now())
-    _q("UPDATE cdc_runs SET records = %s, meta = %s, error = %s WHERE id = %s",
-       (max(0, total - int(meta.get("base", 0))), json.dumps(meta), err, r["id"]), rows=False)
+    records = max(0, total - int(meta.get("base", 0)))
+    if err and err != meta.get("err"):
+        _event(meta, f"✗ {err} — restarting it")
+    elif not err and meta.get("err"):
+        _event(meta, "✓ running again")
+    meta["err"] = err
+    if time.time() - float(meta.get("noted", 0)) > NOTE_S:
+        _event(meta, f"{records} changes so far · {behind} on the way to Iceberg")
+        meta["noted"] = time.time()
+    _q("UPDATE cdc_runs SET records = %s, meta = %s, error = %s, log = %s WHERE id = %s",
+       (records, json.dumps(meta), err, _stream_log(j["id"], meta), r["id"]), rows=False)
 
 
 def reconcile():
