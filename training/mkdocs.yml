@@ -149,6 +149,7 @@ nav:
       - "Your first sync job": cdc/first-job.md
       - "Read the changes in the lake": cdc/read-changes.md
       - "From changes to Silver and Gold": cdc/silver-gold.md
+      - "Live data: Datastream (Debezium + Kafka)": cdc/datastream.md
       - "Run it for real: schedules, costs and clean-up": cdc/operate.md
   - "Transform with dbt":
       - "Why dbt": dbt/why-dbt.md

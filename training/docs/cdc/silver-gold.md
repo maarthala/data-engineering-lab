@@ -43,6 +43,21 @@ for t in ["customers", "products", "orders", "order_items"]:
   that here. For big tables you'd `MERGE` only the changed keys
   ([MERGE & upserts](../unit2/merge.md)).
 
+!!! note "With Debezium"
+    A Debezium *Full load + CDC* table already has deleted rows removed, and its change details
+    sit in one column, `_cdc` ([Read the changes](read-changes.md)). So the function shrinks to
+    dropping that column:
+
+    ```python
+    def current(table):
+        """The table as it is in the shop now (Debezium: deletes are already gone)."""
+        return spark.table(f"my.shop_cdc.{table}").drop("_cdc")
+    ```
+
+    For a *history* table, "as it is now" is each key's **latest** row that isn't a delete:
+    order the rows by `_cdc.ts` per key and keep the newest — see
+    [Slowly changing dimensions](../recipes/scd2.md) for the window function that does it.
+
 Check the counts:
 
 ```python

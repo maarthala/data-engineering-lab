@@ -163,6 +163,34 @@ SELECT count(*) FROM demouser_lake.sandbox."orders_maint$files";
 Trino **refuses** retention under 7 days by default. That's the same safety idea, enforced by
 the server.
 
+### Set it once: 🧹 Maintenance on My catalogs
+Running these by hand is how you learn them. In practice you set **what** a table needs once and
+let a schedule do it. **🗂️ My catalogs** does exactly that, for your own catalogs:
+
+1. Open your lakehouse. The **🧹 Maintenance — the whole catalog** card sets it for every table;
+   **🧹** on a namespace's row sets it for that namespace; a table's panel has a **🧹 Maintenance**
+   tab for one table.
+2. Per kind — **Compaction** (target file size), **Snapshot expiry** (days), **Orphan files**
+   (days) — choose **on** with a value, *as set higher up*, or **off here**, and **Save**. The most
+   specific one wins: a table's own setting beats its namespace's, which beats the catalog's.
+3. It runs **every night at 03:00 UTC**, or now with **▶ Run now**. The table's tab lists its last
+   runs.
+
+Underneath, each setting is a **Polaris policy** — the catalog keeps *what* to do, next to the
+tables it's about — and a run is the same Trino `ALTER TABLE … EXECUTE` you just typed, as the lab.
+(The portal lowers Trino's 7-day minimum for its own runs, so *1 day* works; it needs the SQL unit.)
+
+What a run did on two real tables:
+
+| Table | Before | After |
+|---|---|---|
+| a streamed table (a [Datastream](../cdc/datastream.md) job, a save every few seconds) | 10 data files | 1 data file |
+| a CDC table merged by key (`orders`, updated in place) | 3 data files + **4 delete files**, 1,831 rows in its totals | 1 data file, 0 delete files, 1,822 rows |
+
+The second line is why CDC tables need compaction: every update or delete adds a small **delete
+file** that every read has to apply, and the snapshot's totals still count the replaced rows. A
+compaction applies them once, for good — the table's panel then shows the true row count.
+
 ## Part 2: Delta Lake
 Delta tables get the same treatment with shorter commands. Write a small-files Delta table to the
 lake:
@@ -256,8 +284,9 @@ spark.conf.set("spark.databricks.delta.retentionDurationCheck.enabled", "true")
 | `VACUUM` / `expire_snapshots` | daily or weekly, keeping a 7+ day window |
 | `remove_orphan_files` | weekly or monthly |
 
-Put them in an **Airflow** DAG after the loads ([Unit 5](../unit5/basics.md)), just as you would in
-production.
+Set them on **🗂️ My catalogs → 🧹 Maintenance** (nightly), or put them in an **Airflow** DAG after
+the loads ([Unit 5](../unit5/basics.md)) when they must follow a particular load — just as you
+would in production.
 
 !!! info "What about V-Order?"
     In Microsoft Fabric you'll also see **V-Order**: a Microsoft-only way of writing Parquet that
@@ -282,7 +311,7 @@ production.
 - **Compact** and **Z-order** Iceberg tables (Spark + Trino) and Delta tables
 - **Expire** old snapshots, **VACUUM** Delta, and clean up orphan files safely
 - Read a table's files and history with `.files` / `.snapshots` / `DESCRIBE HISTORY`
-- Choose sensible **retention** and a maintenance schedule
+- Choose sensible **retention** and a maintenance schedule — and set it once on My catalogs
 
 ## 🎯 This runs unchanged on Azure, Databricks, Snowflake & Fabric
 - **Databricks**: exactly these Delta commands (`OPTIMIZE`, `ZORDER BY`, `VACUUM`,

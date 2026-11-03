@@ -62,6 +62,50 @@ you name the columns you want). OLake adds five:
 | `_cdc_lsn` | the change's position in Postgres's log (*log sequence number*). Empty for snapshot rows. |
 | `_olake_timestamp` | when OLake wrote the row into the lake |
 
+!!! note "With Debezium: one `_cdc` column instead of five"
+    A Debezium job's table has the shop's columns with their **own types** (`total` stays
+    `decimal(12,2)`, `created_at` a `timestamp with time zone`) plus a single column `_cdc`, a
+    *row* (a struct) of what happened. In the SQL editor:
+
+    ```sql
+    SHOW COLUMNS FROM <you>_lake.shop_cdc.orders;
+    ```
+
+    ```text
+     Column      | Type
+    -------------+------------------------------------------------------------------------------------------------------
+     order_id    | integer
+     customer_id | integer
+     status      | varchar
+     total       | decimal(12,2)
+     created_at  | timestamp(6) with time zone
+     updated_at  | timestamp(6) with time zone
+     _cdc        | row("op" varchar, "ts" timestamp(6) with time zone, "offset" bigint, "source" varchar, "target" varchar, "key" row("order_id" integer))
+    ```
+
+    | Field | What it holds |
+    |---|---|
+    | `_cdc.op` | what happened: `I` insert (also the full load's rows) · `U` update · `D` delete |
+    | `_cdc.ts` | when the change happened in the source |
+    | `_cdc.offset` | its position in the job's Kafka topic |
+    | `_cdc.source` | the source table, e.g. `shop.public.orders` |
+    | `_cdc.key` | the row's key (`order_id` here; `order_id` + `line` for `order_items`) |
+
+    Read a field with a dot: `SELECT order_id, status, _cdc.op, _cdc.ts FROM … ORDER BY _cdc.ts DESC`:
+
+    ```text
+     order_id |  status   | op |               ts
+    ----------+-----------+----+--------------------------------
+        16454 | paid      | U  | 2026-11-03 10:07:01.872000 UTC
+        16009 | paid      | U  | 2026-11-03 10:06:45.141000 UTC
+        16244 | delivered | U  | 2026-11-03 10:06:30.945000 UTC
+    ```
+
+    In *Full load + CDC* mode a **deleted row is removed** (no tombstone): the table is exactly
+    the shop as it is now — 1,822 rows for 1,822 orders. When you need to see deletes, use the
+    history mode, where each delete is a row with `_cdc.op = 'D'`. The rest of this lesson uses
+    OLake's columns; with Debezium read `_op_type` as `_cdc.op` and `_cdc_timestamp` as `_cdc.ts`.
+
 ### 2 · Right after the first run
 ```python
 spark.sql("""SELECT _op_type, count(*) AS rows
