@@ -28,7 +28,7 @@
     <a class="btn" id="t-open" target="_blank" rel="noopener">Open in new tab ↗</a></div>
   <div id="t-body"></div>
   <script>
-    // A tool (Jupyter, SQLPad, Airflow, Superset, Spark UI, storage console, Polaris Console) inside the
+    // A tool (Jupyter, SQLPad, Airflow, Superset, Spark UI, storage console) inside the
     // portal, the left menu staying: #<tool> in the address (window.LAB_TOOLS, lab-header.js). The tools
     // let the portal frame them (each tool's frame-ancestors setting); the sign-in is the portal's own.
     var key = location.hash.slice(1), t = LAB_TOOLS[key], body = document.getElementById('t-body');

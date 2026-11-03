@@ -119,52 +119,6 @@ spec:
   ports:
     - { name: http, port: 8181, targetPort: 8181 }
     - { name: mgmt, port: 8182, targetPort: 8182 }
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: polaris-console
-  labels: {{- include "de-stack.labels" . | nindent 4 }}
-spec:
-  replicas: 1
-  selector:
-    matchLabels: {{- include "de-stack.selector" (dict "app" "polaris-console") | nindent 6 }}
-  template:
-    metadata:
-      labels: {{- include "de-stack.selector" (dict "app" "polaris-console") | nindent 8 }}
-    spec:
-      containers:
-        - name: console
-          image: {{ .Values.polaris.consoleImage }}
-          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
-          ports:
-            - { name: http, containerPort: 8080 }
-          env:
-            # Runtime config.js (same-origin: API served under /api on the console host).
-            - { name: VITE_POLARIS_API_URL, value: "http://polaris-console.{{ .Values.ingress.baseHost }}" }
-            - { name: VITE_POLARIS_REALM, value: "POLARIS" }
-            - { name: VITE_POLARIS_PRINCIPAL_SCOPE, value: "PRINCIPAL_ROLE:ALL" }
-            - { name: VITE_OAUTH_TOKEN_URL, value: "http://polaris-console.{{ .Values.ingress.baseHost }}/api/catalog/v1/oauth/tokens" }
-            - { name: VITE_POLARIS_REALM_HEADER_NAME, value: "Polaris-Realm" }
-            {{- if .Values.keycloak.enabled }}
-            # "Sign in with Epireum lab account" (Keycloak). The browser does the login + PKCE
-            # code exchange itself, so these are the PUBLIC URLs. /login?local=1 keeps the
-            # Client ID / Secret form for root.
-            - { name: VITE_OIDC_ISSUER_URL, value: "http://auth.{{ .Values.ingress.baseHost }}/realms/de-lab" }
-            - { name: VITE_OIDC_CLIENT_ID, value: polaris-ui }
-            - { name: VITE_OIDC_REDIRECT_URI, value: "http://polaris-console.{{ .Values.ingress.baseHost }}/auth/callback" }
-            - { name: VITE_OIDC_SCOPE, value: "openid profile" }
-            {{- end }}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: polaris-console
-  labels: {{- include "de-stack.labels" . | nindent 4 }}
-spec:
-  selector: {{- include "de-stack.selector" (dict "app" "polaris-console") | nindent 4 }}
-  ports:
-    - { name: http, port: 8080, targetPort: 8080 }
 {{- if .Values.ingress.enabled }}
 ---
 # API on its own host (Spark/Trino/CLI hit this directly).
@@ -183,26 +137,5 @@ spec:
             pathType: Prefix
             backend:
               service: { name: polaris, port: { number: 8181 } }
----
-# Console host, same-origin: /api → polaris, / → the Console UI (no CORS).
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: polaris-console
-  labels: {{- include "de-stack.labels" . | nindent 4 }}
-spec:
-  ingressClassName: {{ .Values.ingress.className }}
-  rules:
-    - host: polaris-console.{{ .Values.ingress.baseHost }}
-      http:
-        paths:
-          - path: /api
-            pathType: Prefix
-            backend:
-              service: { name: polaris, port: { number: 8181 } }
-          - path: /
-            pathType: Prefix
-            backend:
-              service: { name: polaris-console, port: { number: 8080 } }
 {{- end }}
 {{- end }}

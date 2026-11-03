@@ -49,12 +49,12 @@ services:
       POLARIS_URL: http://polaris:8181
       LEARNER_QUOTA_MB: "100"      # each learner's bucket <user>-lake (hard limit)
       # home page: tiles of stopped units (make status) are greyed — tile=host:port it checks
-      LAB_SERVICES: jupyter=jupyterhub:8000,spark=spark-master:8080,sqlpad=sqlpad:3000,airflow=airflow-apiserver:8080,superset=superset:8088,governance=polaris-proxy:8189
+      LAB_SERVICES: jupyter=jupyterhub:8000,spark=spark-master:8080,sqlpad=sqlpad:3000,airflow=airflow-apiserver:8080,superset=superset:8088
       # ⚙️ Settings → Services shows each unit's state (here they're switched in make status)
       LAB_VERSION: ${LAB_VERSION:-}            # the release tag — the Makefile sets it (git describe)
       LAB_UPDATE_CHECK: ${LAB_UPDATE_CHECK:-1}  # 0: no "newer release" banner for managers
       LAB_UPDATE_REPO: ${LAB_UPDATE_REPO:-maarthala/data-engineering-lab}   # a fork: its own repo
-      LAB_UNITS: "SQL=trino:8080,sqlpad:3000;Notebooks=jupyterhub:8000;Spark=spark-master:8080,spark-connect:15002;Airflow=airflow-apiserver:8080;Superset=superset:8088;Polaris console=polaris-proxy:8189;Streaming=kafka-connect:8083"
+      LAB_UNITS: "SQL=trino:8080,sqlpad:3000;Notebooks=jupyterhub:8000;Spark=spark-master:8080,spark-connect:15002;Airflow=airflow-apiserver:8080;Superset=superset:8088;Streaming=kafka-connect:8083"
       TRINO_RULES_PATH: /trino-access/rules.json      # Trino's access rules, kept in step with Polaris
       # "Manage members" (managers only): Keycloak admin + a JupyterHub service token
       KEYCLOAK_ADMIN: admin:admin
@@ -137,7 +137,7 @@ services:
       sparknet:
         aliases: [lab.localhost, auth.lab.localhost, jupyter.lab.localhost, airflow.lab.localhost,
                   superset.lab.localhost, sqlpad.lab.localhost, spark.lab.localhost, storage.lab.localhost,
-                  polaris-console.lab.localhost, polaris.lab.localhost, vault.lab.localhost, trino.lab.localhost]
+                  polaris.lab.localhost, vault.lab.localhost, trino.lab.localhost]
 
   oauth2-proxy:
     image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.4

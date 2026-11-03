@@ -41,12 +41,32 @@
            padding:10px 16px; border-radius:10px; box-shadow:var(--shadow); display:none; z-index:10}
     .toast.err{border-color:var(--danger); color:var(--bad-ink)}
     .placeholder{color:var(--muted); padding:40px; text-align:center}
+    /* a table's own panel: columns · snapshots · properties */
+    .tbl td:first-child .tname{cursor:pointer; color:var(--ink)} .tbl td:first-child .tname:hover{color:var(--accent); text-decoration:underline}
+    .tbl.sel td{background:var(--accent-bg)}
+    .tstats{display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:10px; margin:10px 0 12px}
+    .tstats div{border:1px solid var(--line); border-radius:9px; padding:8px 10px; background:var(--panel)}
+    .tstats b{display:block; font-size:1.1rem} .tstats span{font-size:.76rem; color:var(--muted)}
+    .ttabs{display:flex; gap:2px; border-bottom:1px solid var(--line); margin:4px 0 10px}
+    .ttabs a{padding:7px 12px; cursor:pointer; color:var(--muted); border-bottom:2px solid transparent; margin-bottom:-1px; font-size:.88rem}
+    .ttabs a.on{color:var(--accent); border-bottom-color:var(--accent)}
+    .mono{font-family:ui-monospace,Menlo,monospace; font-size:.8rem}
+    .pillk{font-size:.7rem; padding:1px 7px; border-radius:999px; background:var(--accent-bg); color:var(--accent); margin-left:6px}
+    .tscroll{max-height:380px; overflow:auto}
+    /* 🧹 maintenance */
+    .mrow{display:grid; grid-template-columns:minmax(240px, 380px) 220px auto; justify-content:start; gap:6px 18px; align-items:center; padding:10px 0; border-bottom:1px solid var(--line)}
+    .mrow:last-of-type{border-bottom:0}
+    .mrow b{font-size:.9rem} .mrow .sub{font-size:.8rem}
+    .mrow .ctl{display:flex; gap:6px; align-items:center; flex-wrap:wrap}
+    .mrow .ctl input{width:80px}
+    .mon{color:var(--ok-ink)} .offc{color:var(--muted)}
+    @media (max-width:760px){ .mrow{grid-template-columns:1fr} }
     @media (max-width:760px){ .app{grid-template-columns:1fr} aside{max-height:35vh; border-right:0; border-bottom:1px solid var(--line)} }
 </style>
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=16"></script>
+  <script src="/lab-header.js?v=17"></script>
   <div class="pagebar"><h1>🗂️ My catalogs <span class="dot">·</span> your namespaces, tables and who you share them with</h1></div>
   <div class="app">
     <aside>
@@ -69,6 +89,17 @@
     function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
     function toast(m, err) { var t = $('toast'); t.textContent = m; t.className = 'toast' + (err ? ' err' : ''); t.style.display = 'block';
       clearTimeout(t._h); t._h = setTimeout(function () { t.style.display = 'none'; }, 3500); }
+    function post(path, body) {
+      return fetch('/api/catalogs' + path, {method: 'POST', credentials: 'same-origin',
+          headers: {'Content-Type': 'application/json', 'X-Lab-Request': '1'}, body: JSON.stringify(body)})
+        .then(function (r) { return r.json().then(function (j) { return {ok: r.ok, body: j}; }); });
+    }
+    function task(id, done) {                           // a background task (cdc-runner): ask until it ends
+      fetch('/api/cdc/task?id=' + id, {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (t) {
+        if (t.status === 'queued' || t.status === 'running') return setTimeout(function () { task(id, done); }, 2500);
+        done(t);
+      }).catch(function (e) { done({status: 'failed', error: e.message}); });
+    }
     function api(method, path, params) {
       var q = new URLSearchParams(params || {}).toString();
       return fetch('/api/catalogs' + path + (q ? '?' + q : ''), {method: method, credentials: 'same-origin'})
@@ -148,6 +179,10 @@
           acc.appendChild(el('div', 'sub', 'Their files come with the lake: 📁 My files → 🤝 Shared with me.'));
         m.appendChild(acc);
         help(card, [snippet(name, c.shares[0].namespace, c.shares[0].table)]);
+        var st = el('div', 'card'); st.appendChild(el('h3', null, 'Namespaces & tables'));
+        var stb = el('table'); st.appendChild(stb); m.appendChild(st);
+        var spane = el('div'); m.appendChild(spane);
+        readTree(stb, spane, name);
         return;
       }
       var info = state.data.owned.filter(function (x) { return x.name === name; })[0];
@@ -208,6 +243,9 @@
           list.forEach(function (n) { scope.appendChild(el('option', null, 'namespace ' + n)).value = n; }); }); }
       };
       var stab = el('table'); stab.style.marginTop = '8px'; inv.appendChild(stab);
+      var whoBox = el('div'); whoBox.style.marginTop = '14px'; inv.appendChild(whoBox);
+      var whoBtn = el('button', 'small', '👥 Who has access'); whoBox.appendChild(whoBtn);
+      whoBtn.onclick = function () { accessList(whoBox, name); };
       // Namespaces & tables: namespaces closed; a namespace's tables load when it's opened
       var tree = el('div', 'card'), thead = el('div', 'cardhead'), nsNew = el('button', 'small', '＋ New namespace');
       thead.appendChild(el('h3', null, 'Namespaces & tables')); thead.appendChild(nsNew); tree.appendChild(thead);
@@ -231,7 +269,10 @@
         ok.onclick = create; no.onclick = close;
         inp.onkeydown = function (e) { if (e.key === 'Enter') create(); if (e.key === 'Escape') close(); };
       };
-      var tbody = el('table'); tree.appendChild(tbody); m.appendChild(tree); m.appendChild(inv);
+      var tbody = el('table'); tree.appendChild(tbody); m.appendChild(tree);
+      var pane = el('div'); m.appendChild(pane);                   // the opened table's (or namespace's 🧹) card
+      m.appendChild(inv);
+      var maint = el('div'); m.appendChild(maint); maintCard(maint, name, null, null);   // 🧹 the whole catalog
       tbody.innerHTML = '<tr><td class="sub">Loading…</td></tr>';
       help(head, [info.default ? (function () { var p = el('pre'); p.textContent = '# notebooks: already set up as `my`\nspark.sql("SHOW NAMESPACES IN my").show()\n\n-- SQL editor\nSELECT * FROM ' + name + '.<namespace>.<table>;'; return p; })() : snippet(name),
         el('div', 'sub', 'Tables are made by code (e.g. df.writeTo("' + (info.default ? 'my' : name) + '.bronze.orders").create()) or by 📡 Ingestion. ⧉ next to a table copies its full name.')]);
@@ -251,9 +292,13 @@
           td.appendChild(el('span', 'car', '▸')); td.appendChild(document.createTextNode(' 📁 ' + n));
           tr.appendChild(td); tbody.appendChild(tr);
           var rows = null;
-          tr.appendChild(del('namespace ' + n + ' (it must be empty)', '/namespaces', {catalog: name, namespace: n}, function () {
+          var nsActs = del('namespace ' + n + ' (it must be empty)', '/namespaces', {catalog: name, namespace: n}, function () {
             (rows || []).forEach(function (x) { x.remove(); }); tr.remove();
-          }));
+          });
+          var mb = el('button', 'small', '🧹'); mb.title = 'Maintenance of namespace ' + n;
+          mb.onclick = function (e) { e.stopPropagation(); maintCard(pane, name, n, null); };
+          nsActs.insertBefore(mb, nsActs.firstChild); nsActs.insertBefore(document.createTextNode(' '), mb.nextSibling);
+          tr.appendChild(nsActs);
           tr.onclick = function (e) {
             if (e.target.closest('td.r')) return;
             var opening = !tr.classList.contains('open'); tr.classList.toggle('open', opening);
@@ -263,8 +308,10 @@
               wait.remove();
               if (!r.ok) { rows = null; tr.classList.remove('open'); return toast(r.body.error, true); }
               rows = (r.body.length ? r.body.map(function (t) {
-                var x = row('▦ ' + t, 'tbl'), full = name + '.' + n + '.' + t;
+                var x = el('tr', 'tbl'), full = name + '.' + n + '.' + t, cell = el('td');
+                var tn = el('span', 'tname', '▦ ' + t); tn.title = 'Open the table'; cell.appendChild(tn); x.appendChild(cell);
                 x.firstChild.appendChild(el('span', 'full', full));
+                tn.onclick = function () { detail(n, t, x); };
                 x.appendChild(del('table ' + n + '.' + t + ' and its files', '/tables', {catalog: name, namespace: n, table: t}, function () {
                   x.remove(); rows.splice(rows.indexOf(x), 1);
                 }, full));
@@ -278,6 +325,7 @@
       shares();
 
       function row(label, cls) { var tr = el('tr', cls); tr.appendChild(el('td', null, label)); return tr; }
+      function detail(n, t, tr) { tableCard(pane, name, n, t, tr); }
       // 🗑 → "Delete …? Yes / Cancel" in the same cell (no browser popups)
       function del(what, path, params, gone, copy, label) {
         var td = el('td', 'r');
@@ -341,6 +389,233 @@
           });
         });
       }
+    }
+
+    // a shared catalog's namespaces and tables, as far as the shares reach (read only)
+    function readTree(tbody, pane, cat) {
+      tbody.innerHTML = '<tr><td class="sub">Loading…</td></tr>';
+      api('GET', '/tree', {catalog: cat}).then(function (r) {
+        tbody.innerHTML = '';
+        if (!r.ok) return tbody.appendChild(el('tr', null, '')).appendChild(el('td', 'sub', r.body.error));
+        if (!r.body.length) { var e = el('tr'); e.appendChild(el('td', 'sub', 'No namespaces you can see yet.')); tbody.appendChild(e); }
+        r.body.forEach(function (n) {
+          var tr = el('tr', 'ns'), td = el('td'), rows = null;
+          td.appendChild(el('span', 'car', '▸')); td.appendChild(document.createTextNode(' 📁 ' + n)); tr.appendChild(td); tbody.appendChild(tr);
+          tr.onclick = function () {
+            var opening = !tr.classList.contains('open'); tr.classList.toggle('open', opening);
+            if (rows) { rows.forEach(function (x) { x.style.display = opening ? '' : 'none'; }); return; }
+            api('GET', '/tree', {catalog: cat, namespace: n}).then(function (q) {
+              rows = (q.ok && q.body.length ? q.body : [null]).map(function (t) {
+                var x = el('tr', 'tbl'), c = el('td'); x.appendChild(c);
+                if (!t) { c.appendChild(el('span', 'sub', q.ok ? 'no tables you can see here' : q.body.error)); return x; }
+                var tn = el('span', 'tname', '▦ ' + t); c.appendChild(tn); c.appendChild(el('span', 'full', cat + '.' + n + '.' + t));
+                tn.onclick = function () { tableCard(pane, cat, n, t, x); };
+                return x;
+              });
+              var at = tr; rows.forEach(function (x) { at.after(x); at = x; });
+            });
+          };
+        });
+      });
+    }
+    // 👥 everyone who can reach an owned catalog, and how
+    function accessList(box, cat) {
+      box.innerHTML = ''; box.appendChild(el('div', 'sub', 'Loading…'));
+      api('GET', '/access', {catalog: cat}).then(function (r) {
+        box.innerHTML = '';
+        if (!r.ok) return box.appendChild(el('div', 'sub', '✗ ' + (r.body.error || 'failed')));
+        var hd = el('div', 'cardhead'); hd.appendChild(el('h3', null, '👥 Who has access'));
+        var x = el('button', 'small', '✕'); x.onclick = function () { box.innerHTML = ''; var b = el('button', 'small', '👥 Who has access'); b.onclick = function () { accessList(box, cat); }; box.appendChild(b); };
+        hd.appendChild(x); box.appendChild(hd);
+        var t = el('table'); t.innerHTML = '<tr><th>Who</th><th>How</th><th>On</th><th>Access</th></tr>';
+        r.body.forEach(function (a) {
+          var tr = el('tr');
+          tr.appendChild(el('td', null, a.who.join(', ') || '—'));
+          tr.appendChild(el('td', 'sub', a.how === 'owner' ? 'owner' : a.how === 'share' ? 'your share' : a.how + (a.how.indexOf('role ') === 0 ? ' (🛡 Governance)' : '')));
+          tr.appendChild(el('td', null, a.on.join(' · ')));
+          var td = el('td'); td.appendChild(el('span', 'tag ' + (a.access === 'read' ? 'read' : 'write'), a.access === 'read' ? 'read' : a.access === 'write' ? 'read + write' : a.access));
+          tr.appendChild(td); t.appendChild(tr);
+        });
+        box.appendChild(t);
+        box.appendChild(el('div', 'sub', 'Owners and your shares come from here; roles marked Governance were given by a lab manager.'));
+      });
+    }
+
+    // ---- a table's card -----------------------------------------------------------------------
+    function size(b) { var u = ['B', 'KB', 'MB', 'GB', 'TB'], i = 0; while (b >= 1024 && i < 4) { b /= 1024; i++; } return (i ? b.toFixed(1) : b) + ' ' + u[i]; }
+    function when(ms) { return ms ? new Date(ms).toLocaleString([], {dateStyle: 'medium', timeStyle: 'medium'}) : '—'; }
+    function copyBtn(label, text, title) {
+      var c = el('button', 'small', label); c.title = title || ('Copy: ' + text);
+      c.onclick = function () { (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(
+        function () { toast('Copied'); }, function () { toast(text); }); };
+      return c;
+    }
+    function tableCard(pane, cat, ns, table, tr) {
+      Array.prototype.forEach.call(document.querySelectorAll('.tbl.sel'), function (x) { x.classList.remove('sel'); });
+      if (tr) tr.classList.add('sel');
+      pane.innerHTML = '';
+      var card = el('div', 'card'); pane.appendChild(card);
+      card.appendChild(el('div', 'sub', 'Loading ' + ns + '.' + table + '…'));
+      card.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+      api('GET', '/table', {catalog: cat, namespace: ns, table: table}).then(function (r) {
+        card.innerHTML = '';
+        if (!r.ok) return card.appendChild(el('div', 'sub', '✗ ' + (r.body.error || 'could not load the table')));
+        var d = r.body, head = el('div', 'cardhead');
+        var h = el('h2', null, '▦ ' + ns + '.' + table); h.style.fontSize = '1.05rem'; head.appendChild(h);
+        var acts = el('span'); acts.appendChild(copyBtn('⧉ Name', d.name));
+        var x = el('button', 'small', '✕'); x.title = 'Close'; x.style.marginLeft = '6px';
+        x.onclick = function () { pane.innerHTML = ''; if (tr) tr.classList.remove('sel'); }; acts.appendChild(x);
+        head.appendChild(acts); card.appendChild(head);
+        card.appendChild(el('div', 'sub', d.name + ' · Iceberg v' + d.format_version + ' · changed ' + when(d.updated)));
+        var st = el('div', 'tstats'), now = d.now || {records: 0, data_files: 0, delete_files: 0, bytes: 0};
+        [[now.records.toLocaleString(), 'rows'], [now.data_files, 'data files'], [now.delete_files, 'delete files'],
+         [size(now.bytes), 'on storage'], [d.snapshot_count, 'snapshots']].forEach(function (x) {
+          var b = el('div'); b.appendChild(el('b', null, String(x[0]))); b.appendChild(el('span', null, x[1])); st.appendChild(b); });
+        card.appendChild(st);
+        if (now.delete_files)
+          card.appendChild(el('div', 'sub', '↳ ' + now.delete_files + ' delete file(s): changes not yet merged into the data files — compaction (maintenance) merges them.'));
+        var tabs = el('div', 'ttabs'), body = el('div'); card.appendChild(tabs); card.appendChild(body);
+        var pages = [
+          ['Columns (' + d.columns.length + ')', function () {
+            var t = el('table'); t.innerHTML = '<tr><th>#</th><th>Column</th><th>Type</th><th></th></tr>';
+            d.columns.forEach(function (c) {
+              var tr = el('tr'); tr.appendChild(el('td', 'sub', String(c.id)));
+              var nm = el('td', null, c.name); if (c.key) nm.appendChild(el('span', 'pillk', 'key')); tr.appendChild(nm);
+              tr.appendChild(el('td', 'mono', c.type)); tr.appendChild(el('td', 'sub', c.required ? 'not null' : ''));
+              t.appendChild(tr);
+            });
+            body.appendChild(t);
+            body.appendChild(el('div', 'sub', 'Partitioned by: ' + (d.partitioning.length ? d.partitioning.join(', ') : 'nothing (one partition)')));
+          }],
+          ['Snapshots (' + d.snapshot_count + ')', function () {
+            body.appendChild(el('div', 'sub', 'Every write makes a snapshot — a version of the table you can still read (time travel), until maintenance expires it.'));
+            var w = el('div', 'tscroll'), t = el('table'); w.appendChild(t);
+            t.innerHTML = '<tr><th>When</th><th>Operation</th><th class="r">Rows +</th><th class="r">Rows −</th><th class="r">Files + / −</th><th class="r">Rows then</th><th></th></tr>';
+            d.snapshots.forEach(function (s) {
+              var tr = el('tr'), w0 = el('td', null, when(s.at));
+              if (s.current) w0.appendChild(el('span', 'pillk', 'current'));
+              tr.appendChild(w0); tr.appendChild(el('td', null, (s.operation || '') + (s.engine ? ' · ' + s.engine : '')));
+              [s.added_records, s.deleted_records].forEach(function (v) { tr.appendChild(el('td', 'r', v ? v.toLocaleString() : '—')); });
+              tr.appendChild(el('td', 'r', s.added_files + ' / ' + s.removed_files));
+              tr.appendChild(el('td', 'r', s.total_records.toLocaleString()));
+              var a = el('td', 'r');
+              a.appendChild(copyBtn('⧉ SQL', 'SELECT * FROM ' + d.name + ' FOR VERSION AS OF ' + s.id,
+                'Copy a query of the table as it was then (SQL editor / Trino)'));
+              tr.appendChild(a); t.appendChild(tr);
+            });
+            body.appendChild(w);
+            if (d.snapshot_count > d.snapshots.length) body.appendChild(el('div', 'sub', 'The newest ' + d.snapshots.length + ' of ' + d.snapshot_count + '.'));
+            var p = el('pre'); p.style.marginTop = '10px';
+            p.textContent = '-- SQL editor (Trino): the table as it was\nSELECT * FROM ' + d.name + ' FOR VERSION AS OF <snapshot id>;\nSELECT * FROM ' + d.name +
+              ' FOR TIMESTAMP AS OF TIMESTAMP \'2026-11-03 10:00:00 UTC\';\n\n# notebooks (Spark)\nspark.sql("SELECT * FROM ' + d.name + ' VERSION AS OF <snapshot id>").show()';
+            body.appendChild(p);
+          }],
+          ['🧹 Maintenance', function () { maintBody(body, cat, ns, table); }],
+          ['Properties', function () {
+            var t = el('table'); t.innerHTML = '<tr><th>Property</th><th>Value</th></tr>';
+            var tr0 = el('tr'); tr0.appendChild(el('td', null, 'location')); tr0.appendChild(el('td', 'mono', d.location)); t.appendChild(tr0);
+            Object.keys(d.properties).sort().forEach(function (k) {
+              var tr = el('tr'); tr.appendChild(el('td', 'mono', k)); tr.appendChild(el('td', 'mono', d.properties[k])); t.appendChild(tr); });
+            body.appendChild(t);
+          }]];
+        pages.forEach(function (pg, i) {
+          var a = el('a', i ? '' : 'on', pg[0]); tabs.appendChild(a);
+          a.onclick = function () { Array.prototype.forEach.call(tabs.children, function (x) { x.classList.toggle('on', x === a); });
+            body.innerHTML = ''; pg[1](); };
+        });
+        pages[0][1]();
+      });
+    }
+
+    // ---- 🧹 maintenance: what applies here, set this scope's own, Run now ------------------------
+    var KIND = {compaction: ['Compaction', 'Merge small files (and the delete files CDC upserts leave) up to a target size — faster reads.'],
+                expiry: ['Snapshot expiry', 'Forget snapshots older than N days — time travel goes back that far, and their files are freed.'],
+                orphans: ['Orphan files', 'Delete files no snapshot uses any more (left by failed or old writes), older than N days.']};
+    function said(kind, v) {
+      if (!v) return 'none';
+      if (v.off) return 'off';
+      return kind === 'compaction' ? 'on · files up to ' + v.target_mb + ' MB' : 'on · older than ' + v.days + (v.days === 1 ? ' day' : ' days');
+    }
+    function maintCard(holder, cat, ns, table) {
+      holder.innerHTML = '';
+      var card = el('div', 'card'), head = el('div', 'cardhead');
+      head.appendChild(el('h3', null, '🧹 Maintenance — ' + (ns ? 'namespace ' + ns : 'the whole catalog')));
+      if (ns) { var x = el('button', 'small', '✕'); x.onclick = function () { holder.innerHTML = ''; }; head.appendChild(x); }
+      card.appendChild(head); holder.appendChild(card);
+      var body = el('div'); card.appendChild(body); maintBody(body, cat, ns, table);
+      if (ns) card.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    }
+    function maintBody(body, cat, ns, table) {
+      body.innerHTML = ''; body.appendChild(el('div', 'sub', 'Loading…'));
+      api('GET', '/maintenance', {catalog: cat, namespace: ns || '', table: table || ''}).then(function (r) {
+        body.innerHTML = '';
+        if (!r.ok) return body.appendChild(el('div', 'sub', '✗ ' + (r.body.error || 'failed')));
+        var d = r.body, scope = table ? 'this table' : ns ? 'this namespace' : 'the whole catalog';
+        body.appendChild(el('div', 'sub', (table ? 'What applies to this table' : 'Set here, it applies to every table in ' + scope + ' — a namespace or table can set its own, or switch it off') +
+          '. It runs every night at ' + d.nightly_utc + ' UTC, or when you press Run now (through SQL: the SQL unit must be on).'));
+        d.kinds.forEach(function (k) {
+          var a = d.applies[k], own = d.own[k], row = el('div', 'mrow');
+          var lbl = el('div'); lbl.appendChild(el('b', null, KIND[k][0])); lbl.appendChild(el('div', 'sub', KIND[k][1])); row.appendChild(lbl);
+          var now = el('div'), v = a && a.values;
+          now.appendChild(el('span', v && !v.off ? 'mon' : 'offc', said(k, v)));
+          if (a && a.from !== 'here') now.appendChild(el('div', 'sub', 'set on ' + a.from));
+          row.appendChild(now);
+          var ctl = el('div', 'ctl');
+          if (d.can_edit) {
+            var mode = el('select'); mode.innerHTML = '<option value="inherit">' + (ns ? 'as set higher up' : 'none') + '</option><option value="on">on</option>' +
+              (ns ? '<option value="off">off here</option>' : '');
+            mode.value = !own ? 'inherit' : own.off ? 'off' : 'on';
+            var key = k === 'compaction' ? 'target_mb' : 'days', num = el('input'); num.type = 'number';
+            num.value = (own && !own.off ? own[key] : (v && !v.off ? v[key] : d.defaults[k][key]));
+            var unit = el('span', 'sub', k === 'compaction' ? 'MB' : 'days'), save = el('button', 'small primary', 'Save');
+            function shown() { num.hidden = unit.hidden = mode.value !== 'on'; }
+            mode.onchange = shown; shown();
+            save.onclick = function () {
+              var values = mode.value === 'inherit' ? null : mode.value === 'off' ? {off: true} : {};
+              if (mode.value === 'on') values[key] = +num.value;
+              save.disabled = true;
+              post('/maintenance', {catalog: cat, namespace: ns, table: table, kind: k, values: values}).then(function (res) {
+                save.disabled = false;
+                if (!res.ok) return toast(res.body.error, true);
+                toast(KIND[k][0] + ': ' + (values === null ? 'none of its own' : said(k, values))); maintBody(body, cat, ns, table);
+              });
+            };
+            [mode, num, unit, save].forEach(function (x) { ctl.appendChild(x); });
+          }
+          row.appendChild(ctl); body.appendChild(row);
+        });
+        if (d.can_edit) {
+          var go = el('button', 'small', '▶ Run now'), out = el('span', 'sub'), bar = el('div', 'invite'); bar.style.marginTop = '10px';
+          bar.appendChild(go); bar.appendChild(out); body.appendChild(bar);
+          go.onclick = function () {
+            go.disabled = true; out.textContent = '… running (every table ' + (table ? '' : 'in ' + scope + ' ') + 'a policy covers)';
+            post('/maintenance/run', {catalog: cat, namespace: ns, table: table}).then(function (res) {
+              if (!res.ok) { go.disabled = false; out.textContent = ''; return toast(res.body.error, true); }
+              task(res.body.task, function (t) {
+                go.disabled = false;
+                if (t.status !== 'done') { out.textContent = '✗ ' + (t.error || 'failed'); return; }
+                var rr = t.result || {};
+                out.textContent = rr.tables ? '✓ ' + rr.tables + ' table(s)' + (rr.failed ? ', ' + rr.failed + ' failed' : '') : 'nothing to do — no policy covers a table here';
+                if (table) maintBody(body, cat, ns, table);
+              });
+            });
+          };
+        }
+        if (table && d.runs && d.runs.length) {
+          body.appendChild(el('div', 'sub', 'Last runs')).style.marginTop = '12px';
+          var t = el('table'); t.innerHTML = '<tr><th>When</th><th>Why</th><th>Result</th></tr>';
+          d.runs.forEach(function (x) {
+            var tr = el('tr'); tr.appendChild(el('td', null, new Date(x.started_at).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})));
+            tr.appendChild(el('td', 'sub', x.trigger || ''));
+            var res = x.ok === false ? '✗ ' + (x.error || 'failed') : (x.steps || []).map(function (s) {
+              var c = {}; (s.rows || []).forEach(function (r) { if (r && r.length === 2) c[r[0]] = r[1]; });
+              return s.what + (c.rewritten_data_files_count !== undefined ? ' (' + c.rewritten_data_files_count + ' → ' + c.added_data_files_count + ' files)' : '');
+            }).join(' · ');
+            tr.appendChild(el('td', x.ok === false ? 'bad' : null, res || '—')); t.appendChild(tr);
+          });
+          body.appendChild(t);
+        }
+      });
     }
 
     $('new').onclick = function () {

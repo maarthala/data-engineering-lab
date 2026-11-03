@@ -103,7 +103,6 @@ polaris:
   enabled: true
   image: apache/polaris:1.8.0
   adminImage: apache/polaris-admin-tool:1.8.0
-  consoleImage: ghcr.io/maarthala/de-stack/polaris-console:20261001-2   # upstream + lab SSO (Dockerfile.polaris-console)
 
 trino:
   enabled: true

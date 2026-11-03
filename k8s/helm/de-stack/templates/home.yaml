@@ -14,7 +14,6 @@ data:
    | replace "http://localhost:8003" (printf "http://sqlpad.%s" .Values.ingress.baseHost)
    | replace "http://localhost:8007" (printf "http://trino.%s" .Values.ingress.baseHost)
    | replace "http://localhost:8008" (printf "http://jupyter.%s" .Values.ingress.baseHost)
-   | replace "http://localhost:8189" (printf "http://polaris-console.%s" .Values.ingress.baseHost)
    | replace "http://localhost:9001" (printf "http://storage.%s" .Values.ingress.baseHost)
    | replace "start it in make status (s)" "turn it on in Manage → ⚙️ Settings → Services"
    | indent 4 }}
@@ -34,6 +33,8 @@ data:
 {{ .Files.Get "files/home/activity.html" | indent 4 }}
   settings.html: |
 {{ .Files.Get "files/home/settings.html" | indent 4 }}
+  governance.html: |
+{{ .Files.Get "files/home/governance.html" | indent 4 }}
   admin.js: |
 {{ .Files.Get "files/home/admin.js" | indent 4 }}
   exam-render.js: |
@@ -211,8 +212,8 @@ spec:
             # ⚙️ Settings → Services: managers turn units off/on (scale to 0/1); stopped tools' tiles grey
             # the release deployed (its vX.Y.Z tag; ansible sets it) — managers get a "newer release" banner
             - { name: LAB_VERSION, value: {{ .Values.labVersion | default "" | quote }} }
-            - { name: LAB_UNITS, value: "SQL=trino,sqlpad;Notebooks=jupyterhub;Spark=spark-master,spark-worker,spark-connect;Airflow=airflow,airflow-parser;Superset=superset;Polaris console=polaris-console" }
-            - { name: LAB_SERVICES, value: "jupyter=jupyterhub:8000,spark=spark-master:8080,sqlpad=sqlpad:3000,airflow=airflow-apiserver:8080,superset=superset:8088,governance=polaris-console:8080" }
+            - { name: LAB_UNITS, value: "SQL=trino,sqlpad;Notebooks=jupyterhub;Spark=spark-master,spark-worker,spark-connect;Airflow=airflow,airflow-parser;Superset=superset" }
+            - { name: LAB_SERVICES, value: "jupyter=jupyterhub:8000,spark=spark-master:8080,sqlpad=sqlpad:3000,airflow=airflow-apiserver:8080,superset=superset:8088" }
             # "Manage members" (managers only): Keycloak admin + a JupyterHub service token
             - { name: KEYCLOAK_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: keycloak-admin-password } } }
             - { name: KEYCLOAK_ADMIN, value: "{{ .Values.keycloak.adminUser }}:$(KEYCLOAK_ADMIN_PASSWORD)" }
@@ -244,6 +245,8 @@ spec:
             - { name: lab-code, mountPath: /app/labvault.py, subPath: labvault.py }
             - { name: lab-code, mountPath: /app/labexams.py, subPath: labexams.py }
             - { name: lab-code, mountPath: /app/labcdc.py, subPath: labcdc.py }
+            - { name: lab-code, mountPath: /app/labmaint.py, subPath: labmaint.py }
+            - { name: lab-code, mountPath: /app/labgov.py, subPath: labgov.py }
             - { name: lab-code, mountPath: /app/labdb.py, subPath: labdb.py }
             - { name: lab-code, mountPath: /app/exam_demo.json, subPath: exam_demo.json }
             - { name: lab-seed, mountPath: /app/seed }
@@ -355,7 +358,7 @@ metadata:
 rules:
   - apiGroups: ["apps"]
     resources: ["deployments", "deployments/scale"]
-    resourceNames: [trino, sqlpad, jupyterhub, spark-master, spark-worker, spark-connect, airflow, airflow-parser, superset, polaris-console]
+    resourceNames: [trino, sqlpad, jupyterhub, spark-master, spark-worker, spark-connect, airflow, airflow-parser, superset]
     verbs: ["get", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

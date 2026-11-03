@@ -7,65 +7,102 @@
   <link rel="stylesheet" href="/admin.css?v=8">
   <style>
     main{max-width:none}
-    .seg{display:inline-flex; gap:4px; flex-wrap:wrap}
-    button.on{border-color:var(--accent); color:var(--accent)}
-    .ok{color:var(--accent2)} .bad{color:var(--bad-ink)} .run{color:var(--accent)}
-    .crumbs{display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:.9rem; color:var(--muted); margin:0 0 10px}
-    .crumbs a{color:var(--accent); text-decoration:none; cursor:pointer} .crumbs a:hover{text-decoration:underline}
-    .crumbs b{color:var(--ink)}
-    .lst td{vertical-align:middle} .lst .acts{white-space:nowrap; text-align:right}
-    .lst tr.more > td{background:var(--panel2); padding:8px 14px 12px}
+    /* tabs + the tab's "new" button on one line */
+    .toolbar{display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; justify-content:space-between;
+             border-bottom:1px solid var(--line); margin:0 0 14px}
+    .toolbar .tabs{margin:0; border-bottom:0}
+    .toolbar > button{margin-bottom:8px}
+    .tabs a{cursor:pointer; display:inline-flex; align-items:center; gap:7px}
+    .tabs a .n{font-size:.72rem; min-width:20px; padding:1px 7px; border-radius:999px; background:var(--panel2); color:var(--muted); text-align:center}
+    .tabs a.on .n{background:var(--accent-bg); color:var(--accent)}
+    /* lists */
+    .lst td{vertical-align:middle}
+    .lst td.acts{white-space:nowrap; text-align:right}
+    .lst td.acts button + button{margin-left:4px}
+    .lst tr.more > td{background:var(--panel2); padding:10px 14px 14px}
+    .lst .sub{font-size:.8rem; margin-top:2px}
     a.name{font-weight:600; color:var(--ink); text-decoration:none; cursor:pointer} a.name:hover{color:var(--accent)}
-    dd a, .facts a{color:var(--accent); cursor:pointer}
-    .form{display:grid; grid-template-columns:160px minmax(0, 440px); gap:10px 14px; align-items:center; margin:6px 0 12px}
-    .form label{color:var(--muted); font-size:.88rem}
+    code.ns{font-size:.82rem; background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:1px 6px}
+    .pill{display:inline-flex; align-items:center; gap:6px; padding:2px 10px; border-radius:999px; font-size:.78rem; font-weight:500;
+          white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; vertical-align:middle}
+    .pill.ok{background:var(--ok-bg); color:var(--ok-ink)}
+    .pill.bad{background:var(--bad-bg); color:var(--bad-ink)}
+    .pill.run{background:var(--accent-bg); color:var(--accent)}
+    .pill.idle{background:var(--panel2); color:var(--muted)}
+    .pill.live::before{content:""; width:7px; height:7px; border-radius:50%; background:currentColor; animation:pulse 1.6s infinite}
+    @keyframes pulse{0%,100%{opacity:1} 50%{opacity:.25}}
+    @media (prefers-reduced-motion: reduce){ .pill.live::before{animation:none} }
+    .ok{color:var(--ok-ink)} .bad{color:var(--bad-ink)} .run{color:var(--accent)}
+    .notes{margin:6px 0 0; padding-left:18px; font-size:.82rem; color:var(--muted)}
+    .empty{text-align:center; padding:34px 18px}
+    .empty .big{font-size:1.6rem; margin-bottom:6px}
+    .empty .sub{max-width:520px; margin:0 auto 14px}
+    /* forms */
+    .crumbs{display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:.88rem; color:var(--muted); margin:0 0 12px}
+    .crumbs a{color:var(--accent); text-decoration:none; cursor:pointer} .crumbs a:hover{text-decoration:underline}
+    .crumbs b{color:var(--ink); font-weight:600}
+    .form{display:grid; grid-template-columns:170px minmax(0, 560px); gap:12px 16px; align-items:start; margin:4px 0}
+    .form > label{color:var(--ink); font-size:.86rem; font-weight:500; padding-top:7px}
     .form input[type=text], .form input[type=password], .form input[type=number], .form select{width:100%}
-    .tables{display:flex; flex-direction:column; gap:4px; max-height:320px; overflow:auto; padding:6px 8px;
-            border:1px solid var(--line); border-radius:8px; background:var(--panel2)}
-    .tables label{display:flex; gap:8px; align-items:center; cursor:pointer}
-    pre.log{max-height:420px; overflow:auto; background:var(--panel2); border:1px solid var(--line); border-radius:8px;
-            padding:8px 10px; font-size:.78rem; line-height:1.4; white-space:pre-wrap; word-break:break-all; margin:8px 0 0}
-    .notes{margin:6px 0 0; padding-left:18px; font-size:.86rem}
-    .ask{display:inline-flex; flex-wrap:wrap; align-items:center; gap:8px; padding:6px 10px; border:1px solid var(--gold); border-radius:9px; background:rgba(226,185,59,.08); font-size:.88rem}
-    /* the New job guide: ① Source → ② Destination → ③ Tables → ④ Schedule & review */
-    .steps{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 14px; padding:0; list-style:none}
-    .steps li{display:flex; align-items:center; gap:8px; padding:6px 12px; border:1px solid var(--line); border-radius:999px;
-              font-size:.88rem; color:var(--muted); background:var(--panel)}
-    .steps li i{font-style:normal; display:inline-flex; width:20px; height:20px; border-radius:50%; align-items:center; justify-content:center;
-                font-size:.75rem; background:var(--panel2); border:1px solid var(--line2)}
-    .steps li.done{cursor:pointer; color:var(--ink)} .steps li.done i{background:var(--accent2); border-color:var(--accent2); color:#fff}
-    .steps li.cur{border-color:var(--accent); color:var(--accent); font-weight:600} .steps li.cur i{background:var(--accent); border-color:var(--accent); color:#fff}
-    .picks{display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:10px; margin:6px 0 10px}
-    .pick{border:1px solid var(--line); border-radius:10px; padding:10px 12px; cursor:pointer; background:var(--panel)}
-    .pick:hover{border-color:var(--accent)} .pick.on{border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-bg)}
-    .pick b{display:block; margin-bottom:2px} .pick .sub{font-size:.82rem}
-    .pick.add{display:flex; align-items:center; justify-content:center; color:var(--accent); border-style:dashed; font-weight:600; min-height:58px}
-    .facts{display:grid; grid-template-columns:150px 1fr; gap:6px 14px; font-size:.92rem; margin:4px 0 12px}
+    .form .help{font-size:.8rem; color:var(--muted); margin-top:5px}
+    .form .with{display:flex; gap:8px; align-items:center} .form .with select{flex:1}
+    .sect{font-size:.74rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
+          margin:20px 0 10px; padding-top:14px; border-top:1px solid var(--line)}
+    .sect:first-of-type{border-top:0; padding-top:0; margin-top:4px}
+    .seg{display:inline-flex; gap:4px; flex-wrap:wrap}
+    button.on{border-color:var(--accent); color:var(--accent); background:var(--accent-bg)}
+    .tables{display:flex; flex-direction:column; gap:2px; max-height:300px; overflow:auto; padding:6px;
+            border:1px solid var(--line); border-radius:8px; background:var(--panel)}
+    .tables label{display:flex; gap:8px; align-items:center; cursor:pointer; padding:4px 6px; border-radius:6px; font-size:.88rem}
+    .tables label:hover{background:var(--panel2)}
+    .tables .key{margin-left:auto; font-size:.75rem; color:var(--muted)}
+    /* how a job runs: three choices */
+    .choices{display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px}
+    .choice{border:1px solid var(--line2); border-radius:10px; padding:10px 12px; cursor:pointer; background:var(--panel); text-align:left;
+            font:inherit; color:inherit; display:block; width:100%}
+    .choice:hover{border-color:var(--accent)}
+    .choice b{display:block; font-size:.9rem; margin-bottom:3px}
+    .choice span{display:block; font-size:.78rem; color:var(--muted); line-height:1.35}
+    .choice.on{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-bg)} .choice.on b{color:var(--accent)}
+    .choice:disabled{opacity:.5; cursor:not-allowed; border-color:var(--line)}
+    .cron{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px}
+    .cron input, .form .cron input{width:180px; font-family:ui-monospace, SFMono-Regular, Menlo, monospace}
+    .card.narrow{max-width:820px}
+    .cron select{width:auto}
+    .facts{display:grid; grid-template-columns:150px 1fr; gap:8px 16px; font-size:.9rem; margin:4px 0 0}
     .facts dt{color:var(--muted)} .facts dd{margin:0}
-    .navbtns{display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-top:14px}
+    .facts a{color:var(--accent); cursor:pointer}
+    .head{display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin-bottom:12px}
+    .head h3{margin:0; font-size:1.05rem}
+    .actions{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+    .navbtns{display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-top:18px; padding-top:14px; border-top:1px solid var(--line)}
     .flash{display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between}
-    @media (max-width:640px){ .form, .facts{grid-template-columns:1fr} }
+    pre.log{max-height:420px; overflow:auto; background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+            padding:8px 10px; font-size:.78rem; line-height:1.4; white-space:pre-wrap; word-break:break-all; margin:10px 0 0}
+    .ask{display:inline-flex; flex-wrap:wrap; align-items:center; gap:8px; padding:5px 10px; border:1px solid var(--gold); border-radius:9px;
+         background:var(--warn-bg); font-size:.85rem}
+    @media (max-width:760px){ .form, .facts{grid-template-columns:1fr} .form > label{padding-top:0} .choices{grid-template-columns:1fr} }
   </style>
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=16"></script>
+  <script src="/lab-header.js?v=17"></script>
   <div class="pagebar"><h1>📡 Ingestion <span class="dot">·</span> copy tables from your databases into your lakehouse</h1></div>
   <main id="main"><div class="placeholder">Loading…</div></main>
   <script>
-    // 📡 Ingestion (CDC) — a SOURCE is a database you can reach (PostgreSQL, MySQL, SQL Server); a
-    // DESTINATION is one of your lakehouse catalogs (+ a namespace); a JOB copies chosen tables from a
-    // source to a destination: a full load, then — with CDC — only the inserts, updates and deletes
-    // since the last run, on a schedule or when you press Run now. The work runs in the lab (OLake's
-    // engine), as you. Every screen has its own address (#jobs, #new-job, #job/3, #new-source,
-    // #source/2 …), so the browser's Back button works; New job is a 4-step guide.
+    // 📡 Ingestion — three tabs:
+    //   SOURCES       databases you can reach (PostgreSQL; with OLake also MySQL, SQL Server)
+    //   DESTINATIONS  one of your lakehouse catalogs + a namespace
+    //   JOBS          a source → a destination: the tables, the mode, and how it runs —
+    //                 Manual (Run now), Cron (a cron expression, UTC) or Datastream (always on, Debezium)
+    // The work runs in the lab as you (Debezium + Kafka, or OLake's engine). Every screen has its own
+    // address (#sources, #jobs, #job/3, #new-job …), so the browser's Back button works.
     var main = document.getElementById('main');
     function el(tag, attrs, kids) {
       var e = document.createElement(tag);
       Object.keys(attrs || {}).forEach(function (k) {
         if (k === 'text') e.textContent = attrs[k];
-        else if (k === 'html') e.innerHTML = attrs[k];
-        else e.setAttribute(k, attrs[k]);
+        else if (attrs[k] !== null && attrs[k] !== undefined && attrs[k] !== false) e.setAttribute(k, attrs[k]);
       });
       (kids || []).forEach(function (c) { if (c) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
       return e;
@@ -96,11 +133,18 @@
       });
       return s;
     }
-    function note(text, cls) { return el('div', {class: 'sub ' + (cls || ''), style: 'margin-top:6px', text: text}); }
+    function select(options, value) {                  // options: [[value, text]]
+      var s = el('select', {}, options.map(function (o) { return el('option', {value: o[0], text: o[1]}); }));
+      s.value = value === null || value === undefined ? '' : String(value);
+      return s;
+    }
+    function note(text, cls) { return el('div', {class: 'sub ' + (cls || ''), style: 'margin-top:8px', text: text}); }
     function inp(v, type, ph) { var i = el('input', {type: type || 'text'}); if (v !== undefined && v !== null) i.value = v; if (ph) i.placeholder = ph;
       i.autocomplete = type === 'password' ? 'new-password' : 'off';   // no browser autofill of the portal login
       return i; }
-    function card(kids) { return el('div', {class: 'card', style: 'margin-bottom:12px'}, kids); }
+    function card(kids, cls) { return el('div', {class: 'card' + (cls ? ' ' + cls : ''), style: 'margin-bottom:14px'}, kids); }
+    function pill(cls, text, title) { return el('span', {class: 'pill ' + cls, title: title || text, text: text}); }
+    function help(text) { return el('div', {class: 'help', text: text}); }
     // a task (check / list tables / run) is done by the lab in the background: ask until it ends
     function watch(id, done) {
       api('GET', '/api/cdc/task?id=' + id).then(function (t) {
@@ -109,10 +153,68 @@
       }).catch(function (e) { done({status: 'failed', error: e.message}); });
     }
 
-    var SCHED = {'': 'Manual', '15m': 'Every 15 min', '1h': 'Hourly', '1d': 'Daily'};
-    var MODE = {cdc: 'Full load + CDC', append: 'Full load + every change (history)', full_refresh: 'Full reload every run'};
+    var MODE = {cdc: 'Full load + CDC (merge by key)', append: 'Full load + every change (history)', full_refresh: 'Full reload every run'};
+    var MODE_HELP = {
+      cdc: 'First everything, then the inserts, updates and deletes — merged by the primary key: each table keeps one row per key, the latest.',
+      append: 'First everything, then every insert, update and delete as a new row; nothing is overwritten — the raw material for history and SCD2.',
+      full_refresh: 'Every run copies the chosen tables again.'};
+    var CRONS = [['*/15 * * * *', 'Every 15 minutes'], ['0 * * * *', 'Every hour'], ['0 2 * * *', 'Every day at 02:00'],
+                 ['0 6 * * 1-5', 'Weekdays at 06:00'], ['0 3 * * 0', 'Sundays at 03:00']];
     var data = null, timer = null, busy = {}, flash = null;
-    var wiz = null;          // the New job guide's choices — kept while you add a source / destination on the way
+    var wiz = null;          // the New job form — kept while you add a source / destination on the way
+
+    // ---- how a job runs: '' manual · a cron expression · 'stream' ---------------------------------
+    function runType(schedule) { return !schedule ? 'manual' : schedule === 'stream' ? 'stream' : 'cron'; }
+    function two(n) { return (n < 10 ? '0' : '') + n; }
+    function cronText(c) {                              // the usual shapes in words, else the expression
+      var p = (c || '').split(/\s+/), m, preset = CRONS.filter(function (x) { return x[0] === c; })[0];
+      if (preset) return preset[1] + ' (UTC)';
+      if (p.length !== 5) return c;
+      if ((m = /^\*\/(\d+)$/.exec(p[0])) && p.slice(1).join(' ') === '* * * *') return 'Every ' + m[1] + ' minutes';
+      if (/^\d+$/.test(p[0]) && p[1] === '*' && p.slice(2).join(' ') === '* * *') return 'Every hour at :' + two(+p[0]);
+      if (/^\d+$/.test(p[0]) && /^\d+$/.test(p[1]) && p[2] === '*' && p[3] === '*') {
+        var at = two(+p[1]) + ':' + two(+p[0]) + ' UTC';
+        if (p[4] === '*') return 'Every day at ' + at;
+        if (p[4] === '1-5') return 'Weekdays at ' + at;
+      }
+      return c + ' (UTC)';
+    }
+    function runLabel(j) {
+      var t = runType(j.schedule);
+      if (t === 'manual') return el('span', {}, [el('div', {text: 'Manual'})]);
+      if (t === 'stream') return el('span', {}, [el('div', {text: 'Datastream'}), el('div', {class: 'sub muted', text: j.enabled ? 'always on' : 'stopped'})]);
+      return el('span', {}, [el('div', {text: 'Cron'}), el('div', {class: 'sub muted', title: j.schedule,
+        text: cronText(j.schedule) + (!j.enabled ? ' · paused' : j.next_run ? ' · next ' + when(j.next_run) : '')})]);
+    }
+    // three choices + (for Cron) a preset list and the expression → st.value() is the schedule to save
+    function runPicker(st, engine, changed) {
+      var box = el('div'), choices = el('div', {class: 'choices'}), extra = el('div');
+      var opts = [['manual', 'Manual', 'Runs when you press Run now.'],
+                  ['cron', 'Cron', 'Runs on a schedule — a cron expression, in UTC.'],
+                  ['stream', 'Datastream', 'Always on: changes arrive in seconds (~10–30 s behind).']];
+      opts.forEach(function (o) {
+        var b = el('button', {type: 'button', class: 'choice' + (st.type === o[0] ? ' on' : ''), disabled: o[0] === 'stream' && engine !== 'debezium' ? '' : null},
+          [el('b', {text: o[1]}), el('span', {text: o[0] === 'stream' && engine !== 'debezium' ? 'Needs the Debezium engine.' : o[2]})]);
+        on(b, 'click', function () { st.type = o[0]; [].forEach.call(choices.children, function (x) { x.classList.toggle('on', x === b); }); paint(); changed(); });
+        choices.appendChild(b);
+      });
+      function paint() {
+        extra.innerHTML = '';
+        if (st.type !== 'cron') return;
+        var expr = inp(st.cron || '*/15 * * * *', 'text', 'min hour day month weekday'), words = el('span', {class: 'sub'});
+        var presets = select([['', 'Presets…']].concat(CRONS), '');
+        function said() { st.cron = expr.value.trim(); words.textContent = '→ ' + cronText(st.cron); changed(); }
+        on(presets, 'change', function () { if (presets.value) { expr.value = presets.value; presets.value = ''; said(); } });
+        on(expr, 'input', said);
+        extra.appendChild(el('div', {class: 'cron'}, [presets, expr, words]));
+        extra.appendChild(help('minute hour day-of-month month day-of-week — e.g. */15 * * * * (every 15 minutes), 30 6 * * 1-5 (weekdays 06:30). Times are UTC.'));
+        st.cron = expr.value.trim(); words.textContent = '→ ' + cronText(st.cron);
+      }
+      st.value = function () { return st.type === 'manual' ? '' : st.type === 'stream' ? 'stream' : (st.cron || '').trim(); };
+      paint();
+      box.appendChild(choices); box.appendChild(extra);
+      return box;
+    }
 
     // ---- navigation ----------------------------------------------------------------------------
     function route() { var h = location.hash.slice(1) || 'jobs', i = h.indexOf('/'); return i < 0 ? [h, null] : [h.slice(0, i), h.slice(i + 1)]; }
@@ -131,11 +233,23 @@
       });
     }
     function show() { load().then(draw, function () {}); }
+    // reload the data and update only what changes (`apply`) — no redraw: scroll, open logs and
+    // what you're typing stay as they are. Stops when you've gone to another screen.
+    function refresh(page, apply, ms) {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        var here = function () { return (location.hash.slice(1) || 'jobs') === page; };
+        api('GET', '/api/cdc').then(function (d) { if (here()) { data = d; apply(); } })
+          .catch(function () { if (here()) refresh(page, apply, 10000); });
+      }, ms);
+    }
+    function swap(box, node) { box.innerHTML = ''; box.appendChild(node); }
     function draw() {
       clearTimeout(timer);
       var r = route(), page = r[0], id = r[1];
       main.innerHTML = '';
-      if (page === 'new-job') return jobGuide();
+      offNotice();
+      if (page === 'new-job') return newJob();
       if (page === 'job') return jobPage(+id);
       if (page === 'new-source') return sourcePage({kind: 'postgres', cdc: true});
       if (page === 'source') return sourcePage(byId(data.sources, +id));
@@ -144,65 +258,108 @@
       listPage(['jobs', 'sources', 'destinations'].indexOf(page) >= 0 ? page : 'jobs');
     }
     function byId(list, id) { return list.filter(function (x) { return x.id === id; })[0] || null; }
+    // the Streaming unit (Kafka + Kafka Connect) is off: Debezium jobs wait — say so on every screen
+    function offNotice() {
+      if (data.engine !== 'debezium' || data.streaming) return;
+      main.appendChild(el('div', {class: 'card', style: 'margin-bottom:14px; border-left:4px solid var(--gold); background:var(--warn-bg)'}, [
+        el('b', {text: '⏸ Streaming is off'}),
+        el('div', {class: 'sub', style: 'margin-top:4px', text: 'Jobs need it to run: Datastream jobs wait, Run now and Cron runs fail until it\'s on. ' +
+          'Sources and destinations work as usual. ' + (data.manager
+            ? 'Switch it on in the terminal: make status → Streaming → s.'
+            : 'Ask a lab manager to switch on the Streaming unit.')})]));
+    }
     function showFlash() {
       if (!flash) return;
       var f = flash; flash = null;
-      main.appendChild(el('div', {class: 'card result', style: 'margin-bottom:12px'}, [el('div', {class: 'flash'}, [el('span', {text: f.text}),
+      main.appendChild(el('div', {class: 'card result', style: 'margin-bottom:14px'}, [el('div', {class: 'flash'}, [el('span', {text: f.text}),
         f.action ? on(el('button', {class: 'small primary', text: f.action[0]}), 'click', f.action[1]) : null])]));
     }
-    function alert_(msg) { main.insertBefore(el('div', {class: 'card result err', style: 'margin-bottom:12px'}, [el('div', {text: msg})]), main.firstChild); }
+    function alert_(msg) { main.insertBefore(el('div', {class: 'card result err', style: 'margin-bottom:14px'}, [el('div', {text: msg})]), main.firstChild); }
 
-    // ---- the three lists (tabs) ----------------------------------------------------------------
+    // ---- the three tabs: Sources · Destinations · Jobs --------------------------------------------
     function listPage(tab) {
-      var tabs = seg([['jobs', 'Jobs (' + data.jobs.length + ')'], ['sources', 'Sources (' + data.sources.length + ')'],
-                      ['destinations', 'Destinations (' + data.destinations.length + ')']], tab, function (k) { go(k); });
+      var tabs = el('nav', {class: 'tabs'}, [['sources', 'Sources', data.sources.length], ['destinations', 'Destinations', data.destinations.length],
+                                             ['jobs', 'Jobs', data.jobs.length]].map(function (t) {
+        return on(el('a', {class: t[0] === tab ? 'on' : ''}, [t[1], el('span', {class: 'n', text: String(t[2])})]), 'click', function () { go(t[0]); });
+      }));
       var add = {jobs: ['+ New job', function () { wiz = null; go('new-job'); }], sources: ['+ New source', function () { wiz = null; go('new-source'); }],
                  destinations: ['+ New destination', function () { wiz = null; go('new-destination'); }]}[tab];
-      main.appendChild(el('div', {class: 'bar'}, [tabs, on(el('button', {class: 'primary', text: add[0]}), 'click', add[1])]));
+      main.appendChild(el('div', {class: 'toolbar'}, [tabs, on(el('button', {class: 'primary', text: add[0]}), 'click', add[1])]));
       showFlash();
       main.appendChild({jobs: jobList, sources: sourceList, destinations: destList}[tab]());
-      if (data.jobs.some(function (j) { return j.busy; }) || Object.keys(busy).length) timer = setTimeout(show, 4000);
-    }
-    function checked(c, isBusy) {
-      if (isBusy) return el('span', {class: 'run', text: '… checking'});
-      if (!c) return el('span', {class: 'muted', text: 'not checked yet'});
-      return el('span', {class: c.ok ? 'ok' : 'bad', title: c.message || '', text: c.ok ? '✓ connected' : '✗ ' + (c.message || 'failed').slice(0, 140)});
-    }
-    function last(j) {
-      var r = j.last;
-      if (j.busy && !(r && r.status === 'running')) return el('span', {class: 'run', text: '… starting'});
-      if (!r) return el('span', {class: 'muted', text: 'not run yet'});
-      if (r.status === 'running') return el('span', {class: 'run', text: '… running since ' + when(r.started_at)});
-      return el('span', {class: r.status === 'ok' ? 'ok' : 'bad', title: r.error || '',
-        text: (r.status === 'ok' ? '✓ ' + (r.records === null ? '' : r.records + ' rows · ') : '✗ failed · ') + when(r.finished_at)});
+      if (tab === 'jobs') return liveJobs(location.hash.slice(1) || 'jobs');
+      if (Object.keys(busy).length) timer = setTimeout(show, 5000);
     }
     function table(heads, body) {
-      return el('div', {class: 'wrap'}, [el('table', {class: 'lst'}, [el('thead', {}, [el('tr', {}, heads.map(function (h) { return el('th', {text: h}); }))]), body])]);
+      return el('div', {class: 'wrap'}, [el('table', {class: 'lst'}, [el('thead', {}, [el('tr', {}, heads.map(function (h) {
+        return el('th', {class: h === '' ? 'r' : null, text: h}); }))]), body])]);
     }
-    function empty(text, btn) { return card([el('div', {class: 'sub', text: text}), btn ? el('div', {style: 'margin-top:10px'}, [btn]) : null]); }
+    function empty(icon, title, text, btn) {
+      return card([el('div', {class: 'empty'}, [el('div', {class: 'big', text: icon}), el('h3', {text: title}), el('div', {class: 'sub', text: text}), btn])]);
+    }
+    function checked(c, isBusy) {
+      if (isBusy) return pill('run', '… checking');
+      if (!c) return pill('idle', 'not checked');
+      return pill(c.ok ? 'ok' : 'bad', c.ok ? '✓ ready' : '✗ ' + (c.message || 'failed').slice(0, 60), c.message || '');
+    }
+    function streaming(j) { return j.schedule === 'stream' && j.enabled; }
+    function last(j) {                                 // a job's state, as a pill (+ a line under it)
+      var r = j.last;
+      if (j.schedule === 'stream') {
+        if (!j.enabled) return r && r.trigger === 'stream' && r.status === 'failed'
+          ? el('span', {}, [pill('bad', '✗ stopped'), el('div', {class: 'sub bad', title: r.error || '', text: (r.error || '').slice(0, 200)})])
+          : pill('idle', '■ stopped');
+        if (!r || r.trigger !== 'stream' || r.status !== 'running') return pill('run', '… starting');
+        var behind = (r.meta || {}).behind;
+        return el('span', {}, [pill('ok live', 'streaming'),
+          el('div', {class: 'sub muted', text: (r.records || 0) + ' changes since ' + when(r.started_at) + (behind ? ' · ' + behind + ' on the way' : '')}),
+          r.error ? el('div', {class: 'sub bad', title: r.error, text: '✗ ' + r.error.slice(0, 120) + ' — restarting'}) : null]);
+      }
+      if (j.busy && !(r && r.status === 'running')) return pill('run', '… starting');
+      if (!r) return pill('idle', 'not run yet');
+      if (r.status === 'running') return el('span', {}, [pill('run live', 'running'), el('div', {class: 'sub muted', text: 'since ' + when(r.started_at)})]);
+      return el('span', {}, [pill(r.status === 'ok' ? 'ok' : 'bad', r.status === 'ok' ? '✓ ok' : '✗ failed', r.error || ''),
+        el('div', {class: 'sub muted', text: (r.status === 'ok' && r.records !== null ? r.records + ' rows · ' : '') + when(r.finished_at)})]);
+    }
 
+    var cells = {};                                   // the jobs table's live cells: r<id> runs, s<id> status
+    function jobKeys() { return data.jobs.map(function (j) { return [j.id, j.schedule, j.enabled].join(':'); }).join(','); }
+    function liveJobs(page) {
+      if (!data.jobs.some(function (j) { return j.busy || streaming(j) || runType(j.schedule) === 'cron'; })) return;
+      var keys = jobKeys();
+      refresh(page, function () {
+        if (jobKeys() !== keys) return draw();             // a job added, removed or changed: the whole list
+        data.jobs.forEach(function (j) {
+          if (cells['s' + j.id]) swap(cells['s' + j.id], last(j));
+          if (cells['r' + j.id]) swap(cells['r' + j.id], runLabel(j));
+        });
+        liveJobs(page);
+      }, 5000);
+    }
     function jobList() {
-      if (!data.jobs.length) return empty('No jobs yet. A job copies tables from a source to a destination — the guide takes you through it in four steps.',
+      cells = {};
+      if (!data.jobs.length) return empty('📡', 'No jobs yet', 'A job copies tables from a source into a destination — once, on a schedule, or as a live data stream.',
         on(el('button', {class: 'primary', text: '+ New job'}), 'click', function () { wiz = null; go('new-job'); }));
       var body = el('tbody');
       data.jobs.forEach(function (j) {
-        var runNow = on(el('button', {class: 'small primary', text: 'Run now'}), 'click', function () {
+        var runNow = on(el('button', {class: 'small', text: '▶ Run'}), 'click', function () {
           runNow.disabled = true;
           api('POST', '/api/cdc/jobs/run', {id: j.id}).then(function () { setTimeout(show, 1200); }).catch(function (e) { alert_(e.message); runNow.disabled = false; });
         });
         runNow.disabled = !!j.busy;
-        body.appendChild(el('tr', {}, [el('td', {}, [link(j.name, 'job/' + j.id, 'name')]),
-          el('td', {text: j.source_name + ' → ' + j.dest_name}),
+        runNow.hidden = j.schedule === 'stream';
+        body.appendChild(el('tr', {}, [
+          el('td', {}, [link(j.name, 'job/' + j.id, 'name'), el('div', {class: 'sub muted', text: j.engine === 'debezium' ? 'Debezium' : 'OLake'})]),
+          el('td', {}, [el('div', {text: j.source_name}), el('div', {class: 'sub muted', text: '→ ' + j.dest_name})]),
           el('td', {title: j.tables.join(', '), text: j.tables.length === 1 ? j.tables[0] : j.tables.length + ' tables'}),
-          el('td', {text: MODE[j.mode]}), el('td', {text: (SCHED[j.schedule] || j.schedule) + (j.schedule && !j.enabled ? ' (paused)' : '')}),
-          el('td', {}, [last(j)]),
-          el('td', {class: 'acts'}, [runNow, ' ', on(el('button', {class: 'small', text: 'Open'}), 'click', function () { go('job/' + j.id); })])]));
+          el('td', {text: MODE[j.mode]}), cells['r' + j.id] = el('td', {}, [runLabel(j)]), cells['s' + j.id] = el('td', {}, [last(j)]),
+          el('td', {class: 'acts'}, [runNow, on(el('button', {class: 'small', text: 'Open'}), 'click', function () { go('job/' + j.id); })])]));
       });
-      return card([table(['Job', 'Source → destination', 'Tables', 'Mode', 'Schedule', 'Last run', ''], body)]);
+      return card([table(['Job', 'Source → destination', 'Tables', 'Mode', 'Runs', 'Status', ''], body)]);
     }
 
     function sourceList() {
-      if (!data.sources.length) return empty('No sources yet. A source is a database you can reach — PostgreSQL, MySQL or SQL Server: its host, database and a login.',
+      if (!data.sources.length) return empty('🗄️', 'No sources yet', 'A source is a database you can reach: its host, database and a login.',
         on(el('button', {class: 'primary', text: '+ New source'}), 'click', function () { go('new-source'); }));
       var body = el('tbody');
       data.sources.forEach(function (s) {
@@ -216,7 +373,6 @@
           more.hidden = !more.hidden; tbl.classList.toggle('on', !more.hidden);
           if (!more.hidden) readTables({id: s.id}, '/api/cdc/sources/tables', more.firstChild);
         });
-        var job = on(el('button', {class: 'small primary', text: 'New job'}), 'click', function () { startJob({source: s.id}); });
         var del = on(el('button', {class: 'small', text: 'Delete'}), 'click', function () {
           ask(del, s.cdc && s.slot ? 'Delete it (its replication slot is dropped too)?' : 'Delete it?', 'Yes, delete', function () {
             api('POST', '/api/cdc/sources/delete', {id: s.id}).then(function (r) {
@@ -227,19 +383,23 @@
         var c = s.checked, info = [];
         if (c && (c.notes || []).length) info = info.concat(c.notes);
         if (c) (c.prerequisites || []).filter(function (p) { return !p.passed; }).forEach(function (p) {
-          info.push((p.required ? '✗ needed: ' : 'tip: ') + p.name + ' is ' + p.current + ' — ' + p.recommended);
+          info.push((p.required ? 'needed: ' : 'tip: ') + p.name + ' is ' + p.current + ' — ' + p.recommended);
         });
-        body.appendChild(el('tr', {}, [el('td', {}, [link(s.name, 'source/' + s.id, 'name')]),
-          el('td', {}, [el('div', {text: s.host + ':' + s.port + ' / ' + s.database}), el('div', {class: 'sub', text: data.kinds[s.kind].name})]),
-          el('td', {text: s.username}), el('td', {text: s.cdc ? 'on' : 'off'}),
+        var kind = data.kinds[s.kind] || {name: s.kind};
+        body.appendChild(el('tr', {}, [
+          el('td', {}, [link(s.name, 'source/' + s.id, 'name'), el('div', {class: 'sub muted', text: kind.name})]),
+          el('td', {}, [el('div', {text: s.host + ':' + s.port + ' / ' + s.database}), el('div', {class: 'sub muted', text: 'login ' + s.username})]),
+          el('td', {}, [el('span', {class: 'tag' + (s.cdc ? ' on' : ''), style: 'margin:0', text: s.cdc ? 'CDC on' : 'CDC off'})]),
           el('td', {}, [checked(c, busy['s' + s.id]), info.length ? el('ul', {class: 'notes'}, info.map(function (x) { return el('li', {text: x}); })) : null]),
-          el('td', {class: 'acts'}, [job, ' ', chk, ' ', tbl, ' ', on(el('button', {class: 'small', text: 'Edit'}), 'click', function () { wiz = null; go('source/' + s.id); }), ' ', del])]));
+          el('td', {class: 'acts'}, [chk, tbl, on(el('button', {class: 'small', text: 'Edit'}), 'click', function () { wiz = null; go('source/' + s.id); }), del])]));
         body.appendChild(more);
       });
-      return card([table(['Source', 'Database', 'User', 'CDC', 'Status', ''], body)]);
+      return card([table(['Source', 'Connection', 'Change capture', 'Status', ''], body)]);
     }
 
     function destList() {
+      if (!data.destinations.length) return empty('🧊', 'No destinations yet', 'A destination is one of your lakehouses and a namespace in it — where the tables land.',
+        on(el('button', {class: 'primary', text: '+ New destination'}), 'click', function () { go('new-destination'); }));
       var body = el('tbody');
       data.destinations.forEach(function (d) {
         var chk = on(el('button', {class: 'small', text: 'Check'}), 'click', function () {
@@ -253,11 +413,12 @@
           });
         });
         body.appendChild(el('tr', {}, [el('td', {}, [link(d.name, 'destination/' + d.id, 'name')]), el('td', {text: d.catalog}),
-          el('td', {text: d.namespace || '(the source\'s database_schema)'}), el('td', {}, [checked(d.checked, busy['d' + d.id])]),
-          el('td', {class: 'acts'}, [chk, ' ', on(el('button', {class: 'small', text: 'Edit'}), 'click', function () { wiz = null; go('destination/' + d.id); }), ' ', del])]));
+          el('td', {}, [d.namespace ? el('code', {class: 'ns', text: d.namespace}) : el('span', {class: 'muted', text: '<database>_<schema>'})]),
+          el('td', {}, [checked(d.checked, busy['d' + d.id])]),
+          el('td', {class: 'acts'}, [chk, on(el('button', {class: 'small', text: 'Edit'}), 'click', function () { wiz = null; go('destination/' + d.id); }), del])]));
       });
       return card([table(['Destination', 'Lakehouse', 'Namespace', 'Status', ''], body),
-        el('div', {class: 'sub', style: 'margin-top:8px', text: 'Tables land as Iceberg tables in that lakehouse and namespace — query them in SQL, notebooks or Superset. The lab writes them as you: no keys to type.'})]);
+        note('Tables land as Iceberg tables in that lakehouse and namespace — query them in SQL, notebooks or Superset. The lab writes them as you: no keys to type.', 'muted')]);
     }
     // the tables of a source (saved: its id · or a form) → read-only list in `box`
     function readTables(body, path, box) {
@@ -269,29 +430,31 @@
       if (t.status !== 'done') return note('✗ ' + (t.error || 'failed'), 'bad');
       var tb = t.result.tables;
       if (!tb.length) return note('No tables found.');
-      return el('div', {style: 'margin-top:8px'}, [el('div', {class: 'sub', text: tb.length + (tb.length === 1 ? ' table' : ' tables')}),
+      return el('div', {}, [el('div', {class: 'sub', style: 'margin-bottom:6px', text: tb.length + (tb.length === 1 ? ' table' : ' tables')}),
         el('div', {class: 'tables'}, tb.map(function (x) {
-          return el('div', {}, [el('span', {text: x.table}), el('span', {class: 'muted', text: ' · ' + x.columns + ' columns'})]);
+          return el('label', {}, [el('span', {text: x.table}), el('span', {class: 'muted', text: '· ' + x.columns + ' columns'}),
+            x.key ? el('span', {class: 'key', text: x.key.length ? 'key ' + x.key.join(', ') : 'no key'}) : null]);
         }))]);
     }
 
-    // ---- a source: new or edit (its own page) ----------------------------------------------------
+    // ---- a source: new or edit -------------------------------------------------------------------
     function sourcePage(s) {
       if (!s) return go('sources');
       var back = wiz ? ['New job', 'new-job'] : ['Sources', 'sources'];
       main.appendChild(crumbs([back, [s.id ? s.name : 'New source']]));
       var kind = s.kind || 'postgres';
-      var f = {name: inp(s.name), host: inp(s.host), port: inp(s.port || data.kinds[kind].port, 'number'), database: inp(s.database), username: inp(s.username),
+      var f = {name: inp(s.name, 'text', 'e.g. Shop database'), host: inp(s.host, 'text', 'e.g. lab-db'), port: inp(s.port || data.kinds[kind].port, 'number'),
+               database: inp(s.database), username: inp(s.username),
                password: inp('', 'password', s.id ? 'unchanged' : ''), schemas: inp((s.schemas || []).join(', '), 'text', 'all — or e.g. public, sales')};
-      var cdc = !!s.cdc, schemaLabel = el('label', {text: 'Schemas'}), hint = el('div', {class: 'sub'});
+      var cdc = !!s.cdc, schemaLabel = el('label', {text: 'Schemas'}), schemaBox = el('div', {}, [f.schemas]), hint = help('');
       function kindChanged() {                          // the type's port, schemas (Postgres only), what CDC needs
         var k = data.kinds[kind], ports = Object.keys(data.kinds).map(function (x) { return String(data.kinds[x].port); });
         if (!f.port.value || ports.indexOf(f.port.value) >= 0) f.port.value = k.port;
-        schemaLabel.hidden = f.schemas.hidden = kind !== 'postgres';
+        schemaLabel.hidden = schemaBox.hidden = kind !== 'postgres';
         hint.textContent = 'CDC reads the database\'s change log. ' + k.name + ' needs: ' + k.cdc + '.';
       }
-      var kinds = el('select', {}, Object.keys(data.kinds).map(function (k) { return el('option', {value: k, text: data.kinds[k].name}); }));
-      kinds.value = kind; kinds.disabled = !!s.id;      // a saved source keeps its type
+      var kinds = select(Object.keys(data.kinds).map(function (k) { return [k, data.kinds[k].name]; }), kind);
+      kinds.disabled = !!s.id;                          // a saved source keeps its type
       on(kinds, 'change', function () { kind = kinds.value; kindChanged(); });
       function form() {
         return {id: s.id, kind: kind, name: f.name.value, host: f.host.value, port: f.port.value, database: f.database.value,
@@ -300,7 +463,7 @@
       }
       var msg = el('div');
       var test = on(el('button', {type: 'button', text: 'Test connection'}), 'click', function () {
-        test.disabled = true; msg.innerHTML = ''; msg.appendChild(el('div', {class: 'sub run', text: '… connecting'}));
+        test.disabled = true; msg.innerHTML = ''; msg.appendChild(note('… connecting', 'run'));
         api('POST', '/api/cdc/sources/test', form()).then(function (r) {
           watch(r.task, function (t) {
             test.disabled = false; msg.innerHTML = '';
@@ -314,22 +477,25 @@
         save.disabled = true; msg.innerHTML = ''; msg.appendChild(note('Saving…'));
         api('POST', '/api/cdc/sources', form()).then(function (r) {
           busy['s' + r.id] = 1; watch(r.task, function () { delete busy['s' + r.id]; });
-          if (wiz) { wiz.source = r.id; wiz.found = null; wiz.picked = null; wiz.step = 2; return go('new-job'); }   // back to the guide
+          if (wiz) { wiz.source = r.id; wiz.found = null; wiz.picked = null; return go('new-job'); }   // back to the job form
           flash = {text: '✓ Source "' + f.name.value + '" saved — the lab is checking the connection.',
-                   action: ['Create a job from it →', function () { startJob({source: r.id}); }]};
+                   action: ['Create a job from it →', function () { wiz = {source: r.id}; go('new-job'); }]};
           go('sources');
         }).catch(function (e) { save.disabled = false; msg.innerHTML = ''; msg.appendChild(note(e.message, 'bad')); });
       });
       kindChanged();
-      main.appendChild(card([el('h3', {text: s.id ? 'Edit source ' + s.name : 'New source — a database you can reach'}),
+      main.appendChild(card([el('h3', {text: s.id ? 'Edit source — ' + s.name : 'New source'}),
+        el('div', {class: 'sect', text: 'Database'}),
         el('div', {class: 'form'}, [
-          el('label', {text: 'Database type'}), kinds, el('label', {text: 'Name'}), f.name, el('label', {text: 'Host'}), f.host, el('label', {text: 'Port'}), f.port,
-          el('label', {text: 'Database'}), f.database, el('label', {text: 'User'}), f.username, el('label', {text: 'Password'}), f.password,
-          schemaLabel, f.schemas,
-          el('label', {text: 'Change data capture'}), seg([[true, 'On — copy inserts, updates, deletes'], [false, 'Off — full reloads only']], cdc, function (v) { cdc = v; })]),
-        hint,
-        el('div', {class: 'navbtns'}, [el('span', {class: 'row'}, [on(el('button', {text: '← ' + back[0]}), 'click', function () { go(back[1]); }), test, browse]), save]),
-        msg]));
+          el('label', {text: 'Type'}), kinds, el('label', {text: 'Name'}), f.name, el('label', {text: 'Host'}), f.host, el('label', {text: 'Port'}), f.port,
+          el('label', {text: 'Database'}), f.database, schemaLabel, schemaBox]),
+        el('div', {class: 'sect', text: 'Login'}),
+        el('div', {class: 'form'}, [el('label', {text: 'User'}), f.username,
+          el('label', {text: 'Password'}), el('div', {}, [f.password, help('Kept in the lab\'s vault — never shown again.')])]),
+        el('div', {class: 'sect', text: 'Change data capture'}),
+        el('div', {class: 'form'}, [el('label', {text: 'CDC'}), el('div', {}, [seg([[true, 'On — inserts, updates, deletes'], [false, 'Off']], cdc, function (v) { cdc = v; }), hint])]),
+        el('div', {class: 'navbtns'}, [el('span', {class: 'actions'}, [on(el('button', {text: '← ' + back[0]}), 'click', function () { go(back[1]); }), test, browse]), save]),
+        msg], 'narrow'));
     }
 
     // ---- a destination: new or edit -------------------------------------------------------------
@@ -337,183 +503,200 @@
       if (!d) return go('destinations');
       var back = wiz ? ['New job', 'new-job'] : ['Destinations', 'destinations'];
       main.appendChild(crumbs([back, [d.id ? d.name : 'New destination']]));
-      var name = inp(d.name), ns = inp(d.namespace, 'text', 'e.g. bronze_cdc — empty: <database>_<schema>'), cat = d.catalog || data.catalogs[0], msg = el('div');
+      var name = inp(d.name, 'text', 'e.g. Shop Bronze'), ns = inp(d.namespace, 'text', 'e.g. bronze_shop'), msg = el('div');
+      var cat = select(data.catalogs.map(function (c) { return [c, c]; }), d.catalog || data.catalogs[0]);
       var save = on(el('button', {class: 'primary', text: d.id ? 'Save' : 'Save destination'}), 'click', function () {
         save.disabled = true;
-        api('POST', '/api/cdc/destinations', {id: d.id, name: name.value, catalog: cat, namespace: ns.value}).then(function (r) {
+        api('POST', '/api/cdc/destinations', {id: d.id, name: name.value, catalog: cat.value, namespace: ns.value}).then(function (r) {
           busy['d' + r.id] = 1; watch(r.task, function () { delete busy['d' + r.id]; });
-          if (wiz) { wiz.dest = r.id; wiz.step = 3; return go('new-job'); }
+          if (wiz) { wiz.dest = r.id; return go('new-job'); }
           flash = {text: '✓ Destination "' + name.value + '" saved.'};
           go('destinations');
         }).catch(function (e) { save.disabled = false; msg.innerHTML = ''; msg.appendChild(note(e.message, 'bad')); });
       });
-      main.appendChild(card([el('h3', {text: d.id ? 'Edit destination ' + d.name : 'New destination — one of your lakehouses'}),
+      main.appendChild(card([el('h3', {text: d.id ? 'Edit destination — ' + d.name : 'New destination'}),
         el('div', {class: 'form'}, [el('label', {text: 'Name'}), name,
-          el('label', {text: 'Lakehouse'}), seg(data.catalogs.map(function (c) { return [c, c]; }), cat, function (v) { cat = v; }),
-          el('label', {text: 'Namespace'}), ns]),
-        el('div', {class: 'sub', text: 'Each table lands as <lakehouse>.<namespace>.<table>. Two jobs can\'t write the same table into one namespace.'}),
-        el('div', {class: 'navbtns'}, [on(el('button', {text: '← ' + back[0]}), 'click', function () { go(back[1]); }), save]), msg]));
+          el('label', {text: 'Lakehouse'}), cat,
+          el('label', {text: 'Namespace'}), el('div', {}, [ns, help('Each table lands as <lakehouse>.<namespace>.<table>. Empty: <database>_<schema>. Two jobs can\'t write the same table into one namespace.')])]),
+        el('div', {class: 'navbtns'}, [on(el('button', {text: '← ' + back[0]}), 'click', function () { go(back[1]); }), save]), msg], 'narrow'));
     }
 
-    // ---- New job: the 4-step guide --------------------------------------------------------------
-    var STEPS = ['Source', 'Destination', 'Tables', 'Schedule & review'];
-    function startJob(pre) { wiz = {step: pre.source ? 2 : 1, source: pre.source || null, dest: null}; go('new-job'); }
-    function jobGuide() {
-      if (!wiz) wiz = {step: 1, source: null, dest: null};
-      if (wiz.source && !byId(data.sources, wiz.source)) { wiz.source = null; wiz.step = 1; }
-      if (!wiz.dest && data.destinations.length === 1) wiz.dest = data.destinations[0].id;
-      main.appendChild(crumbs([['Jobs', 'jobs'], ['New job']]));
-      var ok = [!!wiz.source, !!wiz.dest, !!(wiz.picked && chosen().length)];
-      main.appendChild(el('ol', {class: 'steps'}, STEPS.map(function (s, i) {
-        var n = i + 1, done = n !== wiz.step && ok.slice(0, n - 1).every(Boolean);    // a step you can go (back) to
-        var li = el('li', {class: n === wiz.step ? 'cur' : done ? 'done' : ''}, [el('i', {text: n < wiz.step ? '✓' : String(n)}), s]);
-        if (done) on(li, 'click', function () { wiz.step = n; draw(); });
-        return li;
-      })));
-      var body = el('div'), next = el('button', {class: 'primary', text: wiz.step === 4 ? 'Create & run' : 'Next →'});
-      var backB = on(el('button', {text: wiz.step === 1 ? 'Cancel' : '← Back'}), 'click', function () {
-        if (wiz.step === 1) { wiz = null; return go('jobs'); }
-        wiz.step--; draw();
-      });
-      var msg = el('div');
-      main.appendChild(card([body, el('div', {class: 'navbtns'}, [backB, next]), msg]));
-      [stepSource, stepDest, stepTables, stepReview][wiz.step - 1](body, next, msg);
-    }
-    // a source's change stream feeds one CDC job (one replication slot): that job, if any
+    // ---- New job: one form -----------------------------------------------------------------------
+    // a source's change stream feeds one job (one replication slot): that job, if any
     function cdcJob(sid) { return data.jobs.filter(function (j) { return j.source === sid && (j.mode === 'cdc' || j.mode === 'append'); })[0] || null; }
     function chosen() { return (wiz.found || []).map(function (x) { return x.table; }).filter(function (k) { return (wiz.picked || {})[k]; }); }
-    function picks(items, current, onPick, addText, onAdd) {     // cards to choose one, + "add new"
-      var g = el('div', {class: 'picks'});
-      items.forEach(function (it) {
-        g.appendChild(on(el('div', {class: 'pick' + (it.id === current ? ' on' : '')},
-          [el('b', {text: (it.id === current ? '● ' : '') + it.title})].concat(it.lines.map(function (l) { return el('div', {class: 'sub', text: l}); }))),
-          'click', function () { onPick(it.id); }));
-      });
-      g.appendChild(on(el('div', {class: 'pick add', text: addText}), 'click', onAdd));
-      return g;
-    }
-    function stepSource(body, next) {
-      body.appendChild(el('h3', {text: '① Which database do you copy from?'}));
-      body.appendChild(picks(data.sources.map(function (s) {
-        return {id: s.id, title: s.name, lines: [data.kinds[s.kind].name + ' · ' + s.host + ' / ' + s.database,
-          (s.cdc ? (cdcJob(s.id) ? 'CDC used by job ' + cdcJob(s.id).name + ' — full reloads only' : 'CDC on') : 'CDC off') + ' · ' +
-          (s.checked ? (s.checked.ok ? '✓ connected' : '✗ last check failed') : 'not checked yet')]};
-      }), wiz.source, function (id) { if (wiz.source !== id) { wiz.found = null; wiz.picked = null; } wiz.source = id; draw(); },
-        '+ New source', function () { go('new-source'); }));
-      next.disabled = !wiz.source;
-      on(next, 'click', function () { wiz.step = 2; draw(); });
-    }
-    function stepDest(body, next) {
-      body.appendChild(el('h3', {text: '② Where do the tables land?'}));
-      body.appendChild(picks(data.destinations.map(function (d) {
-        return {id: d.id, title: d.name, lines: [d.catalog + '.' + (d.namespace || '<database>_<schema>'), d.checked ? (d.checked.ok ? '✓ ready' : '✗ last check failed') : 'not checked yet']};
-      }), wiz.dest, function (id) { wiz.dest = id; draw(); }, '+ New destination', function () { go('new-destination'); }));
-      next.disabled = !wiz.dest;
-      on(next, 'click', function () { wiz.step = 3; draw(); });
-    }
-    function stepTables(body, next) {
-      var s = byId(data.sources, wiz.source);
-      body.appendChild(el('h3', {text: '③ Which tables of ' + s.name + '?'}));
-      var list = el('div', {class: 'tables'}), count = el('span', {class: 'sub'});
-      var bulk = el('span', {class: 'row'}, [count,
-        on(el('button', {type: 'button', class: 'small', text: 'Select all'}), 'click', function () { wiz.found.forEach(function (x) { wiz.picked[x.table] = true; }); paint(); }),
-        on(el('button', {type: 'button', class: 'small', text: 'None'}), 'click', function () { wiz.picked = {}; paint(); }),
-        on(el('button', {type: 'button', class: 'small', text: '↻ Reload'}), 'click', function () { wiz.found = null; read(); })]);
-      body.appendChild(el('div', {class: 'row', style: 'margin-bottom:6px'}, [bulk]));
-      body.appendChild(list);
-      function paint() {
-        bulk.hidden = !wiz.found;
-        list.innerHTML = '';
-        if (!wiz.found) return;
-        if (!wiz.found.length) return list.appendChild(el('span', {class: 'muted', text: 'No tables found.'}));
-        wiz.found.forEach(function (x) {
-          var cb = on(el('input', {type: 'checkbox'}), 'change', function () { wiz.picked[x.table] = cb.checked; counted(); });
-          cb.checked = !!wiz.picked[x.table];
-          list.appendChild(el('label', {}, [cb, el('span', {text: x.table}), el('span', {class: 'muted', text: '· ' + x.columns + ' columns'})]));
-        });
-        counted();
+    function newJob() {
+      wiz = wiz || {};
+      if (wiz.source && !byId(data.sources, wiz.source)) wiz.source = null;
+      if (wiz.dest && !byId(data.destinations, wiz.dest)) wiz.dest = null;
+      if (!wiz.dest && data.destinations.length === 1) wiz.dest = data.destinations[0].id;
+      wiz.run = wiz.run || {type: 'manual', cron: '*/15 * * * *'};
+      main.appendChild(crumbs([['Jobs', 'jobs'], ['New job']]));
+      var s = byId(data.sources, wiz.source), d = byId(data.destinations, wiz.dest), taken = s && cdcJob(s.id);
+      var autoName = s && d ? (s.name + ' to ' + d.name).replace(/[^A-Za-z0-9 _.-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) : '';
+      var name = inp(wiz.name || autoName, 'text', 'e.g. Shop to Bronze');
+      on(name, 'input', function () { wiz.name = name.value; });
+      var srcSel = select([['', '— choose a source —']].concat(data.sources.map(function (x) {
+        return [x.id, x.name + '  ·  ' + x.host + ' / ' + x.database + (x.cdc ? '' : '  (CDC off)')]; })), wiz.source);
+      on(srcSel, 'change', function () { wiz.source = +srcSel.value || null; wiz.found = null; wiz.picked = null; draw(); });
+      var dstSel = select([['', '— choose a destination —']].concat(data.destinations.map(function (x) {
+        return [x.id, x.name + '  ·  ' + x.catalog + '.' + (x.namespace || '<database>_<schema>')]; })), wiz.dest);
+      on(dstSel, 'change', function () { wiz.dest = +dstSel.value || null; draw(); });
+      var addSrc = on(el('button', {type: 'button', class: 'small', text: '+ New'}), 'click', function () { go('new-source'); });
+      var addDst = on(el('button', {type: 'button', class: 'small', text: '+ New'}), 'click', function () { go('new-destination'); });
+
+      // the tables: read when a source is chosen
+      var list = el('div'), count = el('span', {class: 'sub'});
+      var modes = Object.keys(data.modes).filter(function (k) { return s && s.cdc && !taken ? true : k === 'full_refresh'; });
+      if (modes.indexOf(wiz.mode) < 0) wiz.mode = modes[0];
+      var modeSel = select(modes.map(function (k) { return [k, MODE[k]]; }), wiz.mode || '');
+      var modeHelp = help(wiz.mode ? MODE_HELP[wiz.mode] : '');
+      on(modeSel, 'change', function () { wiz.mode = modeSel.value; modeHelp.textContent = MODE_HELP[wiz.mode]; check(); });
+      var create = el('button', {class: 'primary', text: 'Create job'}), msg = el('div');
+      function check() {
+        var tb = s ? chosen() : [];
+        count.textContent = wiz.found ? tb.length + ' of ' + wiz.found.length + ' selected' : '';
+        var cronBad = wiz.run.type === 'cron' && wiz.run.value && !/^\S+ \S+ \S+ \S+ \S+$/.test(wiz.run.value());
+        create.disabled = !(s && d && tb.length && wiz.mode && name.value.trim()) || cronBad;
+        create.textContent = wiz.run.type === 'stream' ? 'Create & start stream' : 'Create & run';
       }
-      function counted() { var n = chosen().length; count.textContent = n + ' of ' + wiz.found.length + ' selected'; next.disabled = !n; }
+      on(name, 'input', check);
+      function paint() {
+        list.innerHTML = '';
+        if (!s) return list.appendChild(help('Choose a source first.'));
+        if (!wiz.found) return;
+        if (!wiz.found.length) return list.appendChild(help('No tables found.'));
+        list.appendChild(el('div', {class: 'actions', style: 'margin-bottom:6px'}, [count,
+          on(el('button', {type: 'button', class: 'small', text: 'All'}), 'click', function () { wiz.found.forEach(function (x) { wiz.picked[x.table] = true; }); paint(); }),
+          on(el('button', {type: 'button', class: 'small', text: 'None'}), 'click', function () { wiz.picked = {}; paint(); }),
+          on(el('button', {type: 'button', class: 'small', text: '↻ Reload'}), 'click', function () { wiz.found = null; read(); })]));
+        list.appendChild(el('div', {class: 'tables'}, wiz.found.map(function (x) {
+          var cb = on(el('input', {type: 'checkbox'}), 'change', function () { wiz.picked[x.table] = cb.checked; check(); });
+          cb.checked = !!wiz.picked[x.table];
+          return el('label', {}, [cb, el('span', {text: x.table}), el('span', {class: 'muted', text: '· ' + x.columns + ' columns'}),
+            x.key ? el('span', {class: 'key', text: x.key.length ? 'key ' + x.key.join(', ') : 'no key'}) : null]);
+        })));
+        check();
+      }
       function read() {
-        bulk.hidden = true; next.disabled = true; list.innerHTML = ''; list.appendChild(el('span', {class: 'run', text: '… reading the tables of ' + s.name}));
+        list.innerHTML = ''; list.appendChild(note('… reading the tables of ' + s.name, 'run'));
         api('POST', '/api/cdc/sources/tables', {id: s.id}).then(function (r) {
           watch(r.task, function (t) {
-            if (t.status !== 'done') { list.innerHTML = ''; return list.appendChild(el('span', {class: 'bad', text: '✗ ' + (t.error || 'failed') + ' — check the source (Sources)'})); }
+            if (t.status !== 'done') { list.innerHTML = ''; return list.appendChild(note('✗ ' + (t.error || 'failed') + ' — check the source (Sources tab)', 'bad')); }
             wiz.disc = t.id; wiz.found = t.result.tables; wiz.picked = wiz.picked || {}; paint();
           });
-        }).catch(function (e) { list.innerHTML = ''; list.appendChild(el('span', {class: 'bad', text: e.message})); });
+        }).catch(function (e) { list.innerHTML = ''; list.appendChild(note(e.message, 'bad')); });
       }
-      next.disabled = true;
-      if (wiz.found) paint(); else read();
-      on(next, 'click', function () { wiz.step = 4; draw(); });
-    }
-    function stepReview(body, next, msg) {
-      var s = byId(data.sources, wiz.source), d = byId(data.destinations, wiz.dest), tables = chosen(), taken = cdcJob(s.id);
-      var canCdc = s.cdc && !taken;
-      if (!canCdc) wiz.mode = 'full_refresh';
-      wiz.mode = wiz.mode || (canCdc ? 'cdc' : 'full_refresh');
-      wiz.sched = wiz.sched || '';
-      var name = inp(wiz.name || (s.name + ' to ' + d.name).replace(/[^A-Za-z0-9 _.-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60));
-      on(name, 'input', function () { wiz.name = name.value; });
-      body.appendChild(el('h3', {text: '④ How often, and a last look'}));
-      body.appendChild(el('div', {class: 'form'}, [el('label', {text: 'Job name'}), name,
-        el('label', {text: 'Mode'}), el('div', {}, [seg(canCdc ? [['cdc', MODE.cdc], ['append', MODE.append], ['full_refresh', MODE.full_refresh]] : [['full_refresh', MODE.full_refresh]], wiz.mode, function (v) { wiz.mode = v; draw(); }),
-          taken ? el('div', {class: 'sub', style: 'margin-top:4px'}, ['CDC on ' + s.name + ' is used by job ', link(taken.name, 'job/' + taken.id),
-            ' (a source\'s change stream feeds one job) — copy these tables with full reloads, or delete that job and make one with all the tables.']) : null]),
-        el('label', {text: 'Schedule'}), seg(Object.keys(SCHED).map(function (k) { return [k, SCHED[k]]; }), wiz.sched, function (v) { wiz.sched = v; })]));
-      body.appendChild(el('dl', {class: 'facts'}, [
-        el('dt', {text: 'From'}), el('dd', {text: s.name + ' — ' + data.kinds[s.kind].name + ', ' + s.host + ' / ' + s.database}),
-        el('dt', {text: 'To'}), el('dd', {text: d.name + ' — ' + d.catalog + '.' + (d.namespace || '<database>_<schema>')}),
-        el('dt', {text: 'Tables (' + tables.length + ')'}), el('dd', {text: tables.join(', ')})]));
-      body.appendChild(el('div', {class: 'sub', text: {
-        cdc: 'Full load + CDC: the first run copies everything, later runs only the inserts, updates and deletes since the run before. Each table keeps one row per key, the latest (deleted rows stay as _op_type = \'d\').',
-        append: 'Full load + every change (history): the first run copies everything, then every insert, update and delete is added as a new row (_op_type c / u / d, _cdc_timestamp), nothing is overwritten — the raw material for history and SCD2.',
-        full_refresh: 'Full reload: every run copies the chosen tables again.'}[wiz.mode] + ' The first run starts as soon as you create the job.'}));
-      on(next, 'click', function () {
-        next.disabled = true; msg.innerHTML = '';
-        api('POST', '/api/cdc/jobs', {name: name.value, source: s.id, destination: d.id, discover: wiz.disc, tables: tables, mode: wiz.mode, schedule: wiz.sched})
-          .then(function (r) { wiz = null; flash = {text: '✓ Job created — its first run is starting.'}; go('job/' + r.id); })
-          .catch(function (e) { next.disabled = false; msg.appendChild(note(e.message, 'bad')); });
+      if (s && !wiz.found) read(); else paint();
+
+      on(create, 'click', function () {
+        create.disabled = true; msg.innerHTML = '';
+        api('POST', '/api/cdc/jobs', {name: name.value, source: s.id, destination: d.id, discover: wiz.disc, tables: chosen(), mode: wiz.mode, schedule: wiz.run.value()})
+          .then(function (r) { wiz = null; flash = {text: r.task ? '✓ Job created — its first run is starting.' : '✓ Job created — its stream is starting.'}; go('job/' + r.id); })
+          .catch(function (e) { create.disabled = false; msg.appendChild(note(e.message, 'bad')); });
       });
+      var srcInfo = !s ? help('A database you can reach.') : taken
+        ? el('div', {class: 'help'}, ['CDC on ' + s.name + ' is used by job ', link(taken.name, 'job/' + taken.id), ' — a source\'s change stream feeds one job.'])
+        : help(s.cdc ? 'CDC on · ' + (s.checked ? (s.checked.ok ? 'connection checked' : 'last check failed') : 'not checked yet') : 'CDC off — full reloads only.');
+      main.appendChild(card([el('h3', {text: 'New job'}),
+        el('div', {class: 'sect', text: 'From → to'}),
+        el('div', {class: 'form'}, [
+          el('label', {text: 'Source'}), el('div', {}, [el('div', {class: 'with'}, [srcSel, addSrc]), srcInfo]),
+          el('label', {text: 'Destination'}), el('div', {}, [el('div', {class: 'with'}, [dstSel, addDst]),
+            help(d ? 'Tables land in ' + d.catalog + '.' + (d.namespace || '<database>_<schema>') : 'One of your lakehouses + a namespace.')]),
+          el('label', {text: 'Tables'}), list]),
+        el('div', {class: 'sect', text: 'What and when'}),
+        el('div', {class: 'form'}, [
+          el('label', {text: 'Mode'}), el('div', {}, [modes.length ? modeSel : help(!s ? 'Choose a source first.' : taken ? 'This source\'s change stream is used by another job — choose another source.' : 'This source has CDC off — turn it on (Sources › Edit).'), modeHelp]),
+          el('label', {text: 'Runs'}), runPicker(wiz.run, data.engine, check),
+          el('label', {text: 'Job name'}), name]),
+        el('div', {class: 'navbtns'}, [on(el('button', {text: 'Cancel'}), 'click', function () { wiz = null; go('jobs'); }), create]), msg], 'narrow'));
+      check();
     }
 
-    // ---- a job's own page: what it copies, its settings, actions, runs ---------------------------
+    // ---- a job's own page ---------------------------------------------------------------------------
     function jobPage(id) {
       var j = byId(data.jobs, id);
       if (!j) return go('jobs');
       main.appendChild(crumbs([['Jobs', 'jobs'], [j.name]]));
       showFlash();
-      var runNow = on(el('button', {class: 'primary', text: 'Run now'}), 'click', function () {
+      var stream = j.schedule === 'stream';
+      var runNow = on(el('button', {class: 'primary', text: '▶ Run now'}), 'click', function () {
         runNow.disabled = true;
         api('POST', '/api/cdc/jobs/run', {id: j.id}).then(function () { setTimeout(show, 1200); }).catch(function (e) { alert_(e.message); runNow.disabled = false; });
       });
-      runNow.disabled = !!j.busy;
-      var pause = on(el('button', {text: j.enabled ? 'Pause schedule' : 'Resume schedule'}), 'click', function () {
+      runNow.disabled = !!j.busy; runNow.hidden = stream;
+      var toggle = on(el('button', {text: stream ? (j.enabled ? '■ Stop stream' : '▶ Start stream') : j.enabled ? 'Pause schedule' : 'Resume schedule'}), 'click', function () {
         api('POST', '/api/cdc/jobs/set', {id: j.id, enabled: !j.enabled}).then(show).catch(function (e) { alert_(e.message); });
       });
-      pause.hidden = !j.schedule;
-      var del = on(el('button', {class: 'danger', text: 'Delete job'}), 'click', function () {
+      toggle.hidden = !j.schedule;
+      var del = on(el('button', {class: 'danger', text: 'Delete'}), 'click', function () {
         ask(del, 'Delete the job? (its tables stay in your lakehouse)', 'Yes, delete', function () {
           api('POST', '/api/cdc/jobs/delete', {id: j.id}).then(function () { flash = {text: 'Job "' + j.name + '" deleted.'}; go('jobs'); })
             .catch(function (e) { alert_(e.message); });
         });
       });
       var d = byId(data.destinations, j.destination);
-      main.appendChild(card([el('div', {class: 'bar'}, [el('h3', {style: 'margin:0', text: j.name}), el('span', {class: 'row'}, [runNow, pause, del])]),
+      var statusBox = el('span', {}, [last(j)]), runsLabel = el('dd', {}, [runLabel(j)]);
+      main.appendChild(card([el('div', {class: 'head'}, [el('span', {class: 'actions'}, [el('h3', {text: j.name}), statusBox]),
+          el('span', {class: 'actions'}, [runNow, toggle, del])]),
         el('dl', {class: 'facts'}, [
-          el('dt', {text: 'Last run'}), el('dd', {}, [last(j)]),
           el('dt', {text: 'From'}), el('dd', {}, [link(j.source_name, 'source/' + j.source)]),
           el('dt', {text: 'To'}), el('dd', {}, [link(j.dest_name, 'destination/' + j.destination),
-            document.createTextNode(d ? ' — ' + d.catalog + '.' + (d.namespace || '<database>_<schema>') : '')]),
+            document.createTextNode(d ? '  —  ' + d.catalog + '.' + (d.namespace || '<database>_<schema>') : '')]),
           el('dt', {text: 'Tables (' + j.tables.length + ')'}), el('dd', {text: j.tables.join(', ')}),
           el('dt', {text: 'Mode'}), el('dd', {text: MODE[j.mode]}),
-          el('dt', {text: 'Schedule'}), el('dd', {}, [seg(Object.keys(SCHED).map(function (k) { return [k, SCHED[k]]; }), j.schedule, function (v) {
-            api('POST', '/api/cdc/jobs/set', {id: j.id, schedule: v}).then(show).catch(function (e) { alert_(e.message); });
-          }), j.schedule && !j.enabled ? el('span', {class: 'sub', text: '  paused'}) : null])])]));
+          el('dt', {text: 'Runs'}), runsLabel,
+          el('dt', {text: 'Engine'}), el('dd', {class: 'muted', text: j.engine === 'debezium' ? 'Debezium + Kafka' : 'OLake'})])]));
+      // change how it runs
+      var st = {type: runType(j.schedule), cron: runType(j.schedule) === 'cron' ? j.schedule : '*/15 * * * *'}, msg = el('div');
+      var save = el('button', {class: 'primary', text: 'Save'});
+      var picker = runPicker(st, j.engine, function () { save.disabled = st.value() === j.schedule; });
+      save.disabled = true;
+      on(save, 'click', function () {
+        save.disabled = true; msg.innerHTML = '';
+        api('POST', '/api/cdc/jobs/set', {id: j.id, schedule: st.value()}).then(function () { flash = {text: '✓ Saved — the job now runs: ' +
+          (st.type === 'manual' ? 'manually' : st.type === 'stream' ? 'as a data stream' : cronText(st.value()))}; show(); })
+          .catch(function (e) { save.disabled = false; msg.appendChild(note(e.message, 'bad')); });
+      });
+      main.appendChild(card([el('h3', {text: 'How it runs'}), picker, el('div', {class: 'navbtns'}, [el('span'), save]), msg], 'narrow'));
+      var live = null;
+      function loadLog(k) {                            // new text only; follows the end unless you've scrolled up
+        api('GET', '/api/cdc/run?id=' + k.last.id).then(function (x) {
+          var text = (x.error ? 'Error: ' + x.error + '\n\n' : '') + (x.log || '(nothing yet)');
+          if (text === live.textContent) return;
+          var atEnd = live.scrollTop + live.clientHeight >= live.scrollHeight - 30;
+          live.textContent = text;
+          if (atEnd) live.scrollTop = live.scrollHeight;
+        }).catch(function (e) { live.textContent = e.message; });
+      }
+      if (stream && j.last && j.last.trigger === 'stream') {   // the stream's own log, kept up to date by the lab
+        live = el('pre', {class: 'log', text: 'Loading…'});
+        main.appendChild(card([el('div', {class: 'head', style: 'margin-bottom:0'}, [el('h3', {text: 'Log'}),
+          el('span', {class: 'sub muted', text: streaming(j) ? 'updates every few seconds' : 'the last stream'})]), live]));
+        loadLog(j);
+        setTimeout(function () { live.scrollTop = live.scrollHeight; }, 400);
+      }
       var runsBox = el('div');
       main.appendChild(card([el('h3', {text: 'Runs'}), runsBox]));
       showRuns(j, runsBox);
-      if (j.busy) timer = setTimeout(show, 4000);
+      // keep it current in place: the status, the log, and the runs when a run starts or ends
+      var page = location.hash.slice(1) || 'jobs', seen = j.last ? j.last.id + ':' + j.last.status : '';
+      function tick(ms) {
+        refresh(page, function () {
+          var k = byId(data.jobs, j.id);
+          if (!k) return go('jobs');
+          if (k.schedule !== j.schedule || k.enabled !== j.enabled) return draw();   // switched (here or elsewhere)
+          swap(statusBox, last(k)); swap(runsLabel, runLabel(k));
+          runNow.disabled = !!k.busy;
+          var now = k.last ? k.last.id + ':' + k.last.status : '';
+          if (now !== seen) { seen = now; runsBox.innerHTML = ''; showRuns(k, runsBox); }
+          if (live && k.last && k.last.trigger === 'stream') loadLog(k);
+          tick(every(k));
+        }, ms);
+      }
+      function every(x) { return x.busy ? 4000 : streaming(x) ? 5000 : 15000; }
+      tick(every(j));
     }
     function showRuns(j, box) {
       box.appendChild(note('Loading…'));
@@ -521,7 +704,7 @@
         box.innerHTML = '';
         if (!d.runs.length) return box.appendChild(note('No runs yet.'));
         var logBox = el('div');
-        box.appendChild(el('div', {class: 'wrap'}, [el('table', {}, [el('thead', {}, [el('tr', {}, ['Started', 'Took', 'Result', 'Rows', 'Why', ''].map(function (h) { return el('th', {text: h}); }))]),
+        box.appendChild(el('div', {class: 'wrap'}, [el('table', {class: 'lst'}, [el('thead', {}, [el('tr', {}, ['Started', 'Took', 'Result', 'Rows', 'Why', ''].map(function (h) { return el('th', {text: h}); }))]),
           el('tbody', {}, d.runs.map(function (r) {
             var took = r.finished_at ? Math.max(1, Math.round((new Date(r.finished_at) - new Date(r.started_at)) / 1000)) + ' s' : '…';
             var lg = on(el('button', {class: 'small', text: 'Log'}), 'click', function () {
@@ -529,10 +712,12 @@
                 logBox.innerHTML = ''; logBox.appendChild(el('pre', {class: 'log', text: (x.error ? 'Error: ' + x.error + '\n\n' : '') + (x.log || '(no log)')}));
               }).catch(function (e) { alert_(e.message); });
             });
-            return el('tr', {}, [el('td', {class: 'muted', text: when(r.started_at)}), el('td', {class: 'muted', text: took}),
-              el('td', {class: r.status === 'ok' ? 'ok' : r.status === 'running' ? 'run' : 'bad', title: r.error || '',
-                        text: r.status === 'ok' ? '✓ ok' : r.status === 'running' ? '… running' : '✗ ' + (r.error || 'failed').slice(0, 100)}),
-              el('td', {text: r.records === null ? '—' : String(r.records)}), el('td', {class: 'muted', text: r.trigger || ''}), el('td', {}, [lg])]);
+            var res = r.status === 'ok' ? pill('ok', r.trigger === 'stream' ? '■ stopped' : '✓ ok')
+              : r.status === 'running' ? pill('run live', r.trigger === 'stream' ? 'streaming' : 'running')
+              : pill('bad', '✗ ' + (r.error || 'failed').slice(0, 80), r.error || '');
+            return el('tr', {}, [el('td', {class: 'muted', text: when(r.started_at)}), el('td', {class: 'muted', text: took}), el('td', {}, [res]),
+              el('td', {text: r.records === null ? '—' : String(r.records)}), el('td', {class: 'muted', text: r.trigger || ''}),
+              el('td', {class: 'acts'}, [lg])]);
           }))])]));
         box.appendChild(logBox);
       }).catch(function (e) { box.innerHTML = ''; box.appendChild(note(e.message, 'bad')); });

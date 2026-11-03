@@ -51,7 +51,6 @@ GROUPS = [
     ("Spark", ["spark-master", "spark-worker-1", "spark-connect"]),
     ("Airflow", ["airflow-init", "airflow-apiserver", "airflow-scheduler", "airflow-dag-processor", "airflow-dag-processor-learners"]),
     ("Superset", ["superset"]),
-    ("Polaris console", ["polaris-console", "polaris-proxy"]),
     ("Streaming", ["kafka", "kafka-connect"]),          # Debezium + Kafka for 📡 Ingestion — only when needed
 ]
 LOCKED = {"Core"}

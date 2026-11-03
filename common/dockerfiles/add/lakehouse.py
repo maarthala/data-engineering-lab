@@ -1106,7 +1106,7 @@ def share(name, cat, grantee, access, namespace=None, table=None):
         if table:
             g["tableName"] = table
         _ok(_call("PUT", f"{_M}/catalogs/{cat}/catalog-roles/{role}/grants", {"grant": g}, t)[0], f"grant {priv}")
-    # browse: open the catalog in the Polaris Console + see its namespace names (tables in
+    # browse: see the catalog in 🗂 My catalogs + its namespace names (tables in
     # namespaces that aren't shared stay hidden)
     for priv in ("CATALOG_READ_PROPERTIES", "NAMESPACE_LIST"):
         _ok(_call("PUT", f"{_M}/catalogs/{cat}/catalog-roles/{role}/grants",

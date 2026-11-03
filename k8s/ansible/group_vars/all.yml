@@ -28,7 +28,6 @@ build_images:
   - { dockerfile: "Dockerfile.airflow-slim", ref: "ghcr.io/maarthala/de-stack/airflow-slim:latest", flatten: false }
   - { dockerfile: "Dockerfile.home-api",     ref: "ghcr.io/maarthala/de-stack/home-api:latest",     flatten: false }
   - { dockerfile: "Dockerfile.jupyterhub",   ref: "ghcr.io/maarthala/de-stack/jupyterhub:latest",   flatten: false }
-  - { dockerfile: "Dockerfile.polaris-console", ref: "ghcr.io/maarthala/de-stack/polaris-console:latest", flatten: false }
 
 # The home image bakes the built training site (context = training/, not the
 # shared dockerfiles dir), so it's built by its own task rather than the loop.

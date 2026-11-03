@@ -5,7 +5,7 @@
 // Tools open inside the portal (/tool.html#<tool>); window.LAB_TOOLS has their addresses.
 (function () {
   // every app sits next to the portal by name: <app>.lab.localhost:8000 (local) · <app>.de.lan (k8s)
-  var host = location.hostname, k8s = /(^|\.)de\.lan$/.test(host);
+  var host = location.hostname;
   function url(sub, unusedPort, path) { return 'http://' + sub + '.' + location.host + (path || ''); }
   var TOOLS = window.LAB_TOOLS = {
     sync:       {name: 'Ingestion', what: 'Copy tables from your databases (CDC, OLake)', page: '/cdc.html'},   // a portal page
@@ -14,9 +14,7 @@
     airflow:    {name: 'Pipelines', what: 'Airflow', svc: 'airflow', url: url('airflow', 8001)},
     superset:   {name: 'Dashboards', what: 'Superset', svc: 'superset', url: url('superset', 8004)},
     spark:      {name: 'Spark UI', what: 'Spark', svc: 'spark', url: url('spark', 8002)},
-    storage:    {name: 'Storage', what: 'RustFS console', url: url('storage', 9001, '/rustfs/admin/v3/oidc/authorize/default')},
-    governance: {name: 'Governance', what: 'Polaris Console', svc: 'governance', url: url('polaris-console', 8189, '/?sso=1'), managers: true,
-                 external: k8s}            // k8s: its ingress sends the console's own SAMEORIGIN → a new tab
+    storage:    {name: 'Storage', what: 'RustFS console', url: url('storage', 9001, '/rustfs/admin/v3/oidc/authorize/default')}
   };
   // simple line icons (24×24)
   var I = {
@@ -48,7 +46,7 @@
               ['/secrets.html', 'secrets', 'My secrets']];
   var EXTRAS = [['/exams.html', 'exams', 'Mock exams']];
   var MANAGE = [['/manage.html', 'members', 'Members'], ['/teams.html', 'teams', 'Teams'], ['/activity.html', 'activity', 'Activity'],
-                ['/exams-admin.html', 'exams', 'Exams'], ['/settings.html', 'settings', 'Settings']];
+                ['/governance.html', 'governance', 'Governance'], ['/exams-admin.html', 'exams', 'Exams'], ['/settings.html', 'settings', 'Settings']];
   var path = location.pathname.replace(/\/+$/, '') || '/';
   if (path === '/index.html') path = '/';
   var tool = path === '/tool.html' ? location.hash.slice(1) : null;

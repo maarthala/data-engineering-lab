@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Governance — Epireum's Data Engineering Lab</title>
+  <link rel="stylesheet" href="/admin.css?v=8">
+  <style>
+    .chips{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+    .chip2{display:inline-flex; align-items:center; gap:4px; padding:2px 9px; border-radius:999px; border:1px solid var(--line2);
+           background:var(--panel2); font-size:.8rem}
+    .chip2 button{border:0; background:none; padding:0 2px; cursor:pointer; color:var(--muted); font-size:.85rem; line-height:1}
+    .chip2 button:hover{color:var(--bad-ink)}
+    .lock{color:var(--muted); font-size:.8rem} .lock::before{content:"🔒 "}
+    .ed{color:var(--ok-ink); font-size:.8rem}
+    .persona{font-size:.7rem; padding:1px 7px; border-radius:999px; background:var(--accent-bg); color:var(--accent); margin-left:6px}
+    .form2{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+    .form2 input[type=text]{width:220px}
+    .grants td{font-size:.86rem} .mono{font-family:ui-monospace,Menlo,monospace; font-size:.8rem}
+    .rolecard{margin-bottom:12px} .rolecard h3{display:flex; align-items:center; gap:10px; margin:0 0 6px}
+    .ask2{display:inline-flex; flex-wrap:wrap; align-items:center; gap:6px; padding:3px 8px; border:1px solid var(--gold); border-radius:8px;
+          background:var(--warn-bg); font-size:.82rem}
+    .cred{display:grid; grid-template-columns:110px 1fr auto; gap:6px 10px; align-items:center; margin-top:8px; max-width:640px}
+    .muted2{color:var(--muted)}
+  </style>
+</head>
+<body>
+  <header id="lab-top"></header>
+  <script src="/lab-header.js?v=17"></script>
+  <main id="main"><div class="placeholder">Loading…</div></main>
+  <script src="/admin.js?v=5"></script>
+  <script>
+    // 🛡 Governance (managers) — Polaris's access model on the portal:
+    //   Logins (principals) → hold principal roles → which hold catalog roles → which hold grants
+    //   (privileges on a catalog, a namespace or a table). Tabs: Logins · Principal roles · Catalog
+    //   roles & grants (per catalog). What the lab makes itself is shown 🔒 read-only, with why;
+    //   what's made here and the course's personas (analyst, engineer, lead) can be changed.
+    var el = admin.el, data = null, cat = null, catData = null;
+    admin.page('🛡 Governance', 'Who may do what in the lakehouse: logins, their roles, and the grants behind them (Apache Polaris).');
+    var tab = admin.tabs([['logins', 'Logins'], ['roles', 'Principal roles'], ['catalogs', 'Catalog roles & grants']], function (t) { tab = t; draw(); });
+    function gov(body) { return admin.api('POST', '/api/admin/governance', body); }
+    function err(e) { admin.show('That didn\'t work', [e.message], null, true); }
+    function reload(after) {
+      return admin.api('GET', '/api/admin/governance').then(function (d) { data = d; if (after) after(); draw(); }).catch(admin.failed);
+    }
+    // inline "are you sure?" (no browser popups)
+    function ask(btn, q, yes, fn) {
+      var y = el('button', {class: 'small danger', text: yes}), n = el('button', {class: 'small', text: 'Cancel'});
+      var box = el('span', {class: 'ask2'}, [q, y, n]);
+      btn.hidden = true; btn.parentNode.insertBefore(box, btn.nextSibling);
+      n.onclick = function () { box.remove(); btn.hidden = false; };
+      y.onclick = function () { box.remove(); btn.hidden = false; fn(); };
+    }
+    function status(x) { return x.editable ? el('span', {class: 'ed', text: '✓ can be changed'}) : el('span', {class: 'lock', text: x.why}); }
+    function chip(text, onRemove) {
+      return el('span', {class: 'chip2'}, [text, onRemove ? el('button', {title: 'Remove', text: '×', on: {click: onRemove}}) : null]);
+    }
+    function pick(options, placeholder) {               // a select with a first "placeholder" option
+      var s = el('select', {}, [el('option', {value: '', text: placeholder})].concat(options.map(function (o) { return el('option', {value: o, text: o}); })));
+      return s;
+    }
+    function credCard(c, title) {                       // a login's client id + secret, shown once
+      function row(label, v) {
+        var b = el('button', {class: 'small', text: 'Copy'});
+        b.onclick = function () { navigator.clipboard.writeText(v).then(function () { b.textContent = 'Copied ✓'; }); };
+        return [el('span', {class: 'sub', text: label}), el('span', {class: 'secret', text: v}), b];
+      }
+      var card = el('div', {class: 'card result'}, [el('h3', {text: title}),
+        el('div', {class: 'cred'}, row('Client ID', c.client_id).concat(row('Secret', c.client_secret))),
+        el('div', {class: 'sub', style: 'margin-top:8px', text: 'Shown once — Polaris doesn\'t show the secret again (New secret makes another). ' +
+          'Use them in a notebook, Spark or Trino as credential "<client id>:<secret>", scope PRINCIPAL_ROLE:ALL.'})]);
+      return card;
+    }
+    var pending = null;                                  // a card to show above the next draw (new credentials)
+
+    function draw() {
+      if (!data) return;
+      var cards = [];
+      if (pending) { cards.push(pending); pending = null; }
+      if (tab === 'logins') cards = cards.concat(logins());
+      else if (tab === 'roles') cards = cards.concat(roles());
+      else cards = cards.concat(catalogs());
+      admin.fill(cards);
+    }
+
+    // ---- Logins (principals) ----------------------------------------------------------------
+    function logins() {
+      var name = el('input', {type: 'text', placeholder: 'e.g. report_bot', autocomplete: 'off'});
+      var also = el('input', {type: 'checkbox'}); also.checked = true;
+      var go = el('button', {class: 'primary small', text: 'Create login'});
+      go.onclick = function () {
+        go.disabled = true;
+        gov({op: 'create_principal', name: name.value, role: also.checked}).then(function (c) {
+          pending = credCard(c, '✓ Login ' + c.name + ' made' + (also.checked ? ' (with principal role ' + c.name + ')' : '')); reload();
+        }).catch(function (e) { go.disabled = false; err(e); });
+      };
+      var add = el('div', {class: 'card'}, [el('h3', {text: 'New login'}),
+        el('div', {class: 'form2'}, [name, el('label', {class: 'sub'}, [also, ' with a principal role of the same name']), go]),
+        el('div', {class: 'sub', style: 'margin-top:8px', text: 'A login for a tool, a job or a lesson: Polaris gives it a client ID and secret. ' +
+          'It can do nothing until it holds a principal role that holds catalog roles (next tabs).'})]);
+      var editableRoles = data.principal_roles.filter(function (r) { return r.editable; }).map(function (r) { return r.name; });
+      var body = el('tbody');
+      data.principals.forEach(function (p) {
+        var held = el('div', {class: 'chips'});
+        p.roles.forEach(function (r) {
+          var ro = data.principal_roles.filter(function (x) { return x.name === r; })[0];
+          held.appendChild(chip(r, ro && ro.editable ? function () {
+            gov({op: 'unassign', principal: p.name, role: r}).then(function () { reload(); }).catch(err); } : null));
+        });
+        var give = pick(editableRoles.filter(function (r) { return p.roles.indexOf(r) < 0; }), '+ give a role');
+        give.onchange = function () { if (give.value) gov({op: 'assign', principal: p.name, role: give.value}).then(function () { reload(); }).catch(err); };
+        if (p.assignable && give.options.length > 1) held.appendChild(give);
+        var acts = el('td', {class: 'acts'});
+        if (p.editable) {
+          var sec = el('button', {class: 'small', text: 'New secret'});
+          sec.onclick = function () { ask(sec, 'The old secret stops working.', 'New secret', function () {
+            gov({op: 'rotate', name: p.name}).then(function (c) { pending = credCard(c, '✓ New secret for ' + p.name); draw(); window.scrollTo({top: 0}); }).catch(err); }); };
+          acts.appendChild(sec);
+          if (!p.persona) {
+            var del = el('button', {class: 'small', text: 'Delete'});
+            del.onclick = function () { ask(del, 'Delete login ' + p.name + '?', 'Yes, delete', function () {
+              gov({op: 'delete_principal', name: p.name}).then(function () { reload(); }).catch(err); }); };
+            acts.appendChild(document.createTextNode(' ')); acts.appendChild(del);
+          }
+        }
+        body.appendChild(el('tr', {}, [el('td', {}, [el('b', {text: p.name}), p.persona ? el('span', {class: 'persona', text: 'persona'}) : null]),
+          el('td', {class: 'mono muted2', text: p.client_id || ''}), el('td', {}, [held]), el('td', {}, [status(p)]), acts]));
+      });
+      return [add, el('div', {class: 'card'}, [el('h3', {text: 'Logins (' + data.principals.length + ')'}),
+        el('div', {class: 'wrap'}, [el('table', {}, [el('thead', {}, [el('tr', {}, ['Login', 'Client ID', 'Principal roles', '', ''].map(function (h) {
+          return el('th', {text: h}); }))]), body])])])];
+    }
+
+    // ---- Principal roles -----------------------------------------------------------------------
+    function roles() {
+      var name = el('input', {type: 'text', placeholder: 'e.g. finance_readers', autocomplete: 'off'});
+      var go = el('button', {class: 'primary small', text: 'Create role'});
+      go.onclick = function () { go.disabled = true; gov({op: 'create_principal_role', name: name.value}).then(function () {
+        admin.show('✓ Principal role ' + name.value.trim().toLowerCase() + ' made', ['Give it to logins here, and catalog roles on Catalog roles & grants.']); reload(); })
+        .catch(function (e) { go.disabled = false; err(e); }); };
+      var add = el('div', {class: 'card'}, [el('h3', {text: 'New principal role'}), el('div', {class: 'form2'}, [name, go]),
+        el('div', {class: 'sub', style: 'margin-top:8px', text: 'A principal role is what a login is given — like a group. Its rights come from the catalog roles it holds.'})]);
+      var body = el('tbody');
+      data.principal_roles.forEach(function (r) {
+        var held = el('div', {class: 'chips'});
+        r.principals.forEach(function (p) { held.appendChild(chip(p, r.editable ? function () {
+          gov({op: 'unassign', principal: p, role: r.name}).then(function () { reload(); }).catch(err); } : null)); });
+        if (r.editable) {
+          var give = pick(data.principals.filter(function (p) { return p.assignable; }).map(function (p) { return p.name; })
+            .filter(function (p) { return r.principals.indexOf(p) < 0; }), '+ give to a login');
+          give.onchange = function () { if (give.value) gov({op: 'assign', principal: give.value, role: r.name}).then(function () { reload(); }).catch(err); };
+          held.appendChild(give);
+        }
+        var acts = el('td', {class: 'acts'});
+        if (r.editable && data.personas.map(function (x) { return x + '_role'; }).indexOf(r.name) < 0) {
+          var del = el('button', {class: 'small', text: 'Delete'});
+          del.onclick = function () { ask(del, 'Delete role ' + r.name + '?', 'Yes, delete', function () {
+            gov({op: 'delete_principal_role', name: r.name}).then(function () { reload(); }).catch(err); }); };
+          acts.appendChild(del);
+        }
+        body.appendChild(el('tr', {}, [el('td', {}, [el('b', {text: r.name})]), el('td', {}, [held]), el('td', {}, [status(r)]), acts]));
+      });
+      return [add, el('div', {class: 'card'}, [el('h3', {text: 'Principal roles (' + data.principal_roles.length + ')'}),
+        el('div', {class: 'wrap'}, [el('table', {}, [el('thead', {}, [el('tr', {}, ['Role', 'Held by', '', ''].map(function (h) {
+          return el('th', {text: h}); }))]), body])])])];
+    }
+
+    // ---- Catalog roles & grants (one catalog at a time) ---------------------------------------
+    function catalogs() {
+      var sel = pick(data.catalogs.map(function (c) { return c.name; }), '— choose a catalog —');
+      if (cat) sel.value = cat;
+      sel.onchange = function () { cat = sel.value || null; catData = null; draw(); };
+      var c = data.catalogs.filter(function (x) { return x.name === cat; })[0];
+      var head = el('div', {class: 'card'}, [el('h3', {text: 'Catalog'}), el('div', {class: 'form2'}, [sel,
+        c ? el('span', {class: 'sub', text: (c.type || '') + ' · ' + (c.location || '')}) : null])]);
+      if (!cat) return [head];
+      if (!catData || catData.catalog !== cat) {
+        admin.api('GET', '/api/admin/governance/catalog?name=' + encodeURIComponent(cat)).then(function (d) { catData = d; draw(); }).catch(err);
+        return [head, el('div', {class: 'card'}, [el('div', {class: 'sub', text: 'Loading the roles of ' + cat + '…'})])];
+      }
+      var name = el('input', {type: 'text', placeholder: 'e.g. gold_readers', autocomplete: 'off'});
+      var go = el('button', {class: 'primary small', text: 'Create catalog role'});
+      go.onclick = function () { go.disabled = true; gov({op: 'create_catalog_role', catalog: cat, name: name.value}).then(function () { catData = null; draw(); })
+        .catch(function (e) { go.disabled = false; err(e); }); };
+      head.appendChild(el('div', {class: 'form2', style: 'margin-top:12px'}, [name, go]));
+      head.appendChild(el('div', {class: 'sub', style: 'margin-top:6px', text: 'A catalog role is a set of grants in this catalog; give it to principal roles. A login holding one of them gets the grants.'}));
+      return [head].concat(catData.roles.map(roleCard));
+    }
+    function roleCard(r) {
+      function redo() { catData = null; draw(); }
+      var held = el('div', {class: 'chips'}, [el('span', {class: 'sub', text: 'Held by:'})]);
+      if (!r.principal_roles.length) held.appendChild(el('span', {class: 'sub muted2', text: 'no principal role yet'}));
+      r.principal_roles.forEach(function (p) { held.appendChild(chip(p, r.editable ? function () {
+        gov({op: 'unlink', catalog: cat, catalog_role: r.name, principal_role: p}).then(redo).catch(err); } : null)); });
+      if (r.editable) {
+        var give = pick(data.principal_roles.map(function (p) { return p.name; }).filter(function (p) { return r.principal_roles.indexOf(p) < 0; }), '+ give to a principal role');
+        give.onchange = function () { if (give.value) gov({op: 'link', catalog: cat, catalog_role: r.name, principal_role: give.value}).then(redo).catch(err); };
+        held.appendChild(give);
+      }
+      var gbody = el('tbody');
+      if (!r.grants.length) gbody.appendChild(el('tr', {}, [el('td', {class: 'sub', colspan: '3', text: 'No grants yet.'})]));
+      r.grants.forEach(function (g) {
+        var where = g.type === 'catalog' ? 'the whole catalog' : g.type === 'namespace' ? 'namespace ' + g.namespace : 'table ' + g.namespace + '.' + g.table;
+        var x = null;
+        if (r.editable) { x = el('button', {class: 'small', text: 'Revoke'});
+          x.onclick = function () { gov({op: 'revoke', catalog: cat, catalog_role: r.name, on: g.type, privileges: g.privilege, namespace: g.namespace, table: g.table}).then(redo).catch(err); }; }
+        gbody.appendChild(el('tr', {}, [el('td', {text: where}), el('td', {class: 'mono', text: g.privilege}), el('td', {class: 'acts'}, [x])]));
+      });
+      var kids = [el('h3', {}, [el('span', {text: r.name}), status(r)]), held,
+        el('table', {class: 'grants', style: 'margin-top:10px'}, [el('thead', {}, [el('tr', {}, ['On', 'Privilege', ''].map(function (h) { return el('th', {text: h}); }))]), gbody])];
+      if (r.editable) kids.push(grantForm(r, redo));
+      if (r.editable && data.personas.map(function (x) { return x + '_role_cr'; }).indexOf(r.name) < 0) {
+        var del = el('button', {class: 'small', text: 'Delete catalog role'});
+        del.onclick = function () { ask(del, 'Delete ' + r.name + ' (its grants go with it)?', 'Yes, delete', function () {
+          gov({op: 'delete_catalog_role', catalog: cat, name: r.name}).then(redo).catch(err); }); };
+        kids.push(el('div', {style: 'margin-top:10px'}, [del]));
+      }
+      return el('div', {class: 'card rolecard'}, kids);
+    }
+    function grantForm(r, done) {
+      var on = el('select', {}, [['catalog', 'the whole catalog'], ['namespace', 'a namespace'], ['table', 'a table']].map(function (o) {
+        return el('option', {value: o[0], text: o[1]}); }));
+      var ns = el('input', {type: 'text', placeholder: 'namespace, e.g. gold', autocomplete: 'off'});
+      var tb = el('input', {type: 'text', placeholder: 'table', autocomplete: 'off'});
+      var priv = el('select');
+      function fillPriv() {
+        priv.innerHTML = '';
+        var g1 = el('optgroup', {label: 'Bundles'}), g2 = el('optgroup', {label: 'One privilege'});
+        [['read', 'read (list + read data)'], ['write', 'write (read + write, create, drop tables)']].concat(on.value === 'catalog' ? [['manage', 'manage everything in it']] : [])
+          .forEach(function (b) { g1.appendChild(el('option', {value: b[0], text: b[1]})); });
+        data.privileges[on.value].forEach(function (p) { g2.appendChild(el('option', {value: p, text: p})); });
+        priv.appendChild(g1); priv.appendChild(g2);
+        ns.hidden = on.value === 'catalog'; tb.hidden = on.value !== 'table';
+      }
+      on.onchange = fillPriv; fillPriv();
+      var go = el('button', {class: 'small primary', text: 'Grant'});
+      go.onclick = function () {
+        go.disabled = true;
+        gov({op: 'grant', catalog: cat, catalog_role: r.name, on: on.value, privileges: priv.value, namespace: ns.value.trim() || null, table: tb.value.trim() || null})
+          .then(done).catch(function (e) { go.disabled = false; err(e); });
+      };
+      return el('div', {class: 'form2', style: 'margin-top:10px'}, [el('span', {class: 'sub', text: 'Grant on'}), on, ns, tb, priv, go]);
+    }
+
+    reload();
+  </script>
+</body>
+</html>

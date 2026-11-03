@@ -177,52 +177,6 @@
       "bearerOnly": false
     },
     {
-      "clientId": "polaris-ui",
-      "name": "Polaris Console \u2014 sign in with the lab account",
-      "publicClient": true,
-      "standardFlowEnabled": true,
-      "directAccessGrantsEnabled": false,
-      "redirectUris": [
-        "http://polaris-console.lab.localhost:8000/*",
-        "http://polaris-console.de.lan/*"
-      ],
-      "webOrigins": [
-        "http://polaris-console.lab.localhost:8000",
-        "http://polaris-console.de.lan"
-      ],
-      "attributes": {
-        "pkce.code.challenge.method": "S256"
-      },
-      "protocolMappers": [
-        {
-          "name": "principal_name",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-usermodel-property-mapper",
-          "config": {
-            "user.attribute": "username",
-            "claim.name": "principal_name",
-            "jsonType.label": "String",
-            "id.token.claim": "true",
-            "access.token.claim": "true",
-            "userinfo.token.claim": "true"
-          }
-        },
-        {
-          "name": "principal_roles",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-usermodel-property-mapper",
-          "config": {
-            "user.attribute": "username",
-            "claim.name": "principal_roles",
-            "jsonType.label": "String",
-            "id.token.claim": "true",
-            "access.token.claim": "true",
-            "userinfo.token.claim": "true"
-          }
-        }
-      ]
-    },
-    {
       "clientId": "superset",
       "name": "Superset \u2014 dashboards",
       "publicClient": false,
