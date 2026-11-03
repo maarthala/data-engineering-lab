@@ -66,7 +66,7 @@ LOG_COLOURS = ["cyan", "magenta", "blue", "yellow", "green"]
 
 #            symbol, colour, text
 LOOK = {
-    "waiting":    ("·", "dim", "waiting"),
+    "waiting":    ("·", "off", "waiting"),
     "pulling":    (None, "blue", "pulling"),
     "building":   (None, "cyan", "building"),
     "built":      ("◆", "cyan", "built"),
@@ -76,9 +76,9 @@ LOOK = {
     "running":    ("●", "green", "running"),
     "healthy":    ("●", "green", "healthy"),
     "done":       ("✓", "green", "done"),
-    "stopped":    ("○", "dim", "stopped"),
+    "stopped":    ("○", "off", "stopped"),
     "stopping":   (None, "yellow", "stopping"),
-    "removed":    ("○", "dim", "removed"),
+    "removed":    ("○", "off", "removed"),
     "restarting": ("↻", "red", "restarting"),
     "unhealthy":  ("✗", "red", "unhealthy"),
     "failed":     ("✗", "red", "failed"),
@@ -259,6 +259,7 @@ class View:
             curses.init_pair(i, fg, -1)
             self.c[k] = curses.color_pair(i)
         self.c["dim"] = curses.A_DIM
+        self.c["off"] = curses.A_NORMAL      # a unit / service that's off: plain text (dim is invisible in some terminals)
         self.c["bold"] = curses.A_BOLD
         self.tick = 0
         self.sel = 0              # status: selected unit (↑ ↓ move between units, not containers)
@@ -422,7 +423,7 @@ class View:
                 flat = flat[:rows_free - 1]
             groups = [(None, flat)]
         if metrics:
-            self.put(2, w - 27, "  CPU    MEM   PORT", self.c["dim"])
+            self.put(2, w - 27, "  CPU    MEM   PORT", self.c["off"])
         y, drawn, units = 2, [], []
         unit_names = [t for t, _ in groups if any(t == u for u, _ in GROUPS)]
         if self.watch and unit_names:
@@ -435,7 +436,7 @@ class View:
                 if sel:
                     self.put(y, px, " " * (pw - 1), base)
                 self.put(y, px + 1, ("▸ " if sel else "") + title.upper(),
-                         base | self.c["bold"] | (0 if sel else self.c["dim"]))
+                         base | self.c["bold"])
                 title_w = len(title) + (2 if sel else 0)
                 if title in unit_names:
                     units.append(title)
@@ -448,21 +449,21 @@ class View:
                     on = sum(x in READY for x in live)
                     word, col = (("◐ changing", "yellow") if any(x in ("starting", "stopping") for x in live)
                                  else ("● on", "green") if on == len(live)
-                                 else ("○ off", "dim") if on == 0 else ("◐ partly on", "yellow"))
+                                 else ("○ off", "off") if on == 0 else ("◐ partly on", "yellow"))
                     self.put(y, px + 2 + title_w, word, base | self.c[col])
                 if self.watch and metrics and title in unit_names:
                     mem = sum(stats.get(m, {}).get("mem", 0) for m in full)
                     if mem:
-                        self.put(y, w - 20, f"{human(mem):>6}", base | self.c["dim"])
+                        self.put(y, w - 20, f"{human(mem):>6}", base)
                 y += 1
             for m in rows:
                 if y >= 2 + rows_free:
                     break
                 sym, col, txt = LOOK[state[m]]
                 base = 0                                    # (status selects units, not containers)
-                self.put(y, px + 1, sym or spin, self.c[col] | base | (self.c["bold"] if col != "dim" else 0))
+                self.put(y, px + 1, sym or spin, self.c[col] | base | (self.c["bold"] if col not in ("dim", "off") else 0))
                 name = m[len("jupyter-"):] if m.startswith("jupyter-") else m
-                self.put(y, px + 3, name, base | (self.c["dim"] if state[m] in ("waiting", "stopped") else 0),
+                self.put(y, px + 3, name, base,
                          pw - (31 if metrics else 16))
                 port = f":{ports[m][0]}" if m in ports and state[m] in READY else ""
                 if metrics:
@@ -484,7 +485,7 @@ class View:
             self.put(y, px + 1, f"… {hidden} more, all " + ("stopped" if s.mode == "stop" else "ready"),
                      self.c["dim"])
         if folded and y < 2 + rows_free:
-            self.put(y, px + 1, "↑↓ opens a unit · taller window: all", self.c["dim"],
+            self.put(y, px + 1, "↑↓ opens a unit · taller window: all", self.c["cyan"],
                      pw - 2)
         if self.watch and units:                   # details of the selected unit
             unit = units[min(self.sel, len(units) - 1)]
@@ -499,9 +500,9 @@ class View:
             tag = (("off · s starts it" if not core_on(s) else "x stops the whole stack") if unit in LOCKED
                    else "s on · x off")
             self.put(y + 1, w - len(tag) - 1, tag, self.c["yellow"] if unit in LOCKED else self.c["cyan"])
-            self.put(y + 2, px + 1, " · ".join(svcs), self.c["dim"])
+            self.put(y + 2, px + 1, " · ".join(svcs), self.c["off"])
             self.put(y + 3, px + 1, f"CPU {cpu:.1f}% · memory {human(mem)}" +
-                     (f" · ports {', '.join(map(str, ports))}" if ports else ""), self.c["dim"])
+                     (f" · ports {', '.join(map(str, ports))}" if ports else ""), self.c["off"])
         return units if self.watch else drawn
 
     def logs(self, lw, rows):
@@ -578,7 +579,7 @@ class View:
             hint = "containers and network go · volumes (all your data) stay · make up starts it again"
         else:
             hint = ("q quit" if self.stack.compose_rc is not None else "Ctrl-C stop") + f"  ·  full log: {LOG_SHOWN}"
-        self.put(h - 1, 1, hint, self.c["dim"])
+        self.put(h - 1, 1, hint, self.c["cyan"])
         scr.refresh()
 
 
