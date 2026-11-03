@@ -41,6 +41,18 @@
            padding:10px 16px; border-radius:10px; box-shadow:var(--shadow); display:none; z-index:10}
     .toast.err{border-color:var(--danger); color:var(--bad-ink)}
     .placeholder{color:var(--muted); padding:40px; text-align:center}
+    /* a table's own panel: columns · snapshots · properties */
+    .tbl td:first-child .tname{cursor:pointer; color:var(--ink)} .tbl td:first-child .tname:hover{color:var(--accent); text-decoration:underline}
+    .tbl.sel td{background:var(--accent-bg)}
+    .tstats{display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:10px; margin:10px 0 12px}
+    .tstats div{border:1px solid var(--line); border-radius:9px; padding:8px 10px; background:var(--panel)}
+    .tstats b{display:block; font-size:1.1rem} .tstats span{font-size:.76rem; color:var(--muted)}
+    .ttabs{display:flex; gap:2px; border-bottom:1px solid var(--line); margin:4px 0 10px}
+    .ttabs a{padding:7px 12px; cursor:pointer; color:var(--muted); border-bottom:2px solid transparent; margin-bottom:-1px; font-size:.88rem}
+    .ttabs a.on{color:var(--accent); border-bottom-color:var(--accent)}
+    .mono{font-family:ui-monospace,Menlo,monospace; font-size:.8rem}
+    .pillk{font-size:.7rem; padding:1px 7px; border-radius:999px; background:var(--accent-bg); color:var(--accent); margin-left:6px}
+    .tscroll{max-height:380px; overflow:auto}
     @media (max-width:760px){ .app{grid-template-columns:1fr} aside{max-height:35vh; border-right:0; border-bottom:1px solid var(--line)} }
 </style>
 </head>
@@ -231,7 +243,9 @@
         ok.onclick = create; no.onclick = close;
         inp.onkeydown = function (e) { if (e.key === 'Enter') create(); if (e.key === 'Escape') close(); };
       };
-      var tbody = el('table'); tree.appendChild(tbody); m.appendChild(tree); m.appendChild(inv);
+      var tbody = el('table'); tree.appendChild(tbody); m.appendChild(tree);
+      var pane = el('div'); m.appendChild(pane);                   // the opened table's card
+      m.appendChild(inv);
       tbody.innerHTML = '<tr><td class="sub">Loading…</td></tr>';
       help(head, [info.default ? (function () { var p = el('pre'); p.textContent = '# notebooks: already set up as `my`\nspark.sql("SHOW NAMESPACES IN my").show()\n\n-- SQL editor\nSELECT * FROM ' + name + '.<namespace>.<table>;'; return p; })() : snippet(name),
         el('div', 'sub', 'Tables are made by code (e.g. df.writeTo("' + (info.default ? 'my' : name) + '.bronze.orders").create()) or by 📡 Ingestion. ⧉ next to a table copies its full name.')]);
@@ -263,8 +277,10 @@
               wait.remove();
               if (!r.ok) { rows = null; tr.classList.remove('open'); return toast(r.body.error, true); }
               rows = (r.body.length ? r.body.map(function (t) {
-                var x = row('▦ ' + t, 'tbl'), full = name + '.' + n + '.' + t;
+                var x = el('tr', 'tbl'), full = name + '.' + n + '.' + t, cell = el('td');
+                var tn = el('span', 'tname', '▦ ' + t); tn.title = 'Open the table'; cell.appendChild(tn); x.appendChild(cell);
                 x.firstChild.appendChild(el('span', 'full', full));
+                tn.onclick = function () { detail(n, t, x); };
                 x.appendChild(del('table ' + n + '.' + t + ' and its files', '/tables', {catalog: name, namespace: n, table: t}, function () {
                   x.remove(); rows.splice(rows.indexOf(x), 1);
                 }, full));
@@ -278,6 +294,7 @@
       shares();
 
       function row(label, cls) { var tr = el('tr', cls); tr.appendChild(el('td', null, label)); return tr; }
+      function detail(n, t, tr) { tableCard(pane, name, n, t, tr); }
       // 🗑 → "Delete …? Yes / Cancel" in the same cell (no browser popups)
       function del(what, path, params, gone, copy, label) {
         var td = el('td', 'r');
@@ -341,6 +358,91 @@
           });
         });
       }
+    }
+
+    // ---- a table's card -----------------------------------------------------------------------
+    function size(b) { var u = ['B', 'KB', 'MB', 'GB', 'TB'], i = 0; while (b >= 1024 && i < 4) { b /= 1024; i++; } return (i ? b.toFixed(1) : b) + ' ' + u[i]; }
+    function when(ms) { return ms ? new Date(ms).toLocaleString([], {dateStyle: 'medium', timeStyle: 'medium'}) : '—'; }
+    function copyBtn(label, text, title) {
+      var c = el('button', 'small', label); c.title = title || ('Copy: ' + text);
+      c.onclick = function () { (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(
+        function () { toast('Copied'); }, function () { toast(text); }); };
+      return c;
+    }
+    function tableCard(pane, cat, ns, table, tr) {
+      Array.prototype.forEach.call(document.querySelectorAll('.tbl.sel'), function (x) { x.classList.remove('sel'); });
+      if (tr) tr.classList.add('sel');
+      pane.innerHTML = '';
+      var card = el('div', 'card'); pane.appendChild(card);
+      card.appendChild(el('div', 'sub', 'Loading ' + ns + '.' + table + '…'));
+      card.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+      api('GET', '/table', {catalog: cat, namespace: ns, table: table}).then(function (r) {
+        card.innerHTML = '';
+        if (!r.ok) return card.appendChild(el('div', 'sub', '✗ ' + (r.body.error || 'could not load the table')));
+        var d = r.body, head = el('div', 'cardhead');
+        var h = el('h2', null, '▦ ' + ns + '.' + table); h.style.fontSize = '1.05rem'; head.appendChild(h);
+        var acts = el('span'); acts.appendChild(copyBtn('⧉ Name', d.name));
+        var x = el('button', 'small', '✕'); x.title = 'Close'; x.style.marginLeft = '6px';
+        x.onclick = function () { pane.innerHTML = ''; if (tr) tr.classList.remove('sel'); }; acts.appendChild(x);
+        head.appendChild(acts); card.appendChild(head);
+        card.appendChild(el('div', 'sub', d.name + ' · Iceberg v' + d.format_version + ' · changed ' + when(d.updated)));
+        var st = el('div', 'tstats'), now = d.now || {records: 0, data_files: 0, delete_files: 0, bytes: 0};
+        [[now.records.toLocaleString(), 'rows'], [now.data_files, 'data files'], [now.delete_files, 'delete files'],
+         [size(now.bytes), 'on storage'], [d.snapshot_count, 'snapshots']].forEach(function (x) {
+          var b = el('div'); b.appendChild(el('b', null, String(x[0]))); b.appendChild(el('span', null, x[1])); st.appendChild(b); });
+        card.appendChild(st);
+        if (now.delete_files)
+          card.appendChild(el('div', 'sub', '↳ ' + now.delete_files + ' delete file(s): changes not yet merged into the data files — compaction (maintenance) merges them.'));
+        var tabs = el('div', 'ttabs'), body = el('div'); card.appendChild(tabs); card.appendChild(body);
+        var pages = [
+          ['Columns (' + d.columns.length + ')', function () {
+            var t = el('table'); t.innerHTML = '<tr><th>#</th><th>Column</th><th>Type</th><th></th></tr>';
+            d.columns.forEach(function (c) {
+              var tr = el('tr'); tr.appendChild(el('td', 'sub', String(c.id)));
+              var nm = el('td', null, c.name); if (c.key) nm.appendChild(el('span', 'pillk', 'key')); tr.appendChild(nm);
+              tr.appendChild(el('td', 'mono', c.type)); tr.appendChild(el('td', 'sub', c.required ? 'not null' : ''));
+              t.appendChild(tr);
+            });
+            body.appendChild(t);
+            body.appendChild(el('div', 'sub', 'Partitioned by: ' + (d.partitioning.length ? d.partitioning.join(', ') : 'nothing (one partition)')));
+          }],
+          ['Snapshots (' + d.snapshot_count + ')', function () {
+            body.appendChild(el('div', 'sub', 'Every write makes a snapshot — a version of the table you can still read (time travel), until maintenance expires it.'));
+            var w = el('div', 'tscroll'), t = el('table'); w.appendChild(t);
+            t.innerHTML = '<tr><th>When</th><th>Operation</th><th class="r">Rows +</th><th class="r">Rows −</th><th class="r">Files + / −</th><th class="r">Rows then</th><th></th></tr>';
+            d.snapshots.forEach(function (s) {
+              var tr = el('tr'), w0 = el('td', null, when(s.at));
+              if (s.current) w0.appendChild(el('span', 'pillk', 'current'));
+              tr.appendChild(w0); tr.appendChild(el('td', null, (s.operation || '') + (s.engine ? ' · ' + s.engine : '')));
+              [s.added_records, s.deleted_records].forEach(function (v) { tr.appendChild(el('td', 'r', v ? v.toLocaleString() : '—')); });
+              tr.appendChild(el('td', 'r', s.added_files + ' / ' + s.removed_files));
+              tr.appendChild(el('td', 'r', s.total_records.toLocaleString()));
+              var a = el('td', 'r');
+              a.appendChild(copyBtn('⧉ SQL', 'SELECT * FROM ' + d.name + ' FOR VERSION AS OF ' + s.id,
+                'Copy a query of the table as it was then (SQL editor / Trino)'));
+              tr.appendChild(a); t.appendChild(tr);
+            });
+            body.appendChild(w);
+            if (d.snapshot_count > d.snapshots.length) body.appendChild(el('div', 'sub', 'The newest ' + d.snapshots.length + ' of ' + d.snapshot_count + '.'));
+            var p = el('pre'); p.style.marginTop = '10px';
+            p.textContent = '-- SQL editor (Trino): the table as it was\nSELECT * FROM ' + d.name + ' FOR VERSION AS OF <snapshot id>;\nSELECT * FROM ' + d.name +
+              ' FOR TIMESTAMP AS OF TIMESTAMP \'2026-11-03 10:00:00 UTC\';\n\n# notebooks (Spark)\nspark.sql("SELECT * FROM ' + d.name + ' VERSION AS OF <snapshot id>").show()';
+            body.appendChild(p);
+          }],
+          ['Properties', function () {
+            var t = el('table'); t.innerHTML = '<tr><th>Property</th><th>Value</th></tr>';
+            var tr0 = el('tr'); tr0.appendChild(el('td', null, 'location')); tr0.appendChild(el('td', 'mono', d.location)); t.appendChild(tr0);
+            Object.keys(d.properties).sort().forEach(function (k) {
+              var tr = el('tr'); tr.appendChild(el('td', 'mono', k)); tr.appendChild(el('td', 'mono', d.properties[k])); t.appendChild(tr); });
+            body.appendChild(t);
+          }]];
+        pages.forEach(function (pg, i) {
+          var a = el('a', i ? '' : 'on', pg[0]); tabs.appendChild(a);
+          a.onclick = function () { Array.prototype.forEach.call(tabs.children, function (x) { x.classList.toggle('on', x === a); });
+            body.innerHTML = ''; pg[1](); };
+        });
+        pages[0][1]();
+      });
     }
 
     $('new').onclick = function () {

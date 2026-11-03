@@ -932,6 +932,74 @@ def drop_namespace(name, cat, namespace):
     return {"dropped": f"{cat}.{namespace}"}
 
 
+def _may_read(name, cat, namespace, table, t, manager=False):
+    """Owner of the catalog, a share that covers the table (the whole lake, its namespace, or it),
+    or a manager (they look after every lakehouse)."""
+    if manager or _owned(name, cat, t):
+        return True
+    st, body = _call("GET", f"{_M}/principal-roles/{name}/catalog-roles/{cat}", token=t)
+    for r in (body or {}).get("roles", []) if st == 200 else []:
+        if r["name"].startswith("share_"):
+            s = _describe_share(cat, r["name"], t)
+            if s["scope"] == "lake" or (s["namespace"] == namespace and (s["scope"] == "namespace" or s["table"] == table)):
+                return True
+    return False
+
+
+def _type(t):
+    """An Iceberg type (a name, or a struct / list / map object) → text, e.g. struct<op: string, ts: timestamptz>."""
+    if isinstance(t, str):
+        return t
+    k = t.get("type")
+    if k == "struct":
+        return "struct<" + ", ".join(f"{f['name']}: {_type(f['type'])}" for f in t.get("fields", [])) + ">"
+    if k == "list":
+        return f"list<{_type(t.get('element'))}>"
+    if k == "map":
+        return f"map<{_type(t.get('key'))}, {_type(t.get('value'))}>"
+    return str(k)
+
+
+def table_detail(name, cat, namespace, table, manager=False):
+    """🗂 My catalogs → a table: its columns (and key), partitioning, snapshots (newest first — for
+    time travel), size now, properties, and the maintenance policies that apply to it."""
+    t = _admin_token()
+    if not _may_read(name, cat, namespace, table, t, manager):
+        raise PermissionError("you can't see this table")
+    ns = urllib.parse.quote(chr(31).join(namespace.split(".")))
+    st, b = _call("GET", f"/api/catalog/v1/{cat}/namespaces/{ns}/tables/{urllib.parse.quote(table)}", token=t)
+    if st == 404:
+        raise ValueError("no such table")
+    if st != 200:
+        raise RuntimeError(f"load table: HTTP {st}")
+    m = b["metadata"]
+    schema = next((s for s in m.get("schemas", []) if s.get("schema-id") == m.get("current-schema-id")), (m.get("schemas") or [{}])[-1])
+    key = set(schema.get("identifier-field-ids") or [])
+    names = {f["id"]: f["name"] for f in schema.get("fields", [])}
+    spec = next((p for p in m.get("partition-specs", []) if p.get("spec-id") == m.get("default-spec-id")), {})
+    snaps = sorted(m.get("snapshots") or [], key=lambda s: s.get("timestamp-ms", 0), reverse=True)
+    cur = next((s for s in snaps if s.get("snapshot-id") == m.get("current-snapshot-id")), None)
+    num = lambda s, k: int((s.get("summary") or {}).get(k, 0) or 0)
+    return {
+        "name": f"{cat}.{namespace}.{table}", "location": m.get("location"), "format_version": m.get("format-version"),
+        "updated": m.get("last-updated-ms"),
+        "columns": [{"id": f["id"], "name": f["name"], "type": _type(f["type"]), "required": bool(f.get("required")),
+                     "key": f["id"] in key, "doc": f.get("doc")} for f in schema.get("fields", [])],
+        "partitioning": [f"{p.get('transform')}({names.get(p.get('source-id'), p.get('source-id'))})" for p in spec.get("fields", [])],
+        "now": {"records": num(cur, "total-records"), "data_files": num(cur, "total-data-files"),
+                "delete_files": num(cur, "total-delete-files"), "bytes": num(cur, "total-files-size"),
+                "equality_deletes": num(cur, "total-equality-deletes"), "position_deletes": num(cur, "total-position-deletes")} if cur else None,
+        # snapshot ids are 64-bit: as text, a browser's number would round them
+        "snapshots": [{"id": str(s["snapshot-id"]), "at": s.get("timestamp-ms"), "operation": (s.get("summary") or {}).get("operation"),
+                       "added_records": num(s, "added-records"), "deleted_records": num(s, "deleted-records"),
+                       "added_files": num(s, "added-data-files"), "removed_files": num(s, "deleted-data-files"),
+                       "total_records": num(s, "total-records"), "engine": (s.get("summary") or {}).get("engine-name"),
+                       "current": s.get("snapshot-id") == m.get("current-snapshot-id")} for s in snaps[:100]],
+        "snapshot_count": len(snaps),
+        "properties": m.get("properties") or {},
+    }
+
+
 def _share_role(grantee, access, namespace, table=None):
     if not namespace:                                   # the whole lake
         return f"share_{grantee}_{access}_c_all"
