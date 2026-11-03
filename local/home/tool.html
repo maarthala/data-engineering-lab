@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tools — Epireum's Data Engineering Lab</title>
-  <link rel="stylesheet" href="/admin.css?v=8">
+  <title>Epireum's Data Engineering Lab</title>
+  <link rel="stylesheet" href="/admin.css?v=9">
   <style>
     body{height:100vh; overflow:hidden}
     .tbar{display:flex; align-items:center; gap:10px; padding:8px 18px; border-bottom:1px solid var(--line); background:var(--panel); height:46px}
@@ -37,7 +37,7 @@
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=20"></script>
+  <script src="/lab-header.js?v=21"></script>
   <div class="tabs" id="t-tabs" role="tablist"></div>
   <div class="tbar"><b id="t-name"></b><span class="what" id="t-what"></span><span class="sp"></span>
     <span id="t-nb" hidden><button class="small" id="t-restart">Restart server</button> <button class="small danger" id="t-stop">Stop server</button></span>
@@ -45,12 +45,17 @@
     <a class="btn" id="t-open" target="_blank" rel="noopener">Open in new tab ↗</a></div>
   <div id="t-body"></div>
   <script>
-    // The tools (Jupyter, SQLPad, Airflow, Superset, Spark UI, Flink UI, storage console) inside the portal,
+    // The tools (Ingestion, Pub/Sub, Jupyter, SQLPad, Airflow, Superset, Spark UI, Flink UI, storage console) in the portal,
     // the left menu staying — as TABS: opening a tool (#<tool> in the address, from the menu or a link)
     // adds its tab or switches to it; each tab keeps its own frame, so switching doesn't reload the tool.
     // × closes one. The open tabs are remembered for this browser tab (sessionStorage), so after another
     // portal page they come back (the tools load again). Tools: window.LAB_TOOLS (lab-header.js); they let
     // the portal frame them (each tool's frame-ancestors); the sign-in is the portal's own.
+    // Every portal page opens here too (window.LAB_PAGES, lab-header.js: Home, My files … Manage): the
+    // whole portal is tabs. The address is #<key>, or #<key>/<screen> for a page's own screen
+    // (#sync/job/3 = Ingestion's #job/3); opening a page on its own lands here the same way.
+    function lookup(key) { return LAB_TOOLS[key] || LAB_PAGES[key]; }
+    function parse(h) { var i = h.indexOf('/'); return i < 0 ? [h, ''] : [h.slice(0, i), '#' + h.slice(i + 1)]; }
     var body = document.getElementById('t-body'), strip = document.getElementById('t-tabs');
     var tabs = {}, order = [], active = null, manager = null, up = null, KEY = 'lab-tool-tabs';
     function save() { try { sessionStorage.setItem(KEY, JSON.stringify({order: order, active: active})); } catch (e) {} }
@@ -65,9 +70,10 @@
       d.querySelector('h2').textContent = head; d.querySelector('.sub').textContent = text;
       pane.appendChild(d);
     }
+    function src(tab) { return tab.t.page ? tab.t.page + (tab.hash || '') : tab.t.url; }   // a portal page, or a tool's own address
     function frame(tab) {
       var f = document.createElement('iframe');
-      f.src = tab.t.url; f.title = tab.t.what;
+      f.src = src(tab); f.title = tab.t.what;
       f.setAttribute('allow', 'clipboard-read; clipboard-write; fullscreen');
       tab.pane.innerHTML = ''; tab.pane.appendChild(f); tab.frame = f;
     }
@@ -82,15 +88,19 @@
         frame(tab);
       });
     }
-    function open(key) {                                  // add the tool's tab (if new) and show it
-      var t = LAB_TOOLS[key];
-      if (!t || t.page) return false;
+    function open(key, hash) {                            // add the tab (if new) and show it
+      var t = lookup(key);
+      if (!t || t.external) return false;
       if (!tabs[key]) add(key);
+      if (hash) {                                         // a screen of a portal page (Ingestion's #job/3 …)
+        tabs[key].hash = hash;
+        if (tabs[key].frame) tabs[key].frame.contentWindow.location.hash = hash;
+      }
       show(key);
       return true;
     }
     function add(key) {                                   // a tab + its pane; loaded when first shown
-      var t = LAB_TOOLS[key];
+      var t = lookup(key);
       var el = document.createElement('div'); el.className = 'tab'; el.setAttribute('role', 'tab');
       el.innerHTML = '<span class="nm"></span><button class="x" title="Close" aria-label="Close">×</button>';
       el.querySelector('.nm').textContent = t.name;
@@ -107,12 +117,13 @@
       var t = tabs[key].t;
       document.title = t.name + ' — Epireum\'s Data Engineering Lab';
       document.getElementById('t-name').textContent = t.name;
-      document.getElementById('t-what').textContent = t.what;
-      document.getElementById('t-open').href = t.url;
+      document.getElementById('t-what').textContent = LAB_PAGES[key] ? '' : t.what;
+      document.getElementById('t-open').href = t.page || t.url;
       document.getElementById('t-open').hidden = document.getElementById('t-reload').hidden = false;
       document.getElementById('t-nb').hidden = !(key === 'jupyter' && tabs[key].running);
       var title = document.getElementById('lab-title'); if (title) title.textContent = t.name;
-      document.querySelectorAll('#lab-nav a.item[data-tool]').forEach(function (a) { a.classList.toggle('on', a.dataset.tool === key); });
+      var crumb = document.querySelector('#lab-top .crumb'); if (crumb) crumb.textContent = LAB_PAGES[key] ? LAB_PAGES[key].what : 'Tools';
+      document.querySelectorAll('#lab-nav a.item[data-tab]').forEach(function (a) { a.classList.toggle('on', a.dataset.tab === key); });
       tabs[key].el.scrollIntoView({block: 'nearest', inline: 'nearest'});
       save();
     }
@@ -133,22 +144,28 @@
     function empty() {
       document.title = 'Tools — Epireum\'s Data Engineering Lab';
       document.getElementById('t-name').textContent = 'Tools';
-      document.getElementById('t-what').textContent = 'pick one in the menu on the left — it opens in a tab here';
+      document.getElementById('t-what').textContent = 'pick a page or tool in the menu on the left — it opens in a tab here';
       document.getElementById('t-open').hidden = document.getElementById('t-reload').hidden = true;
       document.getElementById('t-nb').hidden = true;
       var title = document.getElementById('lab-title'); if (title) title.textContent = 'Tools';
-      document.querySelectorAll('#lab-nav a.item[data-tool]').forEach(function (a) { a.classList.remove('on'); });
+      document.querySelectorAll('#lab-nav a.item[data-tab]').forEach(function (a) { a.classList.remove('on'); });
       save();
     }
     document.getElementById('t-reload').onclick = function () {
       var tab = tabs[active];
       if (!tab) return;
-      if (tab.frame) tab.frame.src = tab.t.url; else load(tab);
+      if (tab.frame) { if (tab.t.page) tab.frame.contentWindow.location.reload(); else tab.frame.src = src(tab); } else load(tab);
     };
+    // a portal page in a tab asks to open another tool (lab-header.js LAB_GO): its tab, at that screen
+    window.addEventListener('message', function (e) {
+      if (e.origin !== location.origin || !e.data || e.data.lab !== 'open') return;
+      if (open(e.data.tool, e.data.hash) && location.hash.slice(1) !== e.data.tool) history.pushState(null, '', '#' + e.data.tool);
+    });
     window.addEventListener('hashchange', function () {
-      var key = location.hash.slice(1);
-      if (!key) return;
-      if (!open(key)) { history.replaceState(null, '', '#' + (active || '')); }
+      var h = parse(location.hash.slice(1));
+      if (!h[0]) return;
+      if (!open(h[0], h[1])) history.replaceState(null, '', '#' + (active || ''));
+      else if (h[1]) history.replaceState(null, '', '#' + h[0]);        // the screen is the page's own address now
     });
 
     // ---- Notebooks: your own Jupyter server — started only when you say so (a click on the menu
@@ -198,11 +215,12 @@
     document.addEventListener('lab:me', function (e) {
       manager = (e.detail.groups || []).indexOf('managers') >= 0;
       var was = saved(), want = location.hash.slice(1);
-      (was.order || []).forEach(function (k) { if (LAB_TOOLS[k] && !LAB_TOOLS[k].page && !tabs[k]) add(k); });
-      if (want && open(want)) return;
+      (was.order || []).forEach(function (k) { if (lookup(k) && !lookup(k).external && !tabs[k]) add(k); });
+      var h = parse(want);
+      if (h[0] && open(h[0], h[1])) { if (h[1]) history.replaceState(null, '', '#' + h[0]); return; }
       if (was.active && tabs[was.active]) return go(was.active);
       if (order.length) return go(order[order.length - 1]);
-      empty();
+      go('home');                                          // nothing open yet: start at Home
     });
   </script>
 </body>
