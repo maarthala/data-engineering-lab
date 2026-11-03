@@ -325,10 +325,17 @@
       var copy = on(el('button', {class: 'small', text: 'Copy'}), 'click', function () {
         navigator.clipboard.writeText(code).then(function () { copy.textContent = '✓ copied'; setTimeout(function () { copy.textContent = 'Copy'; }, 1500); });
       });
-      return card([el('div', {class: 'head', style: 'margin-bottom:0'}, [el('h3', {text: '🧪 Use it in a notebook'}), copy]),
-        el('div', {class: 'sub muted', text: 'Subscribe with Spark Structured Streaming: parse each event, set a watermark, count per minute of event_time, and write closed windows to an Iceberg table. ' +
-          'You may read your own topics; consumer groups are named ' + data.me + '.… (lab_kafka sets that). Plain Python: Consumer({**lab_kafka(python=True), "group.id": "' + data.me + '.reader"}). Key: ' + key + '.'}),
-        pre]);
+      // folded until opened: a heading you click (▸ / ▾), then the code
+      var body = el('div', {hidden: ''}, [el('div', {class: 'actions', style: 'justify-content:space-between; margin-top:8px'}, [
+          el('div', {class: 'sub muted', style: 'flex:1', text: 'Subscribe with Spark Structured Streaming: parse each event, set a watermark, count per minute of event_time, and write closed windows to an Iceberg table. ' +
+            'You may read your own topics; consumer groups are named ' + data.me + '.… (lab_kafka sets that). Plain Python: Consumer({**lab_kafka(python=True), "group.id": "' + data.me + '.reader"}). Key: ' + key + '.'}),
+          copy]), pre]);
+      var arrow = el('span', {text: '▸', style: 'display:inline-block; width:1em; color:var(--muted)'});
+      var head = on(el('button', {type: 'button', 'aria-expanded': 'false', style: 'all:unset; cursor:pointer; display:flex; align-items:center; gap:6px; width:100%'},
+        [arrow, el('h3', {style: 'margin:0', text: '🧪 Use it in a notebook'}), el('span', {class: 'sub muted', text: 'Spark Structured Streaming · watermark · windows'})]), 'click', function () {
+          body.hidden = !body.hidden; arrow.textContent = body.hidden ? '▸' : '▾'; head.setAttribute('aria-expanded', String(!body.hidden));
+        });
+      return card([head, body]);
     }
 
     // ---- a stream: what it is, its settings, Peek --------------------------------------------
