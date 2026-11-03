@@ -26,8 +26,13 @@
     .tab.on{background:var(--panel); color:var(--ink); border-color:var(--line); font-weight:600; margin-bottom:-1px; padding-bottom:7px}
     .tab .x{all:unset; cursor:pointer; width:18px; height:18px; line-height:18px; text-align:center; border-radius:4px; color:var(--muted); font-size:.9rem}
     .tab .x:hover{background:var(--line); color:var(--ink)}
-    .pane[hidden]{display:none}
-    iframe{height:calc(100vh - var(--top-h) - 46px - 38px)}
+    /* every pane keeps the full size, stacked; a hidden one is only invisible — with display:none a
+       frame shrinks to 0 × 0 and JupyterLab (which lays out its panels by the frame's size) comes back
+       squashed */
+    #t-body{position:relative; height:calc(100vh - var(--top-h) - 46px - 38px)}
+    .pane{position:absolute; inset:0; overflow:auto; background:var(--bg)}
+    .pane.behind{visibility:hidden; pointer-events:none}       /* not [hidden]: admin.css makes that display:none */
+    iframe{height:100%}
   </style>
 </head>
 <body>
@@ -98,7 +103,7 @@
     function show(key) {
       active = key;
       if (!tabs[key].loaded) { tabs[key].loaded = true; load(tabs[key]); }   // a tab loads when first shown
-      order.forEach(function (k) { tabs[k].el.classList.toggle('on', k === key); tabs[k].pane.hidden = k !== key; });
+      order.forEach(function (k) { tabs[k].el.classList.toggle('on', k === key); tabs[k].pane.classList.toggle('behind', k !== key); });
       var t = tabs[key].t;
       document.title = t.name + ' — Epireum\'s Data Engineering Lab';
       document.getElementById('t-name').textContent = t.name;
