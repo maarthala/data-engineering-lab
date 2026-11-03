@@ -81,6 +81,24 @@ def iceberg_schema(kind):
     return {"type": "struct", "schema-id": 0, "fields": fields(FIRST + COLUMNS[kind] + [KAFKA])}
 
 
+# members subscribe from notebooks / Spark on Kafka's members' listener: a login each (SCRAM), allowed
+# to read their own topics and use consumer groups named <member>.… (ACLs) — kept in their own vault
+# folder as the secret "kafka" (username, password, bootstrap), so key_vault / lab_kafka() find it
+MEMBERS_BOOTSTRAP = os.environ.get("KAFKA_MEMBERS_BOOTSTRAP", "kafka:9094")
+VAULT_KEY = "kafka"
+CHECK_S = 300                                        # how often a login's vault secret is looked at again
+
+def spark_ddl(kind):
+    """The event as a Spark DDL schema — from_json(col("value").cast("string"), <this>) in a notebook."""
+    def typ(t):
+        if isinstance(t, str):
+            return {"string": "STRING", "long": "BIGINT", "int": "INT", "double": "DOUBLE", "timestamptz": "TIMESTAMP"}[t]
+        if t[0] == "list":
+            return f"ARRAY<{typ(t[1])}>"
+        return "STRUCT<" + ", ".join(f"{n}: {typ(x)}" for n, x in t[1]) + ">"
+    return ", ".join(f"{n} {typ(t)}" for n, t in FIRST + COLUMNS[kind])
+
+
 RATES = (1, 5, 10, 20, 50, 100)                      # events per second; the most a member may pick is a setting
 LATE_PCT = (0, 5, 20)                                # % of events that arrive late
 LATE_MAX = {60: "up to 1 min", 600: "up to 10 min", 3600: "up to 1 h", 86400: "up to 1 day"}
@@ -103,6 +121,8 @@ CREATE TABLE IF NOT EXISTS pubsub_streams (
   sent bigint NOT NULL DEFAULT 0, late bigint NOT NULL DEFAULT 0, last_at timestamptz,
   recent jsonb NOT NULL DEFAULT '[]', UNIQUE (member, name));
 ALTER TABLE pubsub_streams ADD COLUMN IF NOT EXISTS recent_late jsonb NOT NULL DEFAULT '[]';   -- the last late ones
+CREATE TABLE IF NOT EXISTS pubsub_logins (member text PRIMARY KEY, made_at timestamptz NOT NULL DEFAULT now(),
+  checked_at timestamptz NOT NULL DEFAULT now());   -- a member's Kafka login (cdc-runner: kafka_logins)
 CREATE TABLE IF NOT EXISTS pubsub_sim (id int PRIMARY KEY, beat timestamptz NOT NULL);   -- event-sim is alive
 """
 _ready, _lock = False, threading.Lock()
@@ -170,7 +190,8 @@ def overview(member, jobs=None):
     rows = _q("SELECT * FROM pubsub_streams WHERE member = %s AND state <> 'deleted' ORDER BY name", (member,))
     jobs = jobs or {}
     return {"streams": [dict(_out(s), jobs=jobs.get(s["id"], [])) for s in rows], "kinds": KINDS,
-            "columns": {k: [c for c, _ in FIRST + v] + [KAFKA[0]] for k, v in COLUMNS.items()}, "rates": RATES, "late_pct": LATE_PCT,
+            "columns": {k: [c for c, _ in FIRST + v] + [KAFKA[0]] for k, v in COLUMNS.items()},
+            "ddl": {k: spark_ddl(k) for k in COLUMNS}, "rates": RATES, "late_pct": LATE_PCT,
             "late_max": LATE_MAX, "patterns": PATTERNS, "late_after_s": LATE_AFTER_S, "auto_pause_h": AUTO_PAUSE_H,
             "retention_h": RETENTION_H, "partitions": PARTITIONS, "limits": _limits(),
             "streaming": sim_alive(), "streaming_how": STREAMING_HOW}
@@ -253,3 +274,75 @@ def peek(member, sid):
 def forget(member):
     """A member is deleted: their streams go (event-sim drops the topics when it next runs)."""
     _q("UPDATE pubsub_streams SET state = 'deleted' WHERE member = %s", (member,), rows=False)
+
+
+# ---- members' Kafka logins (run by cdc-runner: it has the vault and Kafka's admin listener) ---------
+def _acls(member):
+    from confluent_kafka.admin import (AclBinding, AclOperation, AclPermissionType, ResourcePatternType,
+                                       ResourceType)
+    p, allow = f"User:{member}", AclPermissionType.ALLOW
+    return [AclBinding(ResourceType.TOPIC, f"{member}.", ResourcePatternType.PREFIXED, p, "*", op, allow)
+            for op in (AclOperation.READ, AclOperation.DESCRIBE)] + \
+           [AclBinding(ResourceType.GROUP, f"{member}.", ResourcePatternType.PREFIXED, p, "*", op, allow)
+            for op in (AclOperation.READ, AclOperation.DESCRIBE)]
+
+
+def _login(admin, member, fresh):
+    """The member's login in Kafka + its secret in their vault folder (the same password again if it's there)."""
+    import secrets
+    import labvault
+    from confluent_kafka.admin import ScramCredentialInfo, ScramMechanism, UserScramCredentialUpsertion
+    have = labvault.fields(member, VAULT_KEY) or {}
+    pw = have.get("password") if have.get("username") == member else None
+    if pw and not fresh:
+        return
+    pw = pw or secrets.token_urlsafe(24)
+    up = UserScramCredentialUpsertion(member, ScramCredentialInfo(ScramMechanism.SCRAM_SHA_512, 8192), pw.encode())
+    for f in admin.alter_user_scram_credentials([up]).values():
+        f.result(timeout=30)
+    for f in admin.create_acls(_acls(member)).values():
+        f.result(timeout=30)
+    labvault.put_fields(member, VAULT_KEY, {"username": member, "password": pw, "bootstrap": MEMBERS_BOOTSTRAP})
+    print(f"[pubsub] Kafka login for {member}", flush=True)
+
+
+def _unlogin(admin, member):
+    import labvault
+    from confluent_kafka.admin import (AclBindingFilter, AclOperation, AclPermissionType, ResourcePatternType,
+                                       ResourceType, ScramMechanism, UserScramCredentialDeletion)
+    for f in admin.alter_user_scram_credentials([UserScramCredentialDeletion(member, ScramMechanism.SCRAM_SHA_512)]).values():
+        try:
+            f.result(timeout=30)
+        except Exception:  # noqa: BLE001 — none
+            pass
+    flt = AclBindingFilter(ResourceType.ANY, None, ResourcePatternType.ANY, f"User:{member}", None,
+                           AclOperation.ANY, AclPermissionType.ANY)
+    for f in admin.delete_acls([flt]).values():
+        f.result(timeout=30)
+    try:
+        labvault.delete(member, VAULT_KEY)
+    except Exception:  # noqa: BLE001 — a deleted member's folder is gone already
+        pass
+    print(f"[pubsub] removed {member}'s Kafka login", flush=True)
+
+
+def kafka_logins(admin):
+    """A login for every member with a stream (and only them); a vault secret deleted on My secrets
+    comes back within CHECK_S."""
+    want = {r["member"] for r in _q("SELECT DISTINCT member FROM pubsub_streams WHERE state <> 'deleted'")}
+    have = {r["member"]: r for r in _q("SELECT member, now() - checked_at > make_interval(secs => %s) AS due "
+                                       "FROM pubsub_logins", (CHECK_S,))}
+    for m in sorted(want):
+        if m not in have or have[m]["due"]:
+            try:
+                _login(admin, m, fresh=m not in have)
+                _q("INSERT INTO pubsub_logins (member) VALUES (%s) ON CONFLICT (member) DO UPDATE SET checked_at = now()",
+                   (m,), rows=False)
+            except Exception as e:  # noqa: BLE001 — next round
+                print(f"[pubsub] Kafka login for {m}: {e}", flush=True)
+    for m in sorted(set(have) - want):
+        try:
+            _unlogin(admin, m)
+            _q("DELETE FROM pubsub_logins WHERE member = %s", (m,), rows=False)
+        except Exception as e:  # noqa: BLE001
+            print(f"[pubsub] remove {m}'s Kafka login: {e}", flush=True)

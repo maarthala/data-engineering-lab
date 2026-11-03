@@ -15,6 +15,7 @@ RUN apt-get update \
 
 # boto3: the AWS SDK the recipes use from notebooks (S3 API; pip matches it to s3fs's botocore).
 # pyyaml: required by the Spark Declarative Pipelines CLI (`%%sql` materialized views).
+# confluent-kafka: subscribe to a 📨 Pub/Sub topic from plain Python (lab_kafka(python=True)).
 # jupyterhub: the single-user server, so JupyterHub can run this image once per learner
 # (same version as the Hub — Zero-to-JupyterHub 4.4.2 ships 5.5.2).
 RUN pip install --no-cache-dir \
@@ -34,6 +35,7 @@ RUN pip install --no-cache-dir \
       openpyxl \
       s3fs \
       boto3 \
+      confluent-kafka==2.12.2 \
       jupyter-fs
 
 # dbt (the dbt course): own venv so its pins can't clash with Jupyter's packages. It sees the

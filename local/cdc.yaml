@@ -105,10 +105,20 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      # PLAINTEXT :9092 the lab's own services (cdc-runner, Kafka Connect, event-sim) — super users;
+      # MEMBERS :9094 members' notebooks / Spark: a login each (SCRAM, made by cdc-runner) and ACLs —
+      # read their own topics (<member>.*), consumer groups <member>.* (on k8s a NetworkPolicy keeps
+      # members off :9092; this laptop stack has none)
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,MEMBERS://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,MEMBERS://kafka:9094
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,MEMBERS:SASL_PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_LISTENER_NAME_MEMBERS_SASL_ENABLED_MECHANISMS: SCRAM-SHA-512
+      KAFKA_LISTENER_NAME_MEMBERS_SCRAM___SHA___512_SASL_JAAS_CONFIG: org.apache.kafka.common.security.scram.ScramLoginModule required;
+      KAFKA_AUTHORIZER_CLASS_NAME: org.apache.kafka.metadata.authorizer.StandardAuthorizer
+      KAFKA_SUPER_USERS: User:ANONYMOUS             # the unauthenticated listeners: the lab's services, the controller
+      KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND: "false"
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1

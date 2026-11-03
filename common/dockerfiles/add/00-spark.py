@@ -169,6 +169,28 @@ def key_vault_set(name, value, secret=True, team=False):
 lab_secret, lab_secrets, lab_secret_set = key_vault, key_vault_list, key_vault_set
 
 
+def lab_kafka(stream=None, python=False):
+    """Kafka options to subscribe to one of your 📨 Pub/Sub streams — your Kafka login (the secret
+    "kafka" on 🔑 My secrets, made with your first stream). You may read your own topics, and use
+    consumer groups named <you>.…:
+        raw = spark.readStream.format("kafka").options(**lab_kafka("orders")).load()
+        c = Consumer({**lab_kafka(python=True), "group.id": "<you>.reader"})     # confluent-kafka
+    stream: the stream's name (or its whole topic, <you>.<name>) → subscribe to it.
+    python=True: the same login as confluent-kafka settings (no subscribe)."""
+    d = _fields("kafka")
+    if python:
+        return {"bootstrap.servers": d["bootstrap"], "security.protocol": "SASL_PLAINTEXT",
+                "sasl.mechanism": "SCRAM-SHA-512", "sasl.username": d["username"], "sasl.password": d["password"]}
+    opts = {"kafka.bootstrap.servers": d["bootstrap"], "kafka.security.protocol": "SASL_PLAINTEXT",
+            "kafka.sasl.mechanism": "SCRAM-SHA-512",
+            "kafka.sasl.jaas.config": 'org.apache.kafka.common.security.scram.ScramLoginModule required '
+                                      f'username="{d["username"]}" password="{d["password"]}";',
+            "groupIdPrefix": f"{d['username']}.spark"}      # Spark's consumer groups: <you>.spark-…
+    if stream:
+        opts["subscribe"] = stream if "." in stream else f"{d['username']}.{stream}"
+    return opts
+
+
 def lab_env(quiet=False):
     """Gone: "My variables" became 🔑 My secrets, read with key_vault("NAME")."""
     print('My variables moved to 🔑 My secrets: read a value with key_vault("NAME") — '

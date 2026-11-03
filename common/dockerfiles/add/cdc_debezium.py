@@ -744,6 +744,11 @@ def reconcile():
         ps_reconcile()
     except Exception as e:  # noqa: BLE001 — the next round tries again
         print(f"[cdc] pub/sub sinks: {e}", flush=True)
+    try:
+        import labpubsub
+        labpubsub.kafka_logins(_admin())                  # members' logins for notebooks / Spark
+    except Exception as e:  # noqa: BLE001
+        print(f"[cdc] pub/sub logins: {e}", flush=True)
     # what deleted jobs left: their connectors, topics, secret files
     gone = sorted({int(CONN.match(n).group(1)) for n in conns} - set(jobs))
     for jid in gone:
