@@ -63,6 +63,7 @@ integration-level updates (like AdventureWorks or SQLPad) get an entry.
 
 | Date | Release / integration | What it adds | Scope |
 |---|---|---|---|
+| 2026-11-03 | **Beam streaming from Pub/Sub (v1.10.0)** | Beam pipelines read your 📨 Pub/Sub streams on the Flink unit: a batch read, or a streaming job with event-time windows whose results are corrected for late events; `lab_beam_jobs()` / `lab_beam_stop()` for your own jobs only. On k8s the Flink UI and notebooks get read-only access to Flink. Lesson *A streaming pipeline: Pub/Sub topics on workers* | local · k8s · course |
 | 2026-11-03 | **Apache Beam on Flink (v1.9.0)** | Dataflow-style Beam pipelines: in a notebook on the local runner, or on the Flink unit's workers with slots (`lab_beam("flink", parallelism=…)`), the Flink UI, and the cluster's size set on ⚙️ Settings. Course unit *Pipelines with Apache Beam* | local · k8s · course |
 | 2026-11-03 | **The portal as tabs (v1.9.0)** | Every page and tool opens as a tab in the portal and keeps its state while you switch | local · k8s |
 | 2026-11-03 | **Pub/Sub event streams (v1.8.0)** | 📨 Pub/Sub: your own Kafka streams of clicks, orders, payments or stock moves, some arriving late; land them in Bronze with an Ingestion job, or process them in a notebook with Spark Structured Streaming (watermarks, windows). Course unit *Event streaming*; 🧹 Reset my lakehouse on My catalogs | local · k8s · course |
