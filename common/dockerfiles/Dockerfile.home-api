@@ -12,6 +12,7 @@ COPY add/labadmin.py /app/labadmin.py
 COPY add/labexams.py /app/labexams.py
 COPY add/labcdc.py /app/labcdc.py
 COPY add/labmaint.py /app/labmaint.py
+COPY add/labgov.py /app/labgov.py
 COPY add/labdb.py /app/labdb.py
 COPY add/exam_demo.json /app/exam_demo.json
 USER nobody

@@ -130,6 +130,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import labadmin
 import labcdc
 import labmaint
+import labgov
 import labdb
 import labexams
 import lakehouse as lh
@@ -802,6 +803,24 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, labadmin.settings())
             if path.startswith("/api/admin/exams"):
                 return self._admin_exams(method, path, user)
+            if path.startswith("/api/admin/governance"):       # 🛡 Polaris's logins, roles, grants (labgov.py)
+                try:
+                    if method == "GET" and path == "/api/admin/governance":
+                        return self._json(200, labgov.overview())
+                    if method == "GET" and path == "/api/admin/governance/catalog":
+                        return self._json(200, labgov.catalog(q.get("name", "")))
+                    if method == "POST" and path == "/api/admin/governance":
+                        if self.headers.get("X-Lab-Admin") != "1":
+                            return self._json(403, {"error": "missing X-Lab-Admin header"})
+                        body = self._body()
+                        out = labgov.do(body)
+                        print(f"[home-api] manager {user}: governance {body.get('op')} "
+                              f"{ {k: v for k, v in body.items() if k != 'op'} }", flush=True)
+                        _rules_now()
+                        return self._json(200, out)
+                    return self._json(404, {"error": "not found"})
+                except labgov.GovError as e:
+                    return self._json(400, {"error": str(e)})
             action = path.rsplit("/", 1)[-1]
             if method != "POST" or action not in {**_ACTIONS, **_TEAM_ACTIONS}:
                 return self._json(404, {"error": "not found"})
