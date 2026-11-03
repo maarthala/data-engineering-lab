@@ -179,6 +179,8 @@ SETTINGS = {           # name: (default, lowest, highest, type)
     "team_quota_mb": (TEAM_QUOTA_MB, 50, 51200, int),
     "jupyter_mem_gb": (float(re.sub(r"[^0-9.]", "", os.environ.get("SINGLEUSER_MEM", "1G")) or 1), 0.5, 16, float),
     "jupyter_cpu": (float(os.environ.get("SINGLEUSER_CPU", "1")), 0.25, 8, float),
+    "pubsub_streams": (3, 0, 20, int),           # 📨 Pub/Sub: streams per member
+    "pubsub_rate": (20, 1, 100, int),            # … and the most events a second one may send
 }
 _settings_cache = (0.0, None)
 

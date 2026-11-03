@@ -51,7 +51,7 @@ GROUPS = [
     ("Spark", ["spark-master", "spark-worker-1", "spark-connect"]),
     ("Airflow", ["airflow-init", "airflow-apiserver", "airflow-scheduler", "airflow-dag-processor", "airflow-dag-processor-learners"]),
     ("Superset", ["superset"]),
-    ("Streaming", ["kafka", "kafka-connect"]),          # Debezium + Kafka for 📡 Ingestion — only when needed
+    ("Streaming", ["kafka", "kafka-connect", "event-sim"]),   # Kafka: 📡 Ingestion (Debezium), 📨 Pub/Sub — when needed
 ]
 LOCKED = {"Core"}
 OFF = {"Streaming"}                    # make up leaves these off (a compose profile); make status s starts them

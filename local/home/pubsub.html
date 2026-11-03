@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pub/Sub — Epireum's Data Engineering Lab</title>
+  <link rel="stylesheet" href="/admin.css?v=8">
+  <style>
+    main{max-width:none}
+    .toolbar{display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; margin:0 0 14px}
+    .lst td{vertical-align:middle}
+    .lst td.acts{white-space:nowrap; text-align:right}
+    .lst td.acts button + button{margin-left:4px}
+    .lst .sub{font-size:.8rem; margin-top:2px}
+    a.name{font-weight:600; color:var(--ink); text-decoration:none; cursor:pointer} a.name:hover{color:var(--accent)}
+    code.t{font-size:.82rem; background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:1px 6px}
+    .pill{display:inline-flex; align-items:center; gap:6px; padding:2px 10px; border-radius:999px; font-size:.78rem; font-weight:500; white-space:nowrap}
+    .pill.ok{background:var(--ok-bg); color:var(--ok-ink)}
+    .pill.bad{background:var(--bad-bg); color:var(--bad-ink)}
+    .pill.run{background:var(--accent-bg); color:var(--accent)}
+    .pill.idle{background:var(--panel2); color:var(--muted)}
+    .pill.live::before{content:""; width:7px; height:7px; border-radius:50%; background:currentColor; animation:pulse 1.6s infinite}
+    @keyframes pulse{0%,100%{opacity:1} 50%{opacity:.25}}
+    @media (prefers-reduced-motion: reduce){ .pill.live::before{animation:none} }
+    .empty{text-align:center; padding:34px 18px}
+    .empty .big{font-size:1.6rem; margin-bottom:6px}
+    .empty .sub{max-width:560px; margin:0 auto 14px}
+    .crumbs{display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:.88rem; color:var(--muted); margin:0 0 12px}
+    .crumbs a{color:var(--accent); text-decoration:none; cursor:pointer} .crumbs a:hover{text-decoration:underline}
+    .crumbs b{color:var(--ink); font-weight:600}
+    .form{display:grid; grid-template-columns:170px minmax(0, 640px); gap:12px 16px; align-items:start; margin:4px 0}
+    .form > label{color:var(--ink); font-size:.86rem; font-weight:500; padding-top:7px}
+    .form input[type=text], .form select{width:100%}
+    .form .help{font-size:.8rem; color:var(--muted); margin-top:5px}
+    .seg{display:inline-flex; gap:4px; flex-wrap:wrap}
+    button.on{border-color:var(--accent); color:var(--accent); background:var(--accent-bg)}
+    .choices{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px}
+    .choice{border:1px solid var(--line2); border-radius:10px; padding:10px 12px; cursor:pointer; background:var(--panel); text-align:left;
+            font:inherit; color:inherit; display:block; width:100%}
+    .choice:hover{border-color:var(--accent)}
+    .choice b{display:block; font-size:.9rem; margin-bottom:3px}
+    .choice span{display:block; font-size:.78rem; color:var(--muted); line-height:1.35}
+    .choice.on{border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-bg)} .choice.on b{color:var(--accent)}
+    .facts{display:grid; grid-template-columns:150px 1fr; gap:8px 16px; font-size:.9rem; margin:4px 0 0}
+    .facts dt{color:var(--muted)} .facts dd{margin:0}
+    .head{display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin-bottom:12px}
+    .head h3{margin:0; font-size:1.05rem}
+    .actions{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+    .ask{display:inline-flex; flex-wrap:wrap; align-items:center; gap:8px; padding:5px 10px; border:1px solid var(--gold); border-radius:9px;
+         background:var(--warn-bg); font-size:.85rem}
+    .peek td{font-size:.82rem; vertical-align:top}
+    .peek td.mono, .peek .mono{font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.78rem}
+    .peek tr.ev{cursor:pointer} .peek tr.ev:hover td{background:var(--panel2)}
+    .peek tr.late td{background:var(--warn-bg)}
+    .peek pre{margin:0; white-space:pre-wrap; word-break:break-all; font-size:.76rem; background:var(--panel2); border:1px solid var(--line);
+              border-radius:8px; padding:8px 10px}
+    .tag{display:inline-block; padding:1px 7px; border-radius:6px; font-size:.75rem; background:var(--gold); color:#222; font-weight:600}
+    .fields{display:flex; flex-wrap:wrap; gap:4px; margin-top:6px} .fields code{font-size:.74rem}
+    @media (max-width:760px){ .form, .facts{grid-template-columns:1fr} .form > label{padding-top:0} .choices{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+  <header id="lab-top"></header>
+  <script src="/lab-header.js?v=18"></script>
+  <div class="pagebar"><h1>📨 Pub/Sub <span class="dot">·</span> event streams on Kafka topics of your own</h1></div>
+  <main id="main"><div class="placeholder">Loading…</div></main>
+  <script>
+    // 📨 Pub/Sub — you make a stream (what it carries: clicks, orders, payments, stock moves; how many a
+    // second; whether some arrive late) and the lab's simulator publishes it to your Kafka topic
+    // <you>.<name>. Peek shows the last events it sent: partition, offset, key, and how late each was.
+    // Screens: #streams · #new · #stream/3 — the browser's Back button works.
+    var main = document.getElementById('main');
+    function el(tag, attrs, kids) {
+      var e = document.createElement(tag);
+      Object.keys(attrs || {}).forEach(function (k) {
+        if (k === 'text') e.textContent = attrs[k];
+        else if (attrs[k] !== null && attrs[k] !== undefined && attrs[k] !== false) e.setAttribute(k, attrs[k]);
+      });
+      (kids || []).forEach(function (c) { if (c) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+      return e;
+    }
+    function on(e, ev, f) { e.addEventListener(ev, f); return e; }
+    function api(method, path, body) {
+      return fetch(path, {method: method, credentials: 'same-origin',
+          headers: body ? {'Content-Type': 'application/json', 'X-Lab-Request': '1'} : {},
+          body: body ? JSON.stringify(body) : undefined})
+        .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); });
+    }
+    function ask(btn, question, yesText, yes) {         // inline "are you sure?" (no browser popups)
+      var y = el('button', {class: 'small danger', text: yesText}), n = el('button', {class: 'small', text: 'Cancel'});
+      var box = el('span', {class: 'ask'}, [el('span', {text: question}), y, n]);
+      btn.hidden = true; btn.parentNode.insertBefore(box, btn.nextSibling);
+      on(n, 'click', function () { box.remove(); btn.hidden = false; });
+      on(y, 'click', function () { box.remove(); btn.hidden = false; yes(btn); });
+    }
+    function when(iso) { return iso ? new Date(iso).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}) : '—'; }
+    function clock(iso) { return iso ? new Date(iso).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'}) : '—'; }
+    function seg(options, value, onPick) {
+      var s = el('span', {class: 'seg'});
+      options.forEach(function (o) {
+        var b = on(el('button', {type: 'button', class: 'small' + (o[0] === value ? ' on' : ''), text: o[1]}), 'click', function () {
+          [].forEach.call(s.children, function (x) { x.classList.toggle('on', x === b); }); onPick(o[0]);
+        });
+        s.appendChild(b);
+      });
+      return s;
+    }
+    function card(kids) { return el('div', {class: 'card', style: 'margin-bottom:14px'}, kids); }
+    function pill(cls, text, title) { return el('span', {class: 'pill ' + cls, title: title || text, text: text}); }
+    function help(text) { return el('div', {class: 'help', text: text}); }
+    function num(n) { return Number(n || 0).toLocaleString(); }
+    function dur(s) {                                    // 7m 12s · 1h 4m · 3.2s
+      if (s < 60) return (Math.round(s * 10) / 10) + 's';
+      var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), r = Math.round(s % 60);
+      return h ? h + 'h ' + m + 'm' : m + 'm ' + r + 's';
+    }
+
+    var data = null, timer = null, open = {};
+    function lateText(s) {
+      if (!s.late_pct) return 'none';
+      return s.late_pct + '% · ' + data.late_max[s.late_max] + ' · ' + (s.late_pattern === 'burst' ? 'bursts' : 'random');
+    }
+    function status(s) {
+      if (s.error) return pill('bad', '✗ ' + s.error);
+      if (!s.ready) return pill('run', '◐ making the topic…');
+      if (s.state === 'paused') return pill('idle', s.paused_why === 'auto' ? '⏸ paused (after ' + data.auto_pause_h + ' h)' : '⏸ paused');
+      if (!data.streaming) return pill('idle', '⏸ waiting for Streaming');
+      return pill('ok live', 'publishing');
+    }
+    function sentText(s) { return num(s.sent) + ' sent' + (s.late ? ' · 🕓 ' + num(s.late) + ' late' : ''); }
+
+    function load() {
+      return api('GET', '/api/pubsub').then(function (d) { data = d; });
+    }
+    function route() {
+      clearTimeout(timer);
+      var h = location.hash.replace(/^#/, '').split('/');
+      main.innerHTML = '';
+      offNotice();
+      if (h[0] === 'new') return newStream();
+      if (h[0] === 'stream') return streamPage(+h[1]);
+      listPage();
+    }
+    function offNotice() {
+      if (data.streaming) return;
+      main.appendChild(el('div', {class: 'card', style: 'margin-bottom:14px; border-left:4px solid var(--gold); background:var(--warn-bg)'}, [
+        el('b', {text: '⏸ Streaming is off'}),
+        el('div', {class: 'sub', style: 'margin-top:4px', text: 'Nothing is published until it\'s on — your streams wait. ' + (data.manager
+          ? 'Switch it on: ' + data.streaming_how + '.' : 'Ask a lab manager to switch on the Streaming unit.')})]));
+    }
+    function alert_(msg) { main.insertBefore(el('div', {class: 'card result err', style: 'margin-bottom:14px'}, [el('div', {text: msg})]), main.firstChild); }
+    // refresh every few seconds without redrawing the page: apply() updates what's on screen
+    function every(ms, apply) {
+      clearTimeout(timer);
+      var page = location.hash;
+      timer = setTimeout(function tick() {
+        if (location.hash !== page) return;
+        apply().then(function () { if (location.hash === page) timer = setTimeout(tick, ms); })
+               .catch(function () { if (location.hash === page) timer = setTimeout(tick, ms * 3); });
+      }, ms);
+    }
+
+    // ---- the list ---------------------------------------------------------------------------
+    function listPage() {
+      var add = on(el('button', {class: 'primary', text: '+ New stream'}), 'click', function () { location.hash = 'new'; });
+      main.appendChild(el('div', {class: 'toolbar'}, [el('div', {class: 'sub muted',
+        text: data.streams.length + ' of ' + data.limits.streams + ' streams · each topic keeps ' + data.retention_h + ' h of events'}), add]));
+      if (!data.streams.length) {
+        main.appendChild(card([el('div', {class: 'empty'}, [el('div', {class: 'big', text: '📨'}),
+          el('h3', {text: 'No streams yet'}),
+          el('div', {class: 'sub muted', text: 'Make one: pick what it carries — clicks, orders, payments or stock moves — and the lab publishes those events to a Kafka topic of yours, a few every second. Turn on late events to practise event time vs processing time.'}),
+          on(el('button', {class: 'primary', text: '+ New stream'}), 'click', function () { location.hash = 'new'; })])]));
+        return;
+      }
+      var cells = {};
+      var rows = data.streams.map(function (s) {
+        var st = el('td', {}, [status(s)]), sent = el('td', {}, [el('div', {text: sentText(s)}), el('div', {class: 'sub muted', text: s.last_at ? 'last ' + clock(s.last_at) : '—'})]);
+        cells[s.id] = [st, sent];
+        var pause = on(el('button', {class: 'small', text: s.state === 'paused' ? '▶ Resume' : '⏸ Pause'}), 'click', function () { setState(s, pause); });
+        var del = on(el('button', {class: 'small danger', text: 'Delete'}), 'click', function () {
+          ask(del, 'Delete ' + s.name + ' and its topic?', 'Delete', function () { remove(s); });
+        });
+        return el('tr', {}, [
+          el('td', {}, [on(el('a', {class: 'name', text: s.name}), 'click', function () { location.hash = 'stream/' + s.id; }),
+                        el('div', {class: 'sub'}, [el('code', {class: 't', text: s.topic})])]),
+          el('td', {text: data.kinds[s.kind].name}),
+          el('td', {text: s.rate + ' / s'}),
+          el('td', {text: lateText(s)}),
+          st, sent,
+          el('td', {class: 'acts'}, [on(el('button', {class: 'small', text: 'Peek'}), 'click', function () { location.hash = 'stream/' + s.id; }), pause, del])]);
+      });
+      main.appendChild(card([el('table', {class: 'lst'}, [el('thead', {}, [el('tr', {}, ['Stream', 'Carries', 'Rate', 'Late events', 'Status', 'Sent', ''].map(function (h) { return el('th', {text: h}); }))]),
+        el('tbody', {}, rows)])]));
+      every(3000, function () {
+        return load().then(function () {
+          if (data.streams.map(function (s) { return s.id; }).sort().join() !== Object.keys(cells).sort().join()) return route();
+          data.streams.forEach(function (s) {
+            var c = cells[s.id]; if (!c) return;
+            c[0].replaceChildren(status(s));
+            c[1].replaceChildren(el('div', {text: sentText(s)}), el('div', {class: 'sub muted', text: s.last_at ? 'last ' + clock(s.last_at) : '—'}));
+          });
+        });
+      });
+    }
+    function setState(s, btn) {
+      btn.disabled = true;
+      api('POST', '/api/pubsub/set', {id: s.id, state: s.state === 'paused' ? 'running' : 'paused'})
+        .then(load).then(route).catch(function (e) { btn.disabled = false; alert_(e.message); });
+    }
+    function remove(s) {
+      api('POST', '/api/pubsub/delete', {id: s.id}).then(load).then(function () { location.hash = 'streams'; route(); })
+        .catch(function (e) { alert_(e.message); });
+    }
+
+    // ---- settings: rate + late events (the new-stream form and the stream's page) ------------
+    function settingsForm(st) {
+      var rates = data.rates.filter(function (r) { return r <= data.limits.rate; });
+      var pattern = el('div'), howLate = el('select', {}, Object.keys(data.late_max).map(function (k) { return el('option', {value: k, text: data.late_max[k]}); }));
+      howLate.value = String(st.late_max);
+      on(howLate, 'change', function () { st.late_max = +howLate.value; });
+      var lateRows = [], hourly = help('');
+      function perHour() { hourly.textContent = 'About ' + num(st.rate * 3600) + ' an hour at this rate; the lab allows up to ' + data.limits.rate + ' a second.'; }
+      perHour();
+      function paintLate() { lateRows.forEach(function (r) { r.hidden = !st.late_pct; }); }
+      function paintPattern() {
+        pattern.replaceChildren(el('div', {class: 'choices'}, [['random', 'Random delays', 'Each late event is held back for a random time, so it arrives after events that happened later — out of order.'],
+          ['burst', 'Offline bursts', 'A phone or till goes offline; its events wait and arrive all at once when it\'s back — a block of old events.']].map(function (o) {
+          return on(el('button', {type: 'button', class: 'choice' + (st.late_pattern === o[0] ? ' on' : '')}, [el('b', {text: o[1]}), el('span', {text: o[2]})]),
+            'click', function () { st.late_pattern = o[0]; paintPattern(); });
+        })));
+      }
+      paintPattern();
+      var rows = [
+        el('label', {text: 'Events a second'}), el('div', {}, [seg(rates.map(function (r) { return [r, String(r)]; }), st.rate, function (v) { st.rate = v; perHour(); }), hourly]),
+        el('label', {text: 'Late events'}), el('div', {}, [seg(data.late_pct.map(function (p) { return [p, p ? p + '% of events' : 'Off']; }), st.late_pct, function (v) { st.late_pct = v; paintLate(); }),
+          help('Every event has an event_time (when it happened) and a publish_time (when it reached Kafka). A late one is more than ' + data.late_after_s + ' s apart.')])];
+      var l1 = el('label', {text: 'How late'}), l2 = el('div', {}, [howLate]);
+      var l3 = el('label', {text: 'Pattern'}), l4 = el('div', {}, [pattern]);
+      lateRows = [l1, l2, l3, l4];
+      paintLate();
+      return rows.concat(lateRows);
+    }
+
+    // ---- new stream -----------------------------------------------------------------------------
+    function newStream() {
+      var st = {kind: 'click_events', name: 'click_events', rate: Math.min(5, data.limits.rate), late_pct: 0, late_max: 600, late_pattern: 'random'}, named = false;
+      var name = el('input', {type: 'text', value: st.name, autocomplete: 'off'});
+      var topic = el('code', {class: 't'});
+      function paintTopic() { topic.textContent = data.me + '.' + (name.value || '…'); }
+      on(name, 'input', function () { named = true; st.name = name.value.trim(); paintTopic(); });
+      var kinds = el('div', {class: 'choices'}), fields = el('div');
+      function paintKinds() {
+        kinds.replaceChildren.apply(kinds, Object.keys(data.kinds).map(function (k) {
+          var d = data.kinds[k];
+          return on(el('button', {type: 'button', class: 'choice' + (st.kind === k ? ' on' : '')}, [el('b', {text: d.name}), el('span', {text: d.what})]),
+            'click', function () { st.kind = k; if (!named) { name.value = st.name = k; paintTopic(); } paintKinds(); });
+        }));
+        var d = data.kinds[st.kind];
+        fields.replaceChildren(help('Each event (JSON) has: '), el('div', {class: 'fields'}, d.fields.map(function (f) { return el('code', {class: 't', text: f}); })),
+          help('Event types: ' + d.types.join(', ') + '. The message key is ' + d.key + ' — the same key always goes to the same partition, in order.'));
+      }
+      paintKinds(); paintTopic();
+      var create = el('button', {class: 'primary', text: 'Create & start'});
+      var err = el('div', {class: 'sub bad', style: 'margin-top:8px'});
+      on(create, 'click', function () {
+        create.disabled = true; err.textContent = '';
+        api('POST', '/api/pubsub', st).then(function (s) { return load().then(function () { location.hash = 'stream/' + s.id; }); })
+          .catch(function (e) { err.textContent = e.message; create.disabled = false; });
+      });
+      main.appendChild(el('div', {class: 'crumbs'}, [on(el('a', {text: 'Streams'}), 'click', function () { location.hash = 'streams'; }), '›', el('b', {text: 'New stream'})]));
+      main.appendChild(card([el('h3', {text: 'New stream'}),
+        el('div', {class: 'form'}, [
+          el('label', {text: 'Carries'}), el('div', {}, [kinds, fields]),
+          el('label', {text: 'Name'}), el('div', {}, [name, help('Lowercase letters, digits and _. Your topic: '), topic]),
+        ].concat(settingsForm(st))),
+        el('div', {class: 'actions', style: 'margin-top:16px'}, [create,
+          on(el('button', {text: 'Cancel'}), 'click', function () { location.hash = 'streams'; })]), err]));
+    }
+
+    // ---- a stream: what it is, its settings, Peek --------------------------------------------
+    function streamPage(id) {
+      var s = data.streams.filter(function (x) { return x.id === id; })[0];
+      if (!s) { location.hash = 'streams'; return; }
+      var d = data.kinds[s.kind];
+      main.appendChild(el('div', {class: 'crumbs'}, [on(el('a', {text: 'Streams'}), 'click', function () { location.hash = 'streams'; }), '›', el('b', {text: s.name})]));
+      var st = el('span', {}, [status(s)]), sent = el('dd', {text: sentText(s)});
+      var pause = on(el('button', {text: s.state === 'paused' ? '▶ Resume' : '⏸ Pause'}), 'click', function () { setState(s, pause); });
+      var del = on(el('button', {class: 'danger', text: 'Delete'}), 'click', function () {
+        ask(del, 'Delete ' + s.name + ' and its topic?', 'Delete', function () { remove(s); });
+      });
+      main.appendChild(card([el('div', {class: 'head'}, [el('h3', {}, [s.name + ' ', st]), el('div', {class: 'actions'}, [pause, del])]),
+        el('dl', {class: 'facts'}, [
+          el('dt', {text: 'Topic'}), el('dd', {}, [el('code', {class: 't', text: s.topic})]),
+          el('dt', {text: 'Carries'}), el('dd', {text: d.name + ' — key ' + d.key}),
+          el('dt', {text: 'Partitions'}), el('dd', {text: data.partitions + ' · events kept ' + data.retention_h + ' h'}),
+          el('dt', {text: 'Sent'}), sent,
+          el('dt', {text: 'Running since'}), el('dd', {text: when(s.resumed_at) + ' · pauses itself after ' + data.auto_pause_h + ' h (Resume starts it again)'})])]));
+      // settings
+      var cfg = {rate: s.rate, late_pct: s.late_pct, late_max: s.late_max, late_pattern: s.late_pattern};
+      var save = el('button', {class: 'primary', text: 'Save'}), msg = el('span', {class: 'sub'});
+      on(save, 'click', function () {
+        save.disabled = true; msg.textContent = '';
+        api('POST', '/api/pubsub/set', Object.assign({id: s.id}, cfg)).then(load)
+          .then(function () { msg.className = 'sub ok'; msg.textContent = '✓ saved — applies within seconds'; })
+          .catch(function (e) { msg.className = 'sub bad'; msg.textContent = e.message; })
+          .then(function () { save.disabled = false; });
+      });
+      main.appendChild(card([el('h3', {text: 'Settings'}), el('div', {class: 'form'}, settingsForm(cfg)),
+        el('div', {class: 'actions', style: 'margin-top:14px'}, [save, msg])]));
+      // peek
+      var body = el('tbody'), info = el('div', {class: 'sub muted'}), only = false, lastP = null;
+      var which = seg([[false, 'All'], [true, '🕓 Late only']], false, function (v) { only = v; if (lastP) paint(lastP); });
+      main.appendChild(card([el('div', {class: 'head'}, [el('h3', {text: '👀 Peek — the last events sent'}), el('div', {class: 'actions'}, [info, which])]),
+        el('table', {class: 'lst peek'}, [el('thead', {}, [el('tr', {}, ['Published', 'Partition · offset', 'Key', 'Event', 'event_time', 'Late'].map(function (h) { return el('th', {text: h}); }))]), body]),
+        help('Newest first. Click an event for its JSON. 🕓 = more than ' + data.late_after_s + ' s between event_time and publish_time.')]));
+      function paint(p) {
+        lastP = p;
+        st.replaceChildren(status(p)); sent.textContent = sentText(p);
+        var list = only ? p.recent_late : p.recent;
+        info.textContent = list.length ? 'refreshes every 2 s' : '';
+        if (!list.length) return body.replaceChildren(el('tr', {}, [el('td', {colspan: 6, class: 'muted', text: !p.ready ? 'Making the topic…'
+          : only ? (p.late_pct ? 'No late event yet — they come after a delay (up to ' + data.late_max[p.late_max] + ').' : 'Late events are off for this stream (Settings).')
+          : 'Nothing sent yet — events appear here within seconds.'})]));
+        var rows = [];
+        list.forEach(function (r) {
+          var e = r.event, late = r.late_s > data.late_after_s, k = e.event_id;
+          var tr = on(el('tr', {class: 'ev' + (late ? ' late' : '')}, [
+            el('td', {class: 'mono', text: clock(e.publish_time)}),
+            el('td', {class: 'mono', text: r.partition + ' · ' + r.offset}),
+            el('td', {class: 'mono', text: r.key}),
+            el('td', {text: e.event_type}),
+            el('td', {class: 'mono', text: clock(e.event_time)}),
+            el('td', {}, [late ? el('span', {class: 'tag', text: '🕓 +' + dur(r.late_s)}) : el('span', {class: 'muted', text: dur(r.late_s)})])]), 'click', function () {
+            if (open[k]) delete open[k]; else open[k] = 1;
+            paint(p);
+          });
+          rows.push(tr);
+          if (open[k]) rows.push(el('tr', {}, [el('td', {colspan: 6}, [el('pre', {text: JSON.stringify(e, null, 2)})])]));
+        });
+        body.replaceChildren.apply(body, rows);
+      }
+      function peek() { return api('GET', '/api/pubsub/peek?id=' + id).then(paint); }
+      peek().catch(function (e) { alert_(e.message); });
+      every(2000, peek);
+    }
+
+    window.addEventListener('hashchange', route);
+    load().then(route).catch(function (e) { main.innerHTML = ''; main.appendChild(el('div', {class: 'card result err'}, [el('div', {text: e.message})])); });
+  </script>
+</body>
+</html>

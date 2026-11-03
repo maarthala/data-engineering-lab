@@ -80,6 +80,7 @@ services:
       - ../common/dockerfiles/add/labvault.py:/app/labvault.py:ro
       - ../common/dockerfiles/add/labexams.py:/app/labexams.py:ro
       - ../common/dockerfiles/add/labcdc.py:/app/labcdc.py:ro
+      - ../common/dockerfiles/add/labpubsub.py:/app/labpubsub.py:ro
       - ../common/dockerfiles/add/labmaint.py:/app/labmaint.py:ro
       - ../common/dockerfiles/add/labgov.py:/app/labgov.py:ro
       - ../common/dockerfiles/add/labdb.py:/app/labdb.py:ro

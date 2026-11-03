@@ -84,6 +84,10 @@ go (leaving = pause), the review comes after submitting. Changes need the X-Lab-
   POST   /api/cdc/jobs {"name", "source", "destination", "discover", "tables", "mode", "schedule"}
          …/jobs/run · …/jobs/delete {"id"} · …/jobs/set {"id", "enabled"?, "schedule"?}
   GET    /api/cdc/task?id=… · /api/cdc/runs?job=… · /api/cdc/run?id=… (its log)
+"📨 Pub/Sub" — a member's event streams (labpubsub.py; event-sim publishes them to Kafka):
+  GET    /api/pubsub                                     my streams + the choices · /api/pubsub/peek?id=… (last events)
+  POST   /api/pubsub {"name", "kind", "rate", "late_pct", "late_max", "late_pattern"}
+         …/pubsub/set {"id", "rate"?, "late_*"?, "state"?: running|paused} · …/pubsub/delete {"id"}
 Managers (/api/admin/exams…, X-Lab-Admin): create an exam; add encrypted banks + their key to it
 (decrypted here, the key isn't kept), a link or a plain file, or a plain exam.json; set
 questions / pass mark / who may take it; delete.
@@ -130,6 +134,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import labadmin
 import labcdc
+import labpubsub
 import labmaint
 import labgov
 import labdb
@@ -447,6 +452,34 @@ class Handler(BaseHTTPRequestHandler):
         except PermissionError as e:
             return self._json(403, {"error": str(e)})
         except (labcdc.CdcError, ValueError, TypeError) as e:
+            return self._json(400, {"error": str(e)})
+
+    def _pubsub(self, method):
+        """📨 Pub/Sub — /api/pubsub*, always the logged-in member's own streams (labpubsub.py)."""
+        path, q = self._route()
+        user = self._user()
+        if not user:
+            return self._json(401, {"error": "not logged in"})
+        name = lake_name(user)
+        try:
+            if method == "GET":
+                if path == "/api/pubsub":
+                    return self._json(200, dict(labpubsub.overview(name), manager=self._manager(), me=name))
+                if path == "/api/pubsub/peek":
+                    return self._json(200, labpubsub.peek(name, q.get("id", "0")))
+                return self._json(404, {"error": "not found"})
+            if method != "POST":
+                return self._json(404, {"error": "not found"})
+            if self.headers.get("X-Lab-Request") != "1":
+                return self._json(403, {"error": "missing X-Lab-Request header"})
+            b = self._body()
+            calls = {"/api/pubsub": lambda: labpubsub.create(name, b),
+                     "/api/pubsub/set": lambda: labpubsub.update(name, b.get("id", 0), b),
+                     "/api/pubsub/delete": lambda: labpubsub.delete(name, b.get("id", 0))}
+            if path not in calls:
+                return self._json(404, {"error": "not found"})
+            return self._json(200, calls[path]())
+        except (labpubsub.PubSubError, ValueError, TypeError) as e:
             return self._json(400, {"error": str(e)})
 
     def _databases(self, method):
@@ -874,6 +907,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._exams(method)
         if self.path.startswith("/api/cdc"):
             return self._cdc(method)
+        if self.path.startswith("/api/pubsub"):
+            return self._pubsub(method)
         if self.path.startswith("/api/databases"):
             return self._databases(method)
         if self.path.startswith("/api/notebook"):
@@ -904,6 +939,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._exams("GET")
         if self.path.startswith("/api/cdc"):
             return self._cdc("GET")
+        if self.path.startswith("/api/pubsub"):
+            return self._pubsub("GET")
         if self.path.startswith("/api/databases"):
             return self._databases("GET")
         if self.path == "/api/notebook":

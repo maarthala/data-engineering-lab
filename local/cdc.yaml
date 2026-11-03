@@ -145,6 +145,29 @@ services:
     networks:
       - sparknet
 
+  # 📨 Pub/Sub: publishes every member's event streams (clicks, orders, payments, stock moves — some
+  # late, if a stream asks) to their Kafka topics; part of the Streaming unit, like Kafka itself
+  event-sim:
+    build:
+      context: ../common/dockerfiles
+      dockerfile: Dockerfile.cdc-runner
+    container_name: event-sim
+    profiles: ["streaming"]
+    command: ["python", "/app/event_sim.py"]
+    environment:
+      PORTAL_DB_URL: postgresql://portal:portal@postgres:5432/portal
+      KAFKA_BOOTSTRAP: kafka:9092
+      EVENT_SIM_SHOP_DB: postgresql://reader:reader@lab-db:5432/shop    # Tidewell's customers, products, stores
+    volumes:
+      - ../common/dockerfiles/add/event_sim.py:/app/event_sim.py:ro
+      - ../common/dockerfiles/add/labpubsub.py:/app/labpubsub.py:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - sparknet
+
 volumes:
   lab-db-data:
   kafka-data:

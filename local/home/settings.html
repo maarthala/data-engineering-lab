@@ -8,7 +8,7 @@
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=17"></script>
+  <script src="/lab-header.js?v=18"></script>
   <main id="main">
     <div class="placeholder">Loading…</div>
   </main>
@@ -62,7 +62,9 @@
       ['jupyter_cpu', 'Jupyter CPU', 'cores', 0.25, 'Per member. Applies when their server next starts.'],
       ['quota_mb', 'Member bucket size', 'MB', 10,
        'Each member\'s files and tables (<user>-lake). Applies to every member at once; a member already above it can only delete until they are under.'],
-      ['team_quota_mb', 'Team bucket size', 'MB', 50, 'Each team\'s bucket (team-<team>-lake). Applies to every team at once.']];
+      ['team_quota_mb', 'Team bucket size', 'MB', 50, 'Each team\'s bucket (team-<team>-lake). Applies to every team at once.'],
+      ['pubsub_streams', '📨 Pub/Sub streams', 'per member', 1, 'How many event streams a member may have. 0 = none.'],
+      ['pubsub_rate', '📨 Pub/Sub rate', 'events / s', 1, 'The most events a second one stream may send. Streams already above it keep their rate.']];
 
     function limitsCard(r) {
       var inputs = {}, save = el('button', {class: 'primary', text: 'Save'});

@@ -689,6 +689,11 @@ def delete(user):
         labcdc.forget(name)
     except Exception as e:  # noqa: BLE001
         print(f"[labadmin] cdc {user}: {e}", flush=True)
+    try:                                                 # their 📨 Pub/Sub streams (event-sim drops the topics)
+        import labpubsub
+        labpubsub.forget(name)
+    except Exception as e:  # noqa: BLE001
+        print(f"[labadmin] pubsub {user}: {e}", flush=True)
     try:                                                 # their own PostgreSQL databases and login
         import labdb
         labdb.forget(name)

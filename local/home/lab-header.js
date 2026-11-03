@@ -9,6 +9,7 @@
   function url(sub, unusedPort, path) { return 'http://' + sub + '.' + location.host + (path || ''); }
   var TOOLS = window.LAB_TOOLS = {
     sync:       {name: 'Ingestion', what: 'Copy tables from your databases (CDC, OLake)', page: '/cdc.html'},   // a portal page
+    pubsub:     {name: 'Pub/Sub', what: 'Event streams on Kafka topics of your own (clicks, orders…)', page: '/pubsub.html'},
     jupyter:    {name: 'Notebooks', what: 'Jupyter', svc: 'jupyter', url: url('jupyter', 8008)},
     sqlpad:     {name: 'SQL editor', what: 'SQLPad', svc: 'sqlpad', url: url('sqlpad', 8003, '/auth/oidc')},
     airflow:    {name: 'Pipelines', what: 'Airflow', svc: 'airflow', url: url('airflow', 8001)},
@@ -24,6 +25,7 @@
     secrets: '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/>',
     databases: '<ellipse cx="12" cy="5.5" rx="7.5" ry="2.5"/><path d="M4.5 5.5v13c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5v-13M4.5 12c0 1.4 3.4 2.5 7.5 2.5s7.5-1.1 7.5-2.5"/>',
     sync: '<path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/>',
+    pubsub: '<circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="5" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M7.5 12H12M12 12l4.8-5.6M12 12l4.8 5.6"/>',
     exams: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1M9 11l2 2 4-4M9 17h6"/>',
     jupyter: '<path d="M4 5a1 1 0 0 1 1-1h11l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M8 13l2 2-2 2M12 17h4"/>',
     sqlpad: '<path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 6l-3 12"/>',
