@@ -233,6 +233,17 @@
       });
     }
     function show() { load().then(draw, function () {}); }
+    // reload the data and update only what changes (`apply`) — no redraw: scroll, open logs and
+    // what you're typing stay as they are. Stops when you've gone to another screen.
+    function refresh(page, apply, ms) {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        var here = function () { return (location.hash.slice(1) || 'jobs') === page; };
+        api('GET', '/api/cdc').then(function (d) { if (here()) { data = d; apply(); } })
+          .catch(function () { if (here()) refresh(page, apply, 10000); });
+      }, ms);
+    }
+    function swap(box, node) { box.innerHTML = ''; box.appendChild(node); }
     function draw() {
       clearTimeout(timer);
       var r = route(), page = r[0], id = r[1];
@@ -265,7 +276,8 @@
       main.appendChild(el('div', {class: 'toolbar'}, [tabs, on(el('button', {class: 'primary', text: add[0]}), 'click', add[1])]));
       showFlash();
       main.appendChild({jobs: jobList, sources: sourceList, destinations: destList}[tab]());
-      if (data.jobs.some(function (j) { return j.busy || streaming(j); }) || Object.keys(busy).length) timer = setTimeout(show, 5000);
+      if (tab === 'jobs') return liveJobs(location.hash.slice(1) || 'jobs');
+      if (Object.keys(busy).length) timer = setTimeout(show, 5000);
     }
     function table(heads, body) {
       return el('div', {class: 'wrap'}, [el('table', {class: 'lst'}, [el('thead', {}, [el('tr', {}, heads.map(function (h) {
@@ -299,7 +311,22 @@
         el('div', {class: 'sub muted', text: (r.status === 'ok' && r.records !== null ? r.records + ' rows · ' : '') + when(r.finished_at)})]);
     }
 
+    var cells = {};                                   // the jobs table's live cells: r<id> runs, s<id> status
+    function jobKeys() { return data.jobs.map(function (j) { return [j.id, j.schedule, j.enabled].join(':'); }).join(','); }
+    function liveJobs(page) {
+      if (!data.jobs.some(function (j) { return j.busy || streaming(j) || runType(j.schedule) === 'cron'; })) return;
+      var keys = jobKeys();
+      refresh(page, function () {
+        if (jobKeys() !== keys) return draw();             // a job added, removed or changed: the whole list
+        data.jobs.forEach(function (j) {
+          if (cells['s' + j.id]) swap(cells['s' + j.id], last(j));
+          if (cells['r' + j.id]) swap(cells['r' + j.id], runLabel(j));
+        });
+        liveJobs(page);
+      }, 5000);
+    }
     function jobList() {
+      cells = {};
       if (!data.jobs.length) return empty('📡', 'No jobs yet', 'A job copies tables from a source into a destination — once, on a schedule, or as a live data stream.',
         on(el('button', {class: 'primary', text: '+ New job'}), 'click', function () { wiz = null; go('new-job'); }));
       var body = el('tbody');
@@ -314,7 +341,7 @@
           el('td', {}, [link(j.name, 'job/' + j.id, 'name'), el('div', {class: 'sub muted', text: j.engine === 'debezium' ? 'Debezium' : 'OLake'})]),
           el('td', {}, [el('div', {text: j.source_name}), el('div', {class: 'sub muted', text: '→ ' + j.dest_name})]),
           el('td', {title: j.tables.join(', '), text: j.tables.length === 1 ? j.tables[0] : j.tables.length + ' tables'}),
-          el('td', {text: MODE[j.mode]}), el('td', {}, [runLabel(j)]), el('td', {}, [last(j)]),
+          el('td', {text: MODE[j.mode]}), cells['r' + j.id] = el('td', {}, [runLabel(j)]), cells['s' + j.id] = el('td', {}, [last(j)]),
           el('td', {class: 'acts'}, [runNow, on(el('button', {class: 'small', text: 'Open'}), 'click', function () { go('job/' + j.id); })])]));
       });
       return card([table(['Job', 'Source → destination', 'Tables', 'Mode', 'Runs', 'Status', ''], body)]);
@@ -599,7 +626,8 @@
         });
       });
       var d = byId(data.destinations, j.destination);
-      main.appendChild(card([el('div', {class: 'head'}, [el('span', {class: 'actions'}, [el('h3', {text: j.name}), last(j)]),
+      var statusBox = el('span', {}, [last(j)]), runsLabel = el('dd', {}, [runLabel(j)]);
+      main.appendChild(card([el('div', {class: 'head'}, [el('span', {class: 'actions'}, [el('h3', {text: j.name}), statusBox]),
           el('span', {class: 'actions'}, [runNow, toggle, del])]),
         el('dl', {class: 'facts'}, [
           el('dt', {text: 'From'}), el('dd', {}, [link(j.source_name, 'source/' + j.source)]),
@@ -607,7 +635,7 @@
             document.createTextNode(d ? '  —  ' + d.catalog + '.' + (d.namespace || '<database>_<schema>') : '')]),
           el('dt', {text: 'Tables (' + j.tables.length + ')'}), el('dd', {text: j.tables.join(', ')}),
           el('dt', {text: 'Mode'}), el('dd', {text: MODE[j.mode]}),
-          el('dt', {text: 'Runs'}), el('dd', {}, [runLabel(j)]),
+          el('dt', {text: 'Runs'}), runsLabel,
           el('dt', {text: 'Engine'}), el('dd', {class: 'muted', text: j.engine === 'debezium' ? 'Debezium + Kafka' : 'OLake'})])]));
       // change how it runs
       var st = {type: runType(j.schedule), cron: runType(j.schedule) === 'cron' ? j.schedule : '*/15 * * * *'}, msg = el('div');
@@ -621,19 +649,43 @@
           .catch(function (e) { save.disabled = false; msg.appendChild(note(e.message, 'bad')); });
       });
       main.appendChild(card([el('h3', {text: 'How it runs'}), picker, el('div', {class: 'navbtns'}, [el('span'), save]), msg], 'narrow'));
+      var live = null;
+      function loadLog(k) {                            // new text only; follows the end unless you've scrolled up
+        api('GET', '/api/cdc/run?id=' + k.last.id).then(function (x) {
+          var text = (x.error ? 'Error: ' + x.error + '\n\n' : '') + (x.log || '(nothing yet)');
+          if (text === live.textContent) return;
+          var atEnd = live.scrollTop + live.clientHeight >= live.scrollHeight - 30;
+          live.textContent = text;
+          if (atEnd) live.scrollTop = live.scrollHeight;
+        }).catch(function (e) { live.textContent = e.message; });
+      }
       if (stream && j.last && j.last.trigger === 'stream') {   // the stream's own log, kept up to date by the lab
-        var live = el('pre', {class: 'log', text: 'Loading…'});
+        live = el('pre', {class: 'log', text: 'Loading…'});
         main.appendChild(card([el('div', {class: 'head', style: 'margin-bottom:0'}, [el('h3', {text: 'Log'}),
           el('span', {class: 'sub muted', text: streaming(j) ? 'updates every few seconds' : 'the last stream'})]), live]));
-        api('GET', '/api/cdc/run?id=' + j.last.id).then(function (x) {
-          live.textContent = (x.error ? 'Error: ' + x.error + '\n\n' : '') + (x.log || '(nothing yet)');
-          live.scrollTop = live.scrollHeight;
-        }).catch(function (e) { live.textContent = e.message; });
+        loadLog(j);
+        setTimeout(function () { live.scrollTop = live.scrollHeight; }, 400);
       }
       var runsBox = el('div');
       main.appendChild(card([el('h3', {text: 'Runs'}), runsBox]));
       showRuns(j, runsBox);
-      if (j.busy || streaming(j)) timer = setTimeout(show, j.busy ? 4000 : 8000);
+      // keep it current in place: the status, the log, and the runs when a run starts or ends
+      var page = location.hash.slice(1) || 'jobs', seen = j.last ? j.last.id + ':' + j.last.status : '';
+      function tick(ms) {
+        refresh(page, function () {
+          var k = byId(data.jobs, j.id);
+          if (!k) return go('jobs');
+          if (k.schedule !== j.schedule || k.enabled !== j.enabled) return draw();   // switched (here or elsewhere)
+          swap(statusBox, last(k)); swap(runsLabel, runLabel(k));
+          runNow.disabled = !!k.busy;
+          var now = k.last ? k.last.id + ':' + k.last.status : '';
+          if (now !== seen) { seen = now; runsBox.innerHTML = ''; showRuns(k, runsBox); }
+          if (live && k.last && k.last.trigger === 'stream') loadLog(k);
+          tick(every(k));
+        }, ms);
+      }
+      function every(x) { return x.busy ? 4000 : streaming(x) ? 5000 : 15000; }
+      tick(every(j));
     }
     function showRuns(j, box) {
       box.appendChild(note('Loading…'));
