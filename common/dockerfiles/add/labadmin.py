@@ -827,6 +827,33 @@ def _member_servers():
     return sorted(u["name"] for u in users or [] if u.get("servers")) if st == 200 else []
 
 
+FLINK_URL = os.environ.get("LAB_FLINK_URL", "http://flink-jobmanager:8081")
+
+
+def flink():
+    """⚙️ Settings → Flink cluster: the size a manager set (TaskManagers × slots), the memory that
+    takes, and what Flink reports now (None while the Flink unit is off)."""
+    cfg = lh.lab_settings()
+    tms, slots = cfg["flink_taskmanagers"], cfg["flink_slots"]
+    live = None
+    try:
+        with urllib.request.urlopen(f"{FLINK_URL}/overview", timeout=3) as r:
+            o = json.loads(r.read())
+        live = {k: o.get(k) for k in ("taskmanagers", "slots-total", "slots-available", "jobs-running")}
+    except (OSError, ValueError):
+        pass
+    return {"taskmanagers": tms, "slots": slots, "total": tms * slots, "memory_mb": lh.flink_memory_mb(slots),
+            "limits": {k: [lo, hi] for k, (_, lo, hi, _) in lh.SETTINGS.items() if k.startswith("flink_")},
+            "control": "k8s" if ON_K8S else "local", "live": live}
+
+
+def set_flink(taskmanagers, slots):
+    """A new size for the Flink cluster. Locally make status applies it (s on the Flink unit, Docker
+    isn't the portal's to drive); k8s: the chart's TaskManager Deployment, when that's there."""
+    lh.save_lab_settings(flink_taskmanagers=taskmanagers, flink_slots=slots)
+    return dict(flink(), applied=False)
+
+
 def services():
     """⚙️ Settings → Services: {control: "k8s" | "make status", units: [{unit, workloads, state
     (on · off · starting · stopping · partly), needs}], jupyter_servers: [members with Jupyter open]}."""

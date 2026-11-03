@@ -24,7 +24,7 @@
     var tab = admin.tabs([['general', 'General'], ['services', 'Services'], ['version', 'Lab version']], function (t) { tab = t; render(); });
     function render() {
       if (!cfg) return;
-      admin.fill(tab === 'services' ? [servicesCard()] : tab === 'version' ? [versionCard()]
+      admin.fill(tab === 'services' ? [servicesCard(), flinkCard()] : tab === 'version' ? [versionCard()]
                  : [registrationCard(cfg.registration), limitsCard(cfg)]);
     }
 
@@ -107,6 +107,55 @@
     }
 
     var WORD = {on: '● on', off: '○ off', starting: '◐ starting…', stopping: '◐ stopping…', partly: '◐ partly on'};
+    // ---- the Flink unit's size: TaskManagers × slots each = how many parallel copies a Beam job can run
+    function flinkCard() {
+      var card = el('div', {class: 'card', style: 'margin-top:14px'}, [el('h3', {text: 'Flink cluster'}), el('div', {class: 'sub', text: 'Loading…'})]);
+      function opts(lo, hi, v) {
+        var s = el('select', {});
+        for (var i = lo; i <= hi; i++) s.appendChild(el('option', {value: i, text: String(i)}));
+        s.value = String(v); return s;
+      }
+      function gb(mb) { return (Math.round(mb / 102.4) / 10) + ' GB'; }
+      function draw(f) {
+        var tms = opts(f.limits.flink_taskmanagers[0], f.limits.flink_taskmanagers[1], f.taskmanagers),
+            slots = opts(f.limits.flink_slots[0], f.limits.flink_slots[1], f.slots),
+            sum = el('div', {class: 'sub', style: 'margin-top:8px'}), save = el('button', {class: 'primary', text: 'Save'});
+        function paint() {
+          var t = +tms.value, sl = +slots.value, mb = 1024 + 256 * sl;
+          sum.textContent = '= ' + t * sl + ' slots: a Beam job runs up to ' + t * sl + ' parallel copies of each step · ' +
+            gb(mb) + ' per TaskManager, ' + gb(mb * t) + ' for all of them (+ about 1.5 GB for the JobManager and Beam\'s job server)';
+          save.disabled = t === f.taskmanagers && sl === f.slots;
+        }
+        tms.addEventListener('change', paint); slots.addEventListener('change', paint); paint();
+        save.addEventListener('click', function () {
+          save.disabled = true;
+          admin.api('POST', '/api/admin/flink', {taskmanagers: +tms.value, slots: +slots.value}).then(function (r) {
+            admin.show('Saved: ' + r.taskmanagers + ' TaskManagers × ' + r.slots + ' slots', [r.control === 'local'
+              ? 'Apply it in the terminal: make status → select Flink → s (when Flink is on: its TaskManagers restart with the new size, running jobs with them).'
+              : 'It applies the next time the Flink unit starts.']);
+            draw(r);
+          }).catch(function (e) { save.disabled = false; admin.show('Not saved', [e.message], null, true); });
+        });
+        var l = f.live;
+        var now = l ? 'Now: ' + l.taskmanagers + ' TaskManager' + (l.taskmanagers === 1 ? '' : 's') + ' · ' + l['slots-total'] + ' slots (' +
+                      l['slots-available'] + ' free) · ' + l['jobs-running'] + ' job' + (l['jobs-running'] === 1 ? '' : 's') + ' running'
+                    : 'The Flink unit is off (Services, above) — the size applies when it starts.';
+        var differs = l && (l.taskmanagers !== f.taskmanagers || l['slots-total'] !== f.total);
+        card.replaceChildren(el('h3', {text: 'Flink cluster'}),
+          el('div', {class: 'sub', text: 'Apache Beam jobs on the Flink unit (lab_beam("flink", parallelism=…)) run in its slots: each TaskManager is one container with its slots, ' +
+            'each slot one parallel copy of a job\'s steps. More slots: more parallel work, and more memory.'}),
+          el('div', {class: 'row', style: 'margin-top:12px; gap:10px; align-items:center'}, [
+            el('label', {text: 'TaskManagers'}), tms, el('span', {text: '×'}), el('label', {text: 'slots each'}), slots, save]),
+          sum,
+          el('div', {class: 'sub', style: 'margin-top:8px' + (differs ? '; color:var(--bad-ink)' : ''),
+            text: now + (differs ? ' — not the saved size yet' + (f.control === 'local' ? ': make status → Flink → s applies it' : '') : '')}));
+      }
+      admin.api('GET', '/api/admin/flink').then(draw).catch(function (e) {
+        card.replaceChildren(el('h3', {text: 'Flink cluster'}), el('div', {class: 'sub', text: e.message}));
+      });
+      return card;
+    }
+
     function servicesCard() {
       var card = el('div', {class: 'card', style: 'margin-top:14px'}, [el('h3', {text: 'Services'}),
                                                                       el('div', {class: 'sub', text: 'Loading…'})]);

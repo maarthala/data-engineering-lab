@@ -48,6 +48,7 @@ from the browser can point at another bucket.
                                        self-registration on the sign-in page + lakehouse.SETTINGS (any of them)
   GET    /api/admin/teams · /api/admin/people            the teams (members, bucket use) · who is where
   GET    /api/admin/services · POST {"unit", "on"}       ⚙️ Settings → Services: units' state; k8s: on/off
+  GET    /api/admin/flink · POST {"taskmanagers", "slots"}   ⚙️ Settings → Flink cluster (its size; live overview)
   POST   /api/admin/{team-create|team-delete} {"team"} · /api/admin/move {"user", "team"}
          /api/admin/team-add {"team", "users": [...]} · /api/admin/team-remove {"users": [...]}  → {"job": id}
 
@@ -846,6 +847,19 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, labadmin.settings())
             if method == "GET" and path == "/api/admin/services":
                 return self._json(200, labadmin.services())
+            if method == "GET" and path == "/api/admin/flink":
+                return self._json(200, labadmin.flink())
+            if method == "POST" and path == "/api/admin/flink":
+                if self.headers.get("X-Lab-Admin") != "1":
+                    return self._json(403, {"error": "missing X-Lab-Admin header"})
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(length) or b"{}") if length else {}
+                try:
+                    r = labadmin.set_flink(body.get("taskmanagers"), body.get("slots"))
+                except ValueError as e:
+                    return self._json(400, {"error": str(e)})
+                print(f"[home-api] manager {user}: Flink {r['taskmanagers']} × {r['slots']} slots", flush=True)
+                return self._json(200, r)
             if method == "GET" and path == "/api/admin/teams":
                 return self._json(200, {"teams": labadmin.teams()})
             if method == "GET" and path == "/api/admin/people":

@@ -1,0 +1,28 @@
+# flink-taskmanager — a Flink 1.20 TaskManager with Apache Beam's Python worker inside (the Flink unit):
+# Beam pipelines' Python code runs next to each TaskManager, so compose (or k8s) can run any number
+# of TaskManagers — one container each, `--scale` / replicas. The worker pool listens on
+# localhost:50000 (lab_beam("flink") asks for environment EXTERNAL localhost:50000).
+# Python 3.10 + apache-beam[aws] 2.77.0: the same as Jupyter (a pipeline's code runs on both).
+#   docker build -f common/dockerfiles/Dockerfile.flink-taskmanager -t <ref> common/dockerfiles
+FROM apache/beam_python3.10_sdk:2.77.0 AS beam
+FROM flink:1.20.5-scala_2.12-java17
+RUN apt-get update && apt-get install -y --no-install-recommends python3.10 python3-pip \
+ && ln -sf /usr/bin/python3.10 /usr/local/bin/python && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN python3.10 -m pip install --no-cache-dir "apache-beam[aws]==2.77.0"
+# the worker runs in this Python (everything is installed), not a fresh venv per job (no python3-venv here)
+ENV RUN_PYTHON_SDK_IN_DEFAULT_ENVIRONMENT=1
+COPY --from=beam /opt/apache/beam /opt/apache/beam
+# A Beam worker logs the pipeline's options (with the member's storage key) through Flink's log —
+# which the Flink UI shows everyone: those lines are dropped before the console and the log file.
+RUN for a in console rolling; do printf '%s\n' \
+      "appender.$a.filter.secrets.type = RegexFilter" \
+      "appender.$a.filter.secrets.regex = (?s).*(Pipeline_options|pipeline_options|secret_access_key|s3SecretAccessKey).*" \
+      "appender.$a.filter.secrets.onMatch = DENY" \
+      "appender.$a.filter.secrets.onMismatch = NEUTRAL" >> /opt/flink/conf/log4j-console.properties; done \
+ && printf '%s\n' "rootLogger.filter.secrets.type = RegexFilter" \
+      "rootLogger.filter.secrets.regex = (?s).*(Pipeline_options|pipeline_options|secret_access_key|s3SecretAccessKey).*" \
+      "rootLogger.filter.secrets.onMatch = DENY" "rootLogger.filter.secrets.onMismatch = NEUTRAL" \
+      >> /opt/flink/conf/log4j-console.properties
+COPY add/flink-taskmanager-entrypoint.sh /lab-entrypoint.sh
+ENTRYPOINT ["/lab-entrypoint.sh"]
+CMD ["taskmanager"]

@@ -1,82 +1,68 @@
 # The Flink unit (off until needed: make status → Flink → s) — a small Flink cluster for Apache Beam
 # pipelines with more than one slot (like Dataflow's workers), and its UI at flink.lab.localhost:8000.
-#  flink-jobmanager      the coordinator: plans each job, places its subtasks in slots, checkpoints; the UI
-#  flink-taskmanager-N   the workers, 2 slots each (2 × 2 = 4 parallel copies of a pipeline's steps)
-#  beam-worker-N         Beam's Python worker next to each TaskManager (same network): runs the
-#                        pipeline's Python code (Map, DoFn …) for that TaskManager's slots
-#  beam-job-server       takes a Beam pipeline from a notebook (PortableRunner) and turns it into a Flink job
+#  flink-jobmanager    the coordinator: plans each job, places its subtasks in slots, checkpoints; the UI
+#  flink-taskmanager   the workers — FLINK_TASKMANAGERS of them, FLINK_SLOTS slots each (2 × 2 = 4
+#                      parallel copies of a pipeline's steps). Each one also runs Beam's Python worker
+#                      (Dockerfile.flink-taskmanager), which runs the pipeline's Python code (Map, DoFn …)
+#  beam-job-server     takes a Beam pipeline from a notebook (PortableRunner) and turns it into a Flink job
+# The sizes are a lab manager's (⚙️ Settings → Flink cluster); make status passes them in when it starts
+# the unit (FLINK_TASKMANAGERS, FLINK_SLOTS, FLINK_TM_MEMORY — defaults below).
 # Without this unit, Beam still runs in Jupyter on its local runner (Prism) — one machine, no slots.
-x-flink: &flink
-  image: flink:1.20.5-scala_2.12-java17
-  profiles: ["flink"]
-  restart: unless-stopped
-  networks:
-    - sparknet
-  volumes:
-    - flink-data:/opt/flink/data              # checkpoints, shared by the JobManager and the TaskManagers
 
-# (Flink's own settings: no comments inside — they'd become part of a value.) Network memory 128 MB:
-# Beam's shuffles between 4 parallel copies need more than the default 64 MB.
-x-flink-conf: &flink-conf |
+# Flink's own settings — no comments inside (they'd become part of a value). The JobManager's don't
+# name the TaskManagers' sizes, so resizing them doesn't restart it. A TaskManager's memory is
+# 1024 MB + 256 MB per slot (make status works it out; less fails Flink's memory check). Network memory 128 MB:
+# Beam's shuffles between parallel copies need more than the default 64 MB.
+x-jm-conf: &jm-conf |
   jobmanager.rpc.address: flink-jobmanager
   jobmanager.memory.process.size: 768m
-  taskmanager.memory.process.size: 1280m
-  taskmanager.memory.network.min: 128mb
-  taskmanager.memory.network.max: 128mb
-  taskmanager.numberOfTaskSlots: 2
   parallelism.default: 2
   state.checkpoints.dir: file:///opt/flink/data/checkpoints
   state.savepoints.dir: file:///opt/flink/data/savepoints
   web.submit.enable: false
   web.cancel.enable: false
 
-x-beam-worker: &beam-worker
-  build:                                       # Apache's Beam 2.77.0 / Python 3.10 worker + boto3 (s3://)
-    context: ../common/dockerfiles
-    dockerfile: Dockerfile.beam-worker
-  image: local-beam-worker
-  profiles: ["flink"]
-  entrypoint: ["/opt/apache/beam/boot", "--worker_pool"]
-  restart: unless-stopped
+x-tm-conf: &tm-conf |
+  jobmanager.rpc.address: flink-jobmanager
+  taskmanager.memory.process.size: ${FLINK_TM_MEMORY:-1536m}
+  taskmanager.memory.network.min: 128mb
+  taskmanager.memory.network.max: 128mb
+  taskmanager.numberOfTaskSlots: ${FLINK_SLOTS:-2}
+  state.checkpoints.dir: file:///opt/flink/data/checkpoints
 
 services:
   flink-jobmanager:
-    <<: *flink
+    image: flink:1.20.5-scala_2.12-java17
     container_name: flink-jobmanager
     hostname: flink-jobmanager
+    profiles: ["flink"]
     command: jobmanager
     environment:
-      FLINK_PROPERTIES: *flink-conf
+      FLINK_PROPERTIES: *jm-conf
+    volumes:
+      - flink-data:/opt/flink/data              # checkpoints, and the pipelines' files (beam-job-server)
+    restart: unless-stopped
+    networks:
+      - sparknet
 
-  flink-taskmanager-1:
-    <<: *flink
-    container_name: flink-taskmanager-1
-    hostname: flink-taskmanager-1
+  # local-flink-taskmanager-1, -2 … (no container_name: compose numbers them)
+  flink-taskmanager:
+    build:
+      context: ../common/dockerfiles
+      dockerfile: Dockerfile.flink-taskmanager
+    image: local-flink-taskmanager
+    profiles: ["flink"]
     command: taskmanager
     environment:
-      FLINK_PROPERTIES: *flink-conf
+      FLINK_PROPERTIES: *tm-conf
+    deploy:
+      replicas: ${FLINK_TASKMANAGERS:-2}
+    volumes:
+      - flink-data:/opt/flink/data
     depends_on: [flink-jobmanager]
-
-  flink-taskmanager-2:
-    <<: *flink
-    container_name: flink-taskmanager-2
-    hostname: flink-taskmanager-2
-    command: taskmanager
-    environment:
-      FLINK_PROPERTIES: *flink-conf
-    depends_on: [flink-jobmanager]
-
-  beam-worker-1:
-    <<: *beam-worker
-    container_name: beam-worker-1
-    network_mode: "service:flink-taskmanager-1"   # localhost:50000 for its TaskManager
-    depends_on: [flink-taskmanager-1]
-
-  beam-worker-2:
-    <<: *beam-worker
-    container_name: beam-worker-2
-    network_mode: "service:flink-taskmanager-2"
-    depends_on: [flink-taskmanager-2]
+    restart: unless-stopped
+    networks:
+      - sparknet
 
   beam-job-server:
     image: apache/beam_flink1.20_job_server:2.77.0

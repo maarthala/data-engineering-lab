@@ -181,7 +181,14 @@ SETTINGS = {           # name: (default, lowest, highest, type)
     "jupyter_cpu": (float(os.environ.get("SINGLEUSER_CPU", "1")), 0.25, 8, float),
     "pubsub_streams": (3, 0, 20, int),           # 📨 Pub/Sub: streams per member
     "pubsub_rate": (20, 1, 100, int),            # … and the most events a second one may send
+    "flink_taskmanagers": (2, 1, 4, int),        # the Flink unit: its TaskManagers …
+    "flink_slots": (2, 1, 4, int),               # … and slots each (parallel copies = the two multiplied)
 }
+
+
+def flink_memory_mb(slots):
+    """A Flink TaskManager's memory for `slots` slots (less fails Flink's memory check)."""
+    return 1024 + 256 * int(slots)
 _settings_cache = (0.0, None)
 
 

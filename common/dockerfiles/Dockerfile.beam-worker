@@ -1,6 +1,0 @@
-# beam-worker — Beam's Python worker for the Flink unit (one next to each TaskManager, --worker_pool):
-# it runs a pipeline's Python code. Apache's image + Beam's [aws] extra (boto3), so pipelines read and
-# write s3:// in the lake. Same Beam / Python as the Jupyter image (apache-beam[aws]==2.77.0, 3.10).
-#   docker build -f common/dockerfiles/Dockerfile.beam-worker -t <ref> common/dockerfiles
-FROM apache/beam_python3.10_sdk:2.77.0
-RUN pip install --no-cache-dir "apache-beam[aws]==2.77.0"

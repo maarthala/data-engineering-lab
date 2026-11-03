@@ -52,8 +52,7 @@ GROUPS = [
     ("Airflow", ["airflow-init", "airflow-apiserver", "airflow-scheduler", "airflow-dag-processor", "airflow-dag-processor-learners"]),
     ("Superset", ["superset"]),
     ("Streaming", ["kafka", "kafka-connect", "event-sim"]),   # Kafka: 📡 Ingestion (Debezium), 📨 Pub/Sub — when needed
-    ("Flink", ["flink-jobmanager", "flink-taskmanager-1", "flink-taskmanager-2", "beam-worker-1", "beam-worker-2",
-               "beam-job-server"]),                     # Apache Beam on a cluster (slots) — when needed
+    ("Flink", ["flink-jobmanager", "flink-taskmanager", "beam-job-server"]),   # Apache Beam on a cluster (slots) — when needed
 ]
 LOCKED = {"Core"}
 OFF = {"Streaming", "Flink"}                    # make up leaves these off (a compose profile); make status s starts them
@@ -682,8 +681,23 @@ def unit_plan(unit, action):
     return out
 
 
+def flink_env():
+    """The Flink unit's sizes from ⚙️ Settings (home-api has them) → compose's FLINK_* variables
+    (local/flink.yaml); the file's defaults when home-api can't say."""
+    p = subprocess.run(["docker", "exec", "-w", "/app", "home-api", "python", "-c",
+                        "import lakehouse as l, json; s = l.lab_settings(); "
+                        "print(json.dumps([s['flink_taskmanagers'], s['flink_slots'], l.flink_memory_mb(s['flink_slots'])]))"],
+                       capture_output=True, text=True, timeout=30)
+    try:
+        tms, slots, mem = json.loads(p.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return {}
+    return {"FLINK_TASKMANAGERS": str(tms), "FLINK_SLOTS": str(slots), "FLINK_TM_MEMORY": f"{mem}m"}
+
+
 def run_unit(stack, action, units):
-    """status s / x: docker compose up -d / stop for every service of the units (data stays)."""
+    """status s / x: docker compose up -d / stop for every service of the units (data stays).
+    s on a unit that's on applies changes (e.g. the Flink cluster's size from ⚙️ Settings)."""
     svcs = [s for t, g in GROUPS if t in units for s in g if s in stack.names]
     tag = "make status"
     with stack.lock:
@@ -696,6 +710,14 @@ def run_unit(stack, action, units):
             with stack.lock:
                 stack.lines.append((tag, f"removed {m} (a member's Jupyter server — files stay in its volume)"))
     cmd = ["up", "-d"] if action == "start" else ["stop"]
+    env = dict(os.environ)
+    if action == "start" and "Flink" in units:
+        fe = flink_env()
+        env.update(fe)
+        if fe:
+            with stack.lock:
+                stack.lines.append((tag, f"Flink: {fe['FLINK_TASKMANAGERS']} TaskManagers × {fe['FLINK_SLOTS']} slots "
+                                         f"({fe['FLINK_TM_MEMORY']} each) — ⚙️ Settings → Flink cluster"))
     # its own session, output to a file: quitting make status (or it crashing) mustn't kill compose
     # halfway — `up -d` waits for health checks, and services after them would stay "Created"
     os.makedirs(os.path.dirname(UNIT_LOG), exist_ok=True)
@@ -703,7 +725,7 @@ def run_unit(stack, action, units):
         out.write(f"\n== {time.strftime('%H:%M:%S')} {action} {' + '.join(units)} ==\n")
         out.flush()
         start = out.tell()
-        p = subprocess.Popen(["docker", "compose", *ALL, "--progress", "plain", *cmd, *svcs], cwd=HERE,
+        p = subprocess.Popen(["docker", "compose", *ALL, "--progress", "plain", *cmd, *svcs], cwd=HERE, env=env,
                              stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
     with open(UNIT_LOG, errors="replace") as f:
         f.seek(start)
