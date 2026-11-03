@@ -46,6 +46,10 @@ class DbzError(RuntimeError):
     pass
 
 
+class SetupError(DbzError):
+    """The job can't start as it is (e.g. its tables belong to something else): it stops, and says why."""
+
+
 # ---- Kafka Connect's REST API ----------------------------------------------------------------
 def _rest(method, path, body=None, ok404=False):
     req = urllib.request.Request(CONNECT + path, method=method, data=json.dumps(body).encode() if body is not None else None,
@@ -259,17 +263,22 @@ def create_tables(j, s, d):
     c.close()
     st, cfg, token = _polaris(j["member"], "GET", f"config?warehouse={urllib.parse.quote(d['catalog'])}")
     pre = urllib.parse.quote(((cfg or {}).get("overrides") or {}).get("prefix") or (cfg or {}).get("defaults", {}).get("prefix") or d["catalog"])
-    for (sch, tb), (rows, key) in cols.items():
+    todo = []
+    for (sch, tb), (rows, key) in cols.items():          # first: a table there already must be a Debezium job's
         ns = _namespace(s, d, sch)
-        st, _, _ = _polaris(j["member"], "GET", f"{pre}/namespaces/{ns}/tables/{tb}", token=token)
-        if st == 200:
-            continue                                     # there already: the sink adds what's missing
+        st, body, _ = _polaris(j["member"], "GET", f"{pre}/namespaces/{ns}/tables/{tb}", token=token)
+        if st != 200:
+            todo.append((ns, tb, rows, key))
+        elif ((body.get("metadata") or {}).get("properties") or {}).get("lab.cdc") != "debezium":
+            raise SetupError(f"{d['catalog']}.{ns}.{tb} is there already, written by something else (another tool's columns) — "
+                             f"choose a destination with another namespace, or delete that table in My catalogs")
+    for ns, tb, rows, key in todo:
         fields = [{"id": i + 1, "name": n, "required": n in key or bool(nn), "type": _ice_type(t)}
                   for i, (n, t, nn) in enumerate(rows)]
         schema = {"type": "struct", "schema-id": 0, "fields": fields,
                   "identifier-field-ids": [f["id"] for f in fields if f["name"] in key] if j["mode"] == "cdc" else []}
         st, body, _ = _polaris(j["member"], "POST", f"{pre}/namespaces/{ns}/tables", token=token,
-                               body={"name": tb, "schema": schema, "properties": {"format-version": "2"}})
+                               body={"name": tb, "schema": schema, "properties": {"format-version": "2", "lab.cdc": "debezium"}})
         if st not in (200, 409):
             raise DbzError(f"couldn't make {d['catalog']}.{ns}.{tb}: HTTP {st} {(body.get('error') or {}).get('message', '')}")
 
@@ -589,6 +598,13 @@ def reconcile():
                         _rest("POST", f"/connectors/{name}/restart?includeTasks=true&onlyFailed=true")
                 _set_state(j["id"], want, c)
                 _stream_run(j, c)
+        except SetupError as e:                          # it can't start: stop it, and say why on its page
+            _q("UPDATE cdc_jobs SET enabled = false WHERE id = %s", (j["id"],), rows=False)
+            r = _q("UPDATE cdc_runs SET status = 'failed', finished_at = now(), error = %s WHERE job_id = %s AND status = 'running' "
+                   "AND trigger = 'stream' RETURNING id", (str(e), j["id"]), one=True)
+            if not r:
+                _q("INSERT INTO cdc_runs (job_id, member, trigger, status, finished_at, error) VALUES (%s, %s, 'stream', 'failed', now(), %s)",
+                   (j["id"], j["member"], str(e)), rows=False)
         except Exception as e:  # noqa: BLE001 — the next round tries again
             print(f"[cdc] debezium job {j['id']}: {e}", flush=True)
 

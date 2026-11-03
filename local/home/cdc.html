@@ -283,7 +283,9 @@
     function last(j) {                                 // a job's state, as a pill (+ a line under it)
       var r = j.last;
       if (j.schedule === 'stream') {
-        if (!j.enabled) return pill('idle', '■ stopped');
+        if (!j.enabled) return r && r.trigger === 'stream' && r.status === 'failed'
+          ? el('span', {}, [pill('bad', '✗ stopped'), el('div', {class: 'sub bad', title: r.error || '', text: (r.error || '').slice(0, 200)})])
+          : pill('idle', '■ stopped');
         if (!r || r.trigger !== 'stream' || r.status !== 'running') return pill('run', '… starting');
         var behind = (r.meta || {}).behind;
         return el('span', {}, [pill('ok live', 'streaming'),
