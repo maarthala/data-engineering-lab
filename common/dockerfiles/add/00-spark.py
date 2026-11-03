@@ -2,6 +2,11 @@
 # Uses SPARK_REMOTE (sc://spark-connect:15002) set in the image, so no config needed.
 # Wrapped so a down spark-connect doesn't break kernel startup.
 from os import environ as _os_env
+import logging as _logging, warnings as _warnings
+
+# Apache Beam's Google Cloud parts warn on import (Python 3.10 support, no apitools) — noise here
+_warnings.filterwarnings("ignore", category=FutureWarning, module=r"google\..*")
+_logging.getLogger().addFilter(lambda r: "apitools not found" not in r.getMessage())
 
 # Under JupyterHub every learner has their own lakehouse (LAKE_* set by the Hub's spawn
 # hook): `my` (and the older name `iceberg`, still the default catalog) then means THEIR
@@ -189,6 +194,40 @@ def lab_kafka(stream=None, python=False):
     if stream:
         opts["subscribe"] = stream if "." in stream else f"{d['username']}.{stream}"
     return opts
+
+
+def lab_beam(runner="local", name="beam", parallelism=None, **options):
+    """Options for an Apache Beam pipeline — beam.Pipeline(options=lab_beam(…)):
+        runner="local"   Beam's local runner (Prism), inside your Jupyter: one machine, no slots
+        runner="flink"   the lab's Flink cluster (the Flink unit): the steps run as parallel copies in
+                         its slots — parallelism=4 → 4 copies; the Flink UI shows the job as <you>-<name>
+    s3:// paths reach your bucket with your own key (like Spark's). More Beam options as keywords,
+    e.g. lab_beam("flink", streaming=True)."""
+    import os
+    import socket
+    from apache_beam.options.pipeline_options import PipelineOptions
+    me = os.environ.get("LAKE_USER", "me")
+    opts = {"s3_endpoint_url": os.environ.get("AWS_S3_ENDPOINT", "http://storage:9000"),
+            "s3_access_key_id": os.environ.get("LAKE_S3_KEY") or os.environ.get("AWS_ACCESS_KEY_ID"),
+            "s3_secret_access_key": os.environ.get("LAKE_S3_SECRET") or os.environ.get("AWS_SECRET_ACCESS_KEY"),
+            "s3_region_name": os.environ.get("AWS_REGION", "us-east-1"), "job_name": f"{me}-{name}"}
+    if runner == "flink":
+        server = os.environ.get("BEAM_JOB_SERVER", "beam-job-server:8099")
+        host, _, port = server.partition(":")
+        try:
+            socket.create_connection((host, int(port or 8099)), timeout=3).close()
+        except OSError:
+            raise ConnectionError("the Flink unit isn't running — a lab manager switches it on "
+                                  "(laptop: make status → Flink → s); runner='local' works without it") from None
+        opts.update(runner="PortableRunner", job_endpoint=server, artifact_endpoint=f"{host}:8098",
+                    environment_type="EXTERNAL",
+                    environment_config="localhost:50000")        # each TaskManager's own Beam worker
+        if parallelism:
+            opts["parallelism"] = int(parallelism)
+    elif runner != "local":
+        raise ValueError("runner: 'local' (Prism, in Jupyter) or 'flink' (the Flink unit)")
+    opts.update(options)
+    return PipelineOptions(**{k: v for k, v in opts.items() if v is not None})
 
 
 def lab_env(quiet=False):

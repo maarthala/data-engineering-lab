@@ -49,12 +49,12 @@ services:
       POLARIS_URL: http://polaris:8181
       LEARNER_QUOTA_MB: "100"      # each learner's bucket <user>-lake (hard limit)
       # home page: tiles of stopped units (make status) are greyed — tile=host:port it checks
-      LAB_SERVICES: jupyter=jupyterhub:8000,spark=spark-master:8080,sqlpad=sqlpad:3000,airflow=airflow-apiserver:8080,superset=superset:8088
+      LAB_SERVICES: jupyter=jupyterhub:8000,spark=spark-master:8080,flink=flink-jobmanager:8081,sqlpad=sqlpad:3000,airflow=airflow-apiserver:8080,superset=superset:8088
       # ⚙️ Settings → Services shows each unit's state (here they're switched in make status)
       LAB_VERSION: ${LAB_VERSION:-}            # the release tag — the Makefile sets it (git describe)
       LAB_UPDATE_CHECK: ${LAB_UPDATE_CHECK:-1}  # 0: no "newer release" banner for managers
       LAB_UPDATE_REPO: ${LAB_UPDATE_REPO:-maarthala/data-engineering-lab}   # a fork: its own repo
-      LAB_UNITS: "SQL=trino:8080,sqlpad:3000;Notebooks=jupyterhub:8000;Spark=spark-master:8080,spark-connect:15002;Airflow=airflow-apiserver:8080;Superset=superset:8088;Streaming=kafka-connect:8083"
+      LAB_UNITS: "SQL=trino:8080,sqlpad:3000;Notebooks=jupyterhub:8000;Spark=spark-master:8080,spark-connect:15002;Airflow=airflow-apiserver:8080;Superset=superset:8088;Streaming=kafka-connect:8083;Flink=flink-jobmanager:8081,beam-job-server:8099"
       TRINO_RULES_PATH: /trino-access/rules.json      # Trino's access rules, kept in step with Polaris
       # "Manage members" (managers only): Keycloak admin + a JupyterHub service token
       KEYCLOAK_ADMIN: admin:admin

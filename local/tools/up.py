@@ -52,9 +52,11 @@ GROUPS = [
     ("Airflow", ["airflow-init", "airflow-apiserver", "airflow-scheduler", "airflow-dag-processor", "airflow-dag-processor-learners"]),
     ("Superset", ["superset"]),
     ("Streaming", ["kafka", "kafka-connect", "event-sim"]),   # Kafka: 📡 Ingestion (Debezium), 📨 Pub/Sub — when needed
+    ("Flink", ["flink-jobmanager", "flink-taskmanager-1", "flink-taskmanager-2", "beam-worker-1", "beam-worker-2",
+               "beam-job-server"]),                     # Apache Beam on a cluster (slots) — when needed
 ]
 LOCKED = {"Core"}
-OFF = {"Streaming"}                    # make up leaves these off (a compose profile); make status s starts them
+OFF = {"Streaming", "Flink"}                    # make up leaves these off (a compose profile); make status s starts them
 NEEDS = {"Superset": ["SQL"]}          # starting Superset starts SQL; stopping SQL stops Superset
 USES = {"Notebooks": "Spark", "Airflow": "Spark"}  # only some work needs it: a hint, not started for you
 # one open port (the gateway): the portal and every app by name — tools open inside the portal

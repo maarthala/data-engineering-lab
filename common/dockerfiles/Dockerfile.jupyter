@@ -16,6 +16,9 @@ RUN apt-get update \
 # boto3: the AWS SDK the recipes use from notebooks (S3 API; pip matches it to s3fs's botocore).
 # pyyaml: required by the Spark Declarative Pipelines CLI (`%%sql` materialized views).
 # confluent-kafka: subscribe to a 📨 Pub/Sub topic from plain Python (lab_kafka(python=True)).
+# apache-beam[aws]: Beam pipelines — on its local runner (Prism) in Jupyter, or on the Flink unit
+# (lab_beam("flink")); [aws] reads / writes s3:// in the lake. The version must match the Flink
+# unit's Beam workers (local/flink.yaml: beam_python3.10_sdk:2.77.0).
 # jupyterhub: the single-user server, so JupyterHub can run this image once per learner
 # (same version as the Hub — Zero-to-JupyterHub 4.4.2 ships 5.5.2).
 RUN pip install --no-cache-dir \
@@ -36,6 +39,7 @@ RUN pip install --no-cache-dir \
       s3fs \
       boto3 \
       confluent-kafka==2.12.2 \
+      "apache-beam[aws]==2.77.0" \
       jupyter-fs
 
 # dbt (the dbt course): own venv so its pins can't clash with Jupyter's packages. It sees the

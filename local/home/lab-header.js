@@ -15,6 +15,7 @@
     airflow:    {name: 'Pipelines', what: 'Airflow', svc: 'airflow', url: url('airflow', 8001)},
     superset:   {name: 'Dashboards', what: 'Superset', svc: 'superset', url: url('superset', 8004)},
     spark:      {name: 'Spark UI', what: 'Spark', svc: 'spark', url: url('spark', 8002)},
+    flink:      {name: 'Flink UI', what: 'Flink — Apache Beam jobs on a cluster with slots', svc: 'flink', url: url('flink', 8081)},
     storage:    {name: 'Storage', what: 'RustFS console', url: url('storage', 9001, '/rustfs/admin/v3/oidc/authorize/default')}
   };
   // simple line icons (24×24)
@@ -32,6 +33,7 @@
     airflow: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="12" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8.5 6H12a3 3 0 0 1 3 3v.5M8.5 18H12a3 3 0 0 0 3-3v-.5"/>',
     superset: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     spark: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+    flink: '<path d="M4 18c3-1 5-4 6-8 1 4 3 7 6 8M7 20h10M12 4v6"/><circle cx="12" cy="4" r="1.5"/>',
     storage: '<rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/>',
     governance: '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
     members: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5c1.9.6 3.1 2.4 3.5 5.5"/>',
