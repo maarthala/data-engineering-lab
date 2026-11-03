@@ -247,6 +247,14 @@ def _clear_catalog(cat, t, keep=True):
     dropped = 0
     for ns in _namespaces(cat, t):
         p = f"{_C}/{cat}/namespaces/{_ns_path(ns)}"
+        if ns == ["lab_maintenance"]:                 # 🧹 its policies first (labmaint) — else it isn't empty
+            at = lh._admin_token()
+            st, body = lh._call("GET", f"/api/catalog/polaris/v1/{cat}/namespaces/lab_maintenance/policies", token=at)
+            for pol in (body or {}).get("identifiers", []) if st == 200 else []:
+                lh._call("DELETE", f"/api/catalog/polaris/v1/{cat}/namespaces/lab_maintenance/policies/"
+                                   f"{urllib.parse.quote(pol['name'])}?detach-all=true", token=at)
+            lh._ok(lh._call("DELETE", p, token=at)[0], f"drop namespace {cat}.lab_maintenance")
+            continue
         for kind in ("views", "tables"):
             st, body = lh._call("GET", f"{p}/{kind}", token=t)
             for ident in (body or {}).get("identifiers", []) if st == 200 else []:
