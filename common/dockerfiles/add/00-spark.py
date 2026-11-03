@@ -178,15 +178,46 @@ def key_vault_set(name, value, secret=True, team=False):
 lab_secret, lab_secrets, lab_secret_set = key_vault, key_vault_list, key_vault_set
 
 
-def lab_kafka(stream=None, python=False):
+class _BeamExpansion:
+    """The lab's expansion service for ReadFromKafka, over a plain connection: given as an address, Beam
+    only connects to an expansion service on this machine (local gRPC credentials)."""
+    def __init__(self, address):
+        self.address = address
+
+    def __enter__(self):
+        import grpc
+        from apache_beam.transforms.external import ExpansionAndArtifactRetrievalStub
+        self._channel = grpc.insecure_channel(self.address, options=[("grpc.max_receive_message_length", -1),
+                                                                     ("grpc.max_send_message_length", -1)])
+        return ExpansionAndArtifactRetrievalStub(self._channel)
+
+    def __exit__(self, *exc):
+        self._channel.close()
+
+
+def lab_kafka(stream=None, python=False, beam=False):
     """Kafka options to subscribe to one of your 📨 Pub/Sub streams — your Kafka login (the secret
     "kafka" on 🔑 My secrets, made with your first stream). You may read your own topics, and use
     consumer groups named <you>.…:
         raw = spark.readStream.format("kafka").options(**lab_kafka("orders")).load()
         c = Consumer({**lab_kafka(python=True), "group.id": "<you>.reader"})     # confluent-kafka
+        beam.io.kafka.ReadFromKafka(**lab_kafka("orders", beam=True))           # Apache Beam (Flink)
     stream: the stream's name (or its whole topic, <you>.<name>) → subscribe to it.
-    python=True: the same login as confluent-kafka settings (no subscribe)."""
+    python=True: the same login as confluent-kafka settings (no subscribe).
+    beam=True: ReadFromKafka's arguments — the login, consumer group <you>.beam, the topic, and the lab's
+    expansion service (Beam's Kafka reader is Java: it runs on the Flink unit, lab_beam("flink"))."""
+    import os
     d = _fields("kafka")
+    if beam:
+        jaas = ('org.apache.kafka.common.security.scram.ScramLoginModule required '
+                f'username="{d["username"]}" password="{d["password"]}";')
+        out = {"consumer_config": {"bootstrap.servers": d["bootstrap"], "security.protocol": "SASL_PLAINTEXT",
+                                   "sasl.mechanism": "SCRAM-SHA-512", "sasl.jaas.config": jaas,
+                                   "group.id": f"{d['username']}.beam", "auto.offset.reset": "earliest"},
+               "expansion_service": _BeamExpansion(os.environ.get("BEAM_EXPANSION", "beam-expansion:8097"))}
+        if stream:
+            out["topics"] = [stream if "." in stream else f"{d['username']}.{stream}"]
+        return out
     if python:
         return {"bootstrap.servers": d["bootstrap"], "security.protocol": "SASL_PLAINTEXT",
                 "sasl.mechanism": "SCRAM-SHA-512", "sasl.username": d["username"], "sasl.password": d["password"]}
@@ -228,11 +259,36 @@ def lab_beam(runner="local", name="beam", parallelism=None, **options):
                     environment_config="localhost:50000")        # each TaskManager's own Beam worker
         if parallelism:
             opts["parallelism"] = int(parallelism)
+        if options.get("streaming"):                       # an unbounded read (Kafka) hands data on at checkpoints
+            opts.setdefault("checkpointing_interval", 10000)
     elif runner != "local":
         raise ValueError("runner: 'local' (Prism, in Jupyter) or 'flink' (the Flink unit)")
     opts.update(options)
     # flags=[]: not the notebook's own command line (Jupyter's "-f kernel-….json")
     return PipelineOptions(flags=[], **{k: v for k, v in opts.items() if v is not None})
+
+
+def _lab_flink(method, path, body=None):
+    """home-api's /api/flink — your notebook's key vault token says who you are."""
+    import json, os, urllib.request
+    url = os.environ.get("LAB_HOME_API", "http://home-api:8000") + path
+    req = urllib.request.Request(url, method=method, data=json.dumps(body).encode() if body is not None else None,
+                                 headers={"X-Vault-Token": os.environ.get("VAULT_TOKEN", ""), "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        return json.loads(r.read())
+
+
+def lab_beam_jobs(running=True):
+    """Your Beam jobs on the Flink unit — [(name, state, seconds)], the newest first (running=False: all)."""
+    jobs = _lab_flink("GET", "/api/flink/jobs")["jobs"]
+    return [(j["name"], j["state"], j["seconds"]) for j in jobs if not running or j["state"] == "RUNNING"]
+
+
+def lab_beam_stop(name):
+    """Stop your streaming Beam job `name` on the Flink unit (the name you gave lab_beam). A streaming job
+    runs until stopped — Beam's own result.cancel() doesn't reach Flink — and holds its slots meanwhile."""
+    r = _lab_flink("POST", "/api/flink/stop", {"name": name})
+    print(f"✓ stopped {r['job']}" if r["stopped"] else f"no running job {r['job']} — yours: {lab_beam_jobs() or 'none'}")
 
 
 def lab_env(quiet=False):

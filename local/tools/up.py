@@ -52,7 +52,7 @@ GROUPS = [
     ("Airflow", ["airflow-init", "airflow-apiserver", "airflow-scheduler", "airflow-dag-processor", "airflow-dag-processor-learners"]),
     ("Superset", ["superset"]),
     ("Streaming", ["kafka", "kafka-connect", "event-sim"]),   # Kafka: 📡 Ingestion (Debezium), 📨 Pub/Sub — when needed
-    ("Flink", ["flink-jobmanager", "flink-taskmanager", "beam-job-server"]),   # Apache Beam on a cluster (slots) — when needed
+    ("Flink", ["flink-jobmanager", "flink-taskmanager", "beam-job-server", "beam-expansion"]),   # Apache Beam on a cluster (slots) — when needed
 ]
 LOCKED = {"Core"}
 OFF = {"Streaming", "Flink"}                    # make up leaves these off (a compose profile); make status s starts them

@@ -311,15 +311,21 @@ class Stream:
 def main():
     print(f"event-sim: Kafka {BOOTSTRAP}", flush=True)
     admin = AdminClient({"bootstrap.servers": BOOTSTRAP})
-    prod = Producer({"bootstrap.servers": BOOTSTRAP, "linger.ms": 50, "compression.type": "lz4",
-                     "message.timeout.ms": 30000,
-                     "allow.auto.create.topics": False})          # a deleted stream's topic must stay deleted
+    def producer():
+        return Producer({"bootstrap.servers": BOOTSTRAP, "linger.ms": 50, "compression.type": "lz4",
+                         "message.timeout.ms": 30000,
+                         "allow.auto.create.topics": False})      # a deleted stream's topic must stay deleted
+    prod = producer()
+    health = {"ok": time.time(), "failed": 0}      # a producer that stays stuck after a broker hiccup is rebuilt
     streams, last_sync = {}, 0.0
 
     def delivered(st, err, msg, late_s):
         if err:
-            print(f"event-sim: {st.topic}: {err}", flush=True)
+            health["failed"] += 1
+            if health["failed"] % 100 == 1:
+                print(f"event-sim: {st.topic}: {err}", flush=True)
             return
+        health["ok"] = time.time()
         r = {"key": msg.key().decode(), "partition": msg.partition(), "offset": msg.offset(),
              "late_s": round(late_s, 1), "event": json.loads(msg.value())}
         st.sent += 1
@@ -403,6 +409,11 @@ def main():
             if st.row["state"] == "running":
                 st.tick(t, min(dt, 2.0), send)
         prod.poll(0)
+        if health["failed"] and time.time() - health["ok"] > 30:
+            print(f"event-sim: nothing delivered for 30 s ({health['failed']} failed) — a new producer", flush=True)
+            prod.flush(5)
+            prod = producer()
+            health.update(ok=time.time(), failed=0)
         time.sleep(TICK_S)
 
 

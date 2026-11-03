@@ -1,2 +1,3 @@
 *
 !add/flink-taskmanager-entrypoint.sh
+!add/beam-java-worker.sh

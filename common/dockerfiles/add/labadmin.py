@@ -885,6 +885,28 @@ def set_flink(taskmanagers, slots):
     return dict(flink(), applied=False)
 
 
+def flink_jobs(member, running=True):
+    """A member's Beam jobs on the Flink unit (named <member>-<name> by lab_beam) — newest first."""
+    with urllib.request.urlopen(f"{FLINK_URL}/jobs/overview", timeout=10) as r:
+        jobs = json.loads(r.read())["jobs"]
+    mine = [j for j in jobs if j["name"].startswith(member + "-") and (not running or j["state"] == "RUNNING")]
+    return [{"name": j["name"][len(member) + 1:], "state": j["state"], "seconds": round(j["duration"] / 1000)}
+            for j in sorted(mine, key=lambda j: -j["start-time"])]
+
+
+def flink_stop(member, name):
+    """Stop a member's own running job <member>-<name> (Beam's own cancel doesn't reach Flink)."""
+    with urllib.request.urlopen(f"{FLINK_URL}/jobs/overview", timeout=10) as r:
+        jobs = json.loads(r.read())["jobs"]
+    stopped = 0
+    for j in jobs:
+        if j["name"] == f"{member}-{name}" and j["state"] == "RUNNING":
+            req = urllib.request.Request(f"{FLINK_URL}/jobs/{j['jid']}?mode=cancel", method="PATCH")
+            urllib.request.urlopen(req, timeout=10).close()
+            stopped += 1
+    return {"stopped": stopped, "job": f"{member}-{name}"}
+
+
 def services():
     """⚙️ Settings → Services: {control: "k8s" | "make status", units: [{unit, workloads, state
     (on · off · starting · stopping · partly), needs}], jupyter_servers: [members with Jupyter open]}."""

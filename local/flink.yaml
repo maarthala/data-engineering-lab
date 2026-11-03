@@ -5,11 +5,14 @@
 #                      parallel copies of a pipeline's steps). Each one also runs Beam's Python worker
 #                      (Dockerfile.flink-taskmanager), which runs the pipeline's Python code (Map, DoFn …)
 #  beam-job-server     takes a Beam pipeline from a notebook (PortableRunner) and turns it into a Flink job
+#  beam-expansion      turns ReadFromKafka into Beam's Java KafkaIO (Kafka-only expansion service)
 # The sizes are a lab manager's (⚙️ Settings → Flink cluster); make status passes them in when it starts
 # the unit (FLINK_TASKMANAGERS, FLINK_SLOTS, FLINK_TM_MEMORY — defaults below).
 # Without this unit, Beam still runs in Jupyter on its local runner (Prism) — one machine, no slots.
 
-# Flink's own settings — no comments inside (they'd become part of a value). The JobManager's don't
+# Flink's own settings — no comments inside (they'd become part of a value). Cancelling is on: Beam's
+# result.cancel() stops a member's job through it; the Flink UI is read-only anyway — the gateway lets
+# only GET through for flink.lab.localhost (configs/gateway/nginx.conf). The JobManager's don't
 # name the TaskManagers' sizes, so resizing them doesn't restart it. A TaskManager's memory is
 # 1280 MB + 256 MB per slot (make status works it out; less fails Flink's memory check). Network memory 256 MB:
 # Beam's shuffles between parallel copies need far more than the default 64 MB (a pipeline with a few
@@ -22,7 +25,7 @@ x-jm-conf: &jm-conf |
   state.checkpoints.dir: file:///opt/flink/data/checkpoints
   state.savepoints.dir: file:///opt/flink/data/savepoints
   web.submit.enable: false
-  web.cancel.enable: false
+  web.cancel.enable: true
 
 x-tm-conf: &tm-conf |
   jobmanager.rpc.address: flink-jobmanager
@@ -65,6 +68,18 @@ services:
     volumes:
       - flink-data:/opt/flink/data
     depends_on: [flink-jobmanager]
+    restart: unless-stopped
+    networks:
+      - sparknet
+
+  # Java steps for Python pipelines — Beam's KafkaIO (ReadFromKafka): lab_kafka(stream, beam=True)
+  beam-expansion:
+    build:
+      context: ../common/dockerfiles
+      dockerfile: Dockerfile.beam-expansion
+    image: local-beam-expansion
+    container_name: beam-expansion
+    profiles: ["flink"]
     restart: unless-stopped
     networks:
       - sparknet

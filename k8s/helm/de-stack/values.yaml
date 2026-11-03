@@ -126,8 +126,9 @@ labDb:
 flink:
   enabled: true
   jobmanagerImage: flink:1.20.5-scala_2.12-java17
-  taskmanagerImage: ghcr.io/maarthala/de-stack/flink-taskmanager:20261103   # + Beam's Python worker (Dockerfile.flink-taskmanager)
+  taskmanagerImage: ghcr.io/maarthala/de-stack/flink-taskmanager:20261103-2   # + Beam's Python worker (Dockerfile.flink-taskmanager)
   jobServerImage: apache/beam_flink1.20_job_server:2.77.0
+  expansionImage: ghcr.io/maarthala/de-stack/beam-expansion:20261103   # ReadFromKafka for Python pipelines (Dockerfile.beam-expansion)
   slots: 2
   storage: 5Gi
 

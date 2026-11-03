@@ -1,0 +1,15 @@
+# beam-expansion — the Flink unit's expansion service: Python's ReadFromKafka asks it to turn the read
+# into Java steps (Beam's KafkaIO), which then run in the TaskManagers' Java worker. Kafka only
+# (add/beam-expansion/pom.xml: one jar with its dependencies). Beam 2.77.0, Java 17.
+#   docker build -f common/dockerfiles/Dockerfile.beam-expansion -t <ref> common/dockerfiles
+FROM maven:3.9.11-eclipse-temurin-17 AS build
+COPY add/beam-expansion/pom.xml /src/pom.xml
+RUN cd /src && mvn -q -B package -DskipTests && ls -la /src/target/*.jar
+FROM eclipse-temurin:17-jre
+COPY --from=build /src/target/beam-kafka-expansion.jar /opt/beam/beam-kafka-expansion.jar
+# use_deprecated_read: KafkaIO's classic (UnboundedSource) read, which Flink runs natively with watermarks —
+# the newer splittable read re-seeks the same offsets forever on the portable Flink runner (nothing comes out).
+# The steps it expands run in a Java worker the TaskManagers start themselves (PROCESS: no Docker there),
+# through the TaskManager image's beam-java-worker.sh
+ENTRYPOINT ["java", "-jar", "/opt/beam/beam-kafka-expansion.jar", "8097", "--javaClassLookupAllowlistFile=*", \
+            "--experiments=use_deprecated_read", "--defaultEnvironmentType=PROCESS", "--defaultEnvironmentConfig={\"command\": \"/opt/apache/beam-java-worker.sh\"}"]

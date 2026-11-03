@@ -49,6 +49,7 @@ from the browser can point at another bucket.
   GET    /api/admin/teams · /api/admin/people            the teams (members, bucket use) · who is where
   GET    /api/admin/services · POST {"unit", "on"}       ⚙️ Settings → Services: units' state; k8s: on/off
   GET    /api/admin/flink · POST {"taskmanagers", "slots"}   ⚙️ Settings → Flink cluster (its size; live overview)
+  GET    /api/flink/jobs · POST /api/flink/stop {"name"}  a member's own Beam jobs — X-Vault-Token (their notebook's)
   POST   /api/admin/{team-create|team-delete} {"team"} · /api/admin/move {"user", "team"}
          /api/admin/team-add {"team", "users": [...]} · /api/admin/team-remove {"users": [...]}  → {"job": id}
 
@@ -484,6 +485,24 @@ class Handler(BaseHTTPRequestHandler):
         threading.Thread(target=_run_job, args=(jid, labadmin.reset_mine, [user]), daemon=True).start()
         print(f"[home-api] {user}: reset my lakehouse", flush=True)
         return self._json(202, {"job": jid})
+
+    def _flink(self, method):
+        """The Flink unit, for a member's notebook (lab_beam_jobs / lab_beam_stop): who asks is the vault
+        token their Jupyter has (X-Vault-Token), not a header — only their own jobs, <member>-<name>."""
+        path, _ = self._route()
+        member = labvault.token_member(self.headers.get("X-Vault-Token", ""))
+        if not member:
+            return self._json(401, {"error": "send your key vault token (X-Vault-Token) — lab_beam_jobs() does"})
+        try:
+            if method == "GET" and path == "/api/flink/jobs":
+                return self._json(200, {"jobs": labadmin.flink_jobs(member, running=False)})
+            if method == "POST" and path == "/api/flink/stop":
+                r = labadmin.flink_stop(member, str(self._body().get("name") or ""))
+                print(f"[home-api] {member}: stop Flink job {r['job']} ({r['stopped']})", flush=True)
+                return self._json(200, r)
+        except OSError:
+            return self._json(503, {"error": "the Flink unit isn't running"})
+        return self._json(404, {"error": "not found"})
 
     def _pubsub(self, method):
         """📨 Pub/Sub — /api/pubsub*, always the logged-in member's own streams (labpubsub.py)."""
@@ -961,6 +980,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._cdc(method)
         if self.path.startswith("/api/pubsub"):
             return self._pubsub(method)
+        if self.path.startswith("/api/flink"):
+            return self._flink(method)
         if self.path.startswith("/api/home/reset"):
             return self._reset_mine(method)
         if self.path.startswith("/api/databases"):
@@ -995,6 +1016,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._cdc("GET")
         if self.path.startswith("/api/pubsub"):
             return self._pubsub("GET")
+        if self.path.startswith("/api/flink"):
+            return self._flink("GET")
         if self.path.startswith("/api/databases"):
             return self._databases("GET")
         if self.path == "/api/notebook":

@@ -77,6 +77,19 @@ def set_member_policy(name, team=None):
     _ok(_call("PUT", f"sys/policies/acl/member-{name}", {"policy": _policy(name, team)})[0], "policy")
 
 
+def token_member(token):
+    """Whose token this is (a member's own, from member_token), else None — how a member's notebook proves
+    who it is to home-api (it can't fake that, unlike a header)."""
+    if not token:
+        return None
+    st, body = _call("GET", "auth/token/lookup-self", token=token)
+    if st != 200:
+        return None
+    data = body["data"]
+    member = (data.get("meta") or {}).get("member")
+    return member if member and f"member-{member}" in (data.get("policies") or []) else None
+
+
 def member_token(name, team=None):
     """A new one-week token that reaches secret/<name>/… (and secret/<team>_team/…); the
     previous one stops working."""

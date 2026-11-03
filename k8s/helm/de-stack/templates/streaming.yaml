@@ -203,7 +203,7 @@ spec:
         - { port: 9092, protocol: TCP }
     - from:
         - podSelector: { matchLabels: { component: singleuser-server } }          # members' Jupyter (KubeSpawner)
-        - podSelector: { matchExpressions: [{ key: app.kubernetes.io/name, operator: In, values: [spark-connect, spark-worker] }] }
+        - podSelector: { matchExpressions: [{ key: app.kubernetes.io/name, operator: In, values: [spark-connect, spark-worker, flink-taskmanager, beam-job-server] }] }   # beam-job-server: plans a streaming read
       ports:
         - { port: 9094, protocol: TCP }
 ---

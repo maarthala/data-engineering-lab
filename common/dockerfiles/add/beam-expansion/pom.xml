@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Beam's expansion service with only Kafka (KafkaIO) in it — what Python's ReadFromKafka asks to
+     turn into Java steps. One jar with its dependencies (the workers fetch it for each job: Beam's own
+     all-connectors expansion service is 840 MB). Built by Dockerfile.beam-expansion. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>lab</groupId>
+  <artifactId>beam-kafka-expansion</artifactId>
+  <version>2.77.0</version>
+  <properties>
+    <beam.version>2.77.0</beam.version>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+  <repositories>
+    <repository><id>confluent</id><url>https://packages.confluent.io/maven/</url></repository>
+  </repositories>
+  <dependencies>
+    <dependency><groupId>org.apache.beam</groupId><artifactId>beam-sdks-java-expansion-service</artifactId><version>${beam.version}</version></dependency>
+    <dependency><groupId>org.apache.beam</groupId><artifactId>beam-sdks-java-io-kafka</artifactId><version>${beam.version}</version></dependency>
+    <dependency><groupId>org.apache.kafka</groupId><artifactId>kafka-clients</artifactId><version>3.9.2</version></dependency>
+    <dependency><groupId>org.slf4j</groupId><artifactId>slf4j-jdk14</artifactId><version>2.0.16</version></dependency>
+  </dependencies>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.6.0</version>
+        <executions><execution><phase>package</phase><goals><goal>shade</goal></goals>
+          <configuration>
+            <finalName>beam-kafka-expansion</finalName>
+            <transformers>
+              <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+              <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                <mainClass>org.apache.beam.sdk.expansion.service.ExpansionService</mainClass>
+              </transformer>
+            </transformers>
+            <filters><filter><artifact>*:*</artifact><excludes>
+              <exclude>META-INF/*.SF</exclude><exclude>META-INF/*.DSA</exclude><exclude>META-INF/*.RSA</exclude>
+            </excludes></filter></filters>
+          </configuration></execution></executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

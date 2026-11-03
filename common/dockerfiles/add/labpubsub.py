@@ -319,6 +319,13 @@ def _unlogin(admin, member):
                            AclOperation.ANY, AclPermissionType.ANY)
     for f in admin.delete_acls([flt]).values():
         f.result(timeout=30)
+    groups = [g.group_id for g in admin.list_consumer_groups().result(timeout=30).valid   # theirs: <member>.…,
+              if g.group_id.startswith(member + ".") or f"_{member}." in g.group_id]       # Beam's Reader-…_<member>.…
+    for f in (admin.delete_consumer_groups(groups).values() if groups else []):
+        try:
+            f.result(timeout=30)
+        except Exception:  # noqa: BLE001 — still in use: without the login it stops soon
+            pass
     try:
         labvault.delete(member, VAULT_KEY)
     except Exception:  # noqa: BLE001 — a deleted member's folder is gone already

@@ -7,9 +7,29 @@
 #  flink-taskmanager   the workers — each pod one TaskManager with its slots, and Beam's Python worker
 #                      inside (Dockerfile.flink-taskmanager) for the pipeline's Python code
 #  beam-job-server     takes a Beam pipeline from a notebook (lab_beam("flink")) and turns it into a Flink job
+#  beam-expansion      builds ReadFromKafka (Java) into a member's Python pipeline (lab_kafka(beam=True))
+# Flink's REST API has no members: whoever reaches it may cancel any job. So the UI, the notebooks and
+# health checks get a read-only door (flink-jobmanager:8081, an nginx sidecar: GET only); the full API
+# (flink-rest:8081) only beam-job-server (submits) and home-api (a member stops their own jobs).
 # Flink's settings: no comments inside them (they'd become part of a value). The TaskManagers' match
 # labadmin._tm_conf (home-api rewrites them when a manager resizes the cluster).
 {{- $slots := int .Values.flink.slots }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flink-ui-proxy
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+data:
+  default.conf: |
+    server {
+        listen 8082;
+        location / {
+            limit_except GET { deny all; }
+            proxy_pass http://127.0.0.1:8081;
+            proxy_set_header Host $host;
+        }
+    }
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -53,7 +73,7 @@ spec:
                 state.checkpoints.dir: file:///opt/flink/data/checkpoints
                 state.savepoints.dir: file:///opt/flink/data/savepoints
                 web.submit.enable: false
-                web.cancel.enable: false
+                web.cancel.enable: true
           ports:
             - { name: rpc, containerPort: 6123 }
             - { name: blob, containerPort: 6124 }
@@ -67,8 +87,19 @@ spec:
             periodSeconds: 10
           volumeMounts:
             - { name: data, mountPath: /opt/flink/data }
+        - name: ui-proxy                        # the read-only door (see the top)
+          image: {{ .Values.home.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - { name: ui-ro, containerPort: 8082 }
+          resources:
+            requests: { memory: 16Mi }
+            limits: { memory: 64Mi }
+          volumeMounts:
+            - { name: ui-proxy, mountPath: /etc/nginx/conf.d/default.conf, subPath: default.conf, readOnly: true }
       volumes:
         - { name: data, persistentVolumeClaim: { claimName: flink-data } }
+        - { name: ui-proxy, configMap: { name: flink-ui-proxy } }
 ---
 apiVersion: v1
 kind: Service
@@ -80,7 +111,39 @@ spec:
   ports:
     - { name: rpc, port: 6123, targetPort: 6123 }
     - { name: blob, port: 6124, targetPort: 6124 }
-    - { name: ui, port: 8081, targetPort: 8081 }
+    - { name: ui, port: 8081, targetPort: 8082 }        # read-only
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flink-rest
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "de-stack.selector" (dict "app" "flink-jobmanager") | nindent 4 }}
+  ports:
+    - { name: rest, port: 8081, targetPort: 8081 }      # the full API: beam-job-server, home-api
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: flink-jobmanager-clients
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "de-stack.selector" (dict "app" "flink-jobmanager") | nindent 6 }}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector: { matchExpressions: [{ key: app.kubernetes.io/name, operator: In, values: [flink-taskmanager, beam-job-server] }] }
+      ports:
+        - { port: 6123, protocol: TCP }
+        - { port: 6124, protocol: TCP }
+    - from:
+        - podSelector: { matchExpressions: [{ key: app.kubernetes.io/name, operator: In, values: [beam-job-server, home-api] }] }
+      ports:
+        - { port: 8081, protocol: TCP }
+    - ports:                                            # the read-only door: anyone (ingress, notebooks)
+        - { port: 8082, protocol: TCP }
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -143,7 +206,7 @@ spec:
           image: {{ .Values.flink.jobServerImage }}
           imagePullPolicy: {{ .Values.global.imagePullPolicy }}
           # a pipeline's files go to the shared volume: the TaskManagers hand them to their Beam worker
-          args: ["--flink-master=flink-jobmanager:8081", "--job-host=0.0.0.0", "--artifacts-dir=/opt/flink/data/beam-artifacts"]
+          args: ["--flink-master=flink-rest:8081", "--job-host=0.0.0.0", "--artifacts-dir=/opt/flink/data/beam-artifacts"]
           ports:
             - { name: job, containerPort: 8099 }
             - { name: artifacts, containerPort: 8098 }
@@ -165,6 +228,41 @@ spec:
   ports:
     - { name: job, port: 8099, targetPort: 8099 }
     - { name: artifacts, port: 8098, targetPort: 8098 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: beam-expansion
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  replicas: 0
+  selector:
+    matchLabels: {{- include "de-stack.selector" (dict "app" "beam-expansion") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "de-stack.selector" (dict "app" "beam-expansion") | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      containers:
+        - name: expansion
+          image: {{ .Values.flink.expansionImage }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - { name: grpc, containerPort: 8097 }
+          resources:
+            requests: { memory: 384Mi }
+            limits: { memory: 768Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: beam-expansion
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "de-stack.selector" (dict "app" "beam-expansion") | nindent 4 }}
+  ports:
+    - { name: grpc, port: 8097, targetPort: 8097 }
 {{- if .Values.ingress.enabled }}
 ---
 apiVersion: networking.k8s.io/v1
