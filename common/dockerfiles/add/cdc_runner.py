@@ -502,14 +502,15 @@ def _work(t):
 
 
 def _due():
-    """Scheduled jobs whose time has come (and that aren't queued or running) → a run task."""
-    for sched, secs in labcdc.SCHEDULES.items():
-        if not secs:
+    """Jobs whose cron has fired since their last run (and that aren't queued or running) → a run task."""
+    for j in _q("SELECT id, member, schedule, last_run_at, created_at FROM cdc_jobs j WHERE enabled "
+                "AND schedule NOT IN ('', 'stream') AND NOT EXISTS (SELECT 1 FROM cdc_tasks t WHERE t.kind = 'run' "
+                "AND t.ref = j.id AND t.status IN ('queued', 'running'))"):
+        try:
+            fired = labcdc.cron_last(j["schedule"])
+        except ValueError:
             continue
-        for j in _q("SELECT id, member FROM cdc_jobs j WHERE enabled AND schedule = %s "
-                    "AND (last_run_at IS NULL OR last_run_at <= now() - make_interval(secs => %s)) "
-                    "AND NOT EXISTS (SELECT 1 FROM cdc_tasks t WHERE t.kind = 'run' AND t.ref = j.id "
-                    "AND t.status IN ('queued', 'running'))", (sched, secs)):
+        if fired and fired > max(j["last_run_at"] or j["created_at"], j["created_at"]):
             labcdc.queue(j["member"], "run", j["id"], {"trigger": "schedule"})
 
 

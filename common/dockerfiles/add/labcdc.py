@@ -8,8 +8,8 @@ Members keep, each only their own (portal database, like 📝 Mock exams):
                 (on: a publication + a logical replication slot, made by the first check)
   destinations  one of their lakehouse catalogs (+ an optional namespace) — no keys to type: a sync
                 writes as the member's job login (lab_jobs: <member>_jobs + their own-bucket key)
-  jobs          source → destination: the tables, full load + CDC or a full reload every run, a
-                schedule (manual / 15 min / hourly / daily); each run's status, rows and log
+  jobs          source → destination: the tables, full load + CDC or a full reload every run, how
+                it runs (manual / cron — a cron expression, UTC / stream); each run's status, rows and log
 The work itself — check a connection, list a source's tables, run a sync — is OLake's engine
 (olakego/source-<kind>, `check` / `discover` / `sync`) in a container per call, started by the
 cdc-runner service (cdc_runner.py), which picks up cdc_tasks rows. Nothing here talks to OLake.
@@ -21,6 +21,7 @@ import os
 import re
 import secrets
 import threading
+import datetime
 
 DB_URL = os.environ.get("PORTAL_DB_URL", "postgresql://portal:portal@postgres:5432/portal")
 VAULT_PATH = "_lab/cdc"                       # vault (admin only): <member>/<source id> → {password}
@@ -35,7 +36,8 @@ KINDS = {"postgres": {"name": "PostgreSQL", "port": 5432,
                    "cdc": "CDC switched on for the database (EXEC sys.sp_cdc_enable_db) and each table "
                           "(sys.sp_cdc_enable_table), and SQL Server Agent running"}}
 ENGINE = os.environ.get("CDC_ENGINE", "olake")              # new jobs: olake | debezium
-SCHEDULES = {"": None, "15m": 15 * 60, "1h": 3600, "1d": 86400, "stream": None}   # stream: debezium only
+# a job's schedule: '' (manual), 'stream' (always on — debezium only) or a cron expression (UTC)
+LEGACY = {"15m": "*/15 * * * *", "1h": "0 * * * *", "1d": "0 2 * * *"}     # the old presets
 MODES = {"cdc": "full load, then changes (CDC)",                 # one row per key: the latest (upsert)
          "append": "full load, then every change as a new row",  # the history: build SCD2 from it
          "full_refresh": "full reload every run"}                # olake only
@@ -74,6 +76,8 @@ CREATE TABLE IF NOT EXISTS cdc_tasks (
   created_at timestamptz NOT NULL DEFAULT now(), finished_at timestamptz);
 CREATE INDEX IF NOT EXISTS cdc_tasks_queued ON cdc_tasks (status, id);
 CREATE TABLE IF NOT EXISTS portal_cdc_seen (member text PRIMARY KEY);      -- got the lab source once (deleting it is fine)
+UPDATE cdc_jobs SET schedule = CASE schedule WHEN '15m' THEN '*/15 * * * *' WHEN '1h' THEN '0 * * * *' ELSE '0 2 * * *' END
+ WHERE schedule IN ('15m', '1h', '1d');
 ALTER TABLE cdc_jobs ADD COLUMN IF NOT EXISTS engine text NOT NULL DEFAULT 'olake';
 ALTER TABLE cdc_runs ADD COLUMN IF NOT EXISTS meta jsonb;                   -- debezium: a stream's base, how far behind
 """
@@ -152,8 +156,88 @@ def _source_out(s):
             "slot": s["slot"], "checked": s["checked"], "created_at": _iso(s["created_at"])}
 
 
-def schedules(engine):
-    return [k for k in SCHEDULES if engine == "debezium" or k != "stream"]
+# ---- cron: minute hour day-of-month month day-of-week (UTC) ---------------------------------
+CRON_FIELDS = ((0, 59), (0, 23), (1, 31), (1, 12), (0, 7))
+
+
+def cron(expr):
+    """'*/15 * * * *' → five sets of numbers (Sunday is 0 or 7); ValueError if it isn't one."""
+    parts = str(expr or "").split()
+    if len(parts) != 5:
+        raise ValueError("five fields: minute hour day month weekday")
+    out = []
+    for f, (lo, hi) in zip(parts, CRON_FIELDS):
+        vals = set()
+        for part in f.split(","):
+            rng, _, step = part.partition("/")
+            step = int(step) if step else 1
+            if rng == "*":
+                a, b = lo, hi
+            elif "-" in rng:
+                a, b = (int(x) for x in rng.split("-", 1))
+            else:
+                a = int(rng)
+                b = hi if step > 1 else a
+            if step < 1 or not lo <= a <= b <= hi:
+                raise ValueError(f"'{part}' is out of range {lo}–{hi}")
+            vals.update(range(a, b + 1, step))
+        out.append(vals)
+    out[4] = {0 if d == 7 else d for d in out[4]}
+    out.append((parts[2] != "*", parts[4] != "*"))         # cron's rule: both days given → either one
+    return out
+
+
+def cron_hits(c, t):
+    mi, ho, dom, mo, dow, (rd, rw) = c
+    if t.minute not in mi or t.hour not in ho or t.month not in mo:
+        return False
+    d, w = t.day in dom, (t.weekday() + 1) % 7 in dow
+    return (d or w) if rd and rw else (d and w)
+
+
+def cron_last(expr, now=None):
+    """The latest time ≤ now the cron fired (looking back 8 days), else None."""
+    c, t = cron(expr), (now or datetime.datetime.now(datetime.timezone.utc)).replace(second=0, microsecond=0)
+    for _ in range(8 * 24 * 60):
+        if cron_hits(c, t):
+            return t
+        t -= datetime.timedelta(minutes=1)
+    return None
+
+
+def cron_next(expr, now=None):
+    c = cron(expr)
+    t = (now or datetime.datetime.now(datetime.timezone.utc)).replace(second=0, microsecond=0) + datetime.timedelta(minutes=1)
+    for _ in range(62 * 24 * 60):                       # a monthly cron, with room
+        if cron_hits(c, t):
+            return t
+        t += datetime.timedelta(minutes=1)
+    return None
+
+
+def schedule_ok(engine, v):
+    """'' | 'stream' (debezium) | a cron expression → the value to keep."""
+    v = " ".join(str(v or "").split())
+    v = LEGACY.get(v, v)
+    if v == "stream":
+        if engine != "debezium":
+            raise CdcError("Datastream needs the Debezium engine")
+        return v
+    if v:
+        try:
+            cron(v)
+        except ValueError as e:
+            raise CdcError(f"cron: {e}") from None
+    return v
+
+
+def _next_run(j):
+    if not j["schedule"] or j["schedule"] == "stream" or not j["enabled"]:
+        return None
+    try:
+        return _iso(cron_next(j["schedule"]))
+    except ValueError:
+        return None
 
 
 def modes(engine):
@@ -180,9 +264,9 @@ def overview(member, catalogs=()):
             "jobs": [{"id": j["id"], "name": j["name"], "source": j["source_id"], "source_name": j["source_name"],
                       "destination": j["dest_id"], "dest_name": j["dest_name"], "catalog": j["catalog"],
                       "tables": j["tables"], "mode": j["mode"], "schedule": j["schedule"], "enabled": j["enabled"],
-                      "engine": j["engine"], "schedules": schedules(j["engine"]),
+                      "engine": j["engine"], "next_run": _next_run(j),
                       "created_at": _iso(j["created_at"]), "last": j["last"], "busy": j["busy"]} for j in jobs],
-            "catalogs": list(catalogs), "engine": ENGINE, "schedules": schedules(ENGINE), "modes": modes(ENGINE),
+            "catalogs": list(catalogs), "engine": ENGINE, "modes": modes(ENGINE),
             "kinds": kinds()}
 
 
@@ -378,8 +462,9 @@ def create_job(member, body):
     s = _own("cdc_sources", member, body.get("source") or 0)
     d = _own("cdc_destinations", member, body.get("destination") or 0)
     mode, schedule = str(body.get("mode") or "cdc"), str(body.get("schedule") or "")
-    if mode not in modes(ENGINE) or schedule not in schedules(ENGINE):
-        raise CdcError("unknown mode or schedule")
+    if mode not in modes(ENGINE):
+        raise CdcError("unknown mode")
+    schedule = schedule_ok(ENGINE, schedule)
     if ENGINE == "debezium" and s["kind"] != "postgres":
         raise CdcError("with Debezium, PostgreSQL sources only (for now)")
     if mode in STREAMING and not s["cdc"]:
@@ -440,8 +525,8 @@ def streams_for(discovered, tables, mode, namespace):
 
 def set_job(member, jid, enabled=None, schedule=None):
     j = _own("cdc_jobs", member, jid)
-    if schedule is not None and schedule not in schedules(j["engine"]):
-        raise CdcError("unknown schedule")
+    if schedule is not None:
+        schedule = schedule_ok(j["engine"], schedule)
     _q("UPDATE cdc_jobs SET enabled = COALESCE(%s, enabled), schedule = COALESCE(%s, schedule) WHERE id = %s",
        (enabled, schedule, j["id"]), rows=False)
     return {"id": j["id"]}
