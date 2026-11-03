@@ -37,7 +37,7 @@ We'll stream Tidewell's **loyalty** system: its members and their points ([Meet 
 - **Sources → + New source**: name `Tidewell loyalty`, host `lab-db`, port `5432`, database
   `loyalty`, user / password `reader` / `reader`, schemas `public`, CDC **on** → **Save source**.
 - **Destinations → + New destination**: name `Loyalty live`, your lakehouse, namespace
-  `loyalty_live` → **Save destination**.
+  **+ New namespace…** → `loyalty_live` → **Save destination**.
 
 ### 2 · The job
 **Jobs → + New job**: source **Tidewell loyalty**, destination **Loyalty live**, tables **All**

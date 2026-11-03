@@ -73,8 +73,10 @@ Under **Destinations**, click **+ New destination**:
 |---|---|
 | Name | Shop CDC |
 | Lakehouse | `<you>_lake` (your main lakehouse, `my` in notebooks) |
-| Namespace | `shop_cdc` |
+| Namespace | **+ New namespace…** → `shop_cdc` |
 
+The **Namespace** list shows the namespaces your lakehouse already has (`bronze`, `silver`,
+`gold`, …). Pick one of them, or **+ New namespace…** and type a name: it's made when you save.
 **Save destination**. The check makes sure the job can write there. Each table will land as
 `<lakehouse>.<namespace>.<table>`, here `my.shop_cdc.orders` in a notebook.
 
@@ -82,7 +84,8 @@ Under **Destinations**, click **+ New destination**:
 Go to **Jobs → + New job**. One form, top to bottom:
 
 1. **Source**: pick **Lab shop (live)** in the dropdown (**+ New** next to it adds one and brings
-   you back). The line under it says whether CDC is on and checked.
+   you back). The line under it says whether CDC is on and checked. (Your 📨 Pub/Sub streams are
+   in this list too, as *&lt;name&gt; (Pub/Sub)*: [Land events in Bronze](../pubsub/bronze.md).)
 2. **Destination**: pick **Shop CDC**. The line under it shows where the tables will land.
 3. **Tables**: the form lists the source's tables by itself, each with its **key** (primary key).
    Click **All**: `public.customers`, `public.order_items`, `public.orders`, `public.products`.

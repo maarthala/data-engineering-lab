@@ -74,7 +74,7 @@ With Core and SQL on, the right side starts like this (shortened):
 | **Spark** | spark-master, spark-worker-1, spark-connect | Spark code: in a notebook (`SparkSession`) or in a DAG (`lab_spark()`) |
 | **Airflow** | airflow-* | DAGs (they come from your bucket, so Notebooks can stay off; DAGs using Spark need **Spark**) |
 | **Superset** | superset | dashboards (starting it also starts **SQL**; stopping SQL also stops it) |
-| **Streaming** | kafka, kafka-connect | 📡 Ingestion with Debezium (Datastream, cron jobs). **Off after `make up`** — switch it on when you need it |
+| **Streaming** | kafka, kafka-connect, event-sim | 📡 Ingestion with Debezium, and 📨 Pub/Sub (the event streams). **Off after `make up`** — switch it on when you need it |
 
 ## Good to know
 

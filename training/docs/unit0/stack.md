@@ -96,6 +96,13 @@ with **Polaris** as the single catalog that every engine consults before touchin
 | **Superset** | **BI dashboards** on the Gold layer — queries via Trino, caches in Redis. |
 | **home** | The **landing portal** (nginx) — one page linking every UI. Start here. |
 
+### Streaming — off until it's needed
+| Service | What it is |
+|---|---|
+| **Kafka** | The **event log**: topics of events (📨 Pub/Sub streams, 📡 Ingestion's change streams), kept for a while so readers can start late. Members' notebooks reach it with their own login (from 🔑 My secrets). |
+| **Kafka Connect** | Runs **connectors**: Debezium (reads a database's changes into Kafka) and the Iceberg sink (writes topics into lakehouse tables). |
+| **event-sim** | Publishes each member's 📨 **Pub/Sub** streams: clicks, orders, payments, stock moves — some late, if the stream asks. |
+
 ## Access & ports
 
 On **Compose** each tool publishes a `localhost` port; on **Kubernetes** each is an
@@ -162,7 +169,7 @@ but disabled by default (re-enable if a lesson needs them):
 - **An alternative catalog** — evaluated earlier; **paused** in favour of Polaris (revisit later).
 - **Keycloak** — an external SSO/identity server; **dropped** for training (principals log in with a client id/secret; an IdP is the production path).
 - **iceberg-rest** — the earlier ungoverned catalog; **folded into Polaris** (one catalog now).
-- **Kafka / Kafka-Connect / Kafka-UI, ClickHouse, Hive Metastore, Hue** — not needed for this course's batch/lakehouse focus.
+- **Kafka-UI, ClickHouse, Hive Metastore, Hue** — not needed for this course (Kafka itself is the **Streaming** unit, above).
 
 ## You can now…
 - Name **every service** in the stack and what it's responsible for

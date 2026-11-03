@@ -295,6 +295,12 @@ rows: 1
   catalog, a namespace (🧹 on its row) or one table; it runs every night, or **Run now**.
 - **👥 Who has access** (under Sharing) — everyone who can reach the catalog and how: you, your
   shares, and roles a lab manager gave on **🛡 Governance**.
+- **🧹 Reset…** (next to *ⓘ How to use it*, on your main lakehouse) — start your lakehouse
+  over: every table, view and namespace you made in `<you>_lake` is deleted, and bronze / silver /
+  gold come back empty with the sample table. A warning lists what goes; type the lakehouse's name
+  to confirm. **Your files stay** (My files, notebooks, DAGs, dbt), and so do your other catalogs,
+  shares, secrets and Ingestion sources and destinations. Ingestion jobs that wrote into it are
+  stopped, and your 📨 Pub/Sub streams paused.
 
 ## My secrets — keys and passwords in a key vault
 
@@ -436,8 +442,9 @@ keep their own lakehouse). It also creates teams and deletes empty ones. **📊 
 signed in, used Jupyter, changed files or tables and ran a DAG, so managers can find members who
 no longer use the lab (filter *inactive 30+ days*) and delete them. **⚙️ Settings** switches **self-registration** on or off (on while a new batch
 signs up, off otherwise) and sets the **members' limits**: after how many idle minutes a Jupyter
-server stops, Jupyter memory and CPU per member (from their next server start), and the member and
-team bucket sizes (applied to every bucket at once). Its **Services** list shows which tools run,
+server stops, Jupyter memory and CPU per member (from their next server start), the member and
+team bucket sizes (applied to every bucket at once), and how many 📨 Pub/Sub streams a member may
+have and how many events a second each may send. Its **Services** list shows which tools run,
 in **units** (SQL, Notebooks, Spark, Airflow, Superset, Streaming). On the shared server,
 managers switch a unit off to free memory and CPU while the class doesn't need it, and back on
 later. All data is kept, and members see its tiles greyed: *Not running. Contact admin.* On a lab
