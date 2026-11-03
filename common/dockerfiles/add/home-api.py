@@ -406,7 +406,7 @@ class Handler(BaseHTTPRequestHandler):
             if method == "GET":
                 if path == "/api/cdc":
                     labcdc.ensure_default_destination(name, f"{name}_lake")
-                    return self._json(200, labcdc.overview(name, cats))
+                    return self._json(200, dict(labcdc.overview(name, cats), manager=self._manager()))
                 if path == "/api/cdc/task":
                     return self._json(200, labcdc.task(name, q.get("id", "0")))
                 if path == "/api/cdc/runs":

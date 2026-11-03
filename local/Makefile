@@ -48,7 +48,7 @@ down: ## Bring the stack down (members' Jupyter servers too) — keeps all data 
 	@if command -v python3 >/dev/null 2>&1; then python3 tools/up.py --stop; else \
 	  ids=$$(docker ps -aq --filter "name=^jupyter-"); \
 	  if [ -n "$$ids" ]; then echo "Removing members' Jupyter servers..."; docker rm -f $$ids >/dev/null; fi; \
-	  $(COMPOSE) down; fi
+	  $(COMPOSE) --profile "*" down; fi
 
 stop: down ## Same as make down
 

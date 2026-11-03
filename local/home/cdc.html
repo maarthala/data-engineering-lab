@@ -248,6 +248,7 @@
       clearTimeout(timer);
       var r = route(), page = r[0], id = r[1];
       main.innerHTML = '';
+      offNotice();
       if (page === 'new-job') return newJob();
       if (page === 'job') return jobPage(+id);
       if (page === 'new-source') return sourcePage({kind: 'postgres', cdc: true});
@@ -257,6 +258,16 @@
       listPage(['jobs', 'sources', 'destinations'].indexOf(page) >= 0 ? page : 'jobs');
     }
     function byId(list, id) { return list.filter(function (x) { return x.id === id; })[0] || null; }
+    // the Streaming unit (Kafka + Kafka Connect) is off: Debezium jobs wait — say so on every screen
+    function offNotice() {
+      if (data.engine !== 'debezium' || data.streaming) return;
+      main.appendChild(el('div', {class: 'card', style: 'margin-bottom:14px; border-left:4px solid var(--gold); background:var(--warn-bg)'}, [
+        el('b', {text: '⏸ Streaming is off'}),
+        el('div', {class: 'sub', style: 'margin-top:4px', text: 'Jobs need it to run: Datastream jobs wait, Run now and Cron runs fail until it\'s on. ' +
+          'Sources and destinations work as usual. ' + (data.manager
+            ? 'Switch it on in the terminal: make status → Streaming → s.'
+            : 'Ask a lab manager to switch on the Streaming unit.')})]));
+    }
     function showFlash() {
       if (!flash) return;
       var f = flash; flash = null;

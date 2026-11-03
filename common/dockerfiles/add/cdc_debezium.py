@@ -49,6 +49,10 @@ class DbzError(RuntimeError):
     pass
 
 
+class Off(DbzError):
+    """The Streaming unit (Kafka, Kafka Connect) isn't running."""
+
+
 class SetupError(DbzError):
     """The job can't start as it is (e.g. its tables belong to something else): it stops, and says why."""
 
@@ -65,8 +69,9 @@ def _rest(method, path, body=None, ok404=False):
             return None
         msg = e.read()[:300].decode("utf-8", "replace")
         raise DbzError(f"Kafka Connect {method} {path.split('?')[0]}: HTTP {e.code} {msg}") from None
-    except urllib.error.URLError as e:
-        raise DbzError(f"can't reach Kafka Connect ({CONNECT}): {e.reason}") from None
+    except (urllib.error.URLError, OSError) as e:
+        raise Off(f"Kafka Connect isn't running ({getattr(e, 'reason', e)}) — the Streaming unit is off: "
+                  "a lab manager switches it on (make status → Streaming → s)") from None
     return json.loads(raw) if raw else None
 
 
@@ -644,10 +649,28 @@ def _stream_run(j, conns):
        (records, json.dumps(meta), err, _stream_log(j["id"], meta), r["id"]), rows=False)
 
 
+_off_said = [None]
+
+
 def reconcile():
     jobs = {j["id"]: j for j in _q("SELECT * FROM cdc_jobs WHERE engine = 'debezium'")}
     running = {t["ref"] for t in _q("SELECT ref FROM cdc_tasks WHERE kind = 'run' AND status IN ('queued', 'running')")}
-    conns = _connectors()
+    try:
+        conns = _connectors()
+    except Off as e:                                     # the unit is off: nothing to keep in step — say so once
+        global _admin_client
+        _admin_client = None                             # (a Kafka client left alone keeps retrying, and logging)
+        if _off_said[0] != "off":
+            print(f"[cdc] {e}", flush=True)
+            _off_said[0] = "off"
+        return
+    except DbzError as e:
+        if "HTTP 404" in str(e) or "HTTP 503" in str(e):   # Kafka Connect still starting: next round
+            return
+        raise
+    if _off_said[0] == "off":
+        print("[cdc] Kafka Connect is up again (the Streaming unit)", flush=True)
+    _off_said[0] = "on"
     # what deleted jobs left: their connectors, topics, secret files
     gone = sorted({int(CONN.match(n).group(1)) for n in conns} - set(jobs))
     for jid in gone:

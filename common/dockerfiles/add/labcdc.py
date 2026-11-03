@@ -38,6 +38,7 @@ KINDS = {"postgres": {"name": "PostgreSQL", "port": 5432,
 ENGINE = os.environ.get("CDC_ENGINE", "olake")              # new jobs: olake | debezium
 # a job's schedule: '' (manual), 'stream' (always on — debezium only) or a cron expression (UTC)
 LEGACY = {"15m": "*/15 * * * *", "1h": "0 * * * *", "1d": "0 2 * * *"}     # the old presets
+CONNECT = os.environ.get("CONNECT_URL", "http://kafka-connect:8083")      # debezium: the Streaming unit
 MODES = {"cdc": "full load, then changes (CDC)",                 # one row per key: the latest (upsert)
          "append": "full load, then every change as a new row",  # the history: build SCD2 from it
          "full_refresh": "full reload every run"}                # olake only
@@ -244,6 +245,27 @@ def modes(engine):
     return {k: v for k, v in MODES.items() if engine == "olake" or k != "full_refresh"}
 
 
+_stream_seen = [0.0, False]
+
+
+def streaming_on():
+    """Debezium: is the Streaming unit (Kafka Connect) up? Asked at most every 10 s."""
+    import socket
+    import time
+    import urllib.parse
+    if ENGINE != "debezium":
+        return True
+    if time.time() - _stream_seen[0] > 10:
+        u = urllib.parse.urlparse(CONNECT)
+        try:
+            socket.create_connection((u.hostname, u.port or 80), timeout=1).close()
+            _stream_seen[1] = True
+        except OSError:
+            _stream_seen[1] = False
+        _stream_seen[0] = time.time()
+    return _stream_seen[1]
+
+
 def kinds():
     return {k: v for k, v in KINDS.items() if ENGINE == "olake" or k == "postgres"}
 
@@ -266,7 +288,7 @@ def overview(member, catalogs=()):
                       "tables": j["tables"], "mode": j["mode"], "schedule": j["schedule"], "enabled": j["enabled"],
                       "engine": j["engine"], "next_run": _next_run(j),
                       "created_at": _iso(j["created_at"]), "last": j["last"], "busy": j["busy"]} for j in jobs],
-            "catalogs": list(catalogs), "engine": ENGINE, "modes": modes(ENGINE),
+            "catalogs": list(catalogs), "engine": ENGINE, "streaming": streaming_on(), "modes": modes(ENGINE),
             "kinds": kinds()}
 
 

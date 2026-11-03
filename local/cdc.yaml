@@ -94,10 +94,12 @@ services:
     networks:
       - sparknet
 
+  # The Streaming unit (off until needed: make status → Streaming → s) — Debezium jobs run here.
   # Kafka (one broker, KRaft — no ZooKeeper): the change stream of every Debezium job, kept 7 days
   kafka:
     image: apache/kafka:4.3.1
     container_name: kafka
+    profiles: ["streaming"]                      # the Streaming unit: make status → Streaming → s (not make up)
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -132,6 +134,7 @@ services:
       context: ../common/dockerfiles
       dockerfile: Dockerfile.kafka-connect
     container_name: kafka-connect
+    profiles: ["streaming"]
     volumes:
       - lab-secrets:/run/lab-secrets:ro
     depends_on:

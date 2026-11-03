@@ -52,8 +52,10 @@ GROUPS = [
     ("Airflow", ["airflow-init", "airflow-apiserver", "airflow-scheduler", "airflow-dag-processor", "airflow-dag-processor-learners"]),
     ("Superset", ["superset"]),
     ("Polaris console", ["polaris-console", "polaris-proxy"]),
+    ("Streaming", ["kafka", "kafka-connect"]),          # Debezium + Kafka for 📡 Ingestion — only when needed
 ]
 LOCKED = {"Core"}
+OFF = {"Streaming"}                    # make up leaves these off (a compose profile); make status s starts them
 NEEDS = {"Superset": ["SQL"]}          # starting Superset starts SQL; stopping SQL stops Superset
 USES = {"Notebooks": "Spark", "Airflow": "Spark"}  # only some work needs it: a hint, not started for you
 # one open port (the gateway): the portal and every app by name — tools open inside the portal
@@ -86,8 +88,11 @@ BAD = {"failed", "unhealthy", "restarting"}
 UNITS = {"B": 1, "KiB": 2**10, "MiB": 2**20, "GiB": 2**30, "TiB": 2**40, "kB": 1e3, "MB": 1e6, "GB": 1e9}
 
 
+ALL = ["--profile", "*"]       # also the units make up leaves off (OFF): their config, state and logs
+
+
 def compose(*args):
-    return subprocess.run(["docker", "compose", *args], cwd=HERE, capture_output=True, text=True)
+    return subprocess.run(["docker", "compose", *ALL, *args], cwd=HERE, capture_output=True, text=True)
 
 
 def size(text):
@@ -111,6 +116,10 @@ class Stack:
         self.mode = mode                        # up · watch · stop
         cfg = json.loads(compose("config", "--format", "json").stdout or "{}").get("services", {})
         self.names = list(cfg) or [s for _, g in GROUPS for s in g]
+        if mode != "watch":                     # make up / down: an OFF unit only when it's running
+            up = set(subprocess.run(["docker", "ps", "--format", "{{.Names}}"], capture_output=True, text=True).stdout.split())
+            off = {m for t, g in GROUPS if t in OFF for m in g}
+            self.names = [n for n in self.names if n not in off or cfg.get(n, {}).get("container_name", n) in up]
         self.container = {s.get("container_name", f"local-{n}-1"): n for n, s in cfg.items()}
         # setup jobs (run once, exit 0): restart "no", or what others wait on to complete
         self.oneshot = {n for n, s in cfg.items() if s.get("restart") == "no"} | {
@@ -606,7 +615,7 @@ def run_stop(stack, dry=False):
         stack.log(" Network local_sparknet Removed ")
         stack.compose_rc = 0
         return
-    p = subprocess.Popen(["docker", "compose", "--progress", "plain", "down"], cwd=HERE, stdout=subprocess.PIPE,
+    p = subprocess.Popen(["docker", "compose", *ALL, "--progress", "plain", "down"], cwd=HERE, stdout=subprocess.PIPE,
                          stderr=subprocess.STDOUT, text=True, bufsize=1)
     for line in p.stdout:
         stack.log(line.rstrip("\n"))
@@ -692,7 +701,7 @@ def run_unit(stack, action, units):
         out.write(f"\n== {time.strftime('%H:%M:%S')} {action} {' + '.join(units)} ==\n")
         out.flush()
         start = out.tell()
-        p = subprocess.Popen(["docker", "compose", "--progress", "plain", *cmd, *svcs], cwd=HERE,
+        p = subprocess.Popen(["docker", "compose", *ALL, "--progress", "plain", *cmd, *svcs], cwd=HERE,
                              stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, start_new_session=True)
     with open(UNIT_LOG, errors="replace") as f:
         f.seek(start)
@@ -1105,7 +1114,7 @@ def stop_plain():
     if ids:
         print("Removing members' Jupyter servers...")
         subprocess.run(["docker", "rm", "-f", *ids], capture_output=True)
-    return subprocess.call(["docker", "compose", "down"], cwd=HERE)
+    return subprocess.call(["docker", "compose", *ALL, "down"], cwd=HERE)
 
 
 def main():
@@ -1130,7 +1139,7 @@ def main():
         if stopping:
             sys.exit(stop_plain() if "--dry-run" not in sys.argv else 0)
         if watch:
-            sys.exit(subprocess.call(["docker", "compose", "ps"], cwd=HERE))
+            sys.exit(subprocess.call(["docker", "compose", *ALL, "ps"], cwd=HERE))
         rc = subprocess.call(["docker", "compose", "up", "-d"] + (["--build"] if BUILD else []), cwd=HERE)
         if rc == 0:
             line = ensure_shared_lake()

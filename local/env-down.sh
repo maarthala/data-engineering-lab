@@ -4,4 +4,4 @@
 set -e
 ids=$(docker ps -aq --filter "name=^jupyter-")          # members' Jupyter servers (JupyterHub's)
 [ -n "$ids" ] && docker rm -f $ids >/dev/null
-docker compose down
+docker compose --profile "*" down        # the units make up leaves off too (Streaming)
