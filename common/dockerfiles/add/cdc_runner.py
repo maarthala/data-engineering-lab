@@ -477,7 +477,16 @@ def drop_source(t):
     return {"note": note}
 
 
-KINDS = {"test_source": test_source, "browse": browse, "drop_source": drop_source, "check_source": check_source, "check_destination": check_destination, "discover": discover, "run": run}
+def maintain(t):
+    """🧹 table maintenance (labmaint.py): Run now on a table / namespace / catalog, or the nightly round."""
+    import labmaint
+    p = t["payload"] or {}
+    if not p.get("catalog"):
+        return {}
+    return labmaint.run(p["catalog"], p.get("namespace"), p.get("table"), p.get("trigger", "run now"))
+
+
+KINDS = {"maintain": maintain, "test_source": test_source, "browse": browse, "drop_source": drop_source, "check_source": check_source, "check_destination": check_destination, "discover": discover, "run": run}
 
 
 # ---- the loop ------------------------------------------------------------------------------
@@ -529,6 +538,11 @@ def main():
             if time.time() - last_due > 30:
                 _due()
                 last_due = time.time()
+                try:
+                    import labmaint
+                    labmaint.nightly_due()                 # 🧹 once a day, the tables' maintenance
+                except Exception as e:  # noqa: BLE001 — Polaris may be restarting
+                    print(f"[cdc] maintenance: {e}", flush=True)
             if labcdc.ENGINE == "debezium" and time.time() - last_dbz > 10:
                 last_dbz = time.time()
                 try:

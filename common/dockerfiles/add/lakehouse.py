@@ -873,7 +873,8 @@ def catalog_tree(name, cat, namespace=None):
     if namespace:
         ns = urllib.parse.quote(chr(31).join(namespace.split(".")))
         return [i["name"] for i in _get(f"/api/catalog/v1/{cat}/namespaces/{ns}/tables", t).get("identifiers", [])]
-    return [".".join(ns) for ns in _get(f"/api/catalog/v1/{cat}/namespaces", t)["namespaces"]]
+    return [".".join(ns) for ns in _get(f"/api/catalog/v1/{cat}/namespaces", t)["namespaces"]
+            if ns != ["lab_maintenance"]]            # 🧹 the maintenance policies live there (labmaint)
 
 
 def drop_table(name, cat, namespace, table):
@@ -891,6 +892,12 @@ def drop_table(name, cat, namespace, table):
     st, _ = _call("DELETE", path, token=t)              # the admin may not purge — the files go below
     if st == 404:
         raise ValueError("no such table")
+    if st in (200, 204):
+        try:
+            import labmaint
+            labmaint.forget_table(cat, namespace, table, t)     # its own maintenance policies
+        except Exception as e:  # noqa: BLE001
+            print(f"[lakehouse] policies of {cat}.{namespace}.{table}: {e}", flush=True)
     if st not in (200, 204):
         raise RuntimeError(f"drop table: HTTP {st}")
     n = 0
@@ -922,7 +929,15 @@ def drop_namespace(name, cat, namespace):
     t = _admin_token()
     if not _owned(name, cat, t):
         raise PermissionError("not your catalog")
+    if namespace == "lab_maintenance":
+        raise ValueError("lab_maintenance keeps this catalog's maintenance policies")
     st, _ = _call("DELETE", f"/api/catalog/v1/{cat}/namespaces/" + urllib.parse.quote(chr(31).join(namespace.split("."))), token=t)
+    if st in (200, 204):
+        try:
+            import labmaint
+            labmaint.forget_namespace(cat, namespace, t)
+        except Exception as e:  # noqa: BLE001
+            print(f"[lakehouse] policies of {cat}.{namespace}: {e}", flush=True)
     if st == 409:
         raise ValueError("this namespace still has tables (or namespaces) — delete them first")
     if st == 404:

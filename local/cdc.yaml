@@ -36,6 +36,7 @@ services:
       - ../common/dockerfiles/add/labcdc.py:/app/labcdc.py:ro
       - ../common/dockerfiles/add/cdc_runner.py:/app/cdc_runner.py:ro
       - ../common/dockerfiles/add/cdc_debezium.py:/app/cdc_debezium.py:ro
+      - ../common/dockerfiles/add/labmaint.py:/app/labmaint.py:ro   # 🧹 table maintenance runs here too
     depends_on:
       portal-db:
         condition: service_completed_successfully
