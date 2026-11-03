@@ -7,6 +7,10 @@ import logging as _logging, warnings as _warnings
 # Apache Beam's Google Cloud parts warn on import (Python 3.10 support, no apitools) — noise here
 _warnings.filterwarnings("ignore", category=FutureWarning, module=r"google\..*")
 _logging.getLogger().addFilter(lambda r: "apitools not found" not in r.getMessage())
+# … and Interactive Beam's charts (not installed) — Beam works without them
+_logging.getLogger("apache_beam.runners.interactive.interactive_environment").setLevel(_logging.ERROR)
+_logging.getLogger("apache_beam.utils.subprocess_server").setLevel(_logging.ERROR)   # the local runner starting / stopping
+_logging.getLogger("PrismJobServer").addFilter(lambda r: r.levelno >= _logging.WARNING)   # … and its progress lines
 
 # Under JupyterHub every learner has their own lakehouse (LAKE_* set by the Hub's spawn
 # hook): `my` (and the older name `iceberg`, still the default catalog) then means THEIR
@@ -227,7 +231,8 @@ def lab_beam(runner="local", name="beam", parallelism=None, **options):
     elif runner != "local":
         raise ValueError("runner: 'local' (Prism, in Jupyter) or 'flink' (the Flink unit)")
     opts.update(options)
-    return PipelineOptions(**{k: v for k, v in opts.items() if v is not None})
+    # flags=[]: not the notebook's own command line (Jupyter's "-f kernel-….json")
+    return PipelineOptions(flags=[], **{k: v for k, v in opts.items() if v is not None})
 
 
 def lab_env(quiet=False):
