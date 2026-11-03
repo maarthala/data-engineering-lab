@@ -13,9 +13,10 @@ The work is done by one of two **engines**, depending on the stack:
 
 - **OLake** — each run is one OLake container: it reads, writes the Iceberg tables as **you**, and
   stops.
-- **Debezium + Kafka** (the laptop stack) — the job is two always-there *connectors* (a reader
+- **Debezium + Kafka** (what new jobs use) — the job is two always-there *connectors* (a reader
   and a writer) that a run wakes up and puts back to sleep; they can also run all the time
-  ([Live data](datastream.md)).
+  ([Live data](datastream.md)). They live in the **Streaming** unit, which a lab manager switches
+  on when the class needs it.
 
 A job's page shows which one it uses (**Engine**). Either way there are no keys to type: the lab
 gives the job your own lakehouse login.

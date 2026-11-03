@@ -118,11 +118,21 @@ labDb:
   image: postgres:18
   storage: 5Gi
 
+# 📡 Ingestion with Debezium: the Streaming unit (templates/streaming.yaml). Off until needed —
+# switched in Manage → ⚙️ Settings → Services; a chart apply sets it back to `replicas`.
+streaming:
+  enabled: true
+  replicas: 0
+  kafkaImage: apache/kafka:4.3.1
+  connectImage: ghcr.io/maarthala/de-stack/kafka-connect:20261103   # Debezium + Tabular's Iceberg sink (Dockerfile.kafka-connect)
+  storage: 10Gi
+
 # 📡 Ingestion (CDC): the runner (OLake engine pods) and Tidewell's simulator. The OLake images
 # (olakego/source-postgres|mysql|mssql:<olakeVersion>) are imported to the node, not pulled.
 cdc:
   enabled: true
-  image: ghcr.io/maarthala/de-stack/cdc-runner:20261102
+  image: ghcr.io/maarthala/de-stack/cdc-runner:20261103     # + confluent-kafka (Debezium jobs)
+  engine: debezium                    # new jobs: debezium (the Streaming unit) | olake (an engine pod per run)
   olakeVersion: v1.1.1
   memGb: "1.5"
   workers: "2"

@@ -1,0 +1,181 @@
+{{- if .Values.streaming.enabled }}
+# The Streaming unit — 📡 Ingestion with Debezium (CDC_ENGINE=debezium): Kafka (one broker, KRaft)
+# and one Kafka Connect worker. cdc-runner makes each job's two connectors (a Debezium Postgres
+# source, an Iceberg sink), pauses and resumes them. Off until needed: replicas from
+# streaming.replicas (0), switched in Manage → ⚙️ Settings → Services (a chart apply sets it back).
+#  kafka            the change stream of every job, kept 7 days, on its own volume
+#  kafka-connect    the worker + its helper (connect_secrets.py): cdc-runner hands the helper the
+#                   files a connector's ${dir:…} reads — passwords never sit in a connector's config
+# Only cdc-runner (and home-api, asking whether it's up) reach them: NetworkPolicies below.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kafka-data
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: {{ .Values.global.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.streaming.storage }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.streaming.replicas }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {{- include "de-stack.selector" (dict "app" "kafka") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "de-stack.selector" (dict "app" "kafka") | nindent 8 }}
+    spec:
+      enableServiceLinks: false          # KAFKA_* service variables would be read as broker settings
+      automountServiceAccountToken: false
+      securityContext: { fsGroup: 1000 }
+      containers:
+        - name: kafka
+          image: {{ .Values.streaming.kafkaImage }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          env:
+            - { name: KAFKA_NODE_ID, value: "1" }
+            - { name: KAFKA_PROCESS_ROLES, value: "broker,controller" }
+            - { name: KAFKA_LISTENERS, value: "PLAINTEXT://:9092,CONTROLLER://:9093" }
+            - { name: KAFKA_ADVERTISED_LISTENERS, value: "PLAINTEXT://kafka:9092" }
+            - { name: KAFKA_CONTROLLER_LISTENER_NAMES, value: CONTROLLER }
+            - { name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP, value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT" }
+            - { name: KAFKA_CONTROLLER_QUORUM_VOTERS, value: "1@localhost:9093" }
+            - { name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR, value: "1" }
+            - { name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR, value: "1" }
+            - { name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR, value: "1" }
+            - { name: KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR, value: "1" }
+            - { name: KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR, value: "1" }
+            - { name: KAFKA_LOG_RETENTION_HOURS, value: "168" }
+            - { name: KAFKA_LOG_DIRS, value: /var/lib/kafka/data/logs }
+            - { name: KAFKA_HEAP_OPTS, value: "-Xms256m -Xmx512m" }
+          ports:
+            - { name: kafka, containerPort: 9092 }
+          resources:
+            requests: { memory: 512Mi }
+            limits: { memory: 1Gi }
+          readinessProbe:
+            tcpSocket: { port: 9092 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/kafka/data }
+      volumes:
+        - { name: data, persistentVolumeClaim: { claimName: kafka-data } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "de-stack.selector" (dict "app" "kafka") | nindent 4 }}
+  ports:
+    - { name: kafka, port: 9092, targetPort: 9092 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-connect
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.streaming.replicas }}
+  selector:
+    matchLabels: {{- include "de-stack.selector" (dict "app" "kafka-connect") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "de-stack.selector" (dict "app" "kafka-connect") | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      containers:
+        - name: kafka-connect
+          image: {{ .Values.streaming.connectImage }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - { name: rest, containerPort: 8083 }
+          resources:
+            requests: { memory: 768Mi }
+            limits: { memory: 1536Mi }
+          readinessProbe:
+            httpGet: { path: /connectors, port: 8083 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          volumeMounts:
+            - { name: secrets, mountPath: /run/lab-secrets, readOnly: true }
+        - name: secrets-helper
+          image: {{ .Values.cdc.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          command: ["python", "/app/connect_secrets.py"]
+          env:
+            - { name: CDC_SECRETS_TOKEN, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: connect-secrets-token } } }
+          ports:
+            - { name: secrets, containerPort: 8090 }
+          resources:
+            requests: { memory: 32Mi }
+            limits: { memory: 96Mi }
+          volumeMounts:
+            - { name: secrets, mountPath: /run/lab-secrets }
+            - { name: lab-code, mountPath: /app/connect_secrets.py, subPath: connect_secrets.py }
+      volumes:
+        - { name: secrets, emptyDir: { medium: Memory, sizeLimit: 8Mi } }   # never on disk
+        - { name: lab-code, configMap: { name: lab-code } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-connect
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "de-stack.selector" (dict "app" "kafka-connect") | nindent 4 }}
+  ports:
+    - { name: rest, port: 8083, targetPort: 8083 }
+    - { name: secrets, port: 8090, targetPort: 8090 }
+---
+# only the Streaming unit itself and cdc-runner talk to Kafka (the broker too: it sends some
+# transaction requests to itself through its service name) …
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-clients
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "de-stack.selector" (dict "app" "kafka") | nindent 6 }}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector: { matchExpressions: [{ key: app.kubernetes.io/name, operator: In, values: [kafka, kafka-connect, cdc-runner] }] }
+      ports:
+        - { port: 9092, protocol: TCP }
+---
+# … and to Kafka Connect (its REST API and the secrets helper): cdc-runner; home-api only asks
+# whether it's up (the Ingestion page's "Streaming is off" notice)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-connect-clients
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "de-stack.selector" (dict "app" "kafka-connect") | nindent 6 }}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector: { matchExpressions: [{ key: app.kubernetes.io/name, operator: In, values: [cdc-runner] }] }
+      ports:
+        - { port: 8083, protocol: TCP }
+        - { port: 8090, protocol: TCP }
+    - from:
+        - podSelector: { matchExpressions: [{ key: app.kubernetes.io/name, operator: In, values: [home-api] }] }
+      ports:
+        - { port: 8083, protocol: TCP }
+{{- end }}

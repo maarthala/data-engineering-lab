@@ -14,7 +14,8 @@ Schedules:
                   to where the source was when the run began and the sink has committed it all,
                   then pauses them again (the change stream waits in the slot meanwhile)
 Passwords and keys never sit in a connector's config (Kafka keeps that in a topic): it names files
-(${dir:/run/lab-secrets/cdc-<job>:<name>}) written here, on a volume only kafka-connect reads.
+(${dir:/run/lab-secrets/cdc-<job>:<name>}) written here, on a volume only kafka-connect reads —
+on k8s through the kafka-connect pod's helper container (connect_secrets.py, CDC_SECRETS_URL).
 reconcile() keeps Kafka Connect in step with the jobs every few seconds: makes missing connectors,
 pauses / resumes them, restarts failed tasks, and removes what deleted jobs left (connectors,
 topics, secret files).
@@ -41,6 +42,8 @@ TIMEOUT = int(os.environ.get("CDC_TIMEOUT_S", "1800"))        # a run longer tha
 IDLE_S = 30                                                   # a quiet source: caught up after this long without news
 CONN = re.compile(r"^cdc-(\d+)-(src|sink)$")
 CONNECT_CONTAINER = os.environ.get("CONNECT_CONTAINER", "kafka-connect")   # local: its log, through the Docker socket
+SECRETS_URL = os.environ.get("CDC_SECRETS_URL", "").rstrip("/")           # k8s: the pod's helper
+SECRETS_TOKEN = os.environ.get("CDC_SECRETS_TOKEN", "")
 EVENTS = 60                                                   # a stream's log keeps its last events
 NOTE_S = 300                                                  # … and says how it's doing every 5 minutes
 
@@ -71,7 +74,7 @@ def _rest(method, path, body=None, ok404=False):
         raise DbzError(f"Kafka Connect {method} {path.split('?')[0]}: HTTP {e.code} {msg}") from None
     except (urllib.error.URLError, OSError) as e:
         raise Off(f"Kafka Connect isn't running ({getattr(e, 'reason', e)}) — the Streaming unit is off: "
-                  "a lab manager switches it on (make status → Streaming → s)") from None
+                  f"a lab manager switches it on ({labcdc.STREAMING_HOW})") from None
     return json.loads(raw) if raw else None
 
 
@@ -102,7 +105,7 @@ def connect_log(jid, since=None, lines=40):
             self.sock.settimeout(20)
             self.sock.connect("/var/run/docker.sock")
     if not os.path.exists("/var/run/docker.sock"):
-        return []
+        return _pod_log(jid, since, lines)
     try:
         c = _Sock("docker", timeout=20)
         q = "stdout=1&stderr=1&tail=4000" + (f"&since={int(since)}" if since else "")
@@ -119,10 +122,38 @@ def connect_log(jid, since=None, lines=40):
         n = int.from_bytes(raw[i + 4:i + 8], "big")
         out.append(raw[i + 8:i + 8 + n])
         i += 8 + n
+    return _keep(b"".join(out).decode("utf-8", "replace"), jid, lines)
+
+
+def _keep(text, jid, lines):
     tag = re.compile(rf"\bcdc-{jid}-(src|sink)\b")
-    keep = [l for l in b"".join(out).decode("utf-8", "replace").splitlines()
-            if tag.search(l) and not l.lstrip().startswith("at ") and not NOISE.search(l)]
+    keep = [l for l in text.splitlines() if tag.search(l) and not l.lstrip().startswith("at ") and not NOISE.search(l)]
     return [re.sub(r"\s*\([a-zA-Z0-9_.$]+:\d+\)\s*$", "", l)[:400] for l in keep[-lines:]]
+
+
+def _pod_log(jid, since, lines):
+    """k8s: the same lines from the kafka-connect pod's log (the runner may read pod logs)."""
+    sa = "/var/run/secrets/kubernetes.io/serviceaccount"
+    if not os.path.exists(f"{sa}/token"):
+        return []
+    import ssl
+    try:
+        ns, token = open(f"{sa}/namespace").read().strip(), open(f"{sa}/token").read().strip()
+        ctx = ssl.create_default_context(cafile=f"{sa}/ca.crt")
+
+        def get(path):
+            req = urllib.request.Request("https://kubernetes.default.svc" + path, headers={"Authorization": f"Bearer {token}"})
+            with urllib.request.urlopen(req, context=ctx, timeout=20) as r:
+                return r.read()
+        pods = json.loads(get(f"/api/v1/namespaces/{ns}/pods?labelSelector=" +
+                              urllib.parse.quote("app.kubernetes.io/name=kafka-connect")))["items"]
+        pod = next((p["metadata"]["name"] for p in pods if p["status"].get("phase") == "Running"), None)
+        if not pod:
+            return []
+        q = "container=kafka-connect&tailLines=4000" + (f"&sinceSeconds={max(1, int(time.time() - since))}" if since else "")
+        return _keep(get(f"/api/v1/namespaces/{ns}/pods/{pod}/log?{q}").decode("utf-8", "replace"), jid, lines)
+    except Exception:  # noqa: BLE001 — the log is a help, not the job
+        return []
 
 
 # ---- names ----------------------------------------------------------------------------------
@@ -352,13 +383,45 @@ def _namespace(s, d, schema):
     return d["namespace"] or re.sub(r"[^a-z0-9_]", "_", f"{s['dbname']}_{schema}".lower())
 
 
+def _helper(method, path, data=None):
+    """k8s: the kafka-connect pod's secrets helper (connect_secrets.py)."""
+    req = urllib.request.Request(SECRETS_URL + path, method=method, data=data, headers={"X-Token": SECRETS_TOKEN})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            raw = r.read()
+            return json.loads(raw) if raw else None
+    except (urllib.error.URLError, OSError) as e:
+        raise Off(f"Kafka Connect's secrets helper isn't reachable ({getattr(e, 'reason', e)}) — the Streaming unit is off: "
+                  f"a lab manager switches it on ({labcdc.STREAMING_HOW})") from None
+
+
+def _secret_dirs():
+    if SECRETS_URL:
+        return _helper("GET", "/") or []
+    return [n for n in os.listdir(SECRETS)] if os.path.isdir(SECRETS) else []
+
+
+def _drop_secrets(jid):
+    if SECRETS_URL:
+        try:
+            _helper("DELETE", f"/cdc-{jid}")
+        except Off:
+            pass
+        return
+    shutil.rmtree(_secret_dir(jid), ignore_errors=True)
+
+
 def write_secrets(j, s):
     env = _job_env(j["member"])
+    values = {"source-password": labcdc.password(s["member"], s["id"]), "catalog-credential": env["LAB_JOB_CREDENTIAL"],
+              "s3-key": env["LAB_JOB_S3_KEY"], "s3-secret": env["LAB_JOB_S3_SECRET"]}
+    if SECRETS_URL:
+        for key, value in values.items():
+            _helper("PUT", f"/cdc-{j['id']}/{key}", value.encode())
+        return
     path = _secret_dir(j["id"])
     os.makedirs(path, exist_ok=True)
-    for key, value in {"source-password": labcdc.password(s["member"], s["id"]),
-                       "catalog-credential": env["LAB_JOB_CREDENTIAL"],
-                       "s3-key": env["LAB_JOB_S3_KEY"], "s3-secret": env["LAB_JOB_S3_SECRET"]}.items():
+    for key, value in values.items():
         tmp = f"{path}/.{key}"
         with open(tmp, "w") as f:
             f.write(value)
@@ -675,10 +738,10 @@ def reconcile():
     gone = sorted({int(CONN.match(n).group(1)) for n in conns} - set(jobs))
     for jid in gone:
         cleanup(jid)
-    for name in os.listdir(SECRETS) if os.path.isdir(SECRETS) else []:
+    for name in _secret_dirs():
         m = re.fullmatch(r"cdc-(\d+)", name)
         if m and int(m.group(1)) not in jobs:
-            shutil.rmtree(f"{SECRETS}/{name}", ignore_errors=True)
+            _drop_secrets(int(m.group(1)))
     for j in jobs.values():
         if j["id"] in running:
             continue
@@ -718,5 +781,5 @@ def cleanup(jid):
                 f.result(timeout=30)
     except Exception as e:  # noqa: BLE001
         print(f"[cdc] topics of job {jid}: {e}", flush=True)
-    shutil.rmtree(_secret_dir(jid), ignore_errors=True)
+    _drop_secrets(jid)
     print(f"[cdc] removed debezium job {jid}'s connectors and topics", flush=True)

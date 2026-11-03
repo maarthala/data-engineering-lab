@@ -79,7 +79,7 @@ Open the run's **Log**. The usual causes:
 | `wal_level is not 'logical'` | the database can't do CDC | make the job a **Full reload**, or ask for `wal_level = logical` |
 | an error about the **replication slot** | the slot was dropped, or lost its log (the 1 GB cap) | **Check** the source (it makes a new slot), then recreate the job |
 | `this job is running already` (on **Run now**) | a run is still busy | wait; one run at a time per job |
-| `the Streaming unit is off` (Debezium) | Kafka + Kafka Connect aren't running | a lab manager switches on **Streaming** (`make status`) |
+| `the Streaming unit is off` (Debezium) | Kafka + Kafka Connect aren't running | a lab manager switches on **Streaming** (`make status`; team stack: Settings → Services) |
 | `… is there already, written by something else` (Debezium) | the destination's namespace holds a table another tool made (e.g. an OLake job's) | choose a destination with another namespace |
 
 ### 3 · Clean up in the right order

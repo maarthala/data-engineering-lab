@@ -39,6 +39,8 @@ ENGINE = os.environ.get("CDC_ENGINE", "olake")              # new jobs: olake | 
 # a job's schedule: '' (manual), 'stream' (always on — debezium only) or a cron expression (UTC)
 LEGACY = {"15m": "*/15 * * * *", "1h": "0 * * * *", "1d": "0 2 * * *"}     # the old presets
 CONNECT = os.environ.get("CONNECT_URL", "http://kafka-connect:8083")      # debezium: the Streaming unit
+STREAMING_HOW = ("Manage → ⚙️ Settings → Services → Streaming" if os.environ.get("KUBERNETES_SERVICE_HOST")
+                 else "make status → Streaming → s")
 MODES = {"cdc": "full load, then changes (CDC)",                 # one row per key: the latest (upsert)
          "append": "full load, then every change as a new row",  # the history: build SCD2 from it
          "full_refresh": "full reload every run"}                # olake only
@@ -288,7 +290,8 @@ def overview(member, catalogs=()):
                       "tables": j["tables"], "mode": j["mode"], "schedule": j["schedule"], "enabled": j["enabled"],
                       "engine": j["engine"], "next_run": _next_run(j),
                       "created_at": _iso(j["created_at"]), "last": j["last"], "busy": j["busy"]} for j in jobs],
-            "catalogs": list(catalogs), "engine": ENGINE, "streaming": streaming_on(), "modes": modes(ENGINE),
+            "catalogs": list(catalogs), "engine": ENGINE, "streaming": streaming_on(), "streaming_how": STREAMING_HOW,
+            "modes": modes(ENGINE),
             "kinds": kinds()}
 
 

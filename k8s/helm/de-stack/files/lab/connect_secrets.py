@@ -1,0 +1,1 @@
+../../../../../common/dockerfiles/add/connect_secrets.py

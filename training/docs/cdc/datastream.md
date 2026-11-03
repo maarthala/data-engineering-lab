@@ -23,11 +23,12 @@ flowchart LR
 A **commit** is one new snapshot of the table. That's the trade: fresher data, but many small
 files and snapshots — which is what [table maintenance](../unit4/table-maintenance.md) is for.
 
-!!! info "Needs the Streaming unit — and the Debezium engine"
+!!! info "Needs the Streaming unit"
     Kafka and Kafka Connect are the **Streaming** unit. It's off until a lab manager switches it on
-    (`make status` → **Streaming** → **s**); while it's off, the Ingestion page says so. Datastream
-    is offered only where Ingestion runs on Debezium (the laptop stack) — elsewhere the choice is
-    greyed out (*Needs the Debezium engine*).
+    — on your laptop `make status` → **Streaming** → **s**, on a team stack **Manage → ⚙️ Settings
+    → Services → Streaming** — and while it's off, the Ingestion page says so. (Jobs made before
+    Ingestion ran on Debezium keep their old engine, OLake, which has no Datastream: the choice is
+    greyed out for them.)
 
 ## Lab
 We'll stream Tidewell's **loyalty** system: its members and their points ([Meet the live shop](live-shop.md)).

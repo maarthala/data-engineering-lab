@@ -265,7 +265,7 @@
         el('b', {text: '⏸ Streaming is off'}),
         el('div', {class: 'sub', style: 'margin-top:4px', text: 'Jobs need it to run: Datastream jobs wait, Run now and Cron runs fail until it\'s on. ' +
           'Sources and destinations work as usual. ' + (data.manager
-            ? 'Switch it on in the terminal: make status → Streaming → s.'
+            ? 'Switch it on: ' + (data.streaming_how || 'make status → Streaming → s') + '.'
             : 'Ask a lab manager to switch on the Streaming unit.')})]));
     }
     function showFlash() {

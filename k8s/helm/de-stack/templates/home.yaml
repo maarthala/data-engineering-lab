@@ -212,7 +212,7 @@ spec:
             # ⚙️ Settings → Services: managers turn units off/on (scale to 0/1); stopped tools' tiles grey
             # the release deployed (its vX.Y.Z tag; ansible sets it) — managers get a "newer release" banner
             - { name: LAB_VERSION, value: {{ .Values.labVersion | default "" | quote }} }
-            - { name: LAB_UNITS, value: "SQL=trino,sqlpad;Notebooks=jupyterhub;Spark=spark-master,spark-worker,spark-connect;Airflow=airflow,airflow-parser;Superset=superset" }
+            - { name: LAB_UNITS, value: "SQL=trino,sqlpad;Notebooks=jupyterhub;Spark=spark-master,spark-worker,spark-connect;Airflow=airflow,airflow-parser;Superset=superset;Streaming=kafka,kafka-connect" }
             - { name: LAB_SERVICES, value: "jupyter=jupyterhub:8000,spark=spark-master:8080,sqlpad=sqlpad:3000,airflow=airflow-apiserver:8080,superset=superset:8088" }
             # "Manage members" (managers only): Keycloak admin + a JupyterHub service token
             - { name: KEYCLOAK_ADMIN_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: keycloak-admin-password } } }
@@ -233,6 +233,8 @@ spec:
             - { name: LAB_DB_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: lab-db-password } } }
             - { name: LABDB_ADMIN_URL, value: "postgresql://postgres:$(LAB_DB_PASSWORD)@lab-db:5432/postgres" }
             - { name: CDC_LAB_DB, value: "postgresql://reader:reader@lab-db:5432/shop" }
+            - { name: CDC_ENGINE, value: {{ .Values.cdc.engine | quote }} }
+            - { name: CONNECT_URL, value: "http://kafka-connect:8083" }
             {{- end }}
           ports:
             - { name: http, containerPort: 8000 }
@@ -358,7 +360,7 @@ metadata:
 rules:
   - apiGroups: ["apps"]
     resources: ["deployments", "deployments/scale"]
-    resourceNames: [trino, sqlpad, jupyterhub, spark-master, spark-worker, spark-connect, airflow, airflow-parser, superset]
+    resourceNames: [trino, sqlpad, jupyterhub, spark-master, spark-worker, spark-connect, airflow, airflow-parser, superset, kafka, kafka-connect]
     verbs: ["get", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

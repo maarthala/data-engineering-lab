@@ -175,7 +175,8 @@ home-api turns on Keycloak's LOGIN events (90 days) at start. SQLPad / Superset 
   - Jupyter memory / CPU per member — from each member's next server start
   - member / team bucket size — applied to every bucket at once
 - **Services** — the tools in units: SQL (trino, sqlpad), Notebooks (jupyterhub), Spark
-  (spark-master/-worker/-connect), Airflow, Superset (needs SQL); Core (sign-in,
+  (spark-master/-worker/-connect), Airflow, Superset (needs SQL), Streaming (kafka, kafka-connect —
+  📡 Ingestion's Debezium jobs; off after a chart apply, `streaming.replicas: 0`); Core (sign-in,
   storage, catalog, home) is always on. A switch per unit scales its Deployments to 0 / 1 —
   turn off what the class isn't using to free the node. Off keeps all data; off for Notebooks
   first stops the members' Jupyter servers (the switch names them). Members see the tiles of an
