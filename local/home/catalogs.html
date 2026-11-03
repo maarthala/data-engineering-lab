@@ -29,6 +29,11 @@
     td.r button + button{margin-left:4px}
     .helpbtn{float:right} .helpbox{margin-top:12px; padding:12px; border:1px dashed var(--line); border-radius:9px; background:var(--panel2)}
     .helpbox pre{margin-bottom:8px}
+    .resetbtn{float:right; margin-right:6px}
+    .resetbox{margin-top:12px; padding:12px 14px; border:1px solid var(--danger); border-left-width:4px; border-radius:9px; background:var(--bad-bg)}
+    .resetbox b.warn{display:block; color:var(--bad-ink); margin-bottom:6px}
+    .resetbox ul{margin:6px 0 8px; padding-left:18px; font-size:.86rem} .resetbox li{margin:2px 0}
+    .resetbox .row{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:8px} .resetbox .row input{flex:1; min-width:180px}
     .cardhead{display:flex; align-items:center; justify-content:space-between; gap:8px} .cardhead h3{margin:0}
     .invite{display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:8px}
     .invite input{width:240px} .invite select{max-width:100%}
@@ -125,6 +130,54 @@
       nodes.forEach(function (x) { box.appendChild(x); });
       b.onclick = function () { box.hidden = !box.hidden; b.textContent = box.hidden ? 'ⓘ How to use it' : '✕ Hide help'; };
       head.insertBefore(b, head.firstChild); head.appendChild(box);
+    }
+    // "🧹 Reset…" next to it (your main lakehouse only): its tables and namespaces go, your files stay —
+    // a warning that says so, then type the
+    // lakehouse's name to confirm (no browser popups); the lab does it in the background (a minute)
+    function resetBtn(head, name) {
+      var b = el('button', 'small danger resetbtn', '🧹 Reset…'), box = el('div', 'resetbox'); box.hidden = true;
+      var bucket = name.replace(/_lake$/, '').replace(/_/g, '-') + '-lake';
+      function close() { box.hidden = true; box.innerHTML = ''; b.disabled = false; }
+      b.onclick = function () {
+        if (!box.hidden) return close();
+        b.disabled = true; box.hidden = false; box.innerHTML = '';
+        box.appendChild(el('b', 'warn', '⚠️ This deletes every table in ' + name + ' — it can\'t be undone.'));
+        var ul = el('ul');
+        ['every table and view, and every namespace you made — bronze / silver / gold come back empty (with the sample table)',
+         'their data in your bucket (' + bucket + '/tables/)',
+         '📡 Ingestion jobs writing into it are stopped, your 📨 Pub/Sub streams paused'].forEach(function (t) { ul.appendChild(el('li', null, t)); });
+        box.appendChild(ul);
+        box.appendChild(el('div', 'sub', 'Stays: your files (My files, notebooks, DAGs, dbt), your other catalogs, the shares you gave, 🔑 secrets, Ingestion sources and destinations, your account.'));
+        var row = el('div', 'row'), inp = el('input'), go = el('button', 'danger', 'Delete and reset'), no = el('button', null, 'Cancel'), msg = el('div', 'sub');
+        inp.placeholder = 'type ' + name + ' to confirm'; inp.autocomplete = 'off'; go.disabled = true;
+        inp.oninput = function () { go.disabled = inp.value.trim() !== name; };
+        no.onclick = close;
+        go.onclick = function () {
+          go.disabled = no.disabled = inp.disabled = true; msg.textContent = '… resetting — about a minute';
+          fetch('/api/home/reset', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-Lab-Request': '1'},
+                                    body: JSON.stringify({confirm: inp.value.trim()})})
+            .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status); return j; }); })
+            .then(function (j) { poll(j.job); })
+            .catch(function (e) { msg.textContent = '✗ ' + e.message; no.disabled = inp.disabled = false; go.disabled = inp.value.trim() !== name; });
+        };
+        function poll(id) {
+          fetch('/api/home/reset?id=' + id, {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (j) {
+            if (j.state === 'running') return setTimeout(function () { poll(id); }, 3000);
+            if (j.state === 'error') { msg.textContent = '✗ ' + j.error; no.disabled = false; return; }
+            var r = j.result;
+            close();
+            toast('✓ ' + name + ' reset: ' + r.dropped + ' tables dropped (' + r.files_removed + ' data files)' +
+                  (r.jobs_stopped.length ? ' · Ingestion jobs stopped: ' + r.jobs_stopped.join(', ') : '') +
+                  (r.streams_paused.length ? ' · streams paused: ' + r.streams_paused.join(', ') : ''));
+            load(true);
+          }).catch(function () { setTimeout(function () { poll(id); }, 5000); });
+        }
+        row.appendChild(inp); row.appendChild(go); row.appendChild(no);
+        box.appendChild(row); box.appendChild(msg);
+        inp.focus();
+      };
+      head.insertBefore(b, head.firstChild.nextSibling);   // floats right: just left of "How to use it"
+      head.appendChild(box);
     }
     function load(keep) {
       return api('GET', '').then(function (r) {
@@ -276,6 +329,7 @@
       tbody.innerHTML = '<tr><td class="sub">Loading…</td></tr>';
       help(head, [info.default ? (function () { var p = el('pre'); p.textContent = '# notebooks: already set up as `my`\nspark.sql("SHOW NAMESPACES IN my").show()\n\n-- SQL editor\nSELECT * FROM ' + name + '.<namespace>.<table>;'; return p; })() : snippet(name),
         el('div', 'sub', 'Tables are made by code (e.g. df.writeTo("' + (info.default ? 'my' : name) + '.bronze.orders").create()) or by 📡 Ingestion. ⧉ next to a table copies its full name.')]);
+      if (info.default) resetBtn(head, name);
 
       var nsList;
       function namespaces() {

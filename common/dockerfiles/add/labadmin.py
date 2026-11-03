@@ -645,23 +645,23 @@ def _pause_writers(name, lake):
 
 
 def reset_mine(user):
-    """🧹 Reset my lakehouse — a member's own button (🏠 Home): <user>_lake and their whole bucket back
-    to a new member's setup (bronze / silver / gold, the starter files, the sample table), with a
-    fresh Jupyter. Their extra catalogs, the shares they gave, 🔑 secrets, 📡 Ingestion sources and
-    destinations and the account stay; jobs writing into the lake are stopped, streams paused."""
+    """🧹 Reset my lakehouse — a member's own button (🗂️ My catalogs, their main lakehouse): every table,
+    view and namespace in <user>_lake dropped and their data (tables/ in the bucket) removed; bronze /
+    silver / gold come back empty, with the sample table. Their files (files/ — My files, notebooks,
+    DAGs, dbt) stay, so Jupyter keeps going; so do extra catalogs, shares given, 🔑 secrets, 📡 Ingestion
+    sources / destinations and the account. Jobs writing into the lake are stopped, streams paused."""
     _check(user)
     name, t = lh.lake_name(user), lh._admin_token()
     lake = f"{name}_lake"
     if lake not in _owned_catalogs(name, t):
         raise AdminError("you have no lakehouse yet")
     jobs, streams = _pause_writers(name, lake)
-    jupyter = _hub_forget(user)                   # first: a running Jupyter would sync files back
     lh.trino_catalog(lake, t)
     dropped = _clear_catalog(lake, _content_token())
-    files = _empty_prefix(lh.bucket_name(name), "")
+    files = _empty_prefix(lh.bucket_name(name), "tables/")
     lh.provision(name)
-    print(f"[labadmin] {user} reset their lakehouse: {dropped} tables, {files} files", flush=True)
-    return {"user": user, "lakehouse": lake, "dropped": dropped, "files_removed": files, "jupyter_reset": jupyter,
+    print(f"[labadmin] {user} reset their lakehouse: {dropped} tables, {files} table files", flush=True)
+    return {"user": user, "lakehouse": lake, "dropped": dropped, "files_removed": files,
             "jobs_stopped": jobs, "streams_paused": streams}
 
 

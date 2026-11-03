@@ -84,7 +84,7 @@ go (leaving = pause), the review comes after submitting. Changes need the X-Lab-
   POST   /api/cdc/jobs {"name", "source", "destination", "discover", "tables", "mode", "schedule"}
          …/jobs/run · …/jobs/delete {"id"} · …/jobs/set {"id", "enabled"?, "schedule"?}
   GET    /api/cdc/task?id=… · /api/cdc/runs?job=… · /api/cdc/run?id=… (its log)
-"🧹 Reset my lakehouse" (🏠 Home) — the member's own lake + bucket back to a new member's setup (labadmin.reset_mine):
+"🧹 Reset my lakehouse" (🗂️ My catalogs) — the member's own lake back to empty bronze / silver / gold (labadmin.reset_mine; files/ stay):
   POST   /api/home/reset {"confirm": "<me>_lake"}          → {"job"} · GET /api/home/reset?id=… → its state
 "📨 Pub/Sub" — a member's event streams (labpubsub.py; event-sim publishes them to Kafka):
   GET    /api/pubsub                                     my streams + the choices · /api/pubsub/peek?id=… (last events)
