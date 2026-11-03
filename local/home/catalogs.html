@@ -179,6 +179,10 @@
           acc.appendChild(el('div', 'sub', 'Their files come with the lake: 📁 My files → 🤝 Shared with me.'));
         m.appendChild(acc);
         help(card, [snippet(name, c.shares[0].namespace, c.shares[0].table)]);
+        var st = el('div', 'card'); st.appendChild(el('h3', null, 'Namespaces & tables'));
+        var stb = el('table'); st.appendChild(stb); m.appendChild(st);
+        var spane = el('div'); m.appendChild(spane);
+        readTree(stb, spane, name);
         return;
       }
       var info = state.data.owned.filter(function (x) { return x.name === name; })[0];
@@ -239,6 +243,9 @@
           list.forEach(function (n) { scope.appendChild(el('option', null, 'namespace ' + n)).value = n; }); }); }
       };
       var stab = el('table'); stab.style.marginTop = '8px'; inv.appendChild(stab);
+      var whoBox = el('div'); whoBox.style.marginTop = '14px'; inv.appendChild(whoBox);
+      var whoBtn = el('button', 'small', '👥 Who has access'); whoBox.appendChild(whoBtn);
+      whoBtn.onclick = function () { accessList(whoBox, name); };
       // Namespaces & tables: namespaces closed; a namespace's tables load when it's opened
       var tree = el('div', 'card'), thead = el('div', 'cardhead'), nsNew = el('button', 'small', '＋ New namespace');
       thead.appendChild(el('h3', null, 'Namespaces & tables')); thead.appendChild(nsNew); tree.appendChild(thead);
@@ -382,6 +389,56 @@
           });
         });
       }
+    }
+
+    // a shared catalog's namespaces and tables, as far as the shares reach (read only)
+    function readTree(tbody, pane, cat) {
+      tbody.innerHTML = '<tr><td class="sub">Loading…</td></tr>';
+      api('GET', '/tree', {catalog: cat}).then(function (r) {
+        tbody.innerHTML = '';
+        if (!r.ok) return tbody.appendChild(el('tr', null, '')).appendChild(el('td', 'sub', r.body.error));
+        if (!r.body.length) { var e = el('tr'); e.appendChild(el('td', 'sub', 'No namespaces you can see yet.')); tbody.appendChild(e); }
+        r.body.forEach(function (n) {
+          var tr = el('tr', 'ns'), td = el('td'), rows = null;
+          td.appendChild(el('span', 'car', '▸')); td.appendChild(document.createTextNode(' 📁 ' + n)); tr.appendChild(td); tbody.appendChild(tr);
+          tr.onclick = function () {
+            var opening = !tr.classList.contains('open'); tr.classList.toggle('open', opening);
+            if (rows) { rows.forEach(function (x) { x.style.display = opening ? '' : 'none'; }); return; }
+            api('GET', '/tree', {catalog: cat, namespace: n}).then(function (q) {
+              rows = (q.ok && q.body.length ? q.body : [null]).map(function (t) {
+                var x = el('tr', 'tbl'), c = el('td'); x.appendChild(c);
+                if (!t) { c.appendChild(el('span', 'sub', q.ok ? 'no tables you can see here' : q.body.error)); return x; }
+                var tn = el('span', 'tname', '▦ ' + t); c.appendChild(tn); c.appendChild(el('span', 'full', cat + '.' + n + '.' + t));
+                tn.onclick = function () { tableCard(pane, cat, n, t, x); };
+                return x;
+              });
+              var at = tr; rows.forEach(function (x) { at.after(x); at = x; });
+            });
+          };
+        });
+      });
+    }
+    // 👥 everyone who can reach an owned catalog, and how
+    function accessList(box, cat) {
+      box.innerHTML = ''; box.appendChild(el('div', 'sub', 'Loading…'));
+      api('GET', '/access', {catalog: cat}).then(function (r) {
+        box.innerHTML = '';
+        if (!r.ok) return box.appendChild(el('div', 'sub', '✗ ' + (r.body.error || 'failed')));
+        var hd = el('div', 'cardhead'); hd.appendChild(el('h3', null, '👥 Who has access'));
+        var x = el('button', 'small', '✕'); x.onclick = function () { box.innerHTML = ''; var b = el('button', 'small', '👥 Who has access'); b.onclick = function () { accessList(box, cat); }; box.appendChild(b); };
+        hd.appendChild(x); box.appendChild(hd);
+        var t = el('table'); t.innerHTML = '<tr><th>Who</th><th>How</th><th>On</th><th>Access</th></tr>';
+        r.body.forEach(function (a) {
+          var tr = el('tr');
+          tr.appendChild(el('td', null, a.who.join(', ') || '—'));
+          tr.appendChild(el('td', 'sub', a.how === 'owner' ? 'owner' : a.how === 'share' ? 'your share' : a.how + (a.how.indexOf('role ') === 0 ? ' (🛡 Governance)' : '')));
+          tr.appendChild(el('td', null, a.on.join(' · ')));
+          var td = el('td'); td.appendChild(el('span', 'tag ' + (a.access === 'read' ? 'read' : 'write'), a.access === 'read' ? 'read' : a.access === 'write' ? 'read + write' : a.access));
+          tr.appendChild(td); t.appendChild(tr);
+        });
+        box.appendChild(t);
+        box.appendChild(el('div', 'sub', 'Owners and your shares come from here; roles marked Governance were given by a lab manager.'));
+      });
     }
 
     // ---- a table's card -----------------------------------------------------------------------

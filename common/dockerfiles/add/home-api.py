@@ -25,7 +25,7 @@ from the browser can point at another bucket.
   GET    /api/catalogs                                   owned + shared-with-me
   POST   /api/catalogs?name=sales                        create <user>_sales
   GET    /api/catalogs/members?q=…                       usernames containing q (3+ characters), for invites
-  GET    /api/catalogs/tree?catalog=…[&namespace=…]     namespaces, or one namespace's tables (owner)
+  GET    /api/catalogs/tree?catalog=…[&namespace=…]     namespaces, or one namespace's tables (owner · as far as a share reaches)
   GET    /api/catalogs/table?catalog&namespace&table     a table: columns, snapshots, size, properties (owner · shared · manager)
   GET    /api/catalogs/maintenance?catalog[&namespace[&table]]   🧹 what maintenance applies there (labmaint.py)
   POST   /api/catalogs/maintenance {"catalog", "namespace"?, "table"?, "kind", "values"}   set / off / none (owner)
@@ -34,6 +34,7 @@ from the browser can point at another bucket.
   POST   /api/catalogs/namespaces?catalog&namespace      create a namespace (owner)
   DELETE /api/catalogs/namespaces?catalog&namespace      drop an empty namespace (owner)
   GET    /api/catalogs/shares?catalog=…                  who has what (owner)
+  GET    /api/catalogs/access?catalog=…                  everyone who can reach it, and how: owner, shares, Governance roles (owner)
   POST   /api/catalogs/shares?catalog&grantee&access[&namespace]  (no namespace: the whole lake)
   DELETE /api/catalogs/shares?catalog=…&role=…           revoke
 
@@ -517,6 +518,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(200, lh.create_namespace(name, q.get("catalog", ""), (q.get("namespace") or "").strip().lower()))
             if method == "DELETE" and path == "/api/catalogs/namespaces":
                 return self._json(200, lh.drop_namespace(name, q.get("catalog", ""), q.get("namespace", "")))
+            if method == "GET" and path == "/api/catalogs/access":
+                return self._json(200, lh.access(name, q.get("catalog", "")))
             if method == "GET" and path == "/api/catalogs/shares":
                 return self._json(200, lh.list_shares(name, q.get("catalog", "")))
             if method == "POST" and path == "/api/catalogs/shares":

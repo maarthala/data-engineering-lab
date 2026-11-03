@@ -864,17 +864,65 @@ def create_catalog(name, short):
     return {"name": cat, "location": loc}
 
 
+def _my_shares(name, cat, t):
+    """The shares on `cat` the learner holds (scope lake / namespace / table)."""
+    st, body = _call("GET", f"{_M}/principal-roles/{name}/catalog-roles/{cat}", token=t)
+    return [_describe_share(cat, r["name"], t) for r in (body or {}).get("roles", []) if st == 200 and r["name"].startswith("share_")]
+
+
 def catalog_tree(name, cat, namespace=None):
-    """Namespaces of a catalog the learner owns, or (namespace given) that namespace's tables —
-    the page lists namespaces and loads a namespace's tables when it's opened."""
+    """Namespaces of a catalog the learner owns — or of one shared with them, as far as the shares
+    reach — or (namespace given) that namespace's tables. The page lists namespaces and loads a
+    namespace's tables when it's opened."""
+    t = _admin_token()
+    shares = None if _owned(name, cat, t) else _my_shares(name, cat, t)
+    if shares is not None and not shares:
+        raise PermissionError("not your catalog")
+    whole = shares is None or any(s["scope"] == "lake" for s in shares)
+    if namespace:
+        ns = urllib.parse.quote(chr(31).join(namespace.split(".")))
+        tables = [i["name"] for i in _get(f"/api/catalog/v1/{cat}/namespaces/{ns}/tables", t).get("identifiers", [])]
+        if whole or any(s["scope"] == "namespace" and s["namespace"] == namespace for s in shares):
+            return tables
+        return [x for x in tables if any(s["table"] == x and s["namespace"] == namespace for s in shares)]
+    names = [".".join(ns) for ns in _get(f"/api/catalog/v1/{cat}/namespaces", t)["namespaces"]
+             if ns != ["lab_maintenance"]]            # 🧹 the maintenance policies live there (labmaint)
+    return names if whole else [n for n in names if any(s["namespace"] == n for s in shares)]
+
+
+def access(name, cat):
+    """🤝 Who can reach a catalog the learner owns, and how: its owners (the member, or a team's
+    members), shares, and roles a manager gave on 🛡 Governance — per catalog role: who holds it,
+    on what (the catalog, a namespace, a table), read / write / manage."""
     t = _admin_token()
     if not _owned(name, cat, t):
         raise PermissionError("not your catalog")
-    if namespace:
-        ns = urllib.parse.quote(chr(31).join(namespace.split(".")))
-        return [i["name"] for i in _get(f"/api/catalog/v1/{cat}/namespaces/{ns}/tables", t).get("identifiers", [])]
-    return [".".join(ns) for ns in _get(f"/api/catalog/v1/{cat}/namespaces", t)["namespaces"]
-            if ns != ["lab_maintenance"]]            # 🧹 the maintenance policies live there (labmaint)
+    holders = {}                                      # principal role → its logins
+    for p in _get(f"{_M}/principals", t).get("principals", []):
+        for r in _get(f"{_M}/principals/{p['name']}/principal-roles", t).get("roles", []):
+            holders.setdefault(r["name"], []).append(p["name"])
+    out = []
+    for r in _get(f"{_M}/catalogs/{cat}/catalog-roles", t).get("roles", []):
+        if r["name"] in ("trino_lab", "catalog_admin"):
+            continue                                   # the lab's own plumbing (Trino, Polaris admin)
+        grants = _get(f"{_M}/catalogs/{cat}/catalog-roles/{r['name']}/grants", t).get("grants", [])
+        proles = [x["name"] for x in _get(f"{_M}/catalogs/{cat}/catalog-roles/{r['name']}/principal-roles", t).get("roles", [])]
+        privs = {g["privilege"] for g in grants}
+        level = ("manage" if privs & {"CATALOG_MANAGE_CONTENT", "CATALOG_MANAGE_ACCESS"} else
+                 "write" if privs & {"TABLE_WRITE_DATA", "TABLE_CREATE", "TABLE_DROP"} else
+                 "read" if "TABLE_READ_DATA" in privs else "browse")
+        where = sorted({"the whole catalog" if g["type"] == "catalog" else
+                        "namespace " + ".".join(g.get("namespace", [])) if g["type"] == "namespace" else
+                        "table " + ".".join(g.get("namespace", [])) + "." + g.get("tableName", "")
+                        for g in grants if not (r["name"].startswith("share_") and g["type"] == "catalog"
+                                                and g["privilege"] in ("CATALOG_READ_PROPERTIES", "NAMESPACE_LIST"))})
+        how = ("owner" if r["name"] == "owner" else "share" if r["name"].startswith("share_") else
+               "the shared lake's readers" if r["name"] == "learner_reader" else "role " + r["name"])
+        out.append({"catalog_role": r["name"], "how": how, "access": level, "on": where or ["the whole catalog"],
+                    "who": sorted({p for pr in proles for p in holders.get(pr, []) if not p.endswith("_jobs")} or set(proles)),
+                    "via": proles, "share": r["name"] if r["name"].startswith("share_") else None})
+    rank = {"owner": 0, "share": 1}
+    return sorted(out, key=lambda x: (rank.get(x["how"], 2), x["catalog_role"]))
 
 
 def drop_table(name, cat, namespace, table):
