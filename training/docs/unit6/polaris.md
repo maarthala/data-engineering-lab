@@ -5,13 +5,14 @@ The lakehouse stores tables; a **catalog** governs them — who can see and touc
 This stack uses **Apache Polaris** (Snowflake's, now Apache), an **Iceberg-native**
 governed REST catalog. It gives you:
 
-- **One catalog for every engine** — Spark, Trino and the Console all reach tables through the
+- **One catalog for every engine** — Spark, Trino and the portal all reach tables through the
   standard **Iceberg REST** protocol
 - **Per-user reads *and* writes** — checked on the identity making each request
 - **Credential vending** — after checking your grants, Polaris hands the engine short-lived
   storage credentials scoped to just those tables (read-only if you may only read)
 - **Owners who share** — you own your lakehouse and decide who else may read or write it
-- **A web Console** to browse catalogs, namespaces, tables and grants
+- **Its own access model** — principals, roles and grants; the portal's **🛡 Governance** page
+  (managers) and **🗂️ My catalogs** show and change it
 
 The model is the universal one — **catalog → namespace → table**, with **principals,
 roles, grants** — so the skills transfer straight to the cloud catalogs
@@ -29,7 +30,7 @@ Every lab account is a Polaris **principal** with two catalogs:
 you (lab account demouser)
    │  sign in once (Keycloak SSO) → Polaris knows you as principal demouser
    ▼
- Spark / Console ──(Iceberg REST)──► Apache Polaris
+ Spark / Trino ──(Iceberg REST)──► Apache Polaris
                                         │ checks demouser's roles + grants,
                                         │ vends scoped RustFS credentials
                                         ▼
@@ -50,9 +51,8 @@ principal demouser ──holds──► principal-role demouser
 A **principal** is *who*; a **principal-role** is the roles they hold; a **catalog-role** is a
 bundle of **grants** inside one catalog. Change a role once and everyone holding it changes.
 
-**Console:** open your lakehouse from 🗂️ **My catalogs → Open in Polaris Console ↗** (it signs
-you in with your lab account). The Console's own catalog list is for admins only, so start from
-My catalogs.
+**On the portal:** 🗂️ **My catalogs** shows your lakehouses, their namespaces and tables (each
+with its columns, snapshots and maintenance), and who you share them with.
 
 ## Lab — share your lakehouse with another user
 Sharing needs **two accounts**: the **owner** of the lakehouse and **another user** to share with.
@@ -104,8 +104,8 @@ spark.sql("INSERT INTO demouser_lake.gold.status_counts VALUES ('test', 1)")   #
 the table's metadata, but the storage credentials it vended you are **read-only** — the
 storage itself refuses the write.
 
-Open **Open in Polaris Console ↗** on the same page: you see the catalog and its namespace
-**names**, but only `gold` lists tables. Seeing that `silver` exists isn't access to it.
+Open the catalog under **Shared with me** on the same page: learner2 sees only the namespace that
+was shared, `gold`, and its tables — each with the same table panel the owner sees.
 
 ### 4 · Owner: widen, then revoke
 - Share **`silver`** with write: **🤝 Invite a member** → `learner2` → **read + write** → to
@@ -128,10 +128,10 @@ bound to the other user's principal-role:
 Inviting a member to your whole main lake also shares your **files** (`files/` in your bucket,
 same access) through their storage policy, not Polaris: tables and files go together.
 Revoke deletes that catalog-role (and the files share). In [6.4](grant-and-query.md) you build the same chain by
-hand in the Console, as the Polaris admin.
+hand on the **🛡 Governance** page, as a lab manager.
 
-!!! info "Governed everywhere — Spark, the Console, SQLPad and Superset"
-    Spark and the Console sign in to Polaris **as you**, so everything above is enforced there.
+!!! info "Governed everywhere — Spark, the portal, SQLPad and Superset"
+    Spark and the portal's pages ask Polaris **as you** (or check your grants first), so everything above is enforced there.
     SQLPad (your own connection) and Superset pass **your username** to Trino, whose access rules
     are generated from these same Polaris grants: your own catalogs, exactly what was shared with
     you, and the shared lake read-only. A new share or revoke reaches Trino within about half a

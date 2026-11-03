@@ -19,7 +19,7 @@ flowchart LR
 
 | # | Thing | Required? | Why |
 |---|---|---|---|
-| 1 | A modern **web browser** | ✅ Always | Every tool (Superset, Airflow, Jupyter, Polaris Console, RustFS) is a web UI |
+| 1 | A modern **web browser** | ✅ Always | Every tool (Superset, Airflow, Jupyter, SQLPad, RustFS) is a web UI |
 | 2 | The **Trino CLI** | Optional, laptop stack only | A terminal client for Trino. On a team stack you run SQL in SQLPad / Superset instead |
 | 3 | **Docker Desktop** + Git | ⚙️ Only if *you* run the stack | Needed to bring the platform up on your own laptop |
 
@@ -28,7 +28,7 @@ instructor's machine). Item 3 is only for running the whole thing yourself.
 
 !!! note "One lab account for everything — and no hosts-file entry"
     You **register once** on the landing page (just a username + password) and that **lab account**
-    signs you in to every tool — Jupyter, Airflow, Superset, SQLPad, the Polaris Console and the
+    signs you in to every tool — Jupyter, Airflow, Superset, SQLPad and the
     RustFS console (single sign-on via Keycloak). There's **nothing to add to your hosts file**
     locally — just open the URLs. (On Kubernetes the cluster admin points the `*.de.lan` wildcard at
     the ingress, as for every other service.)
@@ -38,7 +38,7 @@ instructor's machine). Item 3 is only for running the whole thing yourself.
 ## 1. A web browser
 
 Any recent Chrome, Edge, Firefox, or Safari. That's the entire requirement for Superset, Airflow,
-Jupyter, the Polaris Console, RustFS, and this course site. Bookmark the landing page — it links to
+Jupyter, RustFS, and this course site. Bookmark the landing page — it links to
 everything:
 
 - **Local (Docker):** [http://lab.localhost:8000](http://lab.localhost:8000)
@@ -181,7 +181,7 @@ you're on needs. **4 CPUs** are enough.
 | Python — Notebook | Notebooks | 3.5 GB | **6 GB** |
 | Spark, dbt, Data Vault | Notebooks + Spark | 5 GB, ~7.5 GB while a job runs | **8 GB** |
 | Orchestration (Airflow) | Airflow + Spark | 5.5 GB, ~8 GB while a job runs | **10 GB** |
-| Data governance (Polaris) | SQL + Notebooks + Polaris console | 5 GB | **8 GB** |
+| Data governance (Polaris) | SQL + Notebooks (the Governance page is in the portal, Core) | 5 GB | **8 GB** |
 | Business intelligence (Superset) | Superset (starts SQL with it) | 4 GB | **6 GB** |
 
 *They use about* is what the units measured on a laptop, Core's ~2 GB included. A notebook adds up
@@ -221,9 +221,8 @@ Run through this checklist once — if all three pass, you're ready for Unit {un
    the course examples use), **Register** your own, or use `manager` / `manager`. After signing in you see the lab's tools in four columns and,
    on **📁 My files**, **"bucket <name>-lake · lakehouse <name>_lake"** — your own private
    lakehouse, created on first login.
-2. **Single sign-on works** — open **🗂️ My catalogs**, then **Open in Polaris Console ↗** next to
-   your lakehouse `<name>_lake`. The Console signs you in with your lab account without asking
-   again and shows your lakehouse.
+2. **Single sign-on works** — open **Tools → SQL editor**: SQLPad opens signed in as you, without
+   asking again. And **🗂️ My catalogs** shows your lakehouse `<name>_lake` with its namespaces.
 3. **SQL works**: in SQLPad (connection **Lakehouse (Trino) — demouser**) or Superset SQL Lab:
 
     ```sql
@@ -253,7 +252,7 @@ Everything in the stack, its URL, and how to sign in. (On Kubernetes swap `local
 | SQLPad (SQL workbench) | http://sqlpad.lab.localhost:8000 | lab account (from the landing page you go straight in) |
 | Superset (BI) | http://superset.lab.localhost:8000 | lab account (managers = Admin) |
 | Airflow | http://airflow.lab.localhost:8000 (or the `AIRFLOW_HOST_PORT` you set) | lab account (managers = Admin) |
-| Polaris Console (governance) | http://polaris-console.lab.localhost:8000 | lab account · Client ID/Secret form at `/login?local=1` (admin `root` / `s3cr3t`, [personas](personas.md)) |
+| 🛡 Governance (Polaris logins, roles, grants) | http://lab.localhost:8000/governance.html | a manager account · personas log in from code ([personas](personas.md)) |
 | RustFS console (S3) | http://storage.lab.localhost:8000/rustfs/console/ | lab account — you see **your own bucket** `<name>-lake` · root `admin` / `admin123` |
 | My files · My catalogs | links at the top of the landing page | your bucket's files; create catalogs & share them ([details](workspace.md)) |
 

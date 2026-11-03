@@ -6,7 +6,7 @@ make it a **catalog table** so everyone can query it in SQL and Spark — govern
 addressable as `my.<namespace>.<table>`.
 
 Three moves: **upload → read → register**. Then it's a first-class table in the `my` catalog —
-your own lakehouse — visible to your notebooks (SQL and Spark) and the Polaris Console.
+your own lakehouse — visible to your notebooks (SQL and Spark) and on 🗂️ My catalogs.
 
 > This is the ad-hoc *"someone handed me a file"* version. Ingesting ShopFlow's own sources
 > (Postgres + Parquet) into Bronze systematically — the pipeline version — is
@@ -125,7 +125,7 @@ df = spark.table("my.bronze.customers_upload")   # or spark.sql("SELECT ...")
 df.count()
 ```
 
-The same table is now visible in the **Polaris Console** (your lakehouse `<username>_lake`) and to
+The same table is now on **🗂️ My catalogs** (your lakehouse `<username>_lake` → `bronze`: its columns and snapshots) and visible to
 every Spark session that signs in as you — one governed copy.
 
 #### From SQLPad (Trino)

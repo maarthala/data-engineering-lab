@@ -81,7 +81,7 @@ The other admin logins work the same way — swap the key:
 |---|---|---|
 | Lab manager (landing page, Manage members, every tool) | `manager` | `manager-password` |
 | Keycloak admin console (`http://auth.de.lan/admin`) | `admin` | `keycloak-admin-password` |
-| Polaris Console admin (`/login?local=1`) | `root` | `polaris-root-secret` |
+| Polaris admin (API; the portal uses it) | `root` | `polaris-root-secret` |
 | Polaris personas (governance lessons) | `analyst` / `engineer` / `lead` | `polaris-persona-secret` |
 | Storage (RustFS console) root | `admin` | `storage-root-password` |
 | SQLPad admin (password login) | `admin@de.local` | `sqlpad-admin-password` |
@@ -99,7 +99,7 @@ use `microk8s kubectl`.
 | Keycloak (accounts) | `http://auth.de.lan/admin` | `admin` / secret `keycloak-admin-password` (realm `de-lab`) |
 | Training course | https://maarthala.github.io/data-engineering-lab/ | — (linked from the landing page) |
 | RustFS console | `http://storage.de.lan/rustfs/console/` | lab account (own bucket) · root `admin` / secret `storage-root-password` |
-| Polaris Console | `http://polaris-console.de.lan` | lab account · `/login?local=1`: personas `analyst`/`engineer`/`lead` (secret `polaris-persona-secret`), admin `root` (secret `polaris-root-secret`) |
+| 🛡 Governance | `http://de.lan/governance.html` | a manager account — Polaris logins, roles and grants (personas `analyst`/`engineer`/`lead`: secret `polaris-persona-secret`) |
 | Polaris API | `http://polaris.de.lan` | OAuth2 client credentials (realm `POLARIS`) |
 | Trino | — (internal: only SQLPad, Superset, home-api and JupyterHub reach it) | manager: `kubectl -n de-stack port-forward svc/trino 8080` → `http://localhost:8080/ui/` as `manager` |
 | Superset | `http://superset.de.lan` | lab account |
@@ -115,8 +115,8 @@ use `microk8s kubectl`.
 2. **Governed tables via Spark** — in Jupyter, `my` (formerly `iceberg`, still works) = your own lakehouse
    (`bronze`/`silver`/`gold`), `shared` = the course lake. Spark Connect reads/writes through
    Polaris, which enforces each learner's access.
-   **Personas** (governance lessons): `http://polaris-console.de.lan/login?local=1` with
-   `analyst` / `engineer` / `lead` with the secret `polaris-persona-secret` (admin `root`: `polaris-root-secret`).
+   **Personas** (governance lessons): log in to Polaris from code as `analyst` / `engineer` / `lead`
+   with the secret `polaris-persona-secret`; managers change their grants on **Manage → 🛡 Governance**.
 3. **Query the lake with SQL** — SQLPad (each learner has a private connection
    "Lakehouse (Trino) — <user>") or Superset's SQL Lab. Both pass the learner's identity to Trino,
    whose access rules (generated from Polaris by home-api every 30 s, ConfigMap `trino-access`)
@@ -175,7 +175,7 @@ home-api turns on Keycloak's LOGIN events (90 days) at start. SQLPad / Superset 
   - Jupyter memory / CPU per member — from each member's next server start
   - member / team bucket size — applied to every bucket at once
 - **Services** — the tools in units: SQL (trino, sqlpad), Notebooks (jupyterhub), Spark
-  (spark-master/-worker/-connect), Airflow, Superset (needs SQL), Polaris console; Core (sign-in,
+  (spark-master/-worker/-connect), Airflow, Superset (needs SQL); Core (sign-in,
   storage, catalog, home) is always on. A switch per unit scales its Deployments to 0 / 1 —
   turn off what the class isn't using to free the node. Off keeps all data; off for Notebooks
   first stops the members' Jupyter servers (the switch names them). Members see the tiles of an
@@ -210,7 +210,6 @@ custom ones are built from `common/dockerfiles` by the Ansible `images` role:
 - **Jupyter** — the per-learner image: thin Spark Connect client + bucket sync (`Dockerfile.jupyter`).
 - **JupyterHub** — hub + KubeSpawner + the spawn hook (`Dockerfile.jupyterhub`).
 - **home-api** — landing-page backend, provisioning, My files / My catalogs (`Dockerfile.home-api`).
-- **polaris-console** — upstream console + lab SSO (`Dockerfile.polaris-console`).
 - **Superset**, **airflow-slim**, **home** (nginx + baked training site).
 
 **Code changes need no image rebuild.** The lab's own Python and starter files (lakehouse,
@@ -236,5 +235,4 @@ k8s/helm/de-stack/    Helm umbrella chart (templates, values, config files)
 k8s/ansible/          bootstrap: build-load.yml, deploy.yml, push-images.sh
 common/dockerfiles/   Dockerfiles for the custom images (spark, jupyter, superset, …)
 common/polaris/       seed-polaris.sh (catalog + personas + RBAC)
-common/polaris-console/  Polaris Console image build
 ```

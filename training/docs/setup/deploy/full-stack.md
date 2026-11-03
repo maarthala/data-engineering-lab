@@ -1,7 +1,7 @@
 # Full stack: make up
 
-`make up` starts **every** service at once: SQL, Notebooks, Spark, Airflow, Superset and the
-Polaris console on top of Core. It uses about **9 GB** before you run anything and 11–12 GB under
+`make up` starts **every** service at once: SQL, Notebooks, Spark, Airflow and Superset on top of
+Core (only **Streaming** stays off — switch it on in `make status` when you need it). It uses about **9 GB** before you run anything and 11–12 GB under
 load, so give Docker **12–16 GB** and 6 CPUs. With less, use [`make status`](make-status.md) and
 start only what you're learning.
 

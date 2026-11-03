@@ -95,7 +95,7 @@ SHOW TABLES IN shared.gold
 ```
 
 **Reach it:** SQL (`%%sql` / Trino), Spark (`spark.table("shared.gold.daily_sales")`), Superset
-dashboards, and the Polaris Console — one governed copy, every engine.
+dashboards, and 🗂️ My catalogs — one governed copy, every engine.
 
 ## The whole picture
 

@@ -22,37 +22,24 @@ writes to object storage.
 
 ## A · Create a catalog
 
-**As a member — on 🗂️ My catalogs** (landing page): click **＋ New**, type `learn`,
-**Create**. You get **`demouser_learn`** — e.g. `ravi_learn` — stored in your own bucket at
-`s3://demouser-lake/tables/demouser_learn`, and you're its owner. Click **Open in Polaris Console ↗**
-to see it in the Console.
+**On 🗂️ My catalogs** (landing page): click **＋ New**, type `learn`, **Create**. You get
+**`demouser_learn`** — e.g. `ravi_learn` — stored in your own bucket at
+`s3://demouser-lake/tables/demouser_learn`, and you're its owner. It opens right there: its
+namespaces and tables (empty for now), and later each table's own panel.
 
-!!! note "Why not *Catalogs → Create catalog* in the Console?"
-    Creating catalogs there needs the Polaris **admin** — with your lab account it answers
-    *403*. (For the same reason the Console's **Catalogs** list shows `0` for members:
-    listing *all* catalogs is admin-only. Open yours from My catalogs.)
-
-**As the admin — in the Console** (the platform manager, or your own laptop stack): open
-<http://polaris-console.lab.localhost:8000/login?local=1> (k8s: `http://polaris-console.de.lan/login?local=1` — the
-`?local=1` shows the **Client ID / Secret** form instead of signing you in with your lab account), sign in as `root` / `s3cr3t` (laptop stack; on a team stack this is the platform manager's job), then **Catalogs → Create catalog**:
-
-- **Name:** `learn`
-- **Storage type:** `S3`
-- **Default base location:** `s3://demo-bucket/learn`
-- **Endpoint:** `http://storage:9000` (RustFS — S3-compatible; the in-stack name is `storage`)
-- **Region:** `us-east-1`
-- **Path-style access:** **ON** ← required for RustFS
-- **Create**
+!!! note "What ＋ New does in Polaris"
+    Creating a catalog needs the Polaris **admin**, so the portal does it for you (members can't
+    call that API themselves). It asks Polaris for a catalog with an S3 **storage configuration**:
+    the bucket path it may use (`allowedLocations`), the store's endpoint (`http://storage:9000`
+    — RustFS, S3-compatible), a region, **path-style access ON**, and credential vending (Polaris
+    hands engines short-lived keys for just those tables). Then it gives your principal role the
+    catalog's `owner` role, holding **`CATALOG_MANAGE_CONTENT`** — full control of what's inside.
 
 !!! warning "Path-style access is mandatory for RustFS"
     RustFS is addressed as `storage:9000/bucket` (path-style). The default S3 style is
     `bucket.storage:9000` (virtual-host), which doesn't resolve in this stack — table I/O then
-    fails with an `UnknownHost` error. So **turn Path-style access ON**. (On real AWS S3
-    you'd leave it off.)
-
-Grant your admin write access so you can create tables in it: on the catalog →
-**Catalog Roles** → create one → grant **`CATALOG_MANAGE_CONTENT`** → assign it to the
-`service_admin` principal-role. *(The built-in `polaris_lake` catalog already has this.)*
+    fails with an `UnknownHost` error. My catalogs turns it on for you; creating a catalog with
+    Polaris's API yourself, you'd set `pathStyleAccess: true`. (On real AWS S3 you'd leave it off.)
 
 ## B · Create a namespace & table
 
@@ -87,9 +74,8 @@ INSERT INTO my.demo.sales VALUES
 """)
 ```
 
-You can also create the namespace/table visually in the **Console** (Catalog →
-**Create namespace** / **Create Iceberg Table**); the notebook is just quicker for a
-table with data.
+You can also create the namespace on **🗂️ My catalogs** (**＋ New namespace**); a table needs
+code (or 📡 Ingestion) — the notebook is quickest for a table with data.
 
 **Watch it land in your bucket** (📁 **My files**, or the RustFS console
 <http://storage.lab.localhost:8000/rustfs/console/>): after `CREATE TABLE` you'll see
@@ -113,8 +99,8 @@ FROM my.demo.sales
 GROUP BY product
 ```
 
-The same table is now visible in the **Polaris Console** (open your catalog from
-**My catalogs**) and to every Spark session that signs in as you — one governed copy.
+The same table is now on **🗂️ My catalogs** (open your catalog → `demo` → `sales`: its columns,
+snapshots and size) and readable by every Spark session that signs in as you — one governed copy.
 (Trino and Superset read the course's *shared* lake, not your own — see
 [0.3](../setup/workspace.md).)
 
@@ -124,7 +110,7 @@ the same in **the Databricks catalog** and **Snowflake** (Snowflake calls it
 database → schema → table). Only the catalog name and storage URL change.
 
 ## You can now…
-- Create your own **catalog** on My catalogs (or, as admin, in the Console with **path-style** for RustFS)
+- Create your own **catalog** on My catalogs, and say what its storage configuration holds (**path-style** for RustFS)
 - Create a **namespace** and a **table**, and say when each first touches object storage
 - Query the table from the notebook (DataFrame, `spark.sql`, `%%sql`)
 - Make a *new* catalog visible to Spark with `use_catalog(...)`

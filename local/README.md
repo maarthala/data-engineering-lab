@@ -47,7 +47,7 @@ gate the Pages CI uses) before you push.
 | Training course | https://maarthala.github.io/data-engineering-lab/ | — (linked from the landing page) |
 | Keycloak (accounts) | http://auth.lab.localhost:8000/admin | admin / admin (realm `de-lab`) |
 | RustFS console (S3) | http://storage.lab.localhost:8000/rustfs/console/ | lab account (own bucket) · root admin / admin123 |
-| Polaris Console | http://polaris-console.lab.localhost:8000 | lab account · `/login?local=1`: personas analyst/engineer/lead (id = secret = name), admin root/s3cr3t |
+| 🛡 Governance (Polaris logins, roles, grants) | http://lab.localhost:8000/governance.html | a manager account (personas analyst/engineer/lead: id = secret = name, from code) |
 | Polaris API | http://polaris.lab.localhost:8000 | OAuth2 client credentials (realm `POLARIS`) |
 | Key vault (OpenBao) | http://vault.lab.localhost:8000 | **Sign in with OIDC Provider** = lab account (members: own folder; managers: all) · token `lab-vault-admin-local-token` = the lab's admin |
 | Trino | http://trino.lab.localhost:8000/ui/ | any username, no password |
@@ -66,8 +66,8 @@ make polaris-seed      # runs ../common/polaris/seed-polaris.sh against polaris.
 Then:
 - **Register your lab account** at http://lab.localhost:8000 — it signs you in to every tool and
   creates your own lakehouse, bucket and Jupyter (course page 0.3).
-- **Personas** (governance lessons): Polaris Console http://polaris-console.lab.localhost:8000/login?local=1
-  (`analyst`/`analyst`, `engineer`/`engineer`, `lead`/`lead`; admin `root`/`s3cr3t`).
+- **Personas** (governance lessons): log in to Polaris from code as `analyst`/`analyst`,
+  `engineer`/`engineer`, `lead`/`lead` (admin `root`/`s3cr3t`); managers change their grants on 🛡 Governance.
 - **Query the lake** with Trino (`iceberg` catalog) or Superset SQL Lab.
 - **Governed Spark** — in Jupyter, `iceberg` is your own lakehouse and `shared` the course lake
   (`spark.sql("SELECT * FROM shared.gold.daily_sales")`); Spark Connect reads/writes through Polaris.

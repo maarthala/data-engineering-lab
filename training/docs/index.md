@@ -91,7 +91,7 @@ The full map, with what's *different* on managed platforms, is in
 ## A quick tour
 
 ### 1 · One sign-in for everything
-Every tool — Jupyter, Airflow, Superset, SQLPad, the Polaris Console and the storage console —
+Every tool — Jupyter, Airflow, Superset, SQLPad and the storage console —
 uses the same **lab account**. On your laptop, sign in as `demouser` / `demouser` (every course
 example is written for it), or **Register** your own.
 

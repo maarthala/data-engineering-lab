@@ -15,12 +15,7 @@ flowchart TB
   end
 
   subgraph GOV["Governance"]
-    PX[polaris-proxy<br/>same-origin front]
-    PC[polaris-console<br/>web UI]
     POL[Apache Polaris<br/>Iceberg REST catalog + RBAC]
-    PX --> PC
-    PX --> POL
-    PC --> POL
   end
 
   subgraph ENG["Query & compute engines"]
@@ -42,8 +37,9 @@ flowchart TB
   end
 
   USER --> HOME
-  USER --> TR & SUP & JUP & PX
+  USER --> TR & SUP & JUP
 
+  HOME -->|My catalogs · Governance| POL
   TR -->|catalog + creds| POL
   SC -->|catalog + creds| POL
   AF -->|spark-submit| SM
@@ -74,8 +70,6 @@ with **Polaris** as the single catalog that every engine consults before touchin
 | Service | What it is |
 |---|---|
 | **Apache Polaris** | The Iceberg **REST catalog** + **RBAC**. Engines ask it "does this principal may read/write this table?", and it **vends short-lived storage credentials** for the ones allowed. Accepts Polaris client id/secret logins *and* lab-account (Keycloak) tokens. Keeps its catalog in its own database. |
-| **polaris-console** | The catalog's **web UI** (a single-page app) — browse catalogs/namespaces/tables, manage principals, roles, and grants. |
-| **polaris-proxy** | A tiny nginx front that serves the Console at `/` and proxies the API at `/api` on **one origin** (`:8189`), so the browser makes no cross-origin calls. *(On k8s the ingress does this same-origin routing instead.)* |
 | **polaris-bootstrap** | A **one-shot** job that creates Polaris's schema + realm on first start. Runs once, then exits. |
 
 ### Accounts & your workspace
@@ -112,7 +106,7 @@ single sign-on, register on the home portal) for every tool; see [0.3](../setup/
 |---|---|---|---|
 | Home portal | http://lab.localhost:8000 | `de.lan` | lab account (Register / sign in) · My files · My catalogs |
 | Keycloak (accounts) | http://auth.lab.localhost:8000 | `auth.de.lan` | admin console `admin` / `admin` |
-| Polaris Console | http://polaris-console.lab.localhost:8000 | `polaris-console.de.lan` | lab account · `/login?local=1`: `root` / `s3cr3t` or a persona |
+| 🛡 Governance (Polaris logins, roles, grants) | http://lab.localhost:8000/governance.html | `de.lan/governance.html` | a manager account |
 | Polaris API | http://polaris.lab.localhost:8000 | `polaris.de.lan` | client id/secret |
 | Trino | http://trino.lab.localhost:8000/ui/ (laptop only) | — (internal; use SQLPad / Superset) | lab account, via SQLPad / Superset |
 | Superset | http://superset.lab.localhost:8000 | `superset.de.lan` | lab account |

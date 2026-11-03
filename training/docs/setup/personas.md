@@ -43,20 +43,38 @@ flowchart TB
 
 This is the **medallion access policy** — least privilege by layer. An analyst can't see half-cleaned
 Silver or raw Bronze; an engineer can build Silver but can't rummage in raw Bronze; only the lead
-sees everything. You'll build these exact grants as the Polaris admin in
+sees everything. You'll build these exact grants on the **🛡 Governance** page in
 [6.2](../unit6/polaris-admin.md) and [6.4](../unit6/grant-and-query.md).
 
 ## How to "become" a persona
 
-Sign in with the persona's **Client ID + Secret** wherever the stack asks *who you are*:
+Log in with the persona's **Client ID + Secret** wherever the stack asks *who you are*:
 
-- **Polaris Console** — open <http://polaris-console.lab.localhost:8000/login?local=1> (k8s:
-  `http://polaris-console.de.lan/login?local=1` — the `?local=1` shows the Client ID / Secret form
-  instead of signing you in with your lab account), enter the **Client ID** and **Client Secret**
-  (on your laptop: e.g. `analyst` / `analyst`; on a team stack, ask your platform manager), and sign in. The catalog tree you see is scoped to that persona's
-  grants.
-- **An engine (Trino / Spark)** — point it at the governed catalog with the same client ID/secret;
-  it reads/writes only what that persona is allowed.
+- **From code** (a notebook) — ask Polaris for a token with them, then list what you may see:
+
+    ```python
+    import requests
+
+    POLARIS = "http://polaris:8181/api/catalog"
+    login = {"grant_type": "client_credentials", "client_id": "analyst", "client_secret": "analyst",
+             "scope": "PRINCIPAL_ROLE:ALL"}
+    auth = {"Authorization": "Bearer " + requests.post(f"{POLARIS}/v1/oauth/tokens", data=login).json()["access_token"]}
+    for ns in ("gold", "silver"):
+        r = requests.get(f"{POLARIS}/v1/polaris_lake/namespaces/{ns}/tables", headers=auth)
+        print(ns, r.status_code, [t["name"] for t in r.json().get("identifiers", [])] or r.json()["error"]["message"])
+    ```
+
+    ```text
+    gold 200 ['daily_sales', 'top_products', 'customer_ltv']
+    silver 403 Principal 'analyst' with activated PrincipalRoles '[analyst_role]' and activated grants via '[analyst_role, analyst_role_cr]' is not authorized for op LIST_TABLES
+    ```
+
+    (On your laptop the logins are `analyst` / `analyst` etc.; on a team stack, ask your platform
+    manager.)
+- **An engine (Trino / Spark)** — point it at the governed catalog with the same client ID/secret
+  (`credential = "analyst:analyst"`); it reads/writes only what that persona is allowed.
+- **On 🛡 Governance** (managers) — each persona's principal role, catalog role and grants are
+  listed there, and can be changed for a lesson.
 
 No identity server involved — the principal authenticates to Polaris directly (your lab account
 goes through Keycloak instead).
@@ -68,7 +86,7 @@ accounts** for running the platform. Don't confuse them with the personas above:
 
 | Account | Where | What it is |
 |---|---|---|
-| `root` / `s3cr3t` | Polaris (Console or API) | Catalog **admin** — creates catalogs, users, roles & grants |
+| `root` / `s3cr3t` | Polaris (its API — the portal uses it for you) | Catalog **admin** — creates catalogs, users, roles & grants |
 | your lab account | every tool (single sign-on) | you — your own Jupyter, lakehouse and bucket; managers are admins |
 | `admin` / `admin` | Keycloak admin console | manages lab accounts (realm `de-lab`) |
 | `admin` / `admin123` | RustFS (object store) | Object-store root — used by the platform's own jobs |
@@ -98,5 +116,5 @@ grants. Change the personas or their access there — it's idempotent and safe t
 
 ## You can now…
 - Name the three personas, their logins, and what each is allowed to read/write
-- Sign in as a persona in the **Polaris Console** (or an engine) with its client ID/secret
+- Log in as a persona from code (or an engine) with its client ID/secret, and read Polaris's refusal
 - Tell a **data-access persona** apart from a **platform/ops service account**

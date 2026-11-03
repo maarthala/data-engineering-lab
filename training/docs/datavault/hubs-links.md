@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS my.raw_vault.hub_customer (
 ```
 
 - **`COMMENT '…'`** — documentation stored with the column; shows in `DESCRIBE`, Trino and the
-  Polaris Console.
+  table's panel on 🗂️ My catalogs.
 
 ```sql
 %%sql

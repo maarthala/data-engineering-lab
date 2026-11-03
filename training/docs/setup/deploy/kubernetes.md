@@ -36,7 +36,7 @@ kubectl -n de-stack get pods         # wait for everything to be Running/Ready
 Open the landing page at **`http://de.lan`**. Members **register / sign in** there (Keycloak at
 `http://auth.de.lan`, realm `de-lab`); each gets their own lakehouse, bucket and Jupyter on first
 login. All UIs live at `http(s)://<name>.de.lan` (jupyter, superset, sqlpad, airflow, spark,
-storage — the RustFS console, polaris-console) — the landing page links them.
+storage — the RustFS console) — the landing page links them.
 
 **First sign-in:** every admin password on Kubernetes is random (the laptop defaults don't
 work). Read the manager's with

@@ -289,9 +289,12 @@ rows: 1
   open read-only (copy one into `my_files/` to change it). Jupyter adds it when your server starts,
   so after a new invite restart it (**File → Hub Control Panel → Stop My Server → Start**).
   Revoking the lake takes the files back too (the folder goes at the next start).
-- **Open in Polaris Console ↗** opens the catalog in the Console, signed in as you — browse
-  it, add namespaces and tables. (The Console's own **Catalogs** list shows `0` for members:
-  listing *all* catalogs is admin-only, so open yours from here.)
+- **A table's panel** — click a table: its rows, files and size, its columns (and key), its
+  snapshots (each with a copyable time-travel query), properties, and **🧹 Maintenance**.
+- **🧹 Maintenance** — compaction, snapshot expiry and orphan-file removal, set on the whole
+  catalog, a namespace (🧹 on its row) or one table; it runs every night, or **Run now**.
+- **👥 Who has access** (under Sharing) — everyone who can reach the catalog and how: you, your
+  shares, and roles a lab manager gave on **🛡 Governance**.
 
 ## My secrets — keys and passwords in a key vault
 
@@ -435,7 +438,7 @@ no longer use the lab (filter *inactive 30+ days*) and delete them. **⚙️ Set
 signs up, off otherwise) and sets the **members' limits**: after how many idle minutes a Jupyter
 server stops, Jupyter memory and CPU per member (from their next server start), and the member and
 team bucket sizes (applied to every bucket at once). Its **Services** list shows which tools run,
-in **units** (SQL, Notebooks, Spark, Airflow, Superset, Polaris console). On the shared server,
+in **units** (SQL, Notebooks, Spark, Airflow, Superset, Streaming). On the shared server,
 managers switch a unit off to free memory and CPU while the class doesn't need it, and back on
 later. All data is kept, and members see its tiles greyed: *Not running. Contact admin.* On a lab
 running on your own computer the list only shows the state: switch units in the terminal with

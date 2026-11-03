@@ -94,8 +94,8 @@ shown. To switch the check off, add `LAB_UPDATE_CHECK=0` to `local/.env`.
 ## After it's up
 - **Register your lab account** on the landing page — see
   [0.3 Your lab account & workspace](../workspace.md) for what you get and where things are.
-- For the governance lessons, sign in to the Polaris Console as one of the
-  [personas](../personas.md) (`analyst` / `engineer` / `lead`).
+- For the governance lessons, a manager opens **Manage → 🛡 Governance**; the
+  [personas](../personas.md) (`analyst` / `engineer` / `lead`) log in from code.
 - The training course is published on **GitHub Pages**
   (<https://maarthala.github.io/data-engineering-lab/>), auto-deployed on every push to
   `main` — and the stack's landing page links straight to it, so it's always the current version.
