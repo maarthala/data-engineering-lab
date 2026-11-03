@@ -86,8 +86,8 @@
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=18"></script>
-  <div class="pagebar"><h1>📡 Ingestion <span class="dot">·</span> copy tables from your databases into your lakehouse</h1></div>
+  <script src="/lab-header.js?v=19"></script>
+  <div class="pagebar"><h1>📡 Ingestion <span class="dot">·</span> copy data from your databases and streams into your lakehouse</h1></div>
   <main id="main"><div class="placeholder">Loading…</div></main>
   <script>
     // 📡 Ingestion — three tabs:
@@ -153,11 +153,15 @@
       }).catch(function (e) { done({status: 'failed', error: e.message}); });
     }
 
-    var MODE = {cdc: 'Full load + CDC (merge by key)', append: 'Full load + every change (history)', full_refresh: 'Full reload every run'};
+    var MODE = {cdc: 'Full load + CDC (merge by key)', append: 'Full load + every change (history)', full_refresh: 'Full reload every run',
+                events: 'Every event as a new row'};
     var MODE_HELP = {
       cdc: 'First everything, then the inserts, updates and deletes — merged by the primary key: each table keeps one row per key, the latest.',
       append: 'First everything, then every insert, update and delete as a new row; nothing is overwritten — the raw material for history and SCD2.',
-      full_refresh: 'Every run copies the chosen tables again.'};
+      full_refresh: 'Every run copies the chosen tables again.',
+      events: 'Every event the stream published, as it arrived — late ones included, nothing merged or dropped: Bronze. A new job starts with the oldest event Kafka still keeps (24 h).'};
+    function engineName(j, long) { return j.engine === 'pubsub' ? 'Kafka Connect' + (long ? ' (Iceberg sink)' : '') : j.engine === 'debezium' ? (long ? 'Debezium + Kafka' : 'Debezium') : 'OLake'; }
+    function isStream(s) { return s && s.kind === 'pubsub'; }
     var CRONS = [['*/15 * * * *', 'Every 15 minutes'], ['0 * * * *', 'Every hour'], ['0 2 * * *', 'Every day at 02:00'],
                  ['0 6 * * 1-5', 'Weekdays at 06:00'], ['0 3 * * 0', 'Sundays at 03:00']];
     var data = null, timer = null, busy = {}, flash = null;
@@ -193,8 +197,9 @@
                   ['cron', 'Cron', 'Runs on a schedule — a cron expression, in UTC.'],
                   ['stream', 'Datastream', 'Always on: changes arrive in seconds (~10–30 s behind).']];
       opts.forEach(function (o) {
-        var b = el('button', {type: 'button', class: 'choice' + (st.type === o[0] ? ' on' : ''), disabled: o[0] === 'stream' && engine !== 'debezium' ? '' : null},
-          [el('b', {text: o[1]}), el('span', {text: o[0] === 'stream' && engine !== 'debezium' ? 'Needs the Debezium engine.' : o[2]})]);
+        var noStream = o[0] === 'stream' && engine !== 'debezium' && engine !== 'pubsub';
+        var b = el('button', {type: 'button', class: 'choice' + (st.type === o[0] ? ' on' : ''), disabled: noStream ? '' : null},
+          [el('b', {text: o[1]}), el('span', {text: noStream ? 'Needs the Debezium engine.' : o[2]})]);
         on(b, 'click', function () { st.type = o[0]; [].forEach.call(choices.children, function (x) { x.classList.toggle('on', x === b); }); paint(); changed(); });
         choices.appendChild(b);
       });
@@ -249,10 +254,17 @@
       var r = route(), page = r[0], id = r[1];
       main.innerHTML = '';
       offNotice();
-      if (page === 'new-job') return newJob();
+      if (page === 'new-job') {                          // #new-job/<source>: from 📨 Pub/Sub, its stream chosen
+        if (id) { wiz = {source: +id}; history.replaceState(null, '', '#new-job'); }
+        return newJob();
+      }
       if (page === 'job') return jobPage(+id);
       if (page === 'new-source') return sourcePage({kind: 'postgres', cdc: true});
-      if (page === 'source') return sourcePage(byId(data.sources, +id));
+      if (page === 'source') {
+        var src = byId(data.sources, +id);
+        if (isStream(src)) { location.href = '/pubsub.html#stream/' + src.stream_id; return; }
+        return sourcePage(src);
+      }
       if (page === 'new-destination') return destPage({});
       if (page === 'destination') return destPage(byId(data.destinations, +id));
       listPage(['jobs', 'sources', 'destinations'].indexOf(page) >= 0 ? page : 'jobs');
@@ -349,7 +361,7 @@
         runNow.disabled = !!j.busy;
         runNow.hidden = j.schedule === 'stream';
         body.appendChild(el('tr', {}, [
-          el('td', {}, [link(j.name, 'job/' + j.id, 'name'), el('div', {class: 'sub muted', text: j.engine === 'debezium' ? 'Debezium' : 'OLake'})]),
+          el('td', {}, [link(j.name, 'job/' + j.id, 'name'), el('div', {class: 'sub muted', text: engineName(j)})]),
           el('td', {}, [el('div', {text: j.source_name}), el('div', {class: 'sub muted', text: '→ ' + j.dest_name})]),
           el('td', {title: j.tables.join(', '), text: j.tables.length === 1 ? j.tables[0] : j.tables.length + ' tables'}),
           el('td', {text: MODE[j.mode]}), cells['r' + j.id] = el('td', {}, [runLabel(j)]), cells['s' + j.id] = el('td', {}, [last(j)]),
@@ -385,6 +397,18 @@
         if (c) (c.prerequisites || []).filter(function (p) { return !p.passed; }).forEach(function (p) {
           info.push((p.required ? 'needed: ' : 'tip: ') + p.name + ' is ' + p.current + ' — ' + p.recommended);
         });
+        if (isStream(s)) {                               // 📨 a Pub/Sub stream: managed on its own page
+          var open = el('a', {class: 'small button', href: '/pubsub.html#stream/' + s.stream_id, text: 'Open on Pub/Sub'});
+          open.setAttribute('style', 'font-size:.8rem; text-decoration:none; padding:3px 10px; border:1px solid var(--line2); border-radius:7px; color:var(--ink)');
+          var ok = !c || c.ok;
+          body.appendChild(el('tr', {}, [
+            el('td', {}, [el('a', {class: 'name', href: '/pubsub.html#stream/' + s.stream_id, text: s.name}), el('div', {class: 'sub muted', text: '📨 Pub/Sub stream'})]),
+            el('td', {}, [el('div', {}, ['topic ', el('code', {class: 'ns', text: s.database})]), el('div', {class: 'sub muted', text: 'Kafka'})]),
+            el('td', {}, [el('span', {class: 'tag on', style: 'margin:0', text: 'events'})]),
+            el('td', {}, [ok ? pill('ok', '✓ stream') : pill('bad', '✗ ' + c.message, c.message)]),
+            el('td', {class: 'acts'}, ok ? [open] : [open, del])]));
+          return;
+        }
         var kind = data.kinds[s.kind] || {name: s.kind};
         body.appendChild(el('tr', {}, [
           el('td', {}, [link(s.name, 'source/' + s.id, 'name'), el('div', {class: 'sub muted', text: kind.name})]),
@@ -537,7 +561,7 @@
       var name = inp(wiz.name || autoName, 'text', 'e.g. Shop to Bronze');
       on(name, 'input', function () { wiz.name = name.value; });
       var srcSel = select([['', '— choose a source —']].concat(data.sources.map(function (x) {
-        return [x.id, x.name + '  ·  ' + x.host + ' / ' + x.database + (x.cdc ? '' : '  (CDC off)')]; })), wiz.source);
+        return [x.id, isStream(x) ? x.name + '  ·  topic ' + x.database : x.name + '  ·  ' + x.host + ' / ' + x.database + (x.cdc ? '' : '  (CDC off)')]; })), wiz.source);
       on(srcSel, 'change', function () { wiz.source = +srcSel.value || null; wiz.found = null; wiz.picked = null; draw(); });
       var dstSel = select([['', '— choose a destination —']].concat(data.destinations.map(function (x) {
         return [x.id, x.name + '  ·  ' + x.catalog + '.' + (x.namespace || '<database>_<schema>')]; })), wiz.dest);
@@ -547,14 +571,17 @@
 
       // the tables: read when a source is chosen
       var list = el('div'), count = el('span', {class: 'sub'});
-      var modes = Object.keys(data.modes).filter(function (k) { return s && s.cdc && !taken ? true : k === 'full_refresh'; });
+      var streamTable = isStream(s) ? s.database.split('.').slice(1).join('.') : null;   // a stream lands in a table of its name
+      var where = function () { return d ? d.catalog + '.' + (d.namespace || 'events') + '.' + streamTable : '<destination>.' + streamTable; };
+      if (isStream(s)) taken = null;
+      var modes = isStream(s) ? ['events'] : Object.keys(data.modes).filter(function (k) { return s && s.cdc && !taken ? true : k === 'full_refresh'; });
       if (modes.indexOf(wiz.mode) < 0) wiz.mode = modes[0];
       var modeSel = select(modes.map(function (k) { return [k, MODE[k]]; }), wiz.mode || '');
       var modeHelp = help(wiz.mode ? MODE_HELP[wiz.mode] : '');
       on(modeSel, 'change', function () { wiz.mode = modeSel.value; modeHelp.textContent = MODE_HELP[wiz.mode]; check(); });
       var create = el('button', {class: 'primary', text: 'Create job'}), msg = el('div');
       function check() {
-        var tb = s ? chosen() : [];
+        var tb = isStream(s) ? [streamTable] : s ? chosen() : [];
         count.textContent = wiz.found ? tb.length + ' of ' + wiz.found.length + ' selected' : '';
         var cronBad = wiz.run.type === 'cron' && wiz.run.value && !/^\S+ \S+ \S+ \S+ \S+$/.test(wiz.run.value());
         create.disabled = !(s && d && tb.length && wiz.mode && name.value.trim()) || cronBad;
@@ -587,7 +614,8 @@
           });
         }).catch(function (e) { list.innerHTML = ''; list.appendChild(note(e.message, 'bad')); });
       }
-      if (s && !wiz.found) read(); else paint();
+      if (isStream(s)) list.appendChild(help('Every event of topic ' + s.database + ' → ' + where() + ' — a table made for this job, typed, with _kafka (topic, partition, offset, timestamp).'));
+      else if (s && !wiz.found) read(); else paint();
 
       on(create, 'click', function () {
         create.disabled = true; msg.innerHTML = '';
@@ -595,7 +623,9 @@
           .then(function (r) { wiz = null; flash = {text: r.task ? '✓ Job created — its first run is starting.' : '✓ Job created — its stream is starting.'}; go('job/' + r.id); })
           .catch(function (e) { create.disabled = false; msg.appendChild(note(e.message, 'bad')); });
       });
-      var srcInfo = !s ? help('A database you can reach.') : taken
+      var srcInfo = !s ? help('A database you can reach, or one of your 📨 Pub/Sub streams.') : isStream(s)
+        ? el('div', {class: 'help'}, ['📨 A Pub/Sub stream · topic ' + s.database + ' · ', el('a', {href: '/pubsub.html#stream/' + s.stream_id, text: 'open it'})])
+        : taken
         ? el('div', {class: 'help'}, ['CDC on ' + s.name + ' is used by job ', link(taken.name, 'job/' + taken.id), ' — a source\'s change stream feeds one job.'])
         : help(s.cdc ? 'CDC on · ' + (s.checked ? (s.checked.ok ? 'connection checked' : 'last check failed') : 'not checked yet') : 'CDC off — full reloads only.');
       main.appendChild(card([el('h3', {text: 'New job'}),
@@ -603,12 +633,13 @@
         el('div', {class: 'form'}, [
           el('label', {text: 'Source'}), el('div', {}, [el('div', {class: 'with'}, [srcSel, addSrc]), srcInfo]),
           el('label', {text: 'Destination'}), el('div', {}, [el('div', {class: 'with'}, [dstSel, addDst]),
-            help(d ? 'Tables land in ' + d.catalog + '.' + (d.namespace || '<database>_<schema>') : 'One of your lakehouses + a namespace.')]),
-          el('label', {text: 'Tables'}), list]),
+            help(d ? (isStream(s) ? 'The events land in ' + where() + (d.namespace ? '' : ' (no namespace on the destination: events)')
+                                  : 'Tables land in ' + d.catalog + '.' + (d.namespace || '<database>_<schema>')) : 'One of your lakehouses + a namespace.')]),
+          el('label', {text: isStream(s) ? 'Table' : 'Tables'}), list]),
         el('div', {class: 'sect', text: 'What and when'}),
         el('div', {class: 'form'}, [
           el('label', {text: 'Mode'}), el('div', {}, [modes.length ? modeSel : help(!s ? 'Choose a source first.' : taken ? 'This source\'s change stream is used by another job — choose another source.' : 'This source has CDC off — turn it on (Sources › Edit).'), modeHelp]),
-          el('label', {text: 'Runs'}), runPicker(wiz.run, data.engine, check),
+          el('label', {text: 'Runs'}), runPicker(wiz.run, isStream(s) ? 'pubsub' : data.engine, check),
           el('label', {text: 'Job name'}), name]),
         el('div', {class: 'navbtns'}, [on(el('button', {text: 'Cancel'}), 'click', function () { wiz = null; go('jobs'); }), create]), msg], 'narrow'));
       check();
@@ -641,13 +672,16 @@
       main.appendChild(card([el('div', {class: 'head'}, [el('span', {class: 'actions'}, [el('h3', {text: j.name}), statusBox]),
           el('span', {class: 'actions'}, [runNow, toggle, del])]),
         el('dl', {class: 'facts'}, [
-          el('dt', {text: 'From'}), el('dd', {}, [link(j.source_name, 'source/' + j.source)]),
+          el('dt', {text: 'From'}), el('dd', {}, [isStream(byId(data.sources, j.source))
+            ? el('a', {href: '/pubsub.html#stream/' + byId(data.sources, j.source).stream_id, text: '📨 ' + j.source_name})
+            : link(j.source_name, 'source/' + j.source)]),
           el('dt', {text: 'To'}), el('dd', {}, [link(j.dest_name, 'destination/' + j.destination),
             document.createTextNode(d ? '  —  ' + d.catalog + '.' + (d.namespace || '<database>_<schema>') : '')]),
-          el('dt', {text: 'Tables (' + j.tables.length + ')'}), el('dd', {text: j.tables.join(', ')}),
+          j.engine === 'pubsub' ? el('dt', {text: 'Table'}) : el('dt', {text: 'Tables (' + j.tables.length + ')'}),
+          el('dd', {text: j.engine === 'pubsub' && d ? d.catalog + '.' + (d.namespace || 'events') + '.' + j.tables[0] : j.tables.join(', ')}),
           el('dt', {text: 'Mode'}), el('dd', {text: MODE[j.mode]}),
           el('dt', {text: 'Runs'}), runsLabel,
-          el('dt', {text: 'Engine'}), el('dd', {class: 'muted', text: j.engine === 'debezium' ? 'Debezium + Kafka' : 'OLake'})])]));
+          el('dt', {text: 'Engine'}), el('dd', {class: 'muted', text: engineName(j, true)})])]));
       // change how it runs
       var st = {type: runType(j.schedule), cron: runType(j.schedule) === 'cron' ? j.schedule : '*/15 * * * *'}, msg = el('div');
       var save = el('button', {class: 'primary', text: 'Save'});

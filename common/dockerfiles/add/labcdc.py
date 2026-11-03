@@ -15,6 +15,9 @@ The work itself — check a connection, list a source's tables, run a sync — i
 cdc-runner service (cdc_runner.py), which picks up cdc_tasks rows. Nothing here talks to OLake.
 CDC_ENGINE=debezium: new jobs are Debezium + Kafka Connect instead (cdc_debezium.py) — PostgreSQL
 sources, and one more schedule, "stream" (always on); each job keeps the engine it was made with.
+📨 Pub/Sub streams (labpubsub.py) are sources too, made here for each of the member's streams (kind
+pubsub, stream_id): a job on one (engine pubsub, mode events) lands every event of the stream's topic
+in one table, with Kafka Connect's Iceberg sink — Manual, Cron or Datastream like a Debezium job.
 """
 import json
 import os
@@ -43,7 +46,8 @@ STREAMING_HOW = ("Manage → ⚙️ Settings → Services → Streaming" if os.e
                  else "make status → Streaming → s")
 MODES = {"cdc": "full load, then changes (CDC)",                 # one row per key: the latest (upsert)
          "append": "full load, then every change as a new row",  # the history: build SCD2 from it
-         "full_refresh": "full reload every run"}                # olake only
+         "full_refresh": "full reload every run",                # olake only
+         "events": "every event as a new row"}                   # 📨 Pub/Sub streams only
 STREAMING = ("cdc", "append")                                    # modes that read the change stream
 NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.-]{0,59}$")
 IDENT = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
@@ -83,6 +87,7 @@ UPDATE cdc_jobs SET schedule = CASE schedule WHEN '15m' THEN '*/15 * * * *' WHEN
  WHERE schedule IN ('15m', '1h', '1d');
 ALTER TABLE cdc_jobs ADD COLUMN IF NOT EXISTS engine text NOT NULL DEFAULT 'olake';
 ALTER TABLE cdc_runs ADD COLUMN IF NOT EXISTS meta jsonb;                   -- debezium: a stream's base, how far behind
+ALTER TABLE cdc_sources ADD COLUMN IF NOT EXISTS stream_id bigint;          -- kind pubsub: its 📨 Pub/Sub stream
 """
 _ready, _lock = False, threading.Lock()
 
@@ -156,7 +161,7 @@ def _drop_password(member, sid):
 def _source_out(s):
     return {"id": s["id"], "name": s["name"], "kind": s["kind"], "host": s["host"], "port": s["port"], "database": s["dbname"],
             "username": s["username"], "schemas": s["schemas"], "cdc": s["cdc"], "publication": s["publication"],
-            "slot": s["slot"], "checked": s["checked"], "created_at": _iso(s["created_at"])}
+            "slot": s["slot"], "checked": s["checked"], "created_at": _iso(s["created_at"]), "stream_id": s["stream_id"]}
 
 
 # ---- cron: minute hour day-of-month month day-of-week (UTC) ---------------------------------
@@ -223,7 +228,7 @@ def schedule_ok(engine, v):
     v = " ".join(str(v or "").split())
     v = LEGACY.get(v, v)
     if v == "stream":
-        if engine != "debezium":
+        if engine not in ("debezium", "pubsub"):
             raise CdcError("Datastream needs the Debezium engine")
         return v
     if v:
@@ -244,7 +249,9 @@ def _next_run(j):
 
 
 def modes(engine):
-    return {k: v for k, v in MODES.items() if engine == "olake" or k != "full_refresh"}
+    if engine == "pubsub":
+        return {"events": MODES["events"]}
+    return {k: v for k, v in MODES.items() if k != "events" and (engine == "olake" or k != "full_refresh")}
 
 
 _stream_seen = [0.0, False]
@@ -272,8 +279,46 @@ def kinds():
     return {k: v for k, v in KINDS.items() if ENGINE == "olake" or k == "postgres"}
 
 
+def sync_streams(member):
+    """The member's 📨 Pub/Sub streams as sources: one per stream (made, renamed with it); a deleted
+    stream's source goes — or, while a job still uses it, stays and says so."""
+    streams = {r["id"]: r for r in _q("SELECT id, name, topic FROM pubsub_streams WHERE member = %s AND state <> 'deleted'",
+                                      (member,))} if _q("SELECT to_regclass('pubsub_streams') AS t", one=True)["t"] else {}
+    have = {r["stream_id"]: r for r in _q("SELECT * FROM cdc_sources WHERE member = %s AND kind = 'pubsub'", (member,))}
+    for sid, st in streams.items():
+        name = f"{st['name']} (Pub/Sub)"
+        if sid not in have:
+            _q("INSERT INTO cdc_sources (member, name, kind, host, port, dbname, username, cdc, stream_id, checked) "
+               "VALUES (%s, %s, 'pubsub', 'kafka', 9092, %s, %s, true, %s, %s) ON CONFLICT (member, name) DO NOTHING",
+               (member, name, st["topic"], member, sid, json.dumps({"ok": True, "message": "📨 a Pub/Sub stream"})), rows=False)
+    for sid, s in have.items():
+        if sid in streams:
+            continue
+        if _q("SELECT 1 FROM cdc_jobs WHERE source_id = %s", (s["id"],), one=True):
+            _q("UPDATE cdc_sources SET checked = %s WHERE id = %s",
+               (json.dumps({"ok": False, "message": "its stream was deleted on 📨 Pub/Sub — delete the job using it"}), s["id"]),
+               rows=False)
+        else:
+            _q("DELETE FROM cdc_sources WHERE id = %s", (s["id"],), rows=False)
+
+
+def stream_jobs(member):
+    """{stream id: [{id, name, schedule, enabled}]} — the Ingestion jobs reading each stream."""
+    out = {}
+    for r in _q("SELECT s.stream_id, j.id, j.name, j.schedule, j.enabled FROM cdc_jobs j JOIN cdc_sources s ON s.id = j.source_id "
+                "WHERE j.member = %s AND s.kind = 'pubsub' ORDER BY j.name", (member,)):
+        out.setdefault(r["stream_id"], []).append({k: r[k] for k in ("id", "name", "schedule", "enabled")})
+    return out
+
+
+def _pubsub(s):
+    if s["kind"] == "pubsub":
+        raise CdcError("this source is a 📨 Pub/Sub stream — change or delete it on the Pub/Sub page")
+
+
 def overview(member, catalogs=()):
     """Everything on the member's page: sources, destinations, jobs (+ last run), their catalogs."""
+    sync_streams(member)
     src = _q("SELECT * FROM cdc_sources WHERE member = %s ORDER BY name", (member,))
     dst = _q("SELECT * FROM cdc_destinations WHERE member = %s ORDER BY name", (member,))
     jobs = _q("SELECT j.*, s.name AS source_name, d.name AS dest_name, d.catalog, "
@@ -310,7 +355,8 @@ def _name(v, what="name"):
 
 
 def _limit(table, member):
-    n = _q(f"SELECT count(*) AS n FROM cdc_{table} WHERE member = %s", (member,), one=True)["n"]
+    n = _q(f"SELECT count(*) AS n FROM cdc_{table} WHERE member = %s" + (" AND kind <> 'pubsub'" if table == "sources" else ""),
+           (member,), one=True)["n"]
     if n >= LIMITS[table]:
         raise CdcError(f"you have {n} {table} — the most there can be; delete one first")
 
@@ -370,6 +416,7 @@ def save_source(member, body):
     name, pw = _name(body.get("name")), str(body.get("password") or "")
     if body.get("id"):
         s = _own("cdc_sources", member, body["id"])
+        _pubsub(s)
         if _q("SELECT 1 FROM cdc_sources WHERE member = %s AND name = %s AND id <> %s", (member, name, s["id"]), one=True):
             raise CdcError("you have a source with that name")
         if s["kind"] != kind:
@@ -398,6 +445,10 @@ def save_source(member, body):
 
 def delete_source(member, sid):
     s = _own("cdc_sources", member, sid)
+    if s["kind"] == "pubsub" and not _q("SELECT 1 FROM pubsub_streams WHERE id = %s AND state <> 'deleted'", (s["stream_id"],), one=True):
+        pass                                          # its stream is gone: the source may go (once no job uses it)
+    else:
+        _pubsub(s)
     used = _q("SELECT name FROM cdc_jobs WHERE source_id = %s", (s["id"],))
     if used:
         raise CdcError("used by job " + ", ".join(j["name"] for j in used) + " — delete it first")
@@ -486,6 +537,8 @@ def create_job(member, body):
     name = _name(body.get("name"))
     s = _own("cdc_sources", member, body.get("source") or 0)
     d = _own("cdc_destinations", member, body.get("destination") or 0)
+    if s["kind"] == "pubsub":
+        return _create_stream_job(member, name, s, d, str(body.get("schedule") or ""))
     mode, schedule = str(body.get("mode") or "cdc"), str(body.get("schedule") or "")
     if mode not in modes(ENGINE):
         raise CdcError("unknown mode")
@@ -524,6 +577,29 @@ def create_job(member, body):
              (member, name, s["id"], d["id"], tables, mode, schedule,
               json.dumps(streams_for(t["result"]["streams"], tables, mode, d["namespace"])), ENGINE), one=True)["id"]
     if schedule == "stream":                       # cdc-runner starts the stream (cdc_debezium.reconcile)
+        return {"id": jid}
+    return {"id": jid, "task": queue(member, "run", jid, {"trigger": "first run"})}
+
+
+def _create_stream_job(member, name, s, d, schedule):
+    """A 📨 Pub/Sub stream → one table, <destination namespace (or events)>.<stream name>."""
+    st = _q("SELECT * FROM pubsub_streams WHERE id = %s AND member = %s AND state <> 'deleted'", (s["stream_id"], member), one=True)
+    if not st:
+        raise CdcError("its stream was deleted on 📨 Pub/Sub")
+    schedule = schedule_ok("pubsub", schedule)
+    _limit("jobs", member)
+    if _q("SELECT 1 FROM cdc_jobs WHERE member = %s AND name = %s", (member, name), one=True):
+        raise CdcError("you have a job with that name")
+    ns = d["namespace"] or "events"
+    for o in _q("SELECT j.name, j.tables, d.namespace FROM cdc_jobs j JOIN cdc_destinations d ON d.id = j.dest_id "
+                "WHERE j.member = %s AND d.catalog = %s", (member, d["catalog"])):
+        if (o["namespace"] or "events") == ns and st["name"] in {x.split(".", 1)[-1] for x in o["tables"]}:
+            raise CdcError(f"job {o['name']} already writes {st['name']} into {d['catalog']}.{ns} — "
+                           "choose a destination with another namespace")
+    jid = _q("INSERT INTO cdc_jobs (member, name, source_id, dest_id, tables, mode, schedule, streams, engine) "
+             "VALUES (%s, %s, %s, %s, %s, 'events', %s, '{}', 'pubsub') RETURNING id",
+             (member, name, s["id"], d["id"], [st["name"]], schedule), one=True)["id"]
+    if schedule == "stream":
         return {"id": jid}
     return {"id": jid, "task": queue(member, "run", jid, {"trigger": "first run"})}
 

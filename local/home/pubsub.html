@@ -61,7 +61,7 @@
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=18"></script>
+  <script src="/lab-header.js?v=19"></script>
   <div class="pagebar"><h1>📨 Pub/Sub <span class="dot">·</span> event streams on Kafka topics of your own</h1></div>
   <main id="main"><div class="placeholder">Loading…</div></main>
   <script>
@@ -183,7 +183,7 @@
         return el('tr', {}, [
           el('td', {}, [on(el('a', {class: 'name', text: s.name}), 'click', function () { location.hash = 'stream/' + s.id; }),
                         el('div', {class: 'sub'}, [el('code', {class: 't', text: s.topic})])]),
-          el('td', {}, [el('div', {text: data.kinds[s.kind].name}), s.sink ? el('div', {class: 'sub muted', text: '🏞 → ' + s.sink}) : null]),
+          el('td', {}, [el('div', {text: data.kinds[s.kind].name}), s.jobs.length ? el('div', {class: 'sub muted', text: '🏞 ' + s.jobs.length + ' Ingestion job' + (s.jobs.length > 1 ? 's' : '')}) : null]),
           el('td', {text: s.rate + ' / s'}),
           el('td', {text: lateText(s)}),
           st, sent,
@@ -277,67 +277,23 @@
           on(el('button', {text: 'Cancel'}), 'click', function () { location.hash = 'streams'; })]), err]));
     }
 
-    // ---- 🏞 land the stream in the lakehouse: a table that keeps every event (Kafka Connect's Iceberg sink)
-    function landState(p) {
-      var st = p.sink_status || {};
-      if (st.state === 'failed') return pill('bad', '✗ ' + (st.error || 'failed'), st.error);
-      if (!p.sink_on) return pill('idle', '⏸ stopped');
-      if (!data.streaming) return pill('idle', '⏸ waiting for Streaming');
-      if (st.state === 'running') return pill('ok live', 'landing');
-      return pill('run', '◐ starting…');
-    }
-    function landText(p) {
-      var st = p.sink_status || {};
-      if (st.landed === undefined) return 'The sink starts with the oldest event the topic still has (up to ' + data.retention_h + ' h back).';
-      return num(st.landed) + ' events in the table · ' + num(st.behind) + ' on the way (a commit every ~10 s)';
+    // ---- 🏞 into the lakehouse: 📡 Ingestion jobs with this stream as their source
+    function runText(j) {
+      return !j.schedule ? 'Manual' : j.schedule === 'stream' ? 'Datastream' + (j.enabled ? '' : ' · stopped') : 'Cron ' + j.schedule + (j.enabled ? '' : ' · paused');
     }
     function landCard(s) {
-      var box = el('div'), state = el('span'), text = el('div', {class: 'sub muted', style: 'margin-top:6px'});
-      var c = card([el('div', {class: 'head'}, [el('h3', {}, ['🏞 Land in your lakehouse ', state])]), box]);
-      function linked(p) {
-        var stop = on(el('button', {class: 'small', text: p.sink_on ? '⏸ Stop landing' : '▶ Start landing'}), 'click', function () {
-          stop.disabled = true;
-          api('POST', '/api/pubsub/land/set', {id: s.id, on: !p.sink_on}).then(function (n) { update(n); })
-            .catch(function (e) { stop.disabled = false; alert_(e.message); });
-        });
-        var rm = on(el('button', {class: 'small danger', text: 'Remove'}), 'click', function () {
-          ask(rm, 'Stop landing for good? The table stays.', 'Remove', function () {
-            api('POST', '/api/pubsub/land/remove', {id: s.id}).then(function (n) { update(n); }).catch(function (e) { alert_(e.message); });
-          });
-        });
-        box.replaceChildren(el('dl', {class: 'facts'}, [
-          el('dt', {text: 'Table'}), el('dd', {}, [el('code', {class: 't', text: p.sink})]),
-          el('dt', {text: 'Columns'}), el('dd', {class: 'sub', text: data.columns[s.kind].join(', ')}),
-          el('dt', {text: 'Landed'}), el('dd', {}, [text])]),
-          help('Every event is a new row (append), with _kafka: the topic, partition, offset and Kafka timestamp it came from. Query it in the SQL editor.'),
-          el('div', {class: 'actions', style: 'margin-top:12px'}, [stop, rm]));
-      }
-      function form() {
-        if (!data.catalogs.length) return box.replaceChildren(el('div', {class: 'sub muted', text: 'You have no catalog of your own yet.'}));
-        var cat = el('select', {}, data.catalogs.map(function (x) { return el('option', {value: x, text: x}); }));
-        var ns = el('input', {type: 'text', value: 'events', autocomplete: 'off'});
-        var tb = el('input', {type: 'text', value: s.name, autocomplete: 'off'});
-        var go = el('button', {class: 'primary', text: 'Start landing'}), err = el('div', {class: 'sub bad', style: 'margin-top:8px'});
-        on(go, 'click', function () {
-          go.disabled = true; err.textContent = '';
-          api('POST', '/api/pubsub/land', {id: s.id, catalog: cat.value, namespace: ns.value.trim(), table: tb.value.trim()})
-            .then(function (n) { update(n); }).catch(function (e) { err.textContent = e.message; go.disabled = false; });
-        });
-        box.replaceChildren(el('div', {class: 'sub muted', style: 'margin-bottom:10px',
-          text: 'Kafka keeps events ' + data.retention_h + ' h. Land them in an Iceberg table to keep them, query them with SQL and build Silver from them. The lab\'s Iceberg sink (Kafka Connect) appends every event, a commit every ~10 s.'}),
-          el('div', {class: 'form'}, [el('label', {text: 'Catalog'}), cat, el('label', {text: 'Namespace'}), el('div', {}, [ns, help('Made if it isn\'t there.')]),
-            el('label', {text: 'Table'}), el('div', {}, [tb, help('A new table, made for you and typed: event_time and publish_time are timestamps. The sink starts with the oldest event the topic still has.')])]),
-          el('div', {class: 'actions', style: 'margin-top:12px'}, [go]), err);
-      }
-      var shown = null;
-      function update(p) {
-        state.replaceChildren(p.sink ? landState(p) : '');
-        text.textContent = landText(p);
-        var key = p.sink ? p.sink + (p.sink_on ? '+' : '-') : '';
-        if (key !== shown) { shown = key; p.sink ? linked(p) : form(); }
-      }
-      update(s);
-      return {card: c, update: update};
+      var src = data.sources[s.id];
+      var add = el('a', {class: 'primary button', href: '/cdc.html#new-job/' + (src || ''), text: '+ New Ingestion job'});
+      add.setAttribute('style', 'display:inline-block; text-decoration:none; padding:7px 14px; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; font-size:.88rem');
+      var rows = s.jobs.map(function (j) {
+        return el('tr', {}, [el('td', {}, [el('a', {class: 'name', href: '/cdc.html#job/' + j.id, text: j.name})]), el('td', {class: 'muted', text: runText(j)})]);
+      });
+      return card([el('div', {class: 'head'}, [el('h3', {text: '🏞 Into your lakehouse'}), add]),
+        el('div', {class: 'sub muted', style: 'margin-bottom:10px',
+          text: 'Kafka keeps events ' + data.retention_h + ' h. To keep them, land them in an Iceberg table with a 📡 Ingestion job: this stream is one of its sources. ' +
+                'Every event becomes a row (Bronze) — typed, with _kafka (topic, partition, offset) — Manual, Cron or Datastream. Build Silver from it with SQL, dbt or Spark.'}),
+        rows.length ? el('table', {class: 'lst'}, [el('thead', {}, [el('tr', {}, [el('th', {text: 'Ingestion job'}), el('th', {text: 'Runs'})])]), el('tbody', {}, rows)])
+                    : el('div', {class: 'sub muted', text: 'No job lands it yet.'})]);
     }
 
     // ---- a stream: what it is, its settings, Peek --------------------------------------------
@@ -370,8 +326,7 @@
       });
       main.appendChild(card([el('h3', {text: 'Settings'}), el('div', {class: 'form'}, settingsForm(cfg)),
         el('div', {class: 'actions', style: 'margin-top:14px'}, [save, msg])]));
-      var land = landCard(s);
-      main.appendChild(land.card);
+      main.appendChild(landCard(s));
       // peek
       var body = el('tbody'), info = el('div', {class: 'sub muted'}), only = false, lastP = null;
       var which = seg([[false, 'All'], [true, '🕓 Late only']], false, function (v) { only = v; if (lastP) paint(lastP); });
@@ -380,7 +335,6 @@
         help('Newest first. Click an event for its JSON. 🕓 = more than ' + data.late_after_s + ' s between event_time and publish_time.')]));
       function paint(p) {
         lastP = p;
-        land.update(p);
         st.replaceChildren(status(p)); sent.textContent = sentText(p);
         var list = only ? p.recent_late : p.recent;
         info.textContent = list.length ? 'refreshes every 2 s' : '';

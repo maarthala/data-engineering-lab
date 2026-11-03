@@ -8,7 +8,7 @@
   var host = location.hostname;
   function url(sub, unusedPort, path) { return 'http://' + sub + '.' + location.host + (path || ''); }
   var TOOLS = window.LAB_TOOLS = {
-    sync:       {name: 'Ingestion', what: 'Copy tables from your databases (CDC, OLake)', page: '/cdc.html'},   // a portal page
+    sync:       {name: 'Ingestion', what: 'Copy data from your databases and streams into your lakehouse', page: '/cdc.html'},   // a portal page
     pubsub:     {name: 'Pub/Sub', what: 'Event streams on Kafka topics of your own (clicks, orders…)', page: '/pubsub.html'},
     jupyter:    {name: 'Notebooks', what: 'Jupyter', svc: 'jupyter', url: url('jupyter', 8008)},
     sqlpad:     {name: 'SQL editor', what: 'SQLPad', svc: 'sqlpad', url: url('sqlpad', 8003, '/auth/oidc')},

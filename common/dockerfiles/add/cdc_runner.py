@@ -312,6 +312,8 @@ def _dbz():
 
 def check_source(t):
     s = _q("SELECT * FROM cdc_sources WHERE id = %s", (t["ref"],), one=True)
+    if s["kind"] == "pubsub":                              # a 📨 Pub/Sub stream: nothing to reach
+        return s["checked"] or {}
     if labcdc.ENGINE == "debezium":
         checked = _dbz().check_source(s)
         _q("UPDATE cdc_sources SET checked = %s WHERE id = %s", (json.dumps(checked), s["id"]), rows=False)
@@ -398,7 +400,7 @@ def run(t):
     rid = _q("INSERT INTO cdc_runs (job_id, member, trigger) VALUES (%s, %s, %s) RETURNING id",
              (j["id"], j["member"], (t["payload"] or {}).get("trigger", "schedule")), one=True)["id"]
     _q("UPDATE cdc_jobs SET last_run_at = now() WHERE id = %s", (j["id"],), rows=False)
-    if j["engine"] == "debezium":
+    if j["engine"] in ("debezium", "pubsub"):                 # Kafka Connect (pubsub: a 📨 stream's topic)
         return _run_debezium(j, rid)
     status, records, err, log = "failed", None, None, ""
     try:

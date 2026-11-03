@@ -19,9 +19,10 @@ on k8s through the kafka-connect pod's helper container (connect_secrets.py, CDC
 reconcile() keeps Kafka Connect in step with the jobs every few seconds: makes missing connectors,
 pauses / resumes them, restarts failed tasks, and removes what deleted jobs left (connectors,
 topics, secret files).
-📨 Pub/Sub streams that land in the lakehouse (labpubsub.py) get one connector each, the same
-Iceberg sink: ps-<stream>-sink reads the stream's topic (event-sim publishes it) and appends every
-event to a table made here, typed, with _kafka (topic, partition, offset, timestamp) — ps_reconcile().
+📨 Pub/Sub jobs (engine pubsub: a member's stream as the source, labpubsub.py) are one connector,
+the same Iceberg sink: ps-<job>-sink reads the stream's topic (event-sim publishes it) and appends
+every event to a table made here, typed, with _kafka (topic, partition, offset, timestamp) —
+Manual / Cron / Datastream as above (ps_run, ps_reconcile); the topic is the stream's, it stays.
 """
 import json
 import os
@@ -129,7 +130,7 @@ def connect_log(jid, since=None, lines=40):
 
 
 def _keep(text, jid, lines):
-    tag = re.compile(rf"\bcdc-{jid}-(src|sink)\b")
+    tag = re.compile(rf"\b(cdc|ps)-{jid}-(src|sink)\b")
     keep = [l for l in text.splitlines() if tag.search(l) and not l.lstrip().startswith("at ") and not NOISE.search(l)]
     return [re.sub(r"\s*\([a-zA-Z0-9_.$]+:\d+\)\s*$", "", l)[:400] for l in keep[-lines:]]
 
@@ -621,6 +622,8 @@ def _slot(s):
 # ---- a run (manual / scheduled): resume until caught up, then pause ---------------------------
 def run(j, rid, log):
     """→ the number of changes it read. `log(line)` adds to the run's log."""
+    if j["engine"] == "pubsub":
+        return ps_run(j, rid, log)
     s, d = _rows(j)
     _postgres_only(s)
     write_secrets(j, s)                                    # a key may have been renewed since
@@ -679,7 +682,7 @@ def _stream_log(jid, meta):
     return "\n".join((meta.get("events") or []) + (["", "— Kafka Connect, this job's connectors (latest lines) —"] + lines if lines else []))
 
 
-def _stream_run(j, conns):
+def _stream_run(j, conns, lag_fn=None, failed_fn=None, what="changes"):
     """A streaming job has one 'running' run row while it streams: its changes so far, how far behind,
     and its log — what happened (started, errors, restarts, how it's doing) + Kafka Connect's lines."""
     r = _q("SELECT id, meta FROM cdc_runs WHERE job_id = %s AND trigger = 'stream' AND status = 'running' ORDER BY id DESC LIMIT 1",
@@ -692,11 +695,11 @@ def _stream_run(j, conns):
             _q("UPDATE cdc_runs SET status = 'ok', finished_at = now(), meta = %s, log = %s WHERE id = %s",
                (json.dumps(meta), _stream_log(j["id"], meta), r["id"]), rows=False)
         return
-    total, behind = lag(j)
-    err = _failed(conns, j["id"])
+    total, behind = (lag_fn or lag)(j)
+    err = (failed_fn or _failed)(conns, j["id"])
     if not r:
         meta = {"base": total, "behind": behind, "t0": int(time.time()), "noted": time.time()}
-        _event(meta, f"▶ stream started — the topics hold {total} changes")
+        _event(meta, f"▶ stream started — the topic{'s hold' if what == 'changes' else ' holds'} {total} {what}")
         _q("INSERT INTO cdc_runs (job_id, member, trigger, records, meta, log) VALUES (%s, %s, 'stream', 0, %s, %s)",
            (j["id"], j["member"], json.dumps(meta), "\n".join(meta["events"])), rows=False)
         _q("UPDATE cdc_jobs SET last_run_at = now() WHERE id = %s", (j["id"],), rows=False)
@@ -709,7 +712,7 @@ def _stream_run(j, conns):
         _event(meta, "✓ running again")
     meta["err"] = err
     if time.time() - float(meta.get("noted", 0)) > NOTE_S:
-        _event(meta, f"{records} changes so far · {behind} on the way to Iceberg")
+        _event(meta, f"{records} {what} so far · {behind} on the way to Iceberg")
         meta["noted"] = time.time()
     _q("UPDATE cdc_runs SET records = %s, meta = %s, error = %s, log = %s WHERE id = %s",
        (records, json.dumps(meta), err, _stream_log(j["id"], meta), r["id"]), rows=False)
@@ -765,14 +768,18 @@ def reconcile():
                 _set_state(j["id"], want, c)
                 _stream_run(j, c)
         except SetupError as e:                          # it can't start: stop it, and say why on its page
-            _q("UPDATE cdc_jobs SET enabled = false WHERE id = %s", (j["id"],), rows=False)
-            r = _q("UPDATE cdc_runs SET status = 'failed', finished_at = now(), error = %s WHERE job_id = %s AND status = 'running' "
-                   "AND trigger = 'stream' RETURNING id", (str(e), j["id"]), one=True)
-            if not r:
-                _q("INSERT INTO cdc_runs (job_id, member, trigger, status, finished_at, error) VALUES (%s, %s, 'stream', 'failed', now(), %s)",
-                   (j["id"], j["member"], str(e)), rows=False)
+            _stop(j, e)
         except Exception as e:  # noqa: BLE001 — the next round tries again
             print(f"[cdc] debezium job {j['id']}: {e}", flush=True)
+
+
+def _stop(j, e):
+    _q("UPDATE cdc_jobs SET enabled = false WHERE id = %s", (j["id"],), rows=False)
+    r = _q("UPDATE cdc_runs SET status = 'failed', finished_at = now(), error = %s WHERE job_id = %s AND status = 'running' "
+           "AND trigger = 'stream' RETURNING id", (str(e), j["id"]), one=True)
+    if not r:
+        _q("INSERT INTO cdc_runs (job_id, member, trigger, status, finished_at, error) VALUES (%s, %s, %s, 'failed', now(), %s)",
+           (j["id"], j["member"], "stream" if j["schedule"] == "stream" else "setup", str(e)), rows=False)
 
 
 def cleanup(jid):
@@ -792,16 +799,17 @@ def cleanup(jid):
     print(f"[cdc] removed debezium job {jid}'s connectors and topics", flush=True)
 
 
-# ---- 📨 Pub/Sub: a stream's topic → an Iceberg table (append) ---------------------------------
+# ---- 📨 Pub/Sub jobs: a stream's topic → an Iceberg table (append) --------------------------
 PS_CONN = re.compile(r"^ps-(\d+)-sink$")
+PS_GROUP = re.compile(r"^(connect|cg-control)-ps-(\d+)-sink(-coord)?$")
 
 
-def _ps_sink(sid):
-    return f"ps-{sid}-sink"
+def _ps_sink(jid):
+    return f"ps-{jid}-sink"
 
 
-def _ps_secret(sid, key):
-    return "${dir:" + f"{SECRETS}/ps-{sid}" + ":" + key + "}"
+def _ps_secret(jid, key):
+    return "${dir:" + f"{SECRETS}/ps-{jid}" + ":" + key + "}"
 
 
 def _put_secrets(dirname, values):
@@ -829,6 +837,18 @@ def _drop_dir(dirname):
     shutil.rmtree(f"{SECRETS}/{dirname}", ignore_errors=True)
 
 
+def _ps_info(j):
+    """What a Pub/Sub job lands, where: its stream's topic and kind, <catalog>.<namespace>.<table>."""
+    import labpubsub
+    s, d = _rows(j)
+    st = labpubsub._q("SELECT * FROM pubsub_streams WHERE id = %s AND state <> 'deleted' AND ready",
+                      (s["stream_id"],), one=True) if s else None
+    if not st:
+        raise SetupError("its 📨 Pub/Sub stream was deleted — delete this job (its table stays)")
+    return {"id": j["id"], "member": j["member"], "topic": st["topic"], "kind": st["kind"], "catalog": d["catalog"],
+            "namespace": d["namespace"] or "events", "table": j["tables"][0], "link": f"job-{j['id']}"}
+
+
 def _ps_secrets(r):
     env = _job_env(r["member"])
     _put_secrets(f"ps-{r['id']}", {"catalog-credential": env["LAB_JOB_CREDENTIAL"], "s3-key": env["LAB_JOB_S3_KEY"],
@@ -836,35 +856,35 @@ def _ps_secrets(r):
 
 
 def _ps_table(r):
-    """The stream's table, made typed before the sink writes (event_time a timestamptz, items a list of
-    structs…); one that's there already must be this link's (lab.pubsub.link) — a new link reads the
+    """The job's table, made typed before the sink writes (event_time a timestamptz, items a list of
+    structs…); one that's there already must be this job's (lab.pubsub.link) — a new job reads the
     topic from its oldest event, so into an older table it would add those events a second time."""
     import labpubsub
     import lakehouse
     try:
-        lakehouse.create_namespace(r["member"], r["sink_catalog"], r["sink_namespace"])
+        lakehouse.create_namespace(r["member"], r["catalog"], r["namespace"])
     except ValueError:
         pass                                              # there already
-    st, cfg, token = _polaris(r["member"], "GET", f"config?warehouse={urllib.parse.quote(r['sink_catalog'])}")
-    pre = urllib.parse.quote(((cfg or {}).get("overrides") or {}).get("prefix") or r["sink_catalog"])
-    where = f"{r['sink_catalog']}.{r['sink_namespace']}.{r['sink_table']}"
-    st, body, _ = _polaris(r["member"], "GET", f"{pre}/namespaces/{r['sink_namespace']}/tables/{r['sink_table']}", token=token)
+    st, cfg, token = _polaris(r["member"], "GET", f"config?warehouse={urllib.parse.quote(r['catalog'])}")
+    pre = urllib.parse.quote(((cfg or {}).get("overrides") or {}).get("prefix") or r["catalog"])
+    where = f"{r['catalog']}.{r['namespace']}.{r['table']}"
+    st, body, _ = _polaris(r["member"], "GET", f"{pre}/namespaces/{r['namespace']}/tables/{r['table']}", token=token)
     if st == 200:
         props = (body.get("metadata") or {}).get("properties") or {}
-        if props.get("lab.pubsub.link") != r["sink_link"]:
-            raise SetupError(f"{where} is there already" + (", from an earlier link — landing again would add its events twice"
+        if props.get("lab.pubsub.link") != r["link"]:
+            raise SetupError(f"{where} is there already" + (", from an earlier job — landing again would add its events twice"
                                                               if props.get("lab.pubsub") == r["topic"] else ", made by something else")
-                             + ": remove the link and pick a new table (or delete that one in My catalogs)")
+                             + ": choose a destination with another namespace (or delete that table in My catalogs)")
         return
-    st, body, _ = _polaris(r["member"], "POST", f"{pre}/namespaces/{r['sink_namespace']}/tables", token=token,
-                           body={"name": r["sink_table"], "schema": labpubsub.iceberg_schema(r["kind"]),
-                                 "properties": {"format-version": "2", "lab.pubsub": r["topic"], "lab.pubsub.link": r["sink_link"]}})
+    st, body, _ = _polaris(r["member"], "POST", f"{pre}/namespaces/{r['namespace']}/tables", token=token,
+                           body={"name": r["table"], "schema": labpubsub.iceberg_schema(r["kind"]),
+                                 "properties": {"format-version": "2", "lab.pubsub": r["topic"], "lab.pubsub.link": r["link"]}})
     if st not in (200, 409):
         raise DbzError(f"couldn't make {where}: HTTP {st} {(body.get('error') or {}).get('message', '')}")
 
 
 def ps_sink_config(r):
-    sid = r["id"]
+    jid = r["id"]
     return {"connector.class": "io.tabular.iceberg.connect.IcebergSinkConnector", "tasks.max": "1",
             "topics": r["topic"],
             "key.converter": "org.apache.kafka.connect.storage.StringConverter",
@@ -872,16 +892,16 @@ def ps_sink_config(r):
             "consumer.override.auto.offset.reset": "earliest",
             "consumer.override.allow.auto.create.topics": "false",   # a deleted stream's topic stays deleted
             "iceberg.catalog.type": "rest", "iceberg.catalog.uri": f"{POLARIS}/api/catalog",
-            "iceberg.catalog.warehouse": r["sink_catalog"],
-            "iceberg.catalog.credential": _ps_secret(sid, "catalog-credential"),
+            "iceberg.catalog.warehouse": r["catalog"],
+            "iceberg.catalog.credential": _ps_secret(jid, "catalog-credential"),
             "iceberg.catalog.scope": "PRINCIPAL_ROLE:ALL",
             "iceberg.catalog.oauth2-server-uri": f"{POLARIS}/api/catalog/v1/oauth/tokens",
             "iceberg.catalog.io-impl": "org.apache.iceberg.aws.s3.S3FileIO",
             "iceberg.catalog.s3.endpoint": S3_ENDPOINT, "iceberg.catalog.s3.path-style-access": "true",
-            "iceberg.catalog.s3.access-key-id": _ps_secret(sid, "s3-key"),
-            "iceberg.catalog.s3.secret-access-key": _ps_secret(sid, "s3-secret"),
+            "iceberg.catalog.s3.access-key-id": _ps_secret(jid, "s3-key"),
+            "iceberg.catalog.s3.secret-access-key": _ps_secret(jid, "s3-secret"),
             "iceberg.catalog.client.region": "us-east-1",
-            "iceberg.tables": f"{r['sink_namespace']}.{r['sink_table']}",
+            "iceberg.tables": f"{r['namespace']}.{r['table']}",
             "iceberg.control.commit.interval-ms": str(COMMIT_MS),
             "transforms": "kafka", "transforms.kafka.type": "io.tabular.iceberg.connect.transforms.KafkaMetadataTransform",
             "transforms.kafka.field_name": "_kafka", "transforms.kafka.nested": "true"}
@@ -897,21 +917,49 @@ def _ps_connectors():
     return out
 
 
-def _ps_drop(sid):
-    """A sink no stream wants: the connector and its secret files (its consumer groups go once
-    they're empty — _ps_groups)."""
-    _rest("DELETE", f"/connectors/{_ps_sink(sid)}", ok404=True)
-    _drop_dir(f"ps-{sid}")
-    print(f"[cdc] removed pub/sub sink {sid}", flush=True)
+def _ps_failed(conns, jid):
+    c = conns.get(_ps_sink(jid))
+    if not c:
+        return None
+    for t in c["tasks"]:
+        if t.get("state") == "FAILED":
+            return f"{_ps_sink(jid)}: " + _trace(t.get("trace"))
+    return f"{_ps_sink(jid)} failed" if c["state"] == "FAILED" else None
 
 
-PS_GROUP = re.compile(r"^(connect|cg-control)-ps-(\d+)-sink(-coord)?$")
+def _ps_lag(r):
+    """(events the topic holds, events the sink hasn't committed to Iceberg yet)."""
+    ends = _ends([r["topic"]])
+    done = _committed(f"connect-{_ps_sink(r['id'])}", list(ends))
+    return sum(ends.values()), sum(max(0, e - done.get(k, 0)) for k, e in ends.items())
+
+
+def _ps_ensure(r, state):
+    conns = _ps_connectors()
+    if _ps_sink(r["id"]) in conns:
+        return conns
+    _ps_secrets(r)
+    _ps_table(r)
+    try:
+        _rest("POST", "/connectors", {"name": _ps_sink(r["id"]), "config": ps_sink_config(r), "initial_state": state})
+    except DbzError as e:
+        if "409" not in str(e):
+            raise
+    time.sleep(2)
+    return _ps_connectors()
+
+
+def _ps_drop(jid):
+    """A sink no job wants: the connector and its secret files (its consumer groups go once they're
+    empty — _ps_groups)."""
+    _rest("DELETE", f"/connectors/{_ps_sink(jid)}", ok404=True)
+    _drop_dir(f"ps-{jid}")
+    print(f"[cdc] removed pub/sub job {jid}'s sink", flush=True)
 
 
 def _ps_groups(keep):
     """The consumer groups of sinks that are gone (its offsets: connect-…, and the Iceberg sink's own
-    cg-control-…) — so a new link starts from the oldest event again. A group still emptying is
-    left for the next round."""
+    cg-control-…). A group still emptying is left for the next round."""
     gone = [g.group_id for g in _admin().list_consumer_groups().result(timeout=30).valid
             if PS_GROUP.match(g.group_id) and int(PS_GROUP.match(g.group_id).group(2)) not in keep]
     for g, f in (_admin().delete_consumer_groups(gone).items() if gone else []):
@@ -921,50 +969,85 @@ def _ps_groups(keep):
             pass
 
 
+def ps_run(j, rid, log):
+    """A manual / scheduled run of a Pub/Sub job: resume the sink until it has committed every event the
+    topic held when the run began, then pause. → the events it committed."""
+    r = _ps_info(j)
+    write = _ps_secrets                                    # a key may have been renewed since
+    write(r)
+    t0 = int(time.time())
+    conns = _ps_ensure(r, "PAUSED")
+    group, name = f"connect-{_ps_sink(j['id'])}", _ps_sink(j["id"])
+    ends = _ends([r["topic"]])
+    done0 = _committed(group, list(ends))
+    behind = sum(max(0, e - done0.get(k, 0)) for k, e in ends.items())
+    log(f"topic {r['topic']}: {sum(ends.values())} events kept, {behind} not in {r['catalog']}.{r['namespace']}.{r['table']} yet")
+    if conns[name]["state"] != "RUNNING":
+        _rest("PUT", f"/connectors/{name}/resume")
+    log("resumed the sink")
+    start = time.time()
+    try:
+        while True:
+            if time.time() - start > TIMEOUT:
+                raise DbzError("stopped: it ran longer than the time limit")
+            err = _ps_failed(_ps_connectors(), j["id"])
+            if err:
+                raise DbzError(err)
+            try:
+                done = _committed(group, list(ends))
+            except Exception as e:  # noqa: BLE001 — a new consumer group takes a moment: ask again
+                print(f"[cdc] job {j['id']} offsets: {e!r}", flush=True)
+                done = {}
+            if all(done.get(k, 0) >= e for k, e in ends.items()):
+                n = sum(done.get(k, 0) for k in ends) - sum(done0.get(k, 0) for k in ends)
+                log(f"the sink has committed everything up to the run's start to Iceberg ({n} events)")
+                return n
+            time.sleep(3)
+    finally:
+        try:
+            _rest("PUT", f"/connectors/{name}/pause")
+            log("paused the sink")
+        except Exception as e:  # noqa: BLE001
+            log(f"couldn't pause: {e}")
+        lines = connect_log(j["id"], since=t0)
+        if lines:
+            log("— Kafka Connect, this job's sink —\n" + "\n".join(lines))
+
+
 def ps_reconcile():
-    import labpubsub
-    rows = {r["id"]: r for r in labpubsub._q("SELECT * FROM pubsub_streams WHERE sink_catalog IS NOT NULL "
-                                              "AND state <> 'deleted' AND ready")}
+    jobs = {j["id"]: j for j in _q("SELECT * FROM cdc_jobs WHERE engine = 'pubsub'")}
+    running = {t["ref"] for t in _q("SELECT ref FROM cdc_tasks WHERE kind = 'run' AND status IN ('queued', 'running')")}
     conns = _ps_connectors()
-    for name, c in conns.items():
-        sid = int(PS_CONN.match(name).group(1))
-        if sid not in rows or c["topics"] != rows[sid]["topic"]:
-            _ps_drop(sid)
+    for name in conns:
+        jid = int(PS_CONN.match(name).group(1))
+        if jid not in jobs:
+            _ps_drop(jid)
     for name in _secret_dirs():
         m = re.fullmatch(r"ps-(\d+)", name)
-        if m and int(m.group(1)) not in rows:
+        if m and int(m.group(1)) not in jobs:
             _drop_dir(name)
+    _ps_groups(set(jobs))
     conns = _ps_connectors()
-    _ps_groups(set(conns) and {int(PS_CONN.match(n).group(1)) for n in conns})
-    for sid, r in rows.items():
-        name = _ps_sink(sid)
-        want = "RUNNING" if r["sink_on"] else "PAUSED"
-        status = dict(r["sink_status"] or {})
+    for j in jobs.values():
+        if j["id"] in running:
+            continue
+        name = _ps_sink(j["id"])
+        want = "RUNNING" if j["schedule"] == "stream" and j["enabled"] else "PAUSED"
         try:
-            if name not in conns:
+            if want != "RUNNING" and name not in conns:
+                continue
+            r = _ps_info(j)
+            c = conns if name in conns else _ps_ensure(r, want)
+            if want == "RUNNING" and _ps_failed(c, j["id"]):
+                _ps_table(r)                              # its table taken by something else → SetupError: it stops
                 _ps_secrets(r)
-                _ps_table(r)
-                _rest("POST", "/connectors", {"name": name, "config": ps_sink_config(r), "initial_state": want})
-                status.update(state="starting", error=None, since=_now())
-            else:
-                c = conns[name]
-                err = next((f"{name}: " + _trace(t.get("trace")) for t in c["tasks"] if t.get("state") == "FAILED"), None)
-                if err and want == "RUNNING":
-                    _ps_table(r)                          # its table taken by something else → SetupError
-                    _ps_secrets(r)
-                    _rest("POST", f"/connectors/{name}/restart?includeTasks=true&onlyFailed=true")
-                if c["state"] != want and c["state"] in ("RUNNING", "PAUSED"):
-                    _rest("PUT", f"/connectors/{name}/{'resume' if want == 'RUNNING' else 'pause'}")
-                ends = _ends([r["topic"]])
-                done = _committed(f"connect-{name}", list(ends))
-                status.update(state="failed" if err else want.lower(), error=err,
-                              landed=sum(done.get(k, 0) for k in ends),
-                              behind=sum(max(0, e - done.get(k, 0)) for k, e in ends.items()), at=_now())
-        except SetupError as e:                           # it can't land there: stop, and say why
-            labpubsub._q("UPDATE pubsub_streams SET sink_on = false WHERE id = %s", (sid,), rows=False)
-            status.update(state="failed", error=str(e))
-        except Off:
-            raise
-        except Exception as e:  # noqa: BLE001 — shown on the page; the next round tries again
-            status.update(state="failed", error=_first_line(e)[:400])
-        labpubsub._q("UPDATE pubsub_streams SET sink_status = %s WHERE id = %s", (json.dumps(status), sid), rows=False)
+                _rest("POST", f"/connectors/{name}/restart?includeTasks=true&onlyFailed=true")
+            if name in c and c[name]["state"] in ("RUNNING", "PAUSED") and c[name]["state"] != want:
+                _rest("PUT", f"/connectors/{name}/{'resume' if want == 'RUNNING' else 'pause'}")
+            _stream_run(j, c, lambda _j: _ps_lag(r), _ps_failed, "events")
+        except SetupError as e:                          # it can't land: stop it, and say why on its page
+            _stop(j, e)
+            if name in conns:
+                _ps_drop(j["id"])
+        except Exception as e:  # noqa: BLE001 — the next round tries again
+            print(f"[cdc] pub/sub job {j['id']}: {e}", flush=True)

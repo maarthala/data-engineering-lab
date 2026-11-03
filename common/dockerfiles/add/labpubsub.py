@@ -3,7 +3,8 @@ stock moves — and event-sim (event_sim.py, in the Streaming unit) publishes th
 their own, <member>.<name>, until they pause or delete it. Members subscribe to it (Peek on the page
 for now). Each event has an event_time (when it happened) and a publish_time (when it reached
 Kafka); a stream can send some events late — random delays, or a device that was offline sending its
-backlog at once — to practise event time vs processing time, watermarks and late data.
+backlog at once — to practise event time vs processing time, watermarks and late data. Each stream is
+a source in 📡 Ingestion too (labcdc.sync_streams): a job there lands its events in a table.
 
 Kept in the portal database (like 📡 Ingestion): one row per stream with its settings and what
 event-sim reports back (events sent, how many late, the last ones sent). home-api writes the
@@ -41,7 +42,7 @@ KINDS = {
                   "fields": ["event_id", "event_type", "event_time", "publish_time", "sku", "store", "qty_change",
                              "reason"]},
 }
-# the Iceberg table a stream lands in (🏞 Land in your lakehouse): its columns, typed — + _kafka (where it came from)
+# the Iceberg table a 📡 Ingestion job lands a stream in: its columns, typed — + _kafka (where it came from)
 _ITEM = ("struct", [("product_id", "long"), ("quantity", "int"), ("price", "double")])
 COLUMNS = {
     "click_events": [("session_id", "string"), ("customer_id", "long"), ("device", "string"), ("page", "string"),
@@ -102,13 +103,6 @@ CREATE TABLE IF NOT EXISTS pubsub_streams (
   sent bigint NOT NULL DEFAULT 0, late bigint NOT NULL DEFAULT 0, last_at timestamptz,
   recent jsonb NOT NULL DEFAULT '[]', UNIQUE (member, name));
 ALTER TABLE pubsub_streams ADD COLUMN IF NOT EXISTS recent_late jsonb NOT NULL DEFAULT '[]';   -- the last late ones
--- 🏞 landing in the lakehouse: cdc-runner keeps a sink connector ps-<id>-sink for it, and reports sink_status
-ALTER TABLE pubsub_streams ADD COLUMN IF NOT EXISTS sink_catalog text;
-ALTER TABLE pubsub_streams ADD COLUMN IF NOT EXISTS sink_namespace text;
-ALTER TABLE pubsub_streams ADD COLUMN IF NOT EXISTS sink_table text;
-ALTER TABLE pubsub_streams ADD COLUMN IF NOT EXISTS sink_on boolean NOT NULL DEFAULT false;
-ALTER TABLE pubsub_streams ADD COLUMN IF NOT EXISTS sink_status jsonb;
-ALTER TABLE pubsub_streams ADD COLUMN IF NOT EXISTS sink_link text;       -- this link (the table made for it says so)
 CREATE TABLE IF NOT EXISTS pubsub_sim (id int PRIMARY KEY, beat timestamptz NOT NULL);   -- event-sim is alive
 """
 _ready, _lock = False, threading.Lock()
@@ -164,17 +158,18 @@ def sim_alive():
 
 def _out(s, recent=False):
     o = {k: s[k] for k in ("id", "name", "kind", "topic", "rate", "late_pct", "late_max", "late_pattern", "state",
-                           "paused_why", "ready", "error", "sent", "late", "sink_on", "sink_status")}
-    o["sink"] = ".".join((s["sink_catalog"], s["sink_namespace"], s["sink_table"])) if s["sink_catalog"] else None
+                           "paused_why", "ready", "error", "sent", "late")}
     o.update(created_at=_iso(s["created_at"]), resumed_at=_iso(s["resumed_at"]), last_at=_iso(s["last_at"]))
     if recent:
         o["recent"], o["recent_late"] = s["recent"], s["recent_late"]
     return o
 
 
-def overview(member, catalogs=()):
+def overview(member, jobs=None):
+    """The member's streams (+ the 📡 Ingestion jobs landing each: `jobs`, {stream id: [job]}) and the choices."""
     rows = _q("SELECT * FROM pubsub_streams WHERE member = %s AND state <> 'deleted' ORDER BY name", (member,))
-    return {"streams": [_out(s) for s in rows], "kinds": KINDS, "catalogs": list(catalogs),
+    jobs = jobs or {}
+    return {"streams": [dict(_out(s), jobs=jobs.get(s["id"], [])) for s in rows], "kinds": KINDS,
             "columns": {k: [c for c, _ in FIRST + v] + [KAFKA[0]] for k, v in COLUMNS.items()}, "rates": RATES, "late_pct": LATE_PCT,
             "late_max": LATE_MAX, "patterns": PATTERNS, "late_after_s": LATE_AFTER_S, "auto_pause_h": AUTO_PAUSE_H,
             "retention_h": RETENTION_H, "partitions": PARTITIONS, "limits": _limits(),
@@ -241,45 +236,6 @@ def update(member, sid, body):
                    "paused_why = CASE WHEN %s = 'paused' THEN 'by you' END, "
                    "resumed_at = CASE WHEN %s THEN now() ELSE resumed_at END WHERE id = %s RETURNING *",
                    (rate, pct, mx, pattern, state, state, resumed, s["id"]), one=True))
-
-
-IDENT = re.compile(r"^[a-z][a-z0-9_]{0,62}$")
-
-
-def land(member, sid, body, catalogs):
-    """🏞 Land the stream in one of the member's catalogs: <catalog>.<namespace>.<table>, from the
-    oldest event the topic still has; cdc-runner makes the table and the sink connector."""
-    s = _own(member, sid)
-    if s["sink_catalog"]:
-        raise PubSubError(f"{s['name']} lands in {s['sink_catalog']}.{s['sink_namespace']}.{s['sink_table']} already — "
-                          f"remove that first to choose another table")
-    cat, ns, tb = body.get("catalog"), (body.get("namespace") or "").strip(), (body.get("table") or "").strip()
-    if cat not in catalogs:
-        raise PubSubError("pick one of your catalogs")
-    if not IDENT.fullmatch(ns) or not IDENT.fullmatch(tb):
-        raise PubSubError("namespace and table: lowercase letters, digits and _, starting with a letter")
-    other = _q("SELECT name FROM pubsub_streams WHERE member = %s AND sink_catalog = %s AND sink_namespace = %s "
-               "AND sink_table = %s AND state <> 'deleted'", (member, cat, ns, tb), one=True)
-    if other:
-        raise PubSubError(f"your stream {other['name']} lands in {cat}.{ns}.{tb} — pick another table")
-    import secrets
-    return _out(_q("UPDATE pubsub_streams SET sink_catalog = %s, sink_namespace = %s, sink_table = %s, sink_on = true, "
-                   "sink_status = NULL, sink_link = %s WHERE id = %s RETURNING *",
-                   (cat, ns, tb, secrets.token_hex(8), s["id"]), one=True))
-
-
-def land_on(member, sid, on):
-    s = _own(member, sid)
-    if not s["sink_catalog"]:
-        raise PubSubError("it doesn't land anywhere yet")
-    return _out(_q("UPDATE pubsub_streams SET sink_on = %s WHERE id = %s RETURNING *", (bool(on), s["id"]), one=True))
-
-
-def unland(member, sid):
-    """Stop landing for good: the sink goes (the table stays)."""
-    s = _own(member, sid)
-    return _out(_q("UPDATE pubsub_streams SET sink_catalog = NULL, sink_namespace = NULL, sink_table = NULL, "
-                   "sink_on = false, sink_status = NULL WHERE id = %s RETURNING *", (s["id"],), one=True))
 
 
 def delete(member, sid):
