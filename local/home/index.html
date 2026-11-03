@@ -16,6 +16,12 @@
     @media (max-width:1100px){ .grid2{grid-template-columns:1fr} }
     .card h3{display:flex; align-items:center; justify-content:space-between; gap:8px}
     .card h3 a{font-size:.84rem; font-weight:500}
+    .reset{margin-top:12px; padding-top:10px; border-top:1px solid var(--line)}
+    .reset .danger-link{all:unset; cursor:pointer; font-size:.84rem; color:var(--bad-ink)} .reset .danger-link:hover{text-decoration:underline}
+    .reset .ask{border:1px solid var(--gold); background:var(--warn-bg); border-radius:9px; padding:10px 12px}
+    .reset .ask .note{margin:6px 0 8px}
+    .reset .row{display:flex; flex-wrap:wrap; gap:8px; align-items:center} .reset .row input{flex:1; min-width:160px}
+    .reset .note.ok{color:var(--ok-ink)}
     .resume{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px}
     .tile{display:flex; gap:12px; align-items:center; padding:12px 14px; border:1px solid var(--line); border-radius:9px; color:var(--ink); background:var(--panel)}
     .tile:hover{border-color:#b9c8f5; background:#fafcff}
@@ -95,6 +101,47 @@
     function body(id, kids) { var c = document.getElementById(id); while (c.children.length > 1) c.removeChild(c.lastChild); kids.forEach(function (k) { c.appendChild(k); }); }
     function note(t) { return el('div', {class: 'note', text: t}); }
 
+    // 🧹 Reset my lakehouse: confirm inline by typing the lakehouse's name (no browser popups), then
+    // the lab does it in the background (a minute) — the page asks until it's done
+    function resetBox(l) {
+      var box = el('div', {class: 'reset'}), btn = el('button', {type: 'button', class: 'danger-link', text: '🧹 Reset my lakehouse…'});
+      btn.addEventListener('click', function () {
+        var inp = el('input', {type: 'text', placeholder: l.catalog, autocomplete: 'off', 'aria-label': 'type ' + l.catalog + ' to confirm'});
+        var go = el('button', {type: 'button', class: 'danger', text: 'Reset'}), no = el('button', {type: 'button', text: 'Cancel'}), msg = el('div', {class: 'note'});
+        go.disabled = true;
+        inp.addEventListener('input', function () { go.disabled = inp.value.trim() !== l.catalog; });
+        no.addEventListener('click', function () { box.replaceChildren(btn); });
+        go.addEventListener('click', function () {
+          go.disabled = no.disabled = inp.disabled = true; msg.textContent = '… resetting — about a minute';
+          fetch('/api/home/reset', {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json', 'X-Lab-Request': '1'},
+                                    body: JSON.stringify({confirm: inp.value.trim()})})
+            .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status); return j; }); })
+            .then(function (j) { poll(j.job); })
+            .catch(function (e) { msg.textContent = '✗ ' + e.message; go.disabled = no.disabled = inp.disabled = false; });
+        });
+        function poll(id) {
+          fetch('/api/home/reset?id=' + id, {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (j) {
+            if (j.state === 'running') return setTimeout(function () { poll(id); }, 3000);
+            if (j.state === 'error') { msg.textContent = '✗ ' + j.error; no.disabled = false; return; }
+            var r = j.result;
+            box.replaceChildren(el('div', {class: 'note ok', text: '✓ Reset: ' + r.dropped + ' tables dropped, ' + r.files_removed + ' files removed' +
+              (r.jupyter_reset ? ', Jupyter starts fresh' : '') + (r.jobs_stopped.length ? ' · Ingestion jobs stopped: ' + r.jobs_stopped.join(', ') : '') +
+              (r.streams_paused.length ? ' · streams paused: ' + r.streams_paused.join(', ') : '') + '.'}),
+              el('a', {href: '/', text: 'Refresh'}));
+          }).catch(function () { setTimeout(function () { poll(id); }, 5000); });
+        }
+        box.replaceChildren(el('div', {class: 'ask'}, [
+          el('b', {text: 'Reset ' + l.catalog + '?'}),
+          el('div', {class: 'note', text: 'Every table in it and every folder in your bucket (' + l.bucket + ': files, notebooks, DAGs, checkpoints…) is deleted; ' +
+            'bronze / silver / gold, the starter files and the sample table come back, and Jupyter starts fresh. ' +
+            'Ingestion jobs writing into it are stopped, your Pub/Sub streams paused. Your other catalogs, the shares you gave, your secrets and your account stay.'}),
+          el('div', {class: 'row'}, [inp, go, no]), msg]));
+        inp.focus();
+      });
+      box.appendChild(btn);
+      return box;
+    }
+
     var home = fetch('/api/home').then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; });
     var exams = fetch('/api/exams').then(function (r) { return r.ok ? r.json() : {exams: []}; }).catch(function () { return {exams: []}; });
 
@@ -130,7 +177,8 @@
           el('dl', {class: 'kv'}, [el('dt', {text: 'Your lakehouse'}), el('dd', {}, [el('code', {text: l.catalog})]),
             el('dt', {text: 'Catalogs'}), el('dd', {text: l.owned.length + ' yours' + (l.shared.length ? ' · ' + l.shared.length + ' shared with you' : '')}),
             el('dt', {text: 'Team'}), el('dd', {}, l.team ? [el('code', {text: l.team_catalog})] : ['not in a team yet']),
-            el('dt', {text: 'Files'}), el('dd', {}, [el('a', {href: '/files.html', text: 'bucket ' + l.bucket + ' →'})])])]);
+            el('dt', {text: 'Files'}), el('dd', {}, [el('a', {href: '/files.html', text: 'bucket ' + l.bucket + ' →'})])]),
+          resetBox(l)]);
       }
 
       // ---- my pipelines

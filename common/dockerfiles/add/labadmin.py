@@ -618,6 +618,53 @@ def reset_lakehouse(user):
     return _reset(user, "tables/")
 
 
+def _pause_writers(name, lake):
+    """Before a reset: nothing may write into the lake meanwhile — 📡 Ingestion jobs landing in it stop
+    (scheduled / streaming; Manual ones only run when asked), 📨 Pub/Sub streams pause; a run still
+    going is waited for (up to 2 minutes), and Kafka Connect gets a moment to pause the connectors."""
+    import labcdc
+    jobs = [r["name"] for r in labcdc._q(
+        "UPDATE cdc_jobs j SET enabled = false FROM cdc_destinations d WHERE d.id = j.dest_id AND j.member = %s "
+        "AND d.catalog = %s AND j.enabled AND j.schedule <> '' RETURNING j.name", (name, lake))]
+    streams = []
+    try:
+        import labpubsub
+        streams = [r["name"] for r in labpubsub._q("UPDATE pubsub_streams SET state = 'paused', paused_why = 'reset' "
+                                                    "WHERE member = %s AND state = 'running' RETURNING name", (name,))]
+    except Exception as e:  # noqa: BLE001 — no Pub/Sub tables yet
+        print(f"[labadmin] reset {name}: streams: {e}", flush=True)
+    for _ in range(60):
+        if not labcdc._q("SELECT 1 FROM cdc_tasks t JOIN cdc_jobs j ON j.id = t.ref JOIN cdc_destinations d ON d.id = j.dest_id "
+                         "WHERE t.kind = 'run' AND t.status IN ('queued', 'running') AND j.member = %s AND d.catalog = %s",
+                         (name, lake), one=True):
+            break
+        time.sleep(2)
+    if jobs:
+        time.sleep(15)                                # cdc-runner pauses a stopped job's connectors (every 10 s)
+    return jobs, streams
+
+
+def reset_mine(user):
+    """🧹 Reset my lakehouse — a member's own button (🏠 Home): <user>_lake and their whole bucket back
+    to a new member's setup (bronze / silver / gold, the starter files, the sample table), with a
+    fresh Jupyter. Their extra catalogs, the shares they gave, 🔑 secrets, 📡 Ingestion sources and
+    destinations and the account stay; jobs writing into the lake are stopped, streams paused."""
+    _check(user)
+    name, t = lh.lake_name(user), lh._admin_token()
+    lake = f"{name}_lake"
+    if lake not in _owned_catalogs(name, t):
+        raise AdminError("you have no lakehouse yet")
+    jobs, streams = _pause_writers(name, lake)
+    jupyter = _hub_forget(user)                   # first: a running Jupyter would sync files back
+    lh.trino_catalog(lake, t)
+    dropped = _clear_catalog(lake, _content_token())
+    files = _empty_prefix(lh.bucket_name(name), "")
+    lh.provision(name)
+    print(f"[labadmin] {user} reset their lakehouse: {dropped} tables, {files} files", flush=True)
+    return {"user": user, "lakehouse": lake, "dropped": dropped, "files_removed": files, "jupyter_reset": jupyter,
+            "jobs_stopped": jobs, "streams_paused": streams}
+
+
 def _drop_catalog(cat, t, ct):
     """A catalog and everything in it: tables, namespaces, its Trino catalog, its roles
     (owner, shares …). Returns how many tables/views were dropped."""

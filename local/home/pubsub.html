@@ -123,7 +123,8 @@
     function status(s) {
       if (s.error) return pill('bad', '✗ ' + s.error);
       if (!s.ready) return pill('run', '◐ making the topic…');
-      if (s.state === 'paused') return pill('idle', s.paused_why === 'auto' ? '⏸ paused (after ' + data.auto_pause_h + ' h)' : '⏸ paused');
+      if (s.state === 'paused') return pill('idle', s.paused_why === 'auto' ? '⏸ paused (after ' + data.auto_pause_h + ' h)'
+                                                  : s.paused_why === 'reset' ? '⏸ paused (lakehouse reset)' : '⏸ paused');
       if (!data.streaming) return pill('idle', '⏸ waiting for Streaming');
       return pill('ok live', 'publishing');
     }

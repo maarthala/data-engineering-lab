@@ -84,6 +84,8 @@ go (leaving = pause), the review comes after submitting. Changes need the X-Lab-
   POST   /api/cdc/jobs {"name", "source", "destination", "discover", "tables", "mode", "schedule"}
          …/jobs/run · …/jobs/delete {"id"} · …/jobs/set {"id", "enabled"?, "schedule"?}
   GET    /api/cdc/task?id=… · /api/cdc/runs?job=… · /api/cdc/run?id=… (its log)
+"🧹 Reset my lakehouse" (🏠 Home) — the member's own lake + bucket back to a new member's setup (labadmin.reset_mine):
+  POST   /api/home/reset {"confirm": "<me>_lake"}          → {"job"} · GET /api/home/reset?id=… → its state
 "📨 Pub/Sub" — a member's event streams (labpubsub.py; event-sim publishes them to Kafka):
   GET    /api/pubsub                                     my streams + the choices · /api/pubsub/peek?id=… (last events)
   POST   /api/pubsub {"name", "kind", "rate", "late_pct", "late_max", "late_pattern"}
@@ -454,6 +456,33 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(403, {"error": str(e)})
         except (labcdc.CdcError, ValueError, TypeError) as e:
             return self._json(400, {"error": str(e)})
+
+    def _reset_mine(self, method):
+        """🧹 Reset my lakehouse — the member's own, as a background job (it takes a minute):
+        POST {"confirm": "<lake name>"} → {"job"} · GET ?id=… → its state (only their own jobs)."""
+        path, q = self._route()
+        user = self._user()
+        if not user:
+            return self._json(401, {"error": "not logged in"})
+        if method == "GET":
+            j = _jobs.get(q.get("id", ""))
+            if not j or j.get("user") != user or j.get("action") != "reset-mine":
+                return self._json(404, {"error": "not found"})
+            return self._json(200, j)
+        if method != "POST" or self.headers.get("X-Lab-Request") != "1":
+            return self._json(403, {"error": "missing X-Lab-Request header"})
+        lake = f"{lake_name(user)}_lake"
+        if (self._body().get("confirm") or "").strip() != lake:
+            return self._json(400, {"error": f"type {lake} to confirm"})
+        busy = next((k for k, j in _jobs.items() if j.get("user") == user and j.get("action") == "reset-mine"
+                     and j["state"] == "running"), None)
+        if busy:
+            return self._json(202, {"job": busy})
+        jid = __import__("secrets").token_hex(8)
+        _jobs[jid] = {"state": "running", "action": "reset-mine", "user": user, "by": user}
+        threading.Thread(target=_run_job, args=(jid, labadmin.reset_mine, [user]), daemon=True).start()
+        print(f"[home-api] {user}: reset my lakehouse", flush=True)
+        return self._json(202, {"job": jid})
 
     def _pubsub(self, method):
         """📨 Pub/Sub — /api/pubsub*, always the logged-in member's own streams (labpubsub.py)."""
@@ -918,6 +947,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._cdc(method)
         if self.path.startswith("/api/pubsub"):
             return self._pubsub(method)
+        if self.path.startswith("/api/home/reset"):
+            return self._reset_mine(method)
         if self.path.startswith("/api/databases"):
             return self._databases(method)
         if self.path.startswith("/api/notebook"):
@@ -954,6 +985,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._databases("GET")
         if self.path == "/api/notebook":
             return self._notebook("GET")
+        if self.path.startswith("/api/home/reset"):
+            return self._reset_mine("GET")
         if self.path == "/api/home":                     # 🏠 Home: the member's own overview
             if not self._user():
                 return self._json(401, {"error": "not logged in"})
