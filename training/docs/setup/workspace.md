@@ -445,7 +445,8 @@ signs up, off otherwise) and sets the **members' limits**: after how many idle m
 server stops, Jupyter memory and CPU per member (from their next server start), the member and
 team bucket sizes (applied to every bucket at once), and how many 📨 Pub/Sub streams a member may
 have and how many events a second each may send. Its **Services** list shows which tools run,
-in **units** (SQL, Notebooks, Spark, Airflow, Superset, Streaming). On the shared server,
+in **units** (SQL, Notebooks, Spark, Airflow, Superset, Streaming, Flink), and **Flink cluster** sets
+the Flink unit's size: TaskManagers × slots each. On the shared server,
 managers switch a unit off to free memory and CPU while the class doesn't need it, and back on
 later. All data is kept, and members see its tiles greyed: *Not running. Contact admin.* On a lab
 running on your own computer the list only shows the state: switch units in the terminal with

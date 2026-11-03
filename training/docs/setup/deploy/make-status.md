@@ -75,6 +75,7 @@ With Core and SQL on, the right side starts like this (shortened):
 | **Airflow** | airflow-* | DAGs (they come from your bucket, so Notebooks can stay off; DAGs using Spark need **Spark**) |
 | **Superset** | superset | dashboards (starting it also starts **SQL**; stopping SQL also stops it) |
 | **Streaming** | kafka, kafka-connect, event-sim | 📡 Ingestion with Debezium, and 📨 Pub/Sub (the event streams). **Off after `make up`** — switch it on when you need it |
+| **Flink** | flink-jobmanager, flink-taskmanager (× the size set on ⚙️ Settings → Flink cluster), beam-job-server | Apache Beam pipelines on workers (`lab_beam("flink")`). **Off after `make up`**; **s** again on a running Flink applies a new size |
 
 ## Good to know
 

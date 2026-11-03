@@ -166,6 +166,7 @@ table — read or write — with a teammate. Polaris enforces it on every query
 | Transformation | **dbt** (on Spark) | SQL models for Silver and Gold, in dependency order |
 | Orchestration | **Apache Airflow** | schedule your pipelines — DAGs straight from your bucket |
 | Ingestion (CDC) | **Debezium** + **Kafka Connect** (or **OLake**) | copy a live database into your lakehouse — full load, then inserts, updates and deletes; on demand, on a schedule or as a live stream |
+| Pipelines | **Apache Beam** on **Flink** | Dataflow-style pipelines: the same code on a local runner, on the lab's workers with slots, or on Google Dataflow |
 | Event streaming | **Kafka** | your own pub/sub streams of clicks, orders, payments (some late) — land them in Bronze, or process them with Spark Structured Streaming |
 | BI | **Apache Superset** | dashboards over your Gold tables |
 | Sources | **PostgreSQL** | ShopFlow (the course's online shop) and AdventureWorks |

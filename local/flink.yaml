@@ -11,8 +11,10 @@
 
 # Flink's own settings — no comments inside (they'd become part of a value). The JobManager's don't
 # name the TaskManagers' sizes, so resizing them doesn't restart it. A TaskManager's memory is
-# 1024 MB + 256 MB per slot (make status works it out; less fails Flink's memory check). Network memory 128 MB:
-# Beam's shuffles between parallel copies need more than the default 64 MB.
+# 1280 MB + 256 MB per slot (make status works it out; less fails Flink's memory check). Network memory 256 MB:
+# Beam's shuffles between parallel copies need far more than the default 64 MB (a pipeline with a few
+# shuffles failed with 128); managed memory (Flink's own sorting / state — Beam barely uses it) 10 %; off-heap 256 + 128 MB: Beam's data
+# channels to its Python worker (with less, a Reshuffle failed with "OutOfMemoryError: Direct buffer memory").
 x-jm-conf: &jm-conf |
   jobmanager.rpc.address: flink-jobmanager
   jobmanager.memory.process.size: 768m
@@ -24,9 +26,12 @@ x-jm-conf: &jm-conf |
 
 x-tm-conf: &tm-conf |
   jobmanager.rpc.address: flink-jobmanager
-  taskmanager.memory.process.size: ${FLINK_TM_MEMORY:-1536m}
-  taskmanager.memory.network.min: 128mb
-  taskmanager.memory.network.max: 128mb
+  taskmanager.memory.process.size: ${FLINK_TM_MEMORY:-1792m}
+  taskmanager.memory.network.min: 256mb
+  taskmanager.memory.network.max: 256mb
+  taskmanager.memory.managed.fraction: 0.1
+  taskmanager.memory.framework.off-heap.size: 256mb
+  taskmanager.memory.task.off-heap.size: 128mb
   taskmanager.numberOfTaskSlots: ${FLINK_SLOTS:-2}
   state.checkpoints.dir: file:///opt/flink/data/checkpoints
 

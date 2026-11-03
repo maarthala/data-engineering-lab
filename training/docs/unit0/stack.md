@@ -103,6 +103,13 @@ with **Polaris** as the single catalog that every engine consults before touchin
 | **Kafka Connect** | Runs **connectors**: Debezium (reads a database's changes into Kafka) and the Iceberg sink (writes topics into lakehouse tables). |
 | **event-sim** | Publishes each member's 📨 **Pub/Sub** streams: clicks, orders, payments, stock moves — some late, if the stream asks. |
 
+### Flink — off until it's needed
+| Service | What it is |
+|---|---|
+| **flink-jobmanager** | The coordinator of a small **Flink** cluster: plans each Apache Beam job, places its steps in the workers' slots; the **Flink UI**. |
+| **flink-taskmanager** | The **workers** (TaskManagers), with Beam's Python worker inside: each runs as many parallel copies of a job's steps as it has slots. A lab manager sets how many, and slots each. |
+| **beam-job-server** | Turns a Beam pipeline from a notebook (`lab_beam("flink")`) into a Flink job — like submitting a Dataflow job. |
+
 ## Access & ports
 
 On **Compose** each tool publishes a `localhost` port; on **Kubernetes** each is an

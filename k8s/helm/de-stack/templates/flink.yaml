@@ -107,14 +107,17 @@ spec:
             - name: FLINK_PROPERTIES
               value: |
                 jobmanager.rpc.address: flink-jobmanager
-                taskmanager.memory.process.size: {{ add 1024 (mul 256 $slots) }}m
-                taskmanager.memory.network.min: 128mb
-                taskmanager.memory.network.max: 128mb
+                taskmanager.memory.process.size: {{ add 1280 (mul 256 $slots) }}m
+                taskmanager.memory.network.min: 256mb
+                taskmanager.memory.network.max: 256mb
+                taskmanager.memory.managed.fraction: 0.1
+                taskmanager.memory.framework.off-heap.size: 256mb
+                taskmanager.memory.task.off-heap.size: 128mb
                 taskmanager.numberOfTaskSlots: {{ $slots }}
                 state.checkpoints.dir: file:///opt/flink/data/checkpoints
           resources:
-            requests: { memory: {{ add 1280 (mul 256 $slots) }}Mi }
-            limits: { memory: {{ add 1280 (mul 256 $slots) }}Mi }
+            requests: { memory: {{ add 1536 (mul 256 $slots) }}Mi }
+            limits: { memory: {{ add 1536 (mul 256 $slots) }}Mi }
           volumeMounts:
             - { name: data, mountPath: /opt/flink/data }
       volumes:

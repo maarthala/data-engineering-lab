@@ -188,7 +188,7 @@ SETTINGS = {           # name: (default, lowest, highest, type)
 
 def flink_memory_mb(slots):
     """A Flink TaskManager's memory for `slots` slots (less fails Flink's memory check)."""
-    return 1024 + 256 * int(slots)
+    return 1280 + 256 * int(slots)       # incl. the off-heap memory Beam's data channels use
 _settings_cache = (0.0, None)
 
 

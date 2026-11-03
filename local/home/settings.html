@@ -121,7 +121,7 @@
             slots = opts(f.limits.flink_slots[0], f.limits.flink_slots[1], f.slots),
             sum = el('div', {class: 'sub', style: 'margin-top:8px'}), save = el('button', {class: 'primary', text: 'Save'});
         function paint() {
-          var t = +tms.value, sl = +slots.value, mb = 1024 + 256 * sl;
+          var t = +tms.value, sl = +slots.value, mb = 1280 + 256 * sl;
           sum.textContent = '= ' + t * sl + ' slots: a Beam job runs up to ' + t * sl + ' parallel copies of each step · ' +
             gb(mb) + ' per TaskManager, ' + gb(mb * t) + ' for all of them (+ about 1.5 GB for the JobManager and Beam\'s job server)';
           save.disabled = t === f.taskmanagers && sl === f.slots;

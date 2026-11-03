@@ -852,7 +852,9 @@ def _tm_conf(slots):
     (and local/flink.yaml) write: no comments inside, Flink would read them as part of a value."""
     return "\n".join(["jobmanager.rpc.address: flink-jobmanager",
                       f"taskmanager.memory.process.size: {lh.flink_memory_mb(slots)}m",
-                      "taskmanager.memory.network.min: 128mb", "taskmanager.memory.network.max: 128mb",
+                      "taskmanager.memory.network.min: 256mb", "taskmanager.memory.network.max: 256mb",
+                      "taskmanager.memory.managed.fraction: 0.1",
+                      "taskmanager.memory.framework.off-heap.size: 256mb", "taskmanager.memory.task.off-heap.size: 128mb",
                       f"taskmanager.numberOfTaskSlots: {int(slots)}",
                       "state.checkpoints.dir: file:///opt/flink/data/checkpoints", ""])
 
