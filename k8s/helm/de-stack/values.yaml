@@ -145,7 +145,7 @@ adventureworks:
 spark:
   enabled: true
   repo: spark
-  tag: latest
+  tag: "20261103"            # dated: + the Kafka connector (spark-sql-kafka); re-importing :latest can leave the old image
   workers: 1
   # Pin spark-master/worker to specific node(s). Empty = schedule anywhere.
   # e.g. { de-stack/spark: "true" } after labelling a dedicated node.
@@ -177,7 +177,7 @@ jupyter:
   repo: jupyter              # the single-user image (one pod per learner)
   # A dated tag, not :latest — re-importing :latest on the node left the OLD image behind the
   # tag (learner pods started without jupyter-entrypoint.sh). Bump it with every new build.
-  tag: "20261013-1"
+  tag: "20261103"            # + confluent-kafka (📨 Pub/Sub from plain Python)
   hubImage: ghcr.io/maarthala/de-stack/jupyterhub:20261002-7
   userStorage: 1Gi           # per-learner work volume (PVC claim-<user>)
   userMemory: 1G

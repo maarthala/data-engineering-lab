@@ -1,12 +1,15 @@
 {{- if .Values.streaming.enabled }}
-# The Streaming unit — 📡 Ingestion with Debezium (CDC_ENGINE=debezium): Kafka (one broker, KRaft)
-# and one Kafka Connect worker. cdc-runner makes each job's two connectors (a Debezium Postgres
+# The Streaming unit — 📡 Ingestion with Debezium (CDC_ENGINE=debezium) and 📨 Pub/Sub: Kafka (one
+# broker, KRaft), one Kafka Connect worker and event-sim (members' event streams). cdc-runner makes each job's two connectors (a Debezium Postgres
 # source, an Iceberg sink), pauses and resumes them. Off until needed: replicas from
 # streaming.replicas (0), switched in Manage → ⚙️ Settings → Services (a chart apply sets it back).
 #  kafka            the change stream of every job, kept 7 days, on its own volume
 #  kafka-connect    the worker + its helper (connect_secrets.py): cdc-runner hands the helper the
 #                   files a connector's ${dir:…} reads — passwords never sit in a connector's config
-# Only cdc-runner (and home-api, asking whether it's up) reach them: NetworkPolicies below.
+#  event-sim        publishes each member's 📨 Pub/Sub stream to their topic <member>.<name>
+# Kafka listens twice: :9092 for the lab's own services (no login — super users), :9094 for members'
+# notebooks and Spark (a SCRAM login each, made by cdc-runner; ACLs: their own topics / groups).
+# NetworkPolicies below: only those services reach :9092, members' pods and Spark only :9094.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -44,10 +47,16 @@ spec:
           env:
             - { name: KAFKA_NODE_ID, value: "1" }
             - { name: KAFKA_PROCESS_ROLES, value: "broker,controller" }
-            - { name: KAFKA_LISTENERS, value: "PLAINTEXT://:9092,CONTROLLER://:9093" }
-            - { name: KAFKA_ADVERTISED_LISTENERS, value: "PLAINTEXT://kafka:9092" }
+            - { name: KAFKA_LISTENERS, value: "PLAINTEXT://:9092,CONTROLLER://:9093,MEMBERS://:9094" }
+            - { name: KAFKA_ADVERTISED_LISTENERS, value: "PLAINTEXT://kafka:9092,MEMBERS://kafka:9094" }
             - { name: KAFKA_CONTROLLER_LISTENER_NAMES, value: CONTROLLER }
-            - { name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP, value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT" }
+            - { name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP, value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,MEMBERS:SASL_PLAINTEXT" }
+            - { name: KAFKA_INTER_BROKER_LISTENER_NAME, value: PLAINTEXT }
+            - { name: KAFKA_LISTENER_NAME_MEMBERS_SASL_ENABLED_MECHANISMS, value: SCRAM-SHA-512 }
+            - { name: KAFKA_LISTENER_NAME_MEMBERS_SCRAM___SHA___512_SASL_JAAS_CONFIG, value: "org.apache.kafka.common.security.scram.ScramLoginModule required;" }
+            - { name: KAFKA_AUTHORIZER_CLASS_NAME, value: org.apache.kafka.metadata.authorizer.StandardAuthorizer }
+            - { name: KAFKA_SUPER_USERS, value: "User:ANONYMOUS" }       # the no-login listeners: the lab's services, the controller
+            - { name: KAFKA_ALLOW_EVERYONE_IF_NO_ACL_FOUND, value: "false" }
             - { name: KAFKA_CONTROLLER_QUORUM_VOTERS, value: "1@localhost:9093" }
             - { name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR, value: "1" }
             - { name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR, value: "1" }
@@ -59,6 +68,7 @@ spec:
             - { name: KAFKA_HEAP_OPTS, value: "-Xms256m -Xmx512m" }
           ports:
             - { name: kafka, containerPort: 9092 }
+            - { name: members, containerPort: 9094 }
           resources:
             requests: { memory: 512Mi }
             limits: { memory: 1Gi }
@@ -80,6 +90,7 @@ spec:
   selector: {{- include "de-stack.selector" (dict "app" "kafka") | nindent 4 }}
   ports:
     - { name: kafka, port: 9092, targetPort: 9092 }
+    - { name: members, port: 9094, targetPort: 9094 }
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -140,8 +151,42 @@ spec:
     - { name: rest, port: 8083, targetPort: 8083 }
     - { name: secrets, port: 8090, targetPort: 8090 }
 ---
-# only the Streaming unit itself and cdc-runner talk to Kafka (the broker too: it sends some
-# transaction requests to itself through its service name) …
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-sim
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.streaming.replicas }}
+  selector:
+    matchLabels: {{- include "de-stack.selector" (dict "app" "event-sim") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "de-stack.selector" (dict "app" "event-sim") | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: event-sim
+          image: {{ .Values.cdc.image }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          command: ["python", "/app/event_sim.py"]
+          env:
+            - { name: KAFKA_BOOTSTRAP, value: "kafka:9092" }
+            - { name: EVENT_SIM_SHOP_DB, value: "postgresql://reader:reader@lab-db:5432/shop" }   # Tidewell's customers, products, stores
+            - { name: PG_PORTAL_PASSWORD, valueFrom: { secretKeyRef: { name: {{ $.Values.secrets.name }}, key: pg-portal-password } } }
+            - { name: PORTAL_DB_URL, value: "postgresql://portal:$(PG_PORTAL_PASSWORD)@postgres:5432/portal" }
+          resources:
+            requests: { memory: 64Mi }
+            limits: { memory: 256Mi }
+          volumeMounts:
+{{- range list "event_sim.py" "labpubsub.py" }}
+            - { name: lab-code, mountPath: /app/{{ . }}, subPath: {{ . }} }
+{{- end }}
+      volumes:
+        - { name: lab-code, configMap: { name: lab-code } }
+---
+# :9092 — only the Streaming unit itself and cdc-runner (the broker too: it sends some transaction
+# requests to itself through its service name); :9094 — members' notebooks and Spark, with a login …
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -153,9 +198,14 @@ spec:
   policyTypes: ["Ingress"]
   ingress:
     - from:
-        - podSelector: { matchExpressions: [{ key: app.kubernetes.io/name, operator: In, values: [kafka, kafka-connect, cdc-runner] }] }
+        - podSelector: { matchExpressions: [{ key: app.kubernetes.io/name, operator: In, values: [kafka, kafka-connect, cdc-runner, event-sim] }] }
       ports:
         - { port: 9092, protocol: TCP }
+    - from:
+        - podSelector: { matchLabels: { component: singleuser-server } }          # members' Jupyter (KubeSpawner)
+        - podSelector: { matchExpressions: [{ key: app.kubernetes.io/name, operator: In, values: [spark-connect, spark-worker] }] }
+      ports:
+        - { port: 9094, protocol: TCP }
 ---
 # … and to Kafka Connect (its REST API and the secrets helper): cdc-runner; home-api only asks
 # whether it's up (the Ingestion page's "Streaming is off" notice)
