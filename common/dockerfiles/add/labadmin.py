@@ -847,10 +847,38 @@ def flink():
             "control": "k8s" if ON_K8S else "local", "live": live}
 
 
+def _tm_conf(slots):
+    """The TaskManagers' Flink settings for `slots` slots — the same as the chart's templates/flink.yaml
+    (and local/flink.yaml) write: no comments inside, Flink would read them as part of a value."""
+    return "\n".join(["jobmanager.rpc.address: flink-jobmanager",
+                      f"taskmanager.memory.process.size: {lh.flink_memory_mb(slots)}m",
+                      "taskmanager.memory.network.min: 128mb", "taskmanager.memory.network.max: 128mb",
+                      f"taskmanager.numberOfTaskSlots: {int(slots)}",
+                      "state.checkpoints.dir: file:///opt/flink/data/checkpoints", ""])
+
+
+def _flink_apply(on=None):
+    """k8s: the TaskManager Deployment as the settings say — its slots and memory, and (when the unit
+    is on, or `on`) as many TaskManagers. A changed size restarts them (running jobs with them)."""
+    cfg = lh.lab_settings()
+    tms, slots = cfg["flink_taskmanagers"], cfg["flink_slots"]
+    path = _deploy_path("flink-taskmanager")
+    d = lh._k8s("GET", path)
+    running = d["spec"].get("replicas", 0) > 0 if on is None else on
+    c = d["spec"]["template"]["spec"]["containers"][0]
+    mem = f"{lh.flink_memory_mb(slots) + 256}Mi"             # the pod's limit: Flink's own size + room
+    lh._k8s("PATCH", path, {"spec": {"replicas": tms if running else 0, "template": {"spec": {"containers": [{
+        "name": c["name"], "env": [{"name": "FLINK_PROPERTIES", "value": _tm_conf(slots)}],
+        "resources": {"requests": {"memory": mem}, "limits": {"memory": mem}}}]}}}})
+
+
 def set_flink(taskmanagers, slots):
-    """A new size for the Flink cluster. Locally make status applies it (s on the Flink unit, Docker
-    isn't the portal's to drive); k8s: the chart's TaskManager Deployment, when that's there."""
+    """A new size for the Flink cluster. k8s: applied at once (the TaskManager Deployment). Locally make
+    status applies it (s on the Flink unit — Docker isn't the portal's to drive)."""
     lh.save_lab_settings(flink_taskmanagers=taskmanagers, flink_slots=slots)
+    if ON_K8S:
+        _flink_apply()
+        return dict(flink(), applied=True)
     return dict(flink(), applied=False)
 
 
@@ -886,7 +914,11 @@ def set_service(unit, on):
             _hub("DELETE", f"/users/{user}/server")
     for u in todo:
         for w in names[u]:
-            lh._k8s("PATCH", _deploy_path(w.partition(":")[0]) + "/scale", {"spec": {"replicas": 1 if on else 0}})
+            name = w.partition(":")[0]
+            if name == "flink-taskmanager":                # as many as ⚙️ Settings → Flink cluster says
+                _flink_apply(on)
+                continue
+            lh._k8s("PATCH", _deploy_path(name) + "/scale", {"spec": {"replicas": 1 if on else 0}})
     return {**services(), "changed": todo}
 
 

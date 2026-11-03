@@ -32,6 +32,7 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.88em; c
 
 /* ---- page frame: left menu + top bar (lab-header.js) ---- */
 body.lab{padding-left:var(--nav-w)}
+body.lab.embedded{padding-left:0}                      /* a portal page in a Tools tab: no menu of its own */
 #lab-nav{position:fixed; inset:0 auto 0 0; width:var(--nav-w); background:#fbfbfc; border-right:1px solid var(--line);
   display:flex; flex-direction:column; z-index:20; overflow-y:auto}
 #lab-nav .brand{display:flex; align-items:center; gap:10px; padding:12px 14px; height:var(--top-h); border-bottom:1px solid var(--line); color:var(--ink)}

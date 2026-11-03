@@ -15,6 +15,7 @@
     airflow:    {name: 'Pipelines', what: 'Airflow', svc: 'airflow', url: url('airflow', 8001)},
     superset:   {name: 'Dashboards', what: 'Superset', svc: 'superset', url: url('superset', 8004)},
     spark:      {name: 'Spark UI', what: 'Spark', svc: 'spark', url: url('spark', 8002)},
+    flink:      {name: 'Flink UI', what: 'Flink — Apache Beam jobs on a cluster with slots', svc: 'flink', url: url('flink', 8081)},
     storage:    {name: 'Storage', what: 'RustFS console', url: url('storage', 9001, '/rustfs/admin/v3/oidc/authorize/default')}
   };
   // simple line icons (24×24)
@@ -32,6 +33,7 @@
     airflow: '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="12" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8.5 6H12a3 3 0 0 1 3 3v.5M8.5 18H12a3 3 0 0 0 3-3v-.5"/>',
     superset: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     spark: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+    flink: '<path d="M4 18c3-1 5-4 6-8 1 4 3 7 6 8M7 20h10M12 4v6"/><circle cx="12" cy="4" r="1.5"/>',
     storage: '<rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/>',
     governance: '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
     members: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5c1.9.6 3.1 2.4 3.5 5.5"/>',
@@ -51,13 +53,28 @@
                 ['/governance.html', 'governance', 'Governance'], ['/exams-admin.html', 'exams', 'Exams'], ['/settings.html', 'settings', 'Settings']];
   var path = location.pathname.replace(/\/+$/, '') || '/';
   if (path === '/index.html') path = '/';
-  var tool = path === '/tool.html' ? location.hash.slice(1) : null;
+  var tool = path === '/tool.html' ? location.hash.slice(1).split('/')[0] : null;
+  // every portal page by a short key (its file name; '/' = home) — they all open as tabs on /tool.html
+  function keyOf(href) { return href === '/' ? 'home' : href.replace(/^\//, '').replace(/\.html$/, ''); }
+  var PAGES = window.LAB_PAGES = {};
+  [['Workspace', WORK], ['Extras', EXTRAS], ['Manage', MANAGE]].forEach(function (g) {
+    g[1].forEach(function (x) { PAGES[keyOf(x[0])] = {name: x[2], what: g[0], page: x[0], icon: x[1]}; });
+  });
+  function tabOf(pathname) {                          // a portal path → its tab key (a page or a tool page)
+    var p0 = pathname === '/index.html' ? '/' : pathname;
+    var k = Object.keys(PAGES).filter(function (k) { return PAGES[k].page === p0; })[0];
+    return k || Object.keys(TOOLS).filter(function (k) { return TOOLS[k].page === p0; })[0];
+  }
 
   function item(href, icon, label, on, extra) {
-    return '<a class="item' + (on ? ' on' : '') + '" href="' + href + '"' + (extra || '') + '>' + svg(icon) + '<span>' + label + '</span></a>';
+    var k = href.indexOf('/tool.html#') === 0 ? href.slice(11) : null;
+    return '<a class="item' + (on ? ' on' : '') + '" href="' + href + '"' + (k ? ' data-tab="' + k + '"' : '') + (extra || '') + '>' +
+           svg(icon) + '<span>' + label + '</span></a>';
   }
+  function pageItem(x) { return item('/tool.html#' + keyOf(x[0]), x[1], x[2], tool === keyOf(x[0])); }
   function title() {
     if (tool && TOOLS[tool]) return ['Tools', TOOLS[tool].name];
+    if (tool && PAGES[tool]) return [PAGES[tool].what, PAGES[tool].name];
     var p = Object.keys(TOOLS).filter(function (k) { return TOOLS[k].page === path; })[0];
     if (p) return ['Tools', TOOLS[p].name];
     var w = WORK.filter(function (x) { return x[0] === path; })[0];
@@ -68,20 +85,53 @@
     return m ? ['Manage', m[2]] : ['', document.title.split(' — ')[0]];
   }
 
+  // A portal page open in a tab of the Tools page (Ingestion, Pub/Sub): no menu or top bar of its own
+  // (the Tools page has them) — only the sign-in event. A link to another tool's page opens that
+  // tool's tab; a link to any other portal page leaves the Tools page.
+  var embedded = false;
+  try { embedded = window.top !== window.self && window.top.location.pathname === '/tool.html'; } catch (e) {}
+  window.LAB_GO = function (href) {                   // pages navigate with this: to a page's tab
+    var u = new URL(href, location.href), k = tabOf(u.pathname);
+    if (!embedded || u.origin !== location.origin) return void (location.href = href);
+    if (k && k === tabOf(location.pathname)) return void (location.href = href);    // inside the same page
+    if (k) return void window.top.postMessage({lab: 'open', tool: k, hash: u.hash}, location.origin);
+    window.top.location.href = href;                  // /tool.html#… (a tool) — the Tools page's own hash
+  };
+  // opened on its own (a bookmark, the sign-in landing on /): into the tabs, at the same screen
+  var mine = tabOf(path);
+  if (!embedded && mine && path !== '/tool.html') {
+    location.replace('/tool.html#' + mine + (location.hash.length > 1 ? '/' + location.hash.slice(1) : ''));
+    return;
+  }
+  if (embedded) {
+    document.body.classList.add('lab', 'embedded');
+    var top0 = document.getElementById('lab-top'); if (top0) top0.remove();
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[href]');
+      if (!a || a.target === '_blank' || e.defaultPrevented || e.metaKey || e.ctrlKey) return;
+      var u = new URL(a.getAttribute('href'), location.href);
+      if (u.origin !== location.origin || (u.pathname === location.pathname && u.hash)) return;
+      e.preventDefault(); window.LAB_GO(a.href);
+    });
+    fetch('/api/me', {credentials: 'same-origin'}).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (me) { if (me) document.dispatchEvent(new CustomEvent('lab:me', {detail: me})); }).catch(function () {});
+    return;
+  }
+
   document.body.classList.add('lab');
   var nav = document.createElement('nav');
   nav.id = 'lab-nav';
   nav.innerHTML =
-    '<a class="brand" href="/"><img src="/img/epireum-logo.png" alt=""><b>Data Engineering Lab<span>Epireum</span></b></a>' +
-    '<div class="grp"><h6>Workspace</h6>' + WORK.map(function (x) { return item(x[0], x[1], x[2], x[0] === path); }).join('') + '</div>' +
+    '<a class="brand" href="/tool.html#home"><img src="/img/epireum-logo.png" alt=""><b>Data Engineering Lab<span>Epireum</span></b></a>' +
+    '<div class="grp"><h6>Workspace</h6>' + WORK.map(pageItem).join('') + '</div>' +
     '<div class="grp"><h6>Tools</h6>' + Object.keys(TOOLS).map(function (k) {
       var t = TOOLS[k];
-      return item(t.page || (t.external ? t.url : '/tool.html#' + k), k, t.name + (t.external ? ' <span class="ext">↗</span>' : ''),
+      return item(t.external ? t.url : '/tool.html#' + k, k, t.name + (t.external ? ' <span class="ext">↗</span>' : ''),
                   tool === k || t.page === path,
                   ' data-tool="' + k + '"' + (t.managers ? ' data-mgr hidden' : '') + (t.external ? ' target="_blank" rel="noopener"' : '') + ' title="' + t.what + '"');
     }).join('') + '</div>' +
-    '<div class="grp"><h6>Extras</h6>' + EXTRAS.map(function (x) { return item(x[0], x[1], x[2], x[0] === path); }).join('') + '</div>' +
-    '<div class="grp" id="lab-nav-manage" hidden><h6>Manage</h6>' + MANAGE.map(function (x) { return item(x[0], x[1], x[2], x[0] === path); }).join('') + '</div>' +
+    '<div class="grp"><h6>Extras</h6>' + EXTRAS.map(pageItem).join('') + '</div>' +
+    '<div class="grp" id="lab-nav-manage" hidden><h6>Manage</h6>' + MANAGE.map(pageItem).join('') + '</div>' +
     '<div class="foot"><a href="https://maarthala.github.io/data-engineering-lab/" target="_blank" rel="noopener">Course ↗</a> · ' +
     '<a href="https://github.com/maarthala/data-engineering-lab#readme" target="_blank" rel="noopener">Docs ↗</a>' +
     '<div id="lab-nav-version" style="margin-top:4px"></div></div>';

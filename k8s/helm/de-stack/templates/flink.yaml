@@ -1,0 +1,183 @@
+{{- if .Values.flink.enabled }}
+# The Flink unit — Apache Beam pipelines on a cluster with slots (like Dataflow's workers), and the
+# Flink UI at flink.<baseHost>. Off until needed: replicas 0, switched in Manage → ⚙️ Settings →
+# Services (home-api scales the TaskManagers to ⚙️ Settings → Flink cluster's size; a chart apply sets
+# them back to 0).
+#  flink-jobmanager    the coordinator: plans each job, places its subtasks in slots, checkpoints; the UI
+#  flink-taskmanager   the workers — each pod one TaskManager with its slots, and Beam's Python worker
+#                      inside (Dockerfile.flink-taskmanager) for the pipeline's Python code
+#  beam-job-server     takes a Beam pipeline from a notebook (lab_beam("flink")) and turns it into a Flink job
+# Flink's settings: no comments inside them (they'd become part of a value). The TaskManagers' match
+# labadmin._tm_conf (home-api rewrites them when a manager resizes the cluster).
+{{- $slots := int .Values.flink.slots }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: flink-data
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]           # one node: every Flink pod mounts it (checkpoints, pipelines' files)
+  storageClassName: {{ .Values.global.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.flink.storage }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flink-jobmanager
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  replicas: 0
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: {{- include "de-stack.selector" (dict "app" "flink-jobmanager") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "de-stack.selector" (dict "app" "flink-jobmanager") | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      securityContext: { fsGroup: 9999 }      # the flink user
+      containers:
+        - name: jobmanager
+          image: {{ .Values.flink.jobmanagerImage }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          args: ["jobmanager"]
+          env:
+            - name: FLINK_PROPERTIES
+              value: |
+                jobmanager.rpc.address: flink-jobmanager
+                jobmanager.memory.process.size: 768m
+                parallelism.default: 2
+                state.checkpoints.dir: file:///opt/flink/data/checkpoints
+                state.savepoints.dir: file:///opt/flink/data/savepoints
+                web.submit.enable: false
+                web.cancel.enable: false
+          ports:
+            - { name: rpc, containerPort: 6123 }
+            - { name: blob, containerPort: 6124 }
+            - { name: ui, containerPort: 8081 }
+          resources:
+            requests: { memory: 768Mi }
+            limits: { memory: 1Gi }
+          readinessProbe:
+            httpGet: { path: /overview, port: 8081 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - { name: data, mountPath: /opt/flink/data }
+      volumes:
+        - { name: data, persistentVolumeClaim: { claimName: flink-data } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flink-jobmanager
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "de-stack.selector" (dict "app" "flink-jobmanager") | nindent 4 }}
+  ports:
+    - { name: rpc, port: 6123, targetPort: 6123 }
+    - { name: blob, port: 6124, targetPort: 6124 }
+    - { name: ui, port: 8081, targetPort: 8081 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flink-taskmanager
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  replicas: 0
+  selector:
+    matchLabels: {{- include "de-stack.selector" (dict "app" "flink-taskmanager") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "de-stack.selector" (dict "app" "flink-taskmanager") | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      securityContext: { fsGroup: 9999 }
+      containers:
+        - name: taskmanager
+          image: {{ .Values.flink.taskmanagerImage }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          args: ["taskmanager"]
+          env:
+            - name: FLINK_PROPERTIES
+              value: |
+                jobmanager.rpc.address: flink-jobmanager
+                taskmanager.memory.process.size: {{ add 1024 (mul 256 $slots) }}m
+                taskmanager.memory.network.min: 128mb
+                taskmanager.memory.network.max: 128mb
+                taskmanager.numberOfTaskSlots: {{ $slots }}
+                state.checkpoints.dir: file:///opt/flink/data/checkpoints
+          resources:
+            requests: { memory: {{ add 1280 (mul 256 $slots) }}Mi }
+            limits: { memory: {{ add 1280 (mul 256 $slots) }}Mi }
+          volumeMounts:
+            - { name: data, mountPath: /opt/flink/data }
+      volumes:
+        - { name: data, persistentVolumeClaim: { claimName: flink-data } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: beam-job-server
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  replicas: 0
+  selector:
+    matchLabels: {{- include "de-stack.selector" (dict "app" "beam-job-server") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "de-stack.selector" (dict "app" "beam-job-server") | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      containers:
+        - name: job-server
+          image: {{ .Values.flink.jobServerImage }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          # a pipeline's files go to the shared volume: the TaskManagers hand them to their Beam worker
+          args: ["--flink-master=flink-jobmanager:8081", "--job-host=0.0.0.0", "--artifacts-dir=/opt/flink/data/beam-artifacts"]
+          ports:
+            - { name: job, containerPort: 8099 }
+            - { name: artifacts, containerPort: 8098 }
+          resources:
+            requests: { memory: 512Mi }
+            limits: { memory: 1Gi }
+          volumeMounts:
+            - { name: data, mountPath: /opt/flink/data }
+      volumes:
+        - { name: data, persistentVolumeClaim: { claimName: flink-data } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: beam-job-server
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "de-stack.selector" (dict "app" "beam-job-server") | nindent 4 }}
+  ports:
+    - { name: job, port: 8099, targetPort: 8099 }
+    - { name: artifacts, port: 8098, targetPort: 8098 }
+{{- if .Values.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: flink-ui
+  labels: {{- include "de-stack.labels" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: flink.{{ .Values.ingress.baseHost }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: flink-jobmanager, port: { number: 8081 } }
+{{- end }}
+{{- end }}

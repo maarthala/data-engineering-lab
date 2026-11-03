@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tools — Epireum's Data Engineering Lab</title>
-  <link rel="stylesheet" href="/admin.css?v=8">
+  <title>Epireum's Data Engineering Lab</title>
+  <link rel="stylesheet" href="/admin.css?v=9">
   <style>
     body{height:100vh; overflow:hidden}
     .tbar{display:flex; align-items:center; gap:10px; padding:8px 18px; border-bottom:1px solid var(--line); background:var(--panel); height:46px}
@@ -17,97 +17,211 @@
     .off h2{margin:0 0 8px; font-size:1.2rem}
     .off .row{justify-content:center; margin-top:16px}
     .ask{display:inline-flex; align-items:center; gap:8px; padding:3px 8px; border:1px solid #f0d9a8; border-radius:8px; background:var(--warn-bg); font-size:.84rem}
+    /* the open tools as tabs: one frame each, kept while you switch */
+    .tabs{display:flex; align-items:flex-end; gap:2px; padding:6px 12px 0; background:var(--panel2); border-bottom:1px solid var(--line);
+          height:38px; overflow-x:auto; overflow-y:hidden}
+    .tab{display:inline-flex; align-items:center; gap:6px; padding:6px 8px 6px 12px; border:1px solid transparent; border-bottom:0;
+         border-radius:8px 8px 0 0; font-size:.84rem; color:var(--muted); cursor:pointer; white-space:nowrap; max-width:220px}
+    .tab:hover{color:var(--ink); background:var(--panel)}
+    .tab.on{background:var(--panel); color:var(--ink); border-color:var(--line); font-weight:600; margin-bottom:-1px; padding-bottom:7px}
+    .tab .x{all:unset; cursor:pointer; width:18px; height:18px; line-height:18px; text-align:center; border-radius:4px; color:var(--muted); font-size:.9rem}
+    .tab .x:hover{background:var(--line); color:var(--ink)}
+    /* every pane keeps the full size, stacked; a hidden one is only invisible — with display:none a
+       frame shrinks to 0 × 0 and JupyterLab (which lays out its panels by the frame's size) comes back
+       squashed */
+    #t-body{position:relative; height:calc(100vh - var(--top-h) - 46px - 38px)}
+    .pane{position:absolute; inset:0; overflow:auto; background:var(--bg)}
+    .pane.behind{visibility:hidden; pointer-events:none}       /* not [hidden]: admin.css makes that display:none */
+    iframe{height:100%}
   </style>
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=19"></script>
+  <script src="/lab-header.js?v=21"></script>
+  <div class="tabs" id="t-tabs" role="tablist"></div>
   <div class="tbar"><b id="t-name"></b><span class="what" id="t-what"></span><span class="sp"></span>
     <span id="t-nb" hidden><button class="small" id="t-restart">Restart server</button> <button class="small danger" id="t-stop">Stop server</button></span>
     <button class="small" id="t-reload">Reload</button>
     <a class="btn" id="t-open" target="_blank" rel="noopener">Open in new tab ↗</a></div>
   <div id="t-body"></div>
   <script>
-    // A tool (Jupyter, SQLPad, Airflow, Superset, Spark UI, storage console) inside the
-    // portal, the left menu staying: #<tool> in the address (window.LAB_TOOLS, lab-header.js). The tools
-    // let the portal frame them (each tool's frame-ancestors setting); the sign-in is the portal's own.
-    var key = location.hash.slice(1), t = LAB_TOOLS[key], body = document.getElementById('t-body');
-    window.addEventListener('hashchange', function () { location.reload(); });
-    function off(head, text) {
-      body.innerHTML = '';
+    // The tools (Ingestion, Pub/Sub, Jupyter, SQLPad, Airflow, Superset, Spark UI, Flink UI, storage console) in the portal,
+    // the left menu staying — as TABS: opening a tool (#<tool> in the address, from the menu or a link)
+    // adds its tab or switches to it; each tab keeps its own frame, so switching doesn't reload the tool.
+    // × closes one. The open tabs are remembered for this browser tab (sessionStorage), so after another
+    // portal page they come back (the tools load again). Tools: window.LAB_TOOLS (lab-header.js); they let
+    // the portal frame them (each tool's frame-ancestors); the sign-in is the portal's own.
+    // Every portal page opens here too (window.LAB_PAGES, lab-header.js: Home, My files … Manage): the
+    // whole portal is tabs. The address is #<key>, or #<key>/<screen> for a page's own screen
+    // (#sync/job/3 = Ingestion's #job/3); opening a page on its own lands here the same way.
+    function lookup(key) { return LAB_TOOLS[key] || LAB_PAGES[key]; }
+    function parse(h) { var i = h.indexOf('/'); return i < 0 ? [h, ''] : [h.slice(0, i), '#' + h.slice(i + 1)]; }
+    var body = document.getElementById('t-body'), strip = document.getElementById('t-tabs');
+    var tabs = {}, order = [], active = null, manager = null, up = null, KEY = 'lab-tool-tabs';
+    function save() { try { sessionStorage.setItem(KEY, JSON.stringify({order: order, active: active})); } catch (e) {} }
+    function saved() { try { return JSON.parse(sessionStorage.getItem(KEY) || 'null') || {}; } catch (e) { return {}; } }
+    function services() {
+      return up || (up = fetch('/api/services').then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; }));
+    }
+    function off(pane, head, text) {
+      pane.innerHTML = '';
       var d = document.createElement('div'); d.className = 'card off';
       d.innerHTML = '<h2></h2><div class="sub"></div>';
       d.querySelector('h2').textContent = head; d.querySelector('.sub').textContent = text;
-      body.appendChild(d);
+      pane.appendChild(d);
     }
-    if (!t) {
-      off('Unknown tool', 'Pick a tool in the menu on the left.');
-    } else {
+    function src(tab) { return tab.t.page ? tab.t.page + (tab.hash || '') : tab.t.url; }   // a portal page, or a tool's own address
+    function frame(tab) {
+      var f = document.createElement('iframe');
+      f.src = src(tab); f.title = tab.t.what;
+      f.setAttribute('allow', 'clipboard-read; clipboard-write; fullscreen');
+      tab.pane.innerHTML = ''; tab.pane.appendChild(f); tab.frame = f;
+    }
+    function load(tab) {                                  // what the tab shows: the tool, or why it can't
+      var t = tab.t;
+      if (t.managers && !manager) return off(tab.pane, t.name + ' is for lab managers', 'Your own catalogs are on My catalogs.');
+      services().then(function (u) {
+        if (t.svc && u[t.svc] === false)
+          return off(tab.pane, t.what + ' is not running', manager ? 'Start its unit: make status (local) or Manage → Settings → Services (k8s).'
+                                                                   : 'Ask your lab managers to switch it on.');
+        if (tab.key === 'jupyter') return notebook(tab);
+        frame(tab);
+      });
+    }
+    function open(key, hash) {                            // add the tab (if new) and show it
+      var t = lookup(key);
+      if (!t || t.external) return false;
+      if (!tabs[key]) add(key);
+      if (hash) {                                         // a screen of a portal page (Ingestion's #job/3 …)
+        tabs[key].hash = hash;
+        if (tabs[key].frame) tabs[key].frame.contentWindow.location.hash = hash;
+      }
+      show(key);
+      return true;
+    }
+    function add(key) {                                   // a tab + its pane; loaded when first shown
+      var t = lookup(key);
+      var el = document.createElement('div'); el.className = 'tab'; el.setAttribute('role', 'tab');
+      el.innerHTML = '<span class="nm"></span><button class="x" title="Close" aria-label="Close">×</button>';
+      el.querySelector('.nm').textContent = t.name;
+      el.onclick = function (e) { if (e.target.className !== 'x') go(key); };
+      el.querySelector('.x').onclick = function () { close(key); };
+      var pane = document.createElement('div'); pane.className = 'pane';
+      strip.appendChild(el); body.appendChild(pane);
+      tabs[key] = {key: key, t: t, el: el, pane: pane}; order.push(key);
+    }
+    function show(key) {
+      active = key;
+      if (!tabs[key].loaded) { tabs[key].loaded = true; load(tabs[key]); }   // a tab loads when first shown
+      order.forEach(function (k) { tabs[k].el.classList.toggle('on', k === key); tabs[k].pane.classList.toggle('behind', k !== key); });
+      var t = tabs[key].t;
       document.title = t.name + ' — Epireum\'s Data Engineering Lab';
       document.getElementById('t-name').textContent = t.name;
-      document.getElementById('t-what').textContent = t.what;
-      function show(manager) {
-        if (t.managers && !manager) return off(t.name + ' is for lab managers', 'Your own catalogs are on My catalogs.');
-        fetch('/api/services').then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; }).then(function (up) {
-          document.getElementById('t-open').href = t.url;
-          if (t.svc && up[t.svc] === false)
-            return off(t.what + ' is not running', manager ? 'Start its unit: make status (local) or Manage → Settings → Services (k8s).'
-                                                             : 'Ask your lab managers to switch it on.');
-          if (key === 'jupyter') return notebook();
-          frame();
-        });
-      }
-      function frame() {
-        var f = document.createElement('iframe');
-        f.src = t.url; f.title = t.what;
-        f.setAttribute('allow', 'clipboard-read; clipboard-write; fullscreen');
-        body.innerHTML = ''; body.appendChild(f);
-        document.getElementById('t-reload').onclick = function () { f.src = t.url; };
-      }
-
-      // ---- Notebooks: your own Jupyter server — started only when you say so (a click on the menu
-      // while passing by shouldn't start one); Restart / Stop in the bar, each asked inline
-      function nb(method, path) {
-        return fetch(path, {method: method, credentials: 'same-origin', headers: method === 'POST' ? {'X-Lab-Request': '1'} : {}})
-          .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status); return j; }); });
-      }
-      function notebook() {
-        nb('GET', '/api/notebook').then(function (s) {
-          document.getElementById('t-nb').hidden = !(s.running || s.starting);
-          if (s.running || s.starting) return frame();
-          body.innerHTML = '';
-          var d = document.createElement('div'); d.className = 'card off';
-          d.innerHTML = '<h2>Your Jupyter server isn\'t running</h2><div class="sub">Start it when you want to work in your notebooks — ' +
-            'it takes a few seconds. Your files are kept while it\'s stopped.</div>' +
-            '<div class="row"><button class="primary" id="nb-start">Start Jupyter</button><a class="btn" href="/" style="border:1px solid var(--line2); border-radius:8px; padding:6px 12px">Not now</a></div>';
-          body.appendChild(d);
-          document.getElementById('nb-start').onclick = function () { document.getElementById('t-nb').hidden = false; frame(); };
-        }).catch(function (e) { off('Notebooks are not available', e.message); });
-      }
-      function ask(btn, question, yes) {                   // inline Yes / Cancel (no browser popups)
-        var box = document.createElement('span'); box.className = 'ask';
-        box.innerHTML = '<span></span><button class="small danger">Yes</button><button class="small">Cancel</button>';
-        box.firstChild.textContent = question;
-        btn.parentNode.hidden = true; btn.parentNode.parentNode.insertBefore(box, btn.parentNode);
-        box.children[2].onclick = function () { box.remove(); btn.parentNode.hidden = false; };
-        box.children[1].onclick = function () { box.remove(); btn.parentNode.hidden = false; yes(); };
-      }
-      function stopThen(after, label) {
-        off(label + '…', 'Stopping your Jupyter server — your files are kept.');
-        nb('POST', '/api/notebook/stop').then(after).catch(function (e) { off('Could not stop Jupyter', e.message); });
-      }
-      document.getElementById('t-restart').onclick = function () {
-        ask(this, 'Restart Jupyter? Open kernels stop (unsaved cell output is lost); your files are kept.', function () {
-          stopThen(frame, 'Restarting');
-        });
-      };
-      document.getElementById('t-stop').onclick = function () {
-        ask(this, 'Stop Jupyter? Open kernels stop; your files are kept.', function () {
-          stopThen(function () { document.getElementById('t-nb').hidden = true; notebook(); }, 'Stopping');
-        });
-      };
-      document.addEventListener('lab:me', function (e) { show((e.detail.groups || []).indexOf('managers') >= 0); });
+      document.getElementById('t-what').textContent = LAB_PAGES[key] ? '' : t.what;
+      document.getElementById('t-open').href = t.page || t.url;
+      document.getElementById('t-open').hidden = document.getElementById('t-reload').hidden = false;
+      document.getElementById('t-nb').hidden = !(key === 'jupyter' && tabs[key].running);
+      var title = document.getElementById('lab-title'); if (title) title.textContent = t.name;
+      var crumb = document.querySelector('#lab-top .crumb'); if (crumb) crumb.textContent = LAB_PAGES[key] ? LAB_PAGES[key].what : 'Tools';
+      document.querySelectorAll('#lab-nav a.item[data-tab]').forEach(function (a) { a.classList.toggle('on', a.dataset.tab === key); });
+      tabs[key].el.scrollIntoView({block: 'nearest', inline: 'nearest'});
+      save();
     }
+    function go(key) {                                    // through the address, so Back / links work
+      if (location.hash.slice(1) === key) show(key); else location.hash = key;
+    }
+    function close(key) {
+      var i = order.indexOf(key);
+      tabs[key].el.remove(); tabs[key].pane.remove(); delete tabs[key]; order.splice(i, 1);
+      if (active === key) {
+        active = null;
+        if (order.length) return go(order[Math.min(i, order.length - 1)]);
+        history.replaceState(null, '', location.pathname);
+        empty();
+      }
+      save();
+    }
+    function empty() {
+      document.title = 'Tools — Epireum\'s Data Engineering Lab';
+      document.getElementById('t-name').textContent = 'Tools';
+      document.getElementById('t-what').textContent = 'pick a page or tool in the menu on the left — it opens in a tab here';
+      document.getElementById('t-open').hidden = document.getElementById('t-reload').hidden = true;
+      document.getElementById('t-nb').hidden = true;
+      var title = document.getElementById('lab-title'); if (title) title.textContent = 'Tools';
+      document.querySelectorAll('#lab-nav a.item[data-tab]').forEach(function (a) { a.classList.remove('on'); });
+      save();
+    }
+    document.getElementById('t-reload').onclick = function () {
+      var tab = tabs[active];
+      if (!tab) return;
+      if (tab.frame) { if (tab.t.page) tab.frame.contentWindow.location.reload(); else tab.frame.src = src(tab); } else load(tab);
+    };
+    // a portal page in a tab asks to open another tool (lab-header.js LAB_GO): its tab, at that screen
+    window.addEventListener('message', function (e) {
+      if (e.origin !== location.origin || !e.data || e.data.lab !== 'open') return;
+      if (open(e.data.tool, e.data.hash) && location.hash.slice(1) !== e.data.tool) history.pushState(null, '', '#' + e.data.tool);
+    });
+    window.addEventListener('hashchange', function () {
+      var h = parse(location.hash.slice(1));
+      if (!h[0]) return;
+      if (!open(h[0], h[1])) history.replaceState(null, '', '#' + (active || ''));
+      else if (h[1]) history.replaceState(null, '', '#' + h[0]);        // the screen is the page's own address now
+    });
+
+    // ---- Notebooks: your own Jupyter server — started only when you say so (a click on the menu
+    // while passing by shouldn't start one); Restart / Stop in the bar, each asked inline
+    function nb(method, path) {
+      return fetch(path, {method: method, credentials: 'same-origin', headers: method === 'POST' ? {'X-Lab-Request': '1'} : {}})
+        .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status); return j; }); });
+    }
+    function running(tab, on) { tab.running = on; if (active === tab.key) document.getElementById('t-nb').hidden = !on; }
+    function notebook(tab) {
+      nb('GET', '/api/notebook').then(function (s) {
+        if (s.running || s.starting) { running(tab, true); return frame(tab); }
+        tab.frame = null; tab.pane.innerHTML = '';
+        var d = document.createElement('div'); d.className = 'card off';
+        d.innerHTML = '<h2>Your Jupyter server isn\'t running</h2><div class="sub">Start it when you want to work in your notebooks — ' +
+          'it takes a few seconds. Your files are kept while it\'s stopped.</div>' +
+          '<div class="row"><button class="primary">Start Jupyter</button></div>';
+        tab.pane.appendChild(d);
+        d.querySelector('button').onclick = function () { running(tab, true); frame(tab); };
+      }).catch(function (e) { off(tab.pane, 'Notebooks are not available', e.message); });
+    }
+    function ask(btn, question, yes) {                   // inline Yes / Cancel (no browser popups)
+      var box = document.createElement('span'); box.className = 'ask';
+      box.innerHTML = '<span></span><button class="small danger">Yes</button><button class="small">Cancel</button>';
+      box.firstChild.textContent = question;
+      btn.parentNode.hidden = true; btn.parentNode.parentNode.insertBefore(box, btn.parentNode);
+      box.children[2].onclick = function () { box.remove(); btn.parentNode.hidden = false; };
+      box.children[1].onclick = function () { box.remove(); btn.parentNode.hidden = false; yes(); };
+    }
+    function stopThen(after, label) {
+      var tab = tabs.jupyter;
+      off(tab.pane, label + '…', 'Stopping your Jupyter server — your files are kept.'); tab.frame = null;
+      nb('POST', '/api/notebook/stop').then(after).catch(function (e) { off(tab.pane, 'Could not stop Jupyter', e.message); });
+    }
+    document.getElementById('t-restart').onclick = function () {
+      ask(this, 'Restart Jupyter? Open kernels stop (unsaved cell output is lost); your files are kept.', function () {
+        stopThen(function () { frame(tabs.jupyter); }, 'Restarting');
+      });
+    };
+    document.getElementById('t-stop').onclick = function () {
+      ask(this, 'Stop Jupyter? Open kernels stop; your files are kept.', function () {
+        stopThen(function () { running(tabs.jupyter, false); notebook(tabs.jupyter); }, 'Stopping');
+      });
+    };
+
+    // start: the tabs open before (this browser tab), then the one in the address
+    document.addEventListener('lab:me', function (e) {
+      manager = (e.detail.groups || []).indexOf('managers') >= 0;
+      var was = saved(), want = location.hash.slice(1);
+      (was.order || []).forEach(function (k) { if (lookup(k) && !lookup(k).external && !tabs[k]) add(k); });
+      var h = parse(want);
+      if (h[0] && open(h[0], h[1])) { if (h[1]) history.replaceState(null, '', '#' + h[0]); return; }
+      if (was.active && tabs[was.active]) return go(was.active);
+      if (order.length) return go(order[order.length - 1]);
+      go('home');                                          // nothing open yet: start at Home
+    });
   </script>
 </body>
 </html>

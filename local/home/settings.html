@@ -132,7 +132,7 @@
           admin.api('POST', '/api/admin/flink', {taskmanagers: +tms.value, slots: +slots.value}).then(function (r) {
             admin.show('Saved: ' + r.taskmanagers + ' TaskManagers × ' + r.slots + ' slots', [r.control === 'local'
               ? 'Apply it in the terminal: make status → select Flink → s (when Flink is on: its TaskManagers restart with the new size, running jobs with them).'
-              : 'It applies the next time the Flink unit starts.']);
+              : r.applied ? 'Applied: the TaskManagers restart with the new size (running jobs with them).' : 'It applies the next time the Flink unit starts.']);
             draw(r);
           }).catch(function (e) { save.disabled = false; admin.show('Not saved', [e.message], null, true); });
         });

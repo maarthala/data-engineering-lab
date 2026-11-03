@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ingestion — Epireum's Data Engineering Lab</title>
-  <link rel="stylesheet" href="/admin.css?v=8">
+  <link rel="stylesheet" href="/admin.css?v=9">
   <style>
     main{max-width:none}
     /* tabs + the tab's "new" button on one line */
@@ -86,7 +86,7 @@
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=19"></script>
+  <script src="/lab-header.js?v=21"></script>
   <div class="pagebar"><h1>📡 Ingestion <span class="dot">·</span> copy data from your databases and streams into your lakehouse</h1></div>
   <main id="main"><div class="placeholder">Loading…</div></main>
   <script>
@@ -262,7 +262,7 @@
       if (page === 'new-source') return sourcePage({kind: 'postgres', cdc: true});
       if (page === 'source') {
         var src = byId(data.sources, +id);
-        if (isStream(src)) { location.href = '/pubsub.html#stream/' + src.stream_id; return; }
+        if (isStream(src)) { LAB_GO('/pubsub.html#stream/' + src.stream_id); return; }
         return sourcePage(src);
       }
       if (page === 'new-destination') return destPage({});

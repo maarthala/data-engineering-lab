@@ -120,6 +120,17 @@ labDb:
 
 # 📡 Ingestion with Debezium: the Streaming unit (templates/streaming.yaml). Off until needed —
 # switched in Manage → ⚙️ Settings → Services; a chart apply sets it back to `replicas`.
+# The Flink unit — Apache Beam on a cluster with slots (templates/flink.yaml). Off until a manager
+# switches it on (⚙️ Settings → Services); its size is ⚙️ Settings → Flink cluster (slots below: the
+# chart's start value — home-api sets the saved one when the unit goes on).
+flink:
+  enabled: true
+  jobmanagerImage: flink:1.20.5-scala_2.12-java17
+  taskmanagerImage: ghcr.io/maarthala/de-stack/flink-taskmanager:20261103   # + Beam's Python worker (Dockerfile.flink-taskmanager)
+  jobServerImage: apache/beam_flink1.20_job_server:2.77.0
+  slots: 2
+  storage: 5Gi
+
 streaming:
   enabled: true
   replicas: 0
@@ -177,7 +188,7 @@ jupyter:
   repo: jupyter              # the single-user image (one pod per learner)
   # A dated tag, not :latest — re-importing :latest on the node left the OLD image behind the
   # tag (learner pods started without jupyter-entrypoint.sh). Bump it with every new build.
-  tag: "20261103"            # + confluent-kafka (📨 Pub/Sub from plain Python)
+  tag: "20261103-2"          # + confluent-kafka (📨 Pub/Sub), apache-beam[aws] 2.77.0 (lab_beam)
   hubImage: ghcr.io/maarthala/de-stack/jupyterhub:20261002-7
   userStorage: 1Gi           # per-learner work volume (PVC claim-<user>)
   userMemory: 1G
