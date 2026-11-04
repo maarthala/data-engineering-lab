@@ -118,3 +118,94 @@ c.close()
 **Apache Beam** on the Flink unit: `ReadFromKafka(**lab_kafka("<stream>", beam=True))`, as a batch read
 or a streaming job with windows and late data:
 [A streaming pipeline: Pub/Sub topics on workers](../beam/kafka.md).
+
+## Example: click_events, end to end
+Ready to run: make a stream named **click_events** (**Carries: Click events**), open a notebook, and
+replace `<you>` with your name (the top line of the notebook shows it: *you are …*).
+
+**1 · Read a few events** (plain Python):
+
+```python
+import json
+from confluent_kafka import Consumer
+
+c = Consumer({**lab_kafka(python=True), "group.id": "<you>.reader",
+              "auto.offset.reset": "earliest", "enable.auto.commit": False})
+c.subscribe(["<you>.click_events"])
+got = 0
+while got < 5:
+    m = c.poll(5.0)
+    if m is None or m.error():
+        continue
+    e = json.loads(m.value())
+    print(m.partition(), m.offset(), m.key().decode(), e["event_type"], e["page"], e["event_time"])
+    got += 1
+c.commit(asynchronous=False)
+c.close()
+```
+```text
+2 0 s_a06cfd60b8bf page_view /product/3 2026-11-04T07:24:28.929Z
+2 1 s_a06cfd60b8bf product_view /product/7 2026-11-04T07:24:28.926Z
+2 2 s_1ada303d82a5 page_view /category/home 2026-11-04T07:24:29.848Z
+2 3 s_a06cfd60b8bf add_to_cart /product/1 2026-11-04T07:24:28.804Z
+2 4 s_a06cfd60b8bf add_to_cart /product/12 2026-11-04T07:24:29.019Z
+```
+The key is the session: one visitor's clicks share a partition, in order.
+
+**2 · Events per minute and type, into a table** (Spark Structured Streaming):
+
+```python
+import time
+from pyspark.sql.functions import from_json, col, window, count
+
+spark.conf.set("spark.sql.shuffle.partitions", "3")
+schema = ("event_id STRING, event_type STRING, event_time TIMESTAMP, publish_time TIMESTAMP, session_id STRING, "
+          "customer_id BIGINT, device STRING, page STRING, product_id BIGINT, search_term STRING, referrer STRING")
+
+raw = (spark.readStream.format("kafka").options(**lab_kafka("click_events"))
+       .option("startingOffsets", "earliest").load())
+events = (raw.select(from_json(col("value").cast("string"), schema).alias("e")).select("e.*")
+             .withWatermark("event_time", "2 minutes"))
+
+per_minute = (events.groupBy(window("event_time", "1 minute"), "event_type")
+                    .agg(count("*").alias("events")))
+
+spark.sql("CREATE NAMESPACE IF NOT EXISTS my.silver")
+q = (per_minute.writeStream.format("iceberg").outputMode("append")
+       .option("checkpointLocation", "s3a://<you>-lake/checkpoints/click_events_per_minute")
+       .trigger(processingTime="30 seconds")
+       .toTable("my.silver.click_events_per_minute"))
+time.sleep(300)                       # let it run 5 minutes (or leave it running and go on)
+q.stop()
+```
+
+A minute is written once the watermark (the newest event time minus 2 minutes) has passed its end, so
+the first rows come after about 3 minutes. Then look at the table:
+
+```python
+(spark.table("my.silver.click_events_per_minute")
+      .orderBy("window", "event_type")
+      .select(col("window.start").alias("minute"), "event_type", "events")
+      .show(12, truncate=False))
+```
+```text
++-------------------+----------------+------+
+|minute             |event_type      |events|
++-------------------+----------------+------+
+|2026-11-04 07:24:00|add_to_cart     |54    |
+|2026-11-04 07:24:00|checkout        |5     |
+|2026-11-04 07:24:00|page_view       |104   |
+|2026-11-04 07:24:00|product_view    |112   |
+|2026-11-04 07:24:00|remove_from_cart|4     |
+|2026-11-04 07:24:00|search          |35    |
+|2026-11-04 07:25:00|add_to_cart     |103   |
+|2026-11-04 07:25:00|checkout        |22    |
+|2026-11-04 07:25:00|page_view       |169   |
+|2026-11-04 07:25:00|product_view    |229   |
+|2026-11-04 07:25:00|remove_from_cart|12    |
+|2026-11-04 07:25:00|search          |62    |
++-------------------+----------------+------+
+```
+(07:24 is short: the stream started during that minute. Your numbers differ: it's your own stream.)
+Run the stream cell again and it goes on where it stopped: the checkpoint keeps its place. The table is
+in your lakehouse, so SQLPad and Superset see it too (`<you>_lake.silver.click_events_per_minute`).
