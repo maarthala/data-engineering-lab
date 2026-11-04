@@ -48,7 +48,8 @@ registry would insist.
 ### Land them in your lakehouse
 Kafka keeps events 24 hours. To keep them, land them in an Iceberg table with a **📡 Ingestion** job:
 
-1. Make the stream a source: **📡 Ingestion → Sources → + New source → 📨 Pub/Sub stream → Add as source**.
+1. Make the stream a source: **📡 Ingestion → Sources → + New source**, **Source: 📨 Pub/Sub stream**,
+   pick it in **Stream** → **Save source**.
    Or, on the stream's page, **🏞 Lakehouse → + New Ingestion job**: it adds the source and opens the
    new job with it chosen. (Removing the source later leaves the stream as it is.)
 2. **+ New job**: the source is your stream.
