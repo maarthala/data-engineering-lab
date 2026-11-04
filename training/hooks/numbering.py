@@ -7,7 +7,8 @@ the nav, page headings and references. Nothing in the pages carries a hard-coded
                  A label starting with "+ " is a sub-lesson of the lesson above it (4.2.1).
                  A lesson can also be a group: its first page is the lesson (4.2, an index.md),
                  the others its sub-lessons (4.2.1 …), and the nav expands / collapses it.
-                 Top-level pages (Home, Course overview, Help) get no number.
+                 Top-level pages (Home, Course overview, Help) get no number, nor do the
+                 sections in UNNUMBERED (the Lab guide: reference pages, not lessons).
   page heading   the first "# Title" of a lesson becomes "# 4.2 Title".
   links          [4.3](../unit4/transform-silver.md), [Unit 4](../unit4/fundamentals.md):
                  the number in the link text is replaced by the target page's number.
@@ -27,6 +28,7 @@ import re
 log = logging.getLogger("mkdocs.hooks.numbering")
 
 SUB = "+ "
+UNNUMBERED = {"Lab guide"}     # nav sections kept as they are: no unit number, no lesson numbers
 _num = {}      # page path → "4.2" / "4.2.1"
 _unit = {}     # page path → "4"
 _count = {}    # page path → lessons in its unit
@@ -49,7 +51,7 @@ def on_config(config):
             numbered.append(entry)
             continue
         (label, value), = entry.items()
-        if not isinstance(value, list):                 # top-level page, no number
+        if not isinstance(value, list) or label in UNNUMBERED:   # top-level page / reference section: no number
             numbered.append(entry)
             continue
         unit += 1

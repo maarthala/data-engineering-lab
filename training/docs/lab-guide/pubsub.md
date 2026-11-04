@@ -1,15 +1,10 @@
-# Lab guide
-
-How to use the lab's portal features: what each one does, and the steps. The lessons use them; this
-page is the reference to come back to.
-
-## 📨 Pub/Sub streams
+# 📨 Pub/Sub streams
 
 A **stream** is a Kafka topic of your own, `<you>.<name>`, that the lab's simulator fills with
 business events: a few every second, some of them late if you ask for it. Lessons:
-[Events, topics and partitions](pubsub/events.md) and the ones after it.
+[Events, topics and partitions](../pubsub/events.md) and the ones after it.
 
-### Make a stream
+## Make a stream
 **📨 Pub/Sub → + New stream**, then:
 
 | Choice | What it means |
@@ -22,7 +17,7 @@ business events: a few every second, some of them late if you ask for it. Lesson
 
 A stream pauses itself after 8 hours (**▶ Resume** starts it again), and its topic keeps events for 24 hours.
 
-### Custom schema
+## Custom schema
 Build the event from a library of about 150 ready-made fields (customer, location, device, product,
 order, payment, IoT …):
 
@@ -41,11 +36,11 @@ a while (old and new shapes on one topic, like apps that update one by one). The
 what changed. A field keeps its type in every revision; a new shape needs a new name, as a schema
 registry would insist.
 
-### Look at the events
+## Look at the events
 **👀 Peek** shows the last events sent: partition · offset, key, event time, and how late each one was
 (🕓). Click one for its JSON.
 
-### Land them in your lakehouse
+## Land them in your lakehouse
 Kafka keeps events 24 hours. To keep them, land them in an Iceberg table with a **📡 Ingestion** job:
 
 1. Make the stream a source: **📡 Ingestion → Sources → + New source**, **Source: 📨 Pub/Sub stream**,
@@ -58,15 +53,15 @@ Kafka keeps events 24 hours. To keep them, land them in an Iceberg table with a 
 
 Every event becomes a row (Bronze), typed, with `_kafka` (topic, partition, offset, timestamp). A custom
 stream's table starts with its current revision; a field a later revision adds gets its own column. Build
-Silver from it with SQL, dbt or Spark: [Silver and Gold from late events (batch)](pubsub/late-batch.md).
+Silver from it with SQL, dbt or Spark: [Silver and Gold from late events (batch)](../pubsub/late-batch.md).
 
-### Use it in a notebook
+## Use it in a notebook
 Your stream's Kafka login is in 🔑 **My secrets** (`kafka`); `lab_kafka()` puts it into the settings, so
 the password never sits in your notebook. You may read your own topics, with consumer groups named
 `<you>.…`.
 
 **Spark Structured Streaming**: a watermark, a tumbling window, closed windows into an Iceberg table
-([Stream processing in a notebook](pubsub/stream-processing.md)):
+([Stream processing in a notebook](../pubsub/stream-processing.md)):
 
 ```python
 from pyspark.sql.functions import from_json, col, window, count
@@ -100,7 +95,7 @@ The Spark schema of each kind:
 | Stock moves | `event_id STRING, event_type STRING, event_time TIMESTAMP, publish_time TIMESTAMP, sku STRING, store STRING, qty_change INT, reason STRING` |
 | Custom schema | its own: **🧬 Schema** shows it, with a Copy button. Without an `event_type` field, group by `window(…)` alone |
 
-**Plain Python**, a few events at a time ([Stream processing in a notebook](pubsub/stream-processing.md) explains each line):
+**Plain Python**, a few events at a time ([Stream processing in a notebook](../pubsub/stream-processing.md) explains each line):
 
 ```python
 import json
@@ -122,4 +117,4 @@ c.close()
 
 **Apache Beam** on the Flink unit: `ReadFromKafka(**lab_kafka("<stream>", beam=True))`, as a batch read
 or a streaming job with windows and late data:
-[A streaming pipeline: Pub/Sub topics on workers](beam/kafka.md).
+[A streaming pipeline: Pub/Sub topics on workers](../beam/kafka.md).
