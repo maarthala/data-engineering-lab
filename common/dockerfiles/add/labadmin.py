@@ -646,7 +646,7 @@ def _pause_writers(name, lake):
 
 def reset_mine(user):
     """🧹 Reset my lakehouse — a member's own button (🗂️ My catalogs, their main lakehouse): every table,
-    view and namespace in <user>_lake dropped and their data (tables/ in the bucket) removed; bronze /
+    view and namespace in <user>_lake dropped and their data (tables/<user>_lake/ in the bucket) removed; bronze /
     silver / gold come back empty, with the sample table. Their files (files/ — My files, notebooks,
     DAGs, dbt) stay, so Jupyter keeps going; so do extra catalogs, shares given, 🔑 secrets, 📡 Ingestion
     sources / destinations and the account. Jobs writing into the lake are stopped, streams paused."""
@@ -658,7 +658,7 @@ def reset_mine(user):
     jobs, streams = _pause_writers(name, lake)
     lh.trino_catalog(lake, t)
     dropped = _clear_catalog(lake, _content_token())
-    files = _empty_prefix(lh.bucket_name(name), "tables/")
+    files = _empty_prefix(lh.bucket_name(name), f"tables/{lake}/")   # only this catalog's: extra catalogs keep theirs
     lh.provision(name)
     print(f"[labadmin] {user} reset their lakehouse: {dropped} tables, {files} table files", flush=True)
     return {"user": user, "lakehouse": lake, "dropped": dropped, "files_removed": files,

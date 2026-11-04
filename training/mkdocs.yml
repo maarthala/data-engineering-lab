@@ -82,7 +82,27 @@ nav:
   - "Help & community": help.md
   - "Lab guide":
       - "About the guide": lab-guide/index.md
+      - "🧭 How the lab works": lab-guide/how-it-works.md
+      - "👤 Accounts, members and managers": lab-guide/accounts.md
+      - "🗂 The portal": lab-guide/portal.md
+      - "🏠 Home": lab-guide/home.md
+      - "📁 My files": lab-guide/my-files.md
+      - "🗄 My catalogs": lab-guide/my-catalogs.md
+      - "🛢 My databases": lab-guide/my-databases.md
+      - "🔑 My secrets": lab-guide/my-secrets.md
+      - "📡 Ingestion": lab-guide/ingestion.md
       - "📨 Pub/Sub streams": lab-guide/pubsub.md
+      - "📓 Notebooks": lab-guide/notebooks.md
+      - "⌨️ SQL editor": lab-guide/sql-editor.md
+      - "🔀 Pipelines": lab-guide/pipelines.md
+      - "📊 Dashboards": lab-guide/dashboards.md
+      - "⚡ Spark UI and Flink UI": lab-guide/spark-flink-ui.md
+      - "🪣 Storage": lab-guide/storage.md
+      - "📝 Mock exams": lab-guide/mock-exams.md
+      - "👥 Members, teams and activity": lab-guide/members-teams.md
+      - "🛡 Governance": lab-guide/governance.md
+      - "⚙️ Settings": lab-guide/settings.md
+      - "🗂 Exams (managers)": lab-guide/exams-admin.md
   - "Getting started":
       - "Prerequisites & setup": setup/prerequisites.md
       - "Bring up the stack":          # a lesson with sub-pages: the nav expands / collapses
