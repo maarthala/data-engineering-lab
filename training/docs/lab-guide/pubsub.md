@@ -120,8 +120,8 @@ or a streaming job with windows and late data:
 [A streaming pipeline: Pub/Sub topics on workers](../beam/kafka.md).
 
 ## Example: click_events, end to end
-Ready to run: make a stream named **click_events** (**Carries: Click events**), open a notebook, and
-replace `<you>` with your name (the top line of the notebook shows it: *you are …*).
+Ready to run, as **demouser** with a stream named **click_events** (**Carries: Click events**). For
+your own lakehouse, put your name where it says `demouser` (the notebook's top line shows it: *you are …*).
 
 **1 · Read a few events** (plain Python):
 
@@ -129,9 +129,9 @@ replace `<you>` with your name (the top line of the notebook shows it: *you are 
 import json
 from confluent_kafka import Consumer
 
-c = Consumer({**lab_kafka(python=True), "group.id": "<you>.reader",
+c = Consumer({**lab_kafka(python=True), "group.id": "demouser.reader",
               "auto.offset.reset": "earliest", "enable.auto.commit": False})
-c.subscribe(["<you>.click_events"])
+c.subscribe(["demouser.click_events"])
 got = 0
 while got < 5:
     m = c.poll(5.0)
@@ -172,7 +172,7 @@ per_minute = (events.groupBy(window("event_time", "1 minute"), "event_type")
 
 spark.sql("CREATE NAMESPACE IF NOT EXISTS my.silver")
 q = (per_minute.writeStream.format("iceberg").outputMode("append")
-       .option("checkpointLocation", "s3a://<you>-lake/checkpoints/click_events_per_minute")
+       .option("checkpointLocation", "s3a://demouser-lake/checkpoints/click_events_per_minute")
        .trigger(processingTime="30 seconds")
        .toTable("my.silver.click_events_per_minute"))
 time.sleep(300)                       # let it run 5 minutes (or leave it running and go on)
@@ -208,4 +208,4 @@ the first rows come after about 3 minutes. Then look at the table:
 ```
 (07:24 is short: the stream started during that minute. Your numbers differ: it's your own stream.)
 Run the stream cell again and it goes on where it stopped: the checkpoint keeps its place. The table is
-in your lakehouse, so SQLPad and Superset see it too (`<you>_lake.silver.click_events_per_minute`).
+in your lakehouse, so SQLPad and Superset see it too (`demouser_lake.silver.click_events_per_minute`).
