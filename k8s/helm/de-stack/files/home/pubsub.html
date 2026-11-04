@@ -65,6 +65,7 @@
     .fcard .node:hover{background:transparent}
     .grip{cursor:grab; color:var(--muted); padding:0 2px; user-select:none; font-size:.9rem} .grip:active{cursor:grabbing}
     .drop{outline:2px dashed var(--accent); outline-offset:1px}
+    .drop-before{box-shadow:inset 0 3px 0 var(--accent)}                         /* it goes in above this field */
     .tree.drop{outline-offset:-3px}
     .lib button.add[draggable]{cursor:grab}
     .choices{max-width:640px}
@@ -439,20 +440,21 @@
       }
       // one highlighted target at a time, changed only when the pointer reaches another one; dragleave isn't
       // used: it fires for every input / button inside a row (and rarely says where to), so it made the outline blink
-      var over = null, gone = null;
-      function hover(e) {
-        clearTimeout(gone);
-        if (e) gone = setTimeout(function () { hover(null); }, 200);   // no dragover for a while: the pointer left
+      // (no timers either: Chrome repeats dragover only every few hundred ms while the pointer rests). A
+      // dragover that reaches the document wasn't over a target — that clears it.
+      var over = null;
+      function hover(e, how) {
         if (over === e) return;
-        if (over) over.classList.remove('drop');
-        over = e; if (e) e.classList.add('drop');
+        if (over) over.classList.remove('drop', 'drop-before');
+        over = e; if (e) e.classList.add(how);
       }
-      function target_(e, list, at) {                    // make e a drop target for list[at]
-        on(e, 'dragover', function (ev) { if (!dragging) return; ev.preventDefault(); ev.stopPropagation(); hover(e); });
+      function target_(e, list, at, how) {               // make e a drop target for list[at]: 'drop' (into) or 'drop-before'
+        on(e, 'dragover', function (ev) { if (!dragging) return; ev.preventDefault(); ev.stopPropagation(); hover(e, how || 'drop'); });
         on(e, 'drop', function (ev) { ev.preventDefault(); ev.stopPropagation(); hover(null); dropAt(list, typeof at === 'function' ? at() : at); });
         return e;
       }
       target_(tree, schema.fields, function () { return schema.fields.length; });   // empty space: at the top, last
+      on(document, 'dragover', function () { hover(null); });
       on(document, 'dragend', function () { dragging = null; hover(null); });
       // the library
       var search = el('input', {type: 'text', placeholder: 'Search ' + Object.keys(L).length + ' fields…', autocomplete: 'off'}), groups = el('div');
@@ -528,7 +530,7 @@
                     list.splice(i, 1); if (target === n) target = null; if (schema.key === n.name) schema.key = ''; paint(); }));
         var line = el('div', {class: 'node' + (target === n ? ' target' : '')}, bits);
         if (n.object) target_(line, n.object, function () { return n.object.length; });   // onto an object: into it
-        else target_(line, list, function () { return list.indexOf(n); });                // onto a field: before it
+        else target_(line, list, function () { return list.indexOf(n); }, 'drop-before'); // onto a field: before it
         if (!n.object) return [line];
         on(line, 'click', function (ev) { if (ev.target === line || ev.target.classList.contains('ty')) { target = target === n ? null : n; paint(); } });
         line.title = 'click to add library fields into this object';
