@@ -279,18 +279,36 @@ def kinds():
     return {k: v for k, v in KINDS.items() if ENGINE == "olake" or k == "postgres"}
 
 
+def _streams(member):
+    if not _q("SELECT to_regclass('pubsub_streams') AS t", one=True)["t"]:
+        return {}
+    return {r["id"]: r for r in _q("SELECT id, name, kind, topic, state FROM pubsub_streams WHERE member = %s "
+                                   "AND state <> 'deleted' ORDER BY name", (member,))}
+
+
+def add_stream_source(member, stream_id):
+    """A member's 📨 Pub/Sub stream as a source (New source → Pub/Sub stream, or + New Ingestion job on
+    the stream's page): made once — the one it has already otherwise. → {"id", "existing"}."""
+    st = _streams(member).get(int(stream_id or 0))
+    if not st:
+        raise CdcError("no such stream — make it on 📨 Pub/Sub first")
+    have = _q("SELECT id FROM cdc_sources WHERE member = %s AND kind = 'pubsub' AND stream_id = %s", (member, st["id"]), one=True)
+    if have:
+        return {"id": have["id"], "existing": True}
+    name, n = f"{st['name']} (Pub/Sub)", 2
+    while _q("SELECT 1 FROM cdc_sources WHERE member = %s AND name = %s", (member, name), one=True):
+        name, n = f"{st['name']} (Pub/Sub {n})", n + 1
+    sid = _q("INSERT INTO cdc_sources (member, name, kind, host, port, dbname, username, cdc, stream_id, checked) "
+             "VALUES (%s, %s, 'pubsub', 'kafka', 9092, %s, %s, true, %s, %s) RETURNING id",
+             (member, name, st["topic"], member, st["id"], json.dumps({"ok": True, "message": "📨 a Pub/Sub stream"})), one=True)["id"]
+    return {"id": sid, "existing": False}
+
+
 def sync_streams(member):
-    """The member's 📨 Pub/Sub streams as sources: one per stream (made, renamed with it); a deleted
-    stream's source goes — or, while a job still uses it, stays and says so."""
-    streams = {r["id"]: r for r in _q("SELECT id, name, topic FROM pubsub_streams WHERE member = %s AND state <> 'deleted'",
-                                      (member,))} if _q("SELECT to_regclass('pubsub_streams') AS t", one=True)["t"] else {}
+    """A deleted 📨 Pub/Sub stream's source goes — or, while a job still uses it, stays and says so. (A
+    stream becomes a source only when the member makes it one: add_stream_source.)"""
+    streams = _streams(member)
     have = {r["stream_id"]: r for r in _q("SELECT * FROM cdc_sources WHERE member = %s AND kind = 'pubsub'", (member,))}
-    for sid, st in streams.items():
-        name = f"{st['name']} (Pub/Sub)"
-        if sid not in have:
-            _q("INSERT INTO cdc_sources (member, name, kind, host, port, dbname, username, cdc, stream_id, checked) "
-               "VALUES (%s, %s, 'pubsub', 'kafka', 9092, %s, %s, true, %s, %s) ON CONFLICT (member, name) DO NOTHING",
-               (member, name, st["topic"], member, sid, json.dumps({"ok": True, "message": "📨 a Pub/Sub stream"})), rows=False)
     for sid, s in have.items():
         if sid in streams:
             continue
@@ -327,7 +345,10 @@ def overview(member, catalogs=()):
               "EXISTS (SELECT 1 FROM cdc_tasks t WHERE t.kind = 'run' AND t.ref = j.id AND t.status IN ('queued', 'running')) AS busy "
               "FROM cdc_jobs j JOIN cdc_sources s ON s.id = j.source_id JOIN cdc_destinations d ON d.id = j.dest_id "
               "WHERE j.member = %s ORDER BY j.name", (member,))
+    made = {s["stream_id"]: s["id"] for s in src if s["kind"] == "pubsub"}
     return {"sources": [_source_out(s) for s in src],
+            "streams": [{"id": x["id"], "name": x["name"], "kind": x["kind"], "topic": x["topic"], "state": x["state"],
+                         "source": made.get(x["id"])} for x in _streams(member).values()],
             "destinations": [{"id": d["id"], "name": d["name"], "catalog": d["catalog"], "namespace": d["namespace"],
                               "checked": d["checked"], "created_at": _iso(d["created_at"])} for d in dst],
             "jobs": [{"id": j["id"], "name": j["name"], "source": j["source_id"], "source_name": j["source_name"],
@@ -444,11 +465,7 @@ def save_source(member, body):
 
 
 def delete_source(member, sid):
-    s = _own("cdc_sources", member, sid)
-    if s["kind"] == "pubsub" and not _q("SELECT 1 FROM pubsub_streams WHERE id = %s AND state <> 'deleted'", (s["stream_id"],), one=True):
-        pass                                          # its stream is gone: the source may go (once no job uses it)
-    else:
-        _pubsub(s)
+    s = _own("cdc_sources", member, sid)              # a 📨 stream's source too: the stream stays (Add as source again)
     used = _q("SELECT name FROM cdc_jobs WHERE source_id = %s", (s["id"],))
     if used:
         raise CdcError("used by job " + ", ".join(j["name"] for j in used) + " — delete it first")

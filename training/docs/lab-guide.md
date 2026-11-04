@@ -48,9 +48,12 @@ registry would insist.
 ### Land them in your lakehouse
 Kafka keeps events 24 hours. To keep them, land them in an Iceberg table with a **📡 Ingestion** job:
 
-1. **🏞 Lakehouse → + New Ingestion job** (or **📡 Ingestion → + New job**). The source is your stream.
-2. Pick a destination: a catalog and namespace. The table is named after the stream.
-3. Pick how it runs: **Manual**, **Cron** (an expression) or **Datastream** (all the time, within seconds).
+1. Make the stream a source: **📡 Ingestion → Sources → + New source → 📨 Pub/Sub stream → Add as source**.
+   Or, on the stream's page, **🏞 Lakehouse → + New Ingestion job**: it adds the source and opens the
+   new job with it chosen. (Removing the source later leaves the stream as it is.)
+2. **+ New job**: the source is your stream.
+3. Pick a destination: a catalog and namespace. The table is named after the stream.
+4. Pick how it runs: **Manual**, **Cron** (an expression) or **Datastream** (all the time, within seconds).
 
 Every event becomes a row (Bronze), typed, with `_kafka` (topic, partition, offset, timestamp). A custom
 stream's table starts with its current revision; a field a later revision adds gets its own column. Build

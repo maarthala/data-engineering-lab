@@ -4,7 +4,7 @@ their own, <member>.<name>, until they pause or delete it. Members subscribe to 
 for now). Each event has an event_time (when it happened) and a publish_time (when it reached
 Kafka); a stream can send some events late — random delays, or a device that was offline sending its
 backlog at once — to practise event time vs processing time, watermarks and late data. Each stream is
-a source in 📡 Ingestion too (labcdc.sync_streams): a job there lands its events in a table.
+a source in 📡 Ingestion once the member adds it (labcdc.add_stream_source): a job there lands its events in a table.
 Besides the ready-made kinds a stream can carry a custom schema the member builds from a library of
 fields (labschema.py), and change it later: each change is a new revision (pubsub_schemas), and
 event-sim moves to it — at once, or a share of the events for a while — so the shape drifts.

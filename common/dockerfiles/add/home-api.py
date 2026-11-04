@@ -80,6 +80,7 @@ go (leaving = pause), the review comes after submitting. Changes need the X-Lab-
 "📡 Ingestion (CDC)" — a member's own Postgres → their lakehouse (labcdc.py; cdc-runner does the work):
   GET    /api/cdc                                        my sources, destinations, jobs (+ last run), my catalogs
   POST   /api/cdc/sources {"id"?, "name", "host", "port", "database", "username", "password", "schemas", "cdc"}
+         …/sources/stream {"stream"}: one of my 📨 Pub/Sub streams as a source (made once)
          …/sources/check · …/sources/tables · …/sources/delete {"id"}      → a task (check / list tables)
          …/sources/test · …/sources/browse {the form, saved or not}         → Test connection / Browse tables
   POST   /api/cdc/destinations {"id"?, "name", "catalog", "namespace"} · …/check · …/delete {"id"}
@@ -442,6 +443,7 @@ class Handler(BaseHTTPRequestHandler):
             calls = {
                 "/api/cdc/sources": lambda: labcdc.save_source(name, b),
                 "/api/cdc/sources/delete": lambda: labcdc.delete_source(name, b.get("id", 0)),
+                "/api/cdc/sources/stream": lambda: labcdc.add_stream_source(name, b.get("stream", 0)),
                 "/api/cdc/sources/check": lambda: {"task": labcdc.queue(name, "check_source", labcdc._own("cdc_sources", name, b.get("id", 0))["id"])},
                 "/api/cdc/sources/tables": lambda: labcdc.discover(name, b.get("id", 0)),
                 "/api/cdc/sources/test": lambda: labcdc.try_source(name, b, "test_source"),
@@ -517,7 +519,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if method == "GET":
                 if path == "/api/pubsub":
-                    labcdc.sync_streams(name)                # each stream is a 📡 Ingestion source too
+                    labcdc.sync_streams(name)                # a deleted stream's source goes
                     srcs = {x["stream_id"]: x["id"] for x in labcdc._q(
                         "SELECT id, stream_id FROM cdc_sources WHERE member = %s AND kind = 'pubsub'", (name,))}
                     return self._json(200, dict(labpubsub.overview(name, labcdc.stream_jobs(name)), sources=srcs,

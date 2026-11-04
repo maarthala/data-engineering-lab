@@ -259,7 +259,7 @@
         return newJob();
       }
       if (page === 'job') return jobPage(+id);
-      if (page === 'new-source') return sourcePage({kind: 'postgres', cdc: true});
+      if (page === 'new-source') return id === 'db' ? sourcePage({kind: 'postgres', cdc: true}) : newSource(id);
       if (page === 'source') {
         var src = byId(data.sources, +id);
         if (isStream(src)) { LAB_GO('/pubsub.html#stream/' + src.stream_id); return; }
@@ -386,7 +386,8 @@
           if (!more.hidden) readTables({id: s.id}, '/api/cdc/sources/tables', more.firstChild);
         });
         var del = on(el('button', {class: 'small', text: 'Delete'}), 'click', function () {
-          ask(del, s.cdc && s.slot ? 'Delete it (its replication slot is dropped too)?' : 'Delete it?', 'Yes, delete', function () {
+          ask(del, isStream(s) ? 'Remove it as a source? (The stream stays on 📨 Pub/Sub.)' : s.cdc && s.slot ? 'Delete it (its replication slot is dropped too)?' : 'Delete it?',
+              isStream(s) ? 'Yes, remove' : 'Yes, delete', function () {
             api('POST', '/api/cdc/sources/delete', {id: s.id}).then(function (r) {
               if (r.task) watch(r.task, function (t) { if (t.result && t.result.note) flash = {text: t.result.note}; show(); }); else show();
             }).catch(function (e) { alert_(e.message); });
@@ -406,7 +407,7 @@
             el('td', {}, [el('div', {}, ['topic ', el('code', {class: 'ns', text: s.database})]), el('div', {class: 'sub muted', text: 'Kafka'})]),
             el('td', {}, [el('span', {class: 'tag on', style: 'margin:0', text: 'events'})]),
             el('td', {}, [ok ? pill('ok', '✓ stream') : pill('bad', '✗ ' + c.message, c.message)]),
-            el('td', {class: 'acts'}, ok ? [open] : [open, del])]));
+            el('td', {class: 'acts'}, [open, del])]));
           return;
         }
         var kind = data.kinds[s.kind] || {name: s.kind};
@@ -461,11 +462,43 @@
         }))]);
     }
 
+    // ---- a new source: a database, or one of your 📨 Pub/Sub streams --------------------------------
+    var STREAM_KINDS = {click_events: 'Click events', orders: 'Orders', payments: 'Payments', inventory: 'Stock moves', custom: 'Custom schema'};
+    function newSource(which) {
+      var back = wiz ? ['New job', 'new-job'] : ['Sources', 'sources'];
+      main.appendChild(crumbs([back, ['New source']]));
+      var pick = el('div', {class: 'choices', style: 'max-width:640px'}, [
+        on(el('button', {type: 'button', class: 'choice'}, [el('b', {text: '🗄 Database'}), el('span', {text: 'A database you can reach — its tables, a full copy or every change (CDC).'})]),
+          'click', function () { go('new-source/db'); }),
+        on(el('button', {type: 'button', class: 'choice' + (which === 'stream' ? ' on' : '')}, [el('b', {text: '📨 Pub/Sub stream'}),
+          el('span', {text: 'One of your event streams — every event into a table (Bronze).'})]), 'click', function () { go('new-source/stream'); })]);
+      var kids = [el('h3', {text: 'New source'}), pick];
+      if (which === 'stream') {
+        var msg = el('div', {class: 'sub', style: 'margin-top:8px'});
+        if (!data.streams.length) kids.push(el('div', {class: 'sub muted', style: 'margin-top:14px'}, ['You have no stream yet — ',
+          el('a', {href: '/pubsub.html#new', text: 'make one on 📨 Pub/Sub'}), ', then come back.']));
+        else kids.push(el('table', {class: 'lst', style: 'margin-top:14px'}, [el('thead', {}, [el('tr', {}, ['Stream', 'Carries', 'Topic', ''].map(function (h) { return el('th', {text: h}); }))]),
+          el('tbody', {}, data.streams.map(function (x) {
+            var act = x.source
+              ? el('span', {}, [el('span', {class: 'sub muted', text: '✓ a source already · '}), link('new job with it', 'new-job/' + x.source)])
+              : on(el('button', {class: 'small primary', text: 'Add as source'}), 'click', function (ev) {
+                  var b = ev.target; b.disabled = true; msg.textContent = '';
+                  api('POST', '/api/cdc/sources/stream', {stream: x.id}).then(function (r) {
+                    return load().then(function () { if (wiz) { wiz.source = r.id; go('new-job'); } else go('sources'); });
+                  }).catch(function (e) { b.disabled = false; msg.className = 'sub bad'; msg.textContent = e.message; });
+                });
+            return el('tr', {}, [el('td', {}, [el('b', {text: x.name}), x.state === 'paused' ? el('span', {class: 'sub muted', text: ' · paused'}) : null]),
+              el('td', {class: 'muted', text: STREAM_KINDS[x.kind] || x.kind}), el('td', {}, [el('code', {text: x.topic})]), el('td', {style: 'text-align:right'}, [act])]);
+          }))]), msg);
+      }
+      main.appendChild(card(kids));
+    }
+
     // ---- a source: new or edit -------------------------------------------------------------------
     function sourcePage(s) {
       if (!s) return go('sources');
       var back = wiz ? ['New job', 'new-job'] : ['Sources', 'sources'];
-      main.appendChild(crumbs([back, [s.id ? s.name : 'New source']]));
+      main.appendChild(crumbs(s.id ? [back, [s.name]] : [back, ['New source', 'new-source'], ['🗄 Database']]));
       var kind = s.kind || 'postgres';
       var f = {name: inp(s.name, 'text', 'e.g. Shop database'), host: inp(s.host, 'text', 'e.g. lab-db'), port: inp(s.port || data.kinds[kind].port, 'number'),
                database: inp(s.database), username: inp(s.username),

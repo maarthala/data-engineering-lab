@@ -30,9 +30,10 @@ You need the two streams from [Events, topics and partitions](events.md).
 **Save destination**: the namespace is made at once.
 
 ### 2 · A Datastream job for orders
-Your streams are already sources: the **Sources** tab lists them as *orders (Pub/Sub)* and
-*clicks (Pub/Sub)*, with the topic as their connection. (Change or delete them on 📨 Pub/Sub; the
-stream's page also has **+ New Ingestion job**, which opens this form with the stream chosen.)
+First make both streams sources: **Sources → + New source → 📨 Pub/Sub stream** lists your streams;
+**Add as source** for *orders* and *clicks*. The **Sources** tab now has *orders (Pub/Sub)* and
+*clicks (Pub/Sub)*, with the topic as their connection. (A shortcut: a stream's page on 📨 Pub/Sub has
+**🏞 Lakehouse → + New Ingestion job**, which adds it as a source and opens this form with it chosen.)
 
 **Jobs → + New job**:
 

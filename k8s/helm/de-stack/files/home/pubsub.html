@@ -344,6 +344,13 @@
     function landCard(s) {
       var src = data.sources[s.id];
       var add = el('a', {class: 'primary button', href: '/cdc.html#new-job/' + (src || ''), text: '+ New Ingestion job'});
+      if (!src) on(add, 'click', function (ev) {          // not a source yet: make it one, then the new job with it chosen
+        ev.preventDefault();
+        api('POST', '/api/cdc/sources/stream', {stream: s.id}).then(function (r) {
+          var to = '/cdc.html#new-job/' + r.id;
+          if (window.LAB_GO) LAB_GO(to); else location.href = to;
+        }).catch(function (e) { alert_(e.message); });
+      });
       add.setAttribute('style', 'display:inline-block; text-decoration:none; padding:7px 14px; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; font-size:.88rem');
       var rows = s.jobs.map(function (j) {
         return el('tr', {}, [el('td', {}, [el('a', {class: 'name', href: '/cdc.html#job/' + j.id, text: j.name})]), el('td', {class: 'muted', text: runText(j)})]);
