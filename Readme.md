@@ -63,6 +63,7 @@ integration-level updates (like AdventureWorks or SQLPad) get an entry.
 
 | Date | Release / integration | What it adds | Scope |
 |---|---|---|---|
+| 2026-11-04 | **Lab guide for every feature (v1.11.1)** | The course's Lab guide: a page per portal feature, from how the lab works, accounts and the portal to every workspace page, tool and manager page. Fix: 🧹 Reset my lakehouse no longer removes your extra catalogs' table files | local · k8s · course |
 | 2026-11-04 | **Pub/Sub custom schemas & schema drift (v1.11.0)** | Build your own event from a library of ~150 fields (objects, lists, empties, own values, as text) with a live JSON sample and drag and drop; change it later as a new revision — all at once or rolled out to part of the events — kept compatible so Bronze tables evolve instead of breaking. Create a stream now, start it later; the stream page in tabs | local · k8s |
 | 2026-11-04 | **Ingestion: choose a database or a Pub/Sub stream (v1.11.0)** | New source asks Database or 📨 Pub/Sub stream; streams become sources only when you add them (or from the stream's + New Ingestion job) | local · k8s · course |
 | 2026-11-04 | **Course: Features and the Lab guide (v1.11.0)** | Features: the DE tasks this stack runs, each linked to its lesson; Lab guide: a page per portal feature, first Pub/Sub with a ready-to-run click_events example; the home-page tour with today's portal | course |
