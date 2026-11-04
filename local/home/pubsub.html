@@ -491,7 +491,8 @@
         function setRep() { lo.hidden = hi.hidden = !rep.checked; if (rep.checked) n.repeat = [+lo.value, +hi.value]; else delete n.repeat; preview(); }
         [rep, lo, hi].forEach(function (x) { on(x, 'change', setRep); });
         bits.push(el('label', {title: 'an array of it: from … to elements'}, [rep, 'list']), lo, hi);
-        var empty = on(el('select', {title: 'how often it\'s empty (null)'}, [0, 5, 20, 50].map(function (p) { return el('option', {value: p, text: p ? p + '% empty' : 'never empty'}); })), 'change', function () {
+        var pcts = [0, 5, 20, 50].concat(n.null_pct && [0, 5, 20, 50].indexOf(n.null_pct) < 0 ? [n.null_pct] : []).sort(function (a, b) { return a - b; });
+        var empty = on(el('select', {title: 'how often it\'s empty (null)'}, pcts.map(function (p) { return el('option', {value: p, text: p ? p + '% empty' : 'never empty'}); })), 'change', function () {
           if (+empty.value) n.null_pct = +empty.value; else delete n.null_pct; preview();
         });
         empty.value = String(n.null_pct || 0); bits.push(empty);

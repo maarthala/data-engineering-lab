@@ -97,11 +97,12 @@ example is written for it), or **Register** your own.
 
 ![The lab sign-in page](assets/tour/login.jpg)
 
-### 2 · The home page — your platform at a glance
-After signing in you land on the lab home: the tools grouped the way a data team thinks about
-them — **Build & explore** (notebooks, Spark, SQL), **Pipelines** (Airflow), **Visualize**
-(Superset) and **Lakehouse** (your files, catalogs and storage). The header shows who you are and
-your own lakehouse and bucket.
+### 2 · The home page — your workspace
+After signing in you land in the portal: on the left **Workspace** (your files, catalogs, databases
+and secrets) and **Tools** (Ingestion, Pub/Sub, notebooks, the SQL editor, pipelines, dashboards,
+Spark and storage), and every tool opens as a **tab**, so you can switch between them without losing
+your place. Home shows where you left off, your lakehouse (storage used, tables per layer), your
+Airflow pipelines and your mock exams.
 
 ![The lab home page](assets/tour/home.jpg)
 
@@ -119,11 +120,27 @@ Click any file to **view it in place** — CSVs as a table, notebooks cell by ce
 
 ### 4 · My catalogs — your lakehouse, and sharing
 Your lakehouse is a governed **Polaris catalog** with `bronze` / `silver` / `gold` namespaces
-and a sample table ready to query. Create more catalogs, and **share** a namespace or a single
-table — read or write — with a teammate. Polaris enforces it on every query
-([6.1](unit6/polaris.md)).
+and a sample table ready to query. Create namespaces and more catalogs, **share** a namespace, a
+table or the whole lake with another member, see **who has access**, and set **table maintenance**
+(compaction, snapshot expiry). Polaris enforces the access on every query ([6.1](unit6/polaris.md)).
 
 ![My catalogs — your lakehouse and sharing](assets/tour/my-catalogs.jpg)
+
+### 5 · Ingestion — databases and streams into your lakehouse
+**📡 Ingestion** copies data into Iceberg tables: a **source** (a database such as Tidewell's live
+shop, or one of your Pub/Sub streams), a **destination** (a lakehouse namespace) and a **job** that
+runs Manual, on a Cron schedule, or as a Datastream that brings every change within seconds
+([What is change data capture?](cdc/what-is-cdc.md)).
+
+![Ingestion — sources: databases and a stream](assets/tour/ingestion.jpg)
+
+### 6 · Pub/Sub — event streams of your own
+**📨 Pub/Sub** gives you Kafka topics that the lab fills with business events: clicks, orders,
+payments, stock moves, or an event you build yourself from a library of ready-made fields — objects,
+lists, and later revisions of it (schema drift). Some events can arrive late, to practise event time
+and watermarks ([Events, topics and partitions](pubsub/events.md) · [Lab guide](lab-guide/pubsub.md)).
+
+![Pub/Sub — building a custom event](assets/tour/pubsub.jpg)
 
 ## Who is it for?
 
