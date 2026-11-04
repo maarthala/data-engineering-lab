@@ -104,7 +104,9 @@
 <body>
   <header id="lab-top"></header>
   <script src="/lab-header.js?v=21"></script>
-  <div class="pagebar"><h1>📨 Pub/Sub <span class="dot">·</span> event streams on Kafka topics of your own</h1></div>
+  <div class="pagebar"><h1>📨 Pub/Sub <span class="dot">·</span> event streams on Kafka topics of your own</h1>
+    <div class="desc"><a href="https://maarthala.github.io/data-engineering-lab/lab-guide/#pubsub-streams" target="_blank" rel="noopener"
+      title="make a stream, custom schemas, land it with Ingestion, read it in a notebook (Spark, Python, Beam)">📖 Help — how to use streams (Lab guide) ↗</a></div></div>
   <main id="main"><div class="placeholder">Loading…</div></main>
   <script>
     // 📨 Pub/Sub — you make a stream (what it carries: clicks, orders, payments, stock moves; how many a
@@ -158,7 +160,6 @@
     }
 
     var data = null, timer = null, open = {};
-    var GUIDE = 'https://maarthala.github.io/data-engineering-lab/lab-guide/';   // the course's Lab guide
     function lateText(s) {
       if (!s.late_pct) return 'none';
       return s.late_pct + '% · ' + data.late_max[s.late_max] + ' · ' + (s.late_pattern === 'burst' ? 'bursts' : 'random');
@@ -611,9 +612,7 @@
         ask(del, 'Delete ' + s.name + ' and its topic?', 'Delete', function () { remove(s); });
       });
       function fact(k, v) { return el('div', {}, [el('span', {text: k + ' '}), typeof v === 'string' ? el('b', {text: v}) : v]); }
-      var guide = el('a', {class: 'small button', href: GUIDE + '#pubsub-streams', target: '_blank', rel: 'noopener',
-        title: 'how to land it in your lakehouse, read it in a notebook (Spark, Python, Beam) …', text: '📖 Guide ↗'});
-      main.appendChild(card([el('div', {class: 'head'}, [el('h3', {}, [s.name + ' ', st]), el('div', {class: 'actions'}, [guide, pause, del])]),
+      main.appendChild(card([el('div', {class: 'head'}, [el('h3', {}, [s.name + ' ', st]), el('div', {class: 'actions'}, [pause, del])]),
         el('div', {class: 'meta'}, [
           fact('Topic', el('code', {class: 't', text: s.topic})),
           fact('Carries', carries(s) + ' — key ' + keyOf(s)),
