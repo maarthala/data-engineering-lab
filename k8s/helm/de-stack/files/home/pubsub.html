@@ -64,7 +64,8 @@
     .fcard.alt{background:var(--accent-bg)}
     .fcard .node:hover{background:transparent}
     .grip{cursor:grab; color:var(--muted); padding:0 2px; user-select:none; font-size:.9rem} .grip:active{cursor:grabbing}
-    .drop{outline:2px dashed var(--accent); outline-offset:1px; background:var(--accent-bg) !important}
+    .drop{outline:2px dashed var(--accent); outline-offset:1px}
+    .tree.drop{outline-offset:-3px}
     .lib button.add[draggable]{cursor:grab}
     .choices{max-width:640px}
     .lib{border:1px solid var(--line); border-radius:10px; background:var(--panel2); padding:8px; max-height:460px; overflow:auto}
@@ -436,14 +437,23 @@
         }
         paint();
       }
+      // one highlighted target at a time, changed only when the pointer reaches another one; dragleave isn't
+      // used: it fires for every input / button inside a row (and rarely says where to), so it made the outline blink
+      var over = null, gone = null;
+      function hover(e) {
+        clearTimeout(gone);
+        if (e) gone = setTimeout(function () { hover(null); }, 200);   // no dragover for a while: the pointer left
+        if (over === e) return;
+        if (over) over.classList.remove('drop');
+        over = e; if (e) e.classList.add('drop');
+      }
       function target_(e, list, at) {                    // make e a drop target for list[at]
-        on(e, 'dragover', function (ev) { if (!dragging) return; ev.preventDefault(); ev.stopPropagation(); e.classList.add('drop'); });
-        on(e, 'dragleave', function () { e.classList.remove('drop'); });
-        on(e, 'drop', function (ev) { ev.preventDefault(); ev.stopPropagation(); e.classList.remove('drop'); dropAt(list, typeof at === 'function' ? at() : at); });
+        on(e, 'dragover', function (ev) { if (!dragging) return; ev.preventDefault(); ev.stopPropagation(); hover(e); });
+        on(e, 'drop', function (ev) { ev.preventDefault(); ev.stopPropagation(); hover(null); dropAt(list, typeof at === 'function' ? at() : at); });
         return e;
       }
       target_(tree, schema.fields, function () { return schema.fields.length; });   // empty space: at the top, last
-      on(document, 'dragend', function () { dragging = null; [].forEach.call(document.querySelectorAll('.drop'), function (x) { x.classList.remove('drop'); }); });
+      on(document, 'dragend', function () { dragging = null; hover(null); });
       // the library
       var search = el('input', {type: 'text', placeholder: 'Search ' + Object.keys(L).length + ' fields…', autocomplete: 'off'}), groups = el('div');
       function paintLib() {
