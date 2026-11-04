@@ -79,6 +79,7 @@ nav:
   - Home: index.md
   - "Course overview": course.md
   - "Help & community": help.md
+  - "Lab guide": lab-guide.md
   - "Getting started":
       - "Prerequisites & setup": setup/prerequisites.md
       - "Bring up the stack":          # a lesson with sub-pages: the nav expands / collapses

@@ -158,6 +158,7 @@
     }
 
     var data = null, timer = null, open = {};
+    var GUIDE = 'https://maarthala.github.io/data-engineering-lab/lab-guide/';   // the course's Lab guide
     function lateText(s) {
       if (!s.late_pct) return 'none';
       return s.late_pct + '% · ' + data.late_max[s.late_max] + ' · ' + (s.late_pattern === 'burst' ? 'bursts' : 'random');
@@ -346,58 +347,11 @@
       var rows = s.jobs.map(function (j) {
         return el('tr', {}, [el('td', {}, [el('a', {class: 'name', href: '/cdc.html#job/' + j.id, text: j.name})]), el('td', {class: 'muted', text: runText(j)})]);
       });
-      return card([el('div', {class: 'head'}, [el('h3', {text: '🏞 Into your lakehouse'}), add]),
-        el('div', {class: 'sub muted', style: 'margin-bottom:10px',
-          text: 'Kafka keeps events ' + data.retention_h + ' h. To keep them, land them in an Iceberg table with a 📡 Ingestion job: this stream is one of its sources. ' +
-                'Every event becomes a row (Bronze) — typed, with _kafka (topic, partition, offset) — Manual, Cron or Datastream. Build Silver from it with SQL, dbt or Spark.' +
-                (s.schema ? ' The table starts with the schema\'s current revision; a field a later revision adds gets its own column (a removed one stays, empty).' : '')}),
+      return card([el('div', {class: 'head'}, [el('h3', {text: '🏞 Ingestion jobs landing this stream'}), add]),
         rows.length ? el('table', {class: 'lst'}, [el('thead', {}, [el('tr', {}, [el('th', {text: 'Ingestion job'}), el('th', {text: 'Runs'})])]), el('tbody', {}, rows)])
                     : el('div', {class: 'sub muted', text: 'No job lands it yet.'})]);
     }
 
-    // ---- 🧪 the stream in a notebook: Spark Structured Streaming — watermark, a tumbling window, an Iceberg table
-    function notebookCard(s, opened) {
-      var bucket = data.me.replace(/_/g, '-') + '-lake', out = s.name + '_per_minute', key = keyOf(s);
-      var by = s.schema && !s.schema.schema.fields.some(function (f) { return f.name === 'event_type' && f.field; }) ? '' : ', "event_type"';
-      var code = [
-        '# your Kafka login comes from 🔑 My secrets ("kafka") — lab_kafka() puts it in the options',
-        'from pyspark.sql.functions import from_json, col, window, count',
-        '',
-        'spark.conf.set("spark.sql.shuffle.partitions", "3")   # one per Kafka partition (200, the default, = 200 state files a batch)',
-        'schema = "' + (s.ddl || data.ddl[s.kind]) + '"' + (s.schema ? '   # revision ' + s.schema.revision + ' — a field it doesn\'t list is ignored' : ''),
-        '',
-        'raw = (spark.readStream.format("kafka").options(**lab_kafka("' + s.name + '"))',
-        '       .option("startingOffsets", "earliest").load())        # key, value, partition, offset, timestamp',
-        'events = (raw.select(from_json(col("value").cast("string"), schema).alias("e")).select("e.*")',
-        '             .withWatermark("event_time", "10 minutes"))     # wait 10 min for late events, then close the window',
-        '',
-        'per_minute = (events.groupBy(window("event_time", "1 minute")' + by + ')   # a tumbling window',
-        '                    .agg(count("*").alias("events")))',
-        '',
-        'spark.sql("CREATE NAMESPACE IF NOT EXISTS my.silver")',
-        'q = (per_minute.writeStream.format("iceberg").outputMode("append")   # a window is written once it closes',
-        '       .option("checkpointLocation", "s3a://' + bucket + '/checkpoints/' + out + '")',
-        '       .trigger(processingTime="30 seconds")',
-        '       .toTable("my.silver.' + out + '"))',
-        '',
-        '# q.status · q.lastProgress (eventTime.watermark, numRowsDroppedByWatermark) · q.stop()'].join('\n');
-      var pre = el('pre', {class: 'mono', style: 'white-space:pre; overflow:auto; font-size:.76rem; background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:8px 0 0', text: code});
-      var copy = on(el('button', {class: 'small', text: 'Copy'}), 'click', function () {
-        navigator.clipboard.writeText(code).then(function () { copy.textContent = '✓ copied'; setTimeout(function () { copy.textContent = 'Copy'; }, 1500); });
-      });
-      // folded until opened: a heading you click (▸ / ▾), then the code
-      var body = el('div', {hidden: ''}, [el('div', {class: 'actions', style: 'justify-content:space-between; margin-top:8px'}, [
-          el('div', {class: 'sub muted', style: 'flex:1', text: 'Subscribe with Spark Structured Streaming: parse each event, set a watermark, count per minute of event_time, and write closed windows to an Iceberg table. ' +
-            'You may read your own topics; consumer groups are named ' + data.me + '.… (lab_kafka sets that). Plain Python: Consumer({**lab_kafka(python=True), "group.id": "' + data.me + '.reader"}). Key: ' + key + '.'}),
-          copy]), pre]);
-      var arrow = el('span', {text: '▸', style: 'display:inline-block; width:1em; color:var(--muted)'});
-      var head = on(el('button', {type: 'button', 'aria-expanded': 'false', style: 'all:unset; cursor:pointer; display:flex; align-items:center; gap:6px; width:100%'},
-        [arrow, el('h3', {style: 'margin:0', text: '🧪 Use it in a notebook'}), el('span', {class: 'sub muted', text: 'Spark Structured Streaming · watermark · windows'})]), 'click', function () {
-          body.hidden = !body.hidden; arrow.textContent = body.hidden ? '▸' : '▾'; head.setAttribute('aria-expanded', String(!body.hidden));
-        });
-      if (opened) { body.hidden = false; return card([el('h3', {style: 'margin:0', text: '🧪 Use it in a notebook'}), body]); }
-      return card([head, body]);
-    }
 
     // ---- 🧬 custom schema: the editor (library | the event's fields | a sample) ----------------
     function clone(x) { return JSON.parse(JSON.stringify(x)); }
@@ -613,11 +567,14 @@
         var just = saved && saved.id === s.id ? el('div', {class: 'sub ok', style: 'margin-bottom:8px'},
           ['✓ revision ' + cur.revision + ' saved — the simulator moves to it within seconds: ', changeChips(saved.changes)]) : null;
         saved = null;
-        box.replaceChildren(el('div', {class: 'head'}, [el('h3', {text: '🧬 Schema — revision ' + cur.revision}), change]), just,
-          el('div', {class: 'sub muted', style: 'margin-bottom:8px', text: 'Every event carries schema_revision. Changing the schema saves a new revision; the simulator moves to it — at once, or part of the events for a while, like apps that update one by one. ' +
-            'That is schema drift: see how your Ingestion table, Spark or Beam code copes.'}),
+        box.replaceChildren.apply(box, [el('div', {class: 'head'}, [el('h3', {text: '🧬 Schema — revision ' + cur.revision}), change]), just,
+          el('div', {class: 'sub muted', style: 'margin-bottom:8px', text: 'Each change is a new revision; every event carries schema_revision.'}),
           el('div', {class: 'fields'}, s.columns.map(function (c) { return el('code', {class: 't', text: c}); })),
-          el('h4', {style: 'margin:14px 0 6px; font-size:.92rem', text: 'Revisions'}), revs);
+          el('div', {class: 'actions', style: 'margin-top:10px; align-items:flex-start'}, [el('div', {class: 'sub muted', text: 'Spark schema (from_json):'}),
+            el('code', {class: 't', style: 'flex:1; white-space:normal; word-break:break-word', text: s.ddl}),
+            (function () { var b = on(el('button', {class: 'small', text: 'Copy'}), 'click', function () {
+              navigator.clipboard.writeText(s.ddl).then(function () { b.textContent = '✓ copied'; setTimeout(function () { b.textContent = 'Copy'; }, 1500); }); }); return b; })()]),
+          el('h4', {style: 'margin:14px 0 6px; font-size:.92rem', text: 'Revisions'}), revs].filter(Boolean));
         loadRevs();
       }
       function edit() {
@@ -654,7 +611,9 @@
         ask(del, 'Delete ' + s.name + ' and its topic?', 'Delete', function () { remove(s); });
       });
       function fact(k, v) { return el('div', {}, [el('span', {text: k + ' '}), typeof v === 'string' ? el('b', {text: v}) : v]); }
-      main.appendChild(card([el('div', {class: 'head'}, [el('h3', {}, [s.name + ' ', st]), el('div', {class: 'actions'}, [pause, del])]),
+      var guide = el('a', {class: 'small button', href: GUIDE + '#pubsub-streams', target: '_blank', rel: 'noopener',
+        title: 'how to land it in your lakehouse, read it in a notebook (Spark, Python, Beam) …', text: '📖 Guide ↗'});
+      main.appendChild(card([el('div', {class: 'head'}, [el('h3', {}, [s.name + ' ', st]), el('div', {class: 'actions'}, [guide, pause, del])]),
         el('div', {class: 'meta'}, [
           fact('Topic', el('code', {class: 't', text: s.topic})),
           fact('Carries', carries(s) + ' — key ' + keyOf(s)),
@@ -664,7 +623,7 @@
           el('div', {class: 'sub muted', text: 'pauses itself after ' + data.auto_pause_h + ' h'})])]));
       // the rest in tabs: #stream/<id>/<tab> — Back works, Peek first
       var tabs = [['peek', '👀 Peek']].concat(s.schema ? [['schema', '🧬 Schema']] : [],
-        [['settings', '⚙️ Settings'], ['lake', '🏞 Lakehouse', s.jobs.length], ['notebook', '🧪 Notebook']]);
+        [['settings', '⚙️ Settings'], ['lake', '🏞 Lakehouse', s.jobs.length]]);
       if (!tabs.some(function (t) { return t[0] === tab; })) tab = 'peek';
       main.appendChild(el('div', {class: 'tabs stabs'}, tabs.map(function (t) {
         return on(el('a', {class: t[0] === tab ? 'on' : null}, [t[1], t[2] ? el('span', {class: 'n', text: String(t[2])}) : null]), 'click', function () {
@@ -685,7 +644,6 @@
       }
       if (tab === 'schema') main.appendChild(schemaCard(s));
       if (tab === 'lake') main.appendChild(landCard(s));
-      if (tab === 'notebook') main.appendChild(notebookCard(s, true));
       // peek
       var body = el('tbody'), info = el('div', {class: 'sub muted'}), only = false, lastP = null;
       var which = seg([[false, 'All'], [true, '🕓 Late only']], false, function (v) { only = v; if (lastP) paint(lastP); });
