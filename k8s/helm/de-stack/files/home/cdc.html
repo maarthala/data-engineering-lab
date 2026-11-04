@@ -513,16 +513,25 @@
       // a new source: a database (the form below) or one of your 📨 Pub/Sub streams (just pick it)
       var dbPart = el('div'), streamPart = el('div'), what = null;
       if (!s.id) {
-        var free = data.streams.filter(function (x) { return !x.source; });
-        var stSel = select((free.length ? [] : [['', data.streams.length ? '— all your streams are sources already —' : '— you have no stream yet —']]).concat(
-          data.streams.map(function (x) {
-            return [x.id, x.name + '  ·  ' + (STREAM_KINDS[x.kind] || x.kind) + '  ·  topic ' + x.topic + (x.source ? '  (a source already)' : '')]; })),
-          free.length ? free[0].id : '');
-        [].forEach.call(stSel.options, function (o) { var x = data.streams.filter(function (y) { return String(y.id) === o.value; })[0]; if (x && x.source) o.disabled = true; });
-        var stMsg = el('div');
-        var stSave = on(el('button', {class: 'primary', text: 'Save source'}), 'click', function () {
+        var stSel = select(data.streams.length ? data.streams.map(function (x) {
+          return [x.id, x.name + '  ·  ' + (STREAM_KINDS[x.kind] || x.kind) + '  ·  topic ' + x.topic]; }) : [['', '— you have no stream yet —']],
+          (data.streams.filter(function (x) { return !x.source; })[0] || data.streams[0] || {}).id);
+        var stMsg = el('div'), stHelp = el('div', {class: 'help'});
+        var stSave = el('button', {class: 'primary', text: 'Save source'});
+        function chosen() { return data.streams.filter(function (x) { return String(x.id) === stSel.value; })[0]; }
+        function paintStream() {                         // one that's a source already: straight to a new job with it
+          var x = chosen(), src = x && x.source && byId(data.sources, x.source);
+          stSave.disabled = !x;
+          stSave.textContent = src ? 'New job with it →' : 'Save source';
+          stHelp.replaceChildren(!data.streams.length ? el('span', {}, ['Make one on ', el('a', {href: '/pubsub.html#new', text: '📨 Pub/Sub'}), ' first.'])
+            : src ? '✓ It\'s a source already: ' + src.name + '.' : 'Every event of its topic, into a table (Bronze). The source is named ' + x.name + ' (Pub/Sub).');
+        }
+        on(stSel, 'change', paintStream);
+        on(stSave, 'click', function () {
+          var x = chosen();
+          if (x.source) { wiz = Object.assign(wiz || {}, {source: x.source, found: null, picked: null}); return go('new-job'); }
           stSave.disabled = true; stMsg.innerHTML = '';
-          api('POST', '/api/cdc/sources/stream', {stream: +stSel.value}).then(function (r) {
+          api('POST', '/api/cdc/sources/stream', {stream: x.id}).then(function (r) {
             return load().then(function () {
               if (wiz) { wiz.source = r.id; wiz.found = null; wiz.picked = null; return go('new-job'); }
               flash = {text: '✓ Your stream is a source now.', action: ['Create a job from it →', function () { wiz = {source: r.id}; go('new-job'); }]};
@@ -530,10 +539,8 @@
             });
           }).catch(function (e) { stSave.disabled = false; stMsg.appendChild(note(e.message, 'bad')); });
         });
-        stSave.disabled = !free.length;
-        streamPart.append(el('div', {class: 'form'}, [el('label', {text: 'Stream'}), el('div', {}, [stSel,
-          help(free.length ? 'Every event of its topic, into a table (Bronze). Named <stream> (Pub/Sub).' : '')].concat(
-          !data.streams.length ? [el('div', {class: 'help'}, ['Make one on ', el('a', {href: '/pubsub.html#new', text: '📨 Pub/Sub'}), ' first.'])] : []))]),
+        paintStream();
+        streamPart.append(el('div', {class: 'form'}, [el('label', {text: 'Stream'}), el('div', {}, [stSel, stHelp])]),
           el('div', {class: 'navbtns'}, [el('span', {class: 'actions'}, [on(el('button', {text: '← ' + back[0]}), 'click', function () { go(back[1]); })]), stSave]), stMsg);
         what = el('div', {class: 'form', style: 'margin-bottom:6px'}, [el('label', {text: 'Source'}), seg([[false, '🗄 Database'], [true, '📨 Pub/Sub stream']], !!stream, function (v) {
           stream = v; dbPart.hidden = v; streamPart.hidden = !v; history.replaceState(null, '', '#new-source' + (v ? '/stream' : ''));
