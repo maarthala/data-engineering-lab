@@ -284,11 +284,13 @@ def create(member, body):
     if _q("SELECT 1 FROM pubsub_streams WHERE topic = %s", (topic,), one=True):
         raise PubSubError(f"a stream called {name} exists (or is still being deleted) — pick another name")
     schema = _schema(body.get("schema")) if kind == "custom" else None
+    start = body.get("state", "running") != "paused"      # Create (start later) → paused, "not started yet"
     c = _conn()                                          # the stream and its first revision together
     try:
         with c, c.cursor() as cur:
-            cur.execute("INSERT INTO pubsub_streams (member, name, kind, topic, rate, late_pct, late_max, late_pattern) "
-                        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *", (member, name, kind, topic, rate, pct, mx, pattern))
+            cur.execute("INSERT INTO pubsub_streams (member, name, kind, topic, rate, late_pct, late_max, late_pattern, state, paused_why) "
+                        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
+                        (member, name, kind, topic, rate, pct, mx, pattern, "running" if start else "paused", None if start else "new"))
             s = cur.fetchone()
             if schema:
                 cur.execute("INSERT INTO pubsub_schemas (stream_id, revision, schema, note) VALUES (%s, 1, %s, 'first')",

@@ -90,7 +90,7 @@ go (leaving = pause), the review comes after submitting. Changes need the X-Lab-
   POST   /api/home/reset {"confirm": "<me>_lake"}          → {"job"} · GET /api/home/reset?id=… → its state
 "📨 Pub/Sub" — a member's event streams (labpubsub.py; event-sim publishes them to Kafka):
   GET    /api/pubsub                                     my streams + the choices · /api/pubsub/peek?id=… (last events)
-  POST   /api/pubsub {"name", "kind", "rate", "late_pct", "late_max", "late_pattern"}
+  POST   /api/pubsub {"name", "kind", "rate", "late_pct", "late_max", "late_pattern", "state"?: paused (start later)}
          …/pubsub/set {"id", "rate"?, "late_*"?, "state"?: running|paused} · …/pubsub/delete {"id"}
          kind "custom" + "schema" (labschema.py) · …/pubsub/sample {"schema"} (a preview) ·
          …/pubsub/schema {"id", "schema", "rollout_pct"?, "rollout_minutes"?, "note"?} (a new revision) ·

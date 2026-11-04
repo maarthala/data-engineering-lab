@@ -162,10 +162,12 @@
       if (s.error) return pill('bad', '✗ ' + s.error);
       if (!s.ready) return pill('run', '◐ making the topic…');
       if (s.state === 'paused') return pill('idle', s.paused_why === 'auto' ? '⏸ paused (after ' + data.auto_pause_h + ' h)'
-                                                  : s.paused_why === 'reset' ? '⏸ paused (lakehouse reset)' : '⏸ paused');
+                                                  : s.paused_why === 'reset' ? '⏸ paused (lakehouse reset)'
+                                                  : s.paused_why === 'new' ? '⏸ not started yet' : '⏸ paused');
       if (!data.streaming) return pill('idle', '⏸ waiting for Streaming');
       return pill('ok live', 'publishing');
     }
+    function playText(s) { return s.state !== 'paused' ? '⏸ Pause' : s.paused_why === 'new' ? '▶ Start' : '▶ Resume'; }
     function sentText(s) { return num(s.sent) + ' sent' + (s.late ? ' · 🕓 ' + num(s.late) + ' late' : ''); }
     function carries(s) { return data.kinds[s.kind].name + (s.schema ? ' · revision ' + s.schema.revision : ''); }
     function keyOf(s) { return s.key || data.kinds[s.kind].key; }
@@ -217,7 +219,7 @@
       var rows = data.streams.map(function (s) {
         var st = el('td', {}, [status(s)]), sent = el('td', {}, [el('div', {text: sentText(s)}), el('div', {class: 'sub muted', text: s.last_at ? 'last ' + clock(s.last_at) : '—'})]);
         cells[s.id] = [st, sent];
-        var pause = on(el('button', {class: 'small', text: s.state === 'paused' ? '▶ Resume' : '⏸ Pause'}), 'click', function () { setState(s, pause); });
+        var pause = on(el('button', {class: 'small', text: playText(s)}), 'click', function () { setState(s, pause); });
         var del = on(el('button', {class: 'small danger', text: 'Delete'}), 'click', function () {
           ask(del, 'Delete ' + s.name + ' and its topic?', 'Delete', function () { remove(s); });
         });
@@ -306,12 +308,16 @@
       var form = el('div', {class: 'form'});
       paintKinds(); paintTopic();
       var create = el('button', {class: 'primary', text: 'Create & start'});
+      var later = el('button', {text: 'Create', title: 'make it now, start publishing later (▶ Start on its page)'});
       var err = el('div', {class: 'sub bad', style: 'margin-top:8px'});
-      on(create, 'click', function () {
-        create.disabled = true; err.textContent = '';
-        api('POST', '/api/pubsub', st).then(function (s) { return load().then(function () { location.hash = 'stream/' + s.id; }); })
-          .catch(function (e) { err.textContent = e.message; create.disabled = false; });
-      });
+      function make(start) {
+        create.disabled = later.disabled = true; err.textContent = '';
+        api('POST', '/api/pubsub', Object.assign({}, st, {state: start ? 'running' : 'paused'}))
+          .then(function (s) { return load().then(function () { location.hash = 'stream/' + s.id; }); })
+          .catch(function (e) { err.textContent = e.message; create.disabled = later.disabled = false; });
+      }
+      on(create, 'click', function () { make(true); });
+      on(later, 'click', function () { make(false); });
       main.appendChild(el('div', {class: 'crumbs'}, [on(el('a', {text: 'Streams'}), 'click', function () { location.hash = 'streams'; }), '›', el('b', {text: 'New stream'})]));
       main.appendChild(card([el('h3', {text: 'New stream'}),
         (function () {
@@ -320,8 +326,9 @@
             .concat(settingsForm(st)).forEach(function (x) { form.appendChild(x); });
           return form;
         })(),
-        el('div', {class: 'actions', style: 'margin-top:16px'}, [create,
-          on(el('button', {text: 'Cancel'}), 'click', function () { location.hash = 'streams'; })]), err]));
+        el('div', {class: 'actions', style: 'margin-top:16px'}, [create, later,
+          on(el('button', {text: 'Cancel'}), 'click', function () { location.hash = 'streams'; }),
+          el('span', {class: 'sub muted', text: 'Create makes it without publishing — start it when you\'re ready.'})]), err]));
     }
 
     // ---- 🏞 into the lakehouse: 📡 Ingestion jobs with this stream as their source
@@ -638,7 +645,7 @@
       var d = data.kinds[s.kind];
       main.appendChild(el('div', {class: 'crumbs'}, [on(el('a', {text: 'Streams'}), 'click', function () { location.hash = 'streams'; }), '›', el('b', {text: s.name})]));
       var st = el('span', {}, [status(s)]), sent = el('dd', {text: sentText(s)});
-      var pause = on(el('button', {text: s.state === 'paused' ? '▶ Resume' : '⏸ Pause'}), 'click', function () { setState(s, pause); });
+      var pause = on(el('button', {text: playText(s)}), 'click', function () { setState(s, pause); });
       var del = on(el('button', {class: 'danger', text: 'Delete'}), 'click', function () {
         ask(del, 'Delete ' + s.name + ' and its topic?', 'Delete', function () { remove(s); });
       });
