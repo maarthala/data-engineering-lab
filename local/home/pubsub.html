@@ -57,7 +57,12 @@
     .tag{display:inline-block; padding:1px 7px; border-radius:6px; font-size:.75rem; background:var(--gold); color:#222; font-weight:600}
     .fields{display:flex; flex-wrap:wrap; gap:4px; margin-top:6px} .fields code{font-size:.74rem}
     /* the custom-schema editor: the library | the event's fields, then a sample */
-    .sch{display:grid; grid-template-columns:minmax(220px, 300px) minmax(0, 1fr); gap:12px; margin-top:10px}
+    .sch{display:grid; grid-template-columns:minmax(200px, 260px) minmax(0, 1fr) minmax(260px, 380px); gap:12px; margin-top:10px; align-items:start}
+    .json{position:sticky; top:10px; border:1px solid var(--line); border-radius:10px; padding:8px; background:var(--panel)}
+    .json pre{margin:0; max-height:560px; overflow:auto; font-size:.75rem; background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:8px 10px}
+    .fcard{border:1px solid var(--line); border-radius:9px; padding:3px; margin:0 0 6px; background:var(--panel)}
+    .fcard.alt{background:var(--accent-bg)}
+    .fcard .node:hover{background:transparent}
     .choices{max-width:640px}
     .lib{border:1px solid var(--line); border-radius:10px; background:var(--panel2); padding:8px; max-height:460px; overflow:auto}
     .lib input{width:100%; margin-bottom:6px}
@@ -81,6 +86,7 @@
     .chg{display:inline-block; font-size:.74rem; padding:1px 7px; border-radius:6px; margin:2px 4px 2px 0; background:var(--panel2); border:1px solid var(--line)}
     .chg.added{background:var(--ok-bg); color:var(--ok-ink)} .chg.removed{background:var(--bad-bg); color:var(--bad-ink)}
     .chg.renamed, .chg.type, .chg.list{background:var(--warn-bg)}
+    @media (max-width:1100px){ .sch{grid-template-columns:minmax(200px, 260px) minmax(0, 1fr)} .sch .json{grid-column:1 / -1; position:static} }
     @media (max-width:760px){ .form, .facts{grid-template-columns:1fr} .form > label{padding-top:0} .choices{grid-template-columns:1fr} .sch{grid-template-columns:1fr} }
   </style>
 </head>
@@ -383,7 +389,7 @@
     }
     function uid() { return Math.random().toString(36).slice(2, 8); }
     function schemaEditor(schema, fresh) {
-      var L = lib(), target = null, sampleBox = el('pre', {class: 'mono', style: 'margin:0; max-height:280px; overflow:auto; font-size:.76rem; background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:8px 10px'});
+      var L = lib(), target = null, sampleBox = el('pre', {class: 'mono'});
       var errBox = el('div', {class: 'sub bad'}), tree = el('div', {class: 'tree'}), libBox = el('div', {class: 'lib'});
       function count(ns) { return ns.reduce(function (n, x) { return n + 1 + (x.object ? count(x.object) : 0); }, 0); }
       function used(ns, name) { return ns.some(function (x) { return x.name === name; }); }
@@ -472,7 +478,8 @@
           ' · ' + count(schema.fields) + ' of ' + data.library.limits.fields + ' fields · always there too: ' + data.library.fixed.join(', ')]);
         var keyNone = el('input', {type: 'radio', name: 'schema-key'}); keyNone.checked = !schema.key;
         on(keyNone, 'change', function () { schema.key = ''; preview(); });
-        tree.replaceChildren.apply(tree, [top].concat([].concat.apply([], schema.fields.map(function (n) { return row(n, schema.fields, 0); })),
+        tree.replaceChildren.apply(tree, [top].concat(schema.fields.map(function (n, i) {   // each top field a card, colours alternating
+            return el('div', {class: 'fcard' + (i % 2 ? ' alt' : '')}, row(n, schema.fields, 0)); }),
           [el('label', {class: 'sub muted', style: 'display:inline-flex; gap:4px; margin-top:6px'}, [keyNone, 'key: event_id (every event its own)'])]));
         preview();
       }
@@ -483,7 +490,7 @@
           api('POST', '/api/pubsub/sample', {schema: schema}).then(function (r) {
             errBox.textContent = ''; sampleBox.textContent = JSON.stringify(r.events[0], null, 2);
           }).catch(function (e) { errBox.textContent = '✗ ' + e.message; });
-        }, 300);
+        }, 150);
       }
       var starts = fresh ? el('div', {class: 'actions', style: 'margin-bottom:4px'}, [el('span', {class: 'sub muted', text: 'Start from:'})].concat(
         Object.keys(data.library.templates).map(function (t) {
@@ -492,8 +499,8 @@
           });
         }), [on(el('button', {type: 'button', class: 'small', text: 'empty'}), 'click', function () { schema.fields.length = 0; schema.key = ''; target = null; paint(); })])) : null;
       paint();
-      return el('div', {}, [starts, el('div', {class: 'sch'}, [libBox, tree]),
-        el('div', {style: 'margin-top:10px'}, [el('div', {class: 'sub muted', style: 'margin-bottom:4px', text: 'A sample event (publish_time is added when it\'s sent):'}), errBox, sampleBox])]);
+      return el('div', {}, [starts, el('div', {class: 'sch'}, [libBox, tree,
+        el('div', {class: 'json'}, [el('div', {class: 'sub muted', style: 'margin-bottom:4px', text: 'A sample event — changes as you edit (publish_time is added when it\'s sent):'}), errBox, sampleBox])])]);
     }
     function changeChips(changes) {
       var sym = {added: '+', removed: '−', renamed: '↻', type: '⇄', list: '[ ]', values: '≡', empty: '∅', key: '🔑'};
