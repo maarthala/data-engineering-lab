@@ -38,6 +38,7 @@ services:
       - ../common/dockerfiles/add/cdc_debezium.py:/app/cdc_debezium.py:ro
       - ../common/dockerfiles/add/labmaint.py:/app/labmaint.py:ro   # 🧹 table maintenance runs here too
       - ../common/dockerfiles/add/labpubsub.py:/app/labpubsub.py:ro # 📨 Pub/Sub streams' lakehouse sinks too
+      - ../common/dockerfiles/add/labschema.py:/app/labschema.py:ro # … and custom schemas
     depends_on:
       portal-db:
         condition: service_completed_successfully
@@ -172,6 +173,7 @@ services:
     volumes:
       - ../common/dockerfiles/add/event_sim.py:/app/event_sim.py:ro
       - ../common/dockerfiles/add/labpubsub.py:/app/labpubsub.py:ro
+      - ../common/dockerfiles/add/labschema.py:/app/labschema.py:ro
     depends_on:
       kafka:
         condition: service_healthy

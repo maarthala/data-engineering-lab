@@ -79,7 +79,7 @@ spec:
             requests: { memory: 64Mi }
             limits: { memory: 256Mi }
           volumeMounts:
-{{- range list "lakehouse.py" "labvault.py" "lab_jobs.py" "labcdc.py" "cdc_runner.py" "cdc_debezium.py" "labmaint.py" "labpubsub.py" }}
+{{- range list "lakehouse.py" "labvault.py" "lab_jobs.py" "labcdc.py" "cdc_runner.py" "cdc_debezium.py" "labmaint.py" "labpubsub.py" "labschema.py" }}
             - { name: lab-code, mountPath: /app/{{ . }}, subPath: {{ . }} }
 {{- end }}
       volumes:

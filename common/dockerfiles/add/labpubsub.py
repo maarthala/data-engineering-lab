@@ -5,14 +5,20 @@ for now). Each event has an event_time (when it happened) and a publish_time (wh
 Kafka); a stream can send some events late — random delays, or a device that was offline sending its
 backlog at once — to practise event time vs processing time, watermarks and late data. Each stream is
 a source in 📡 Ingestion too (labcdc.sync_streams): a job there lands its events in a table.
+Besides the ready-made kinds a stream can carry a custom schema the member builds from a library of
+fields (labschema.py), and change it later: each change is a new revision (pubsub_schemas), and
+event-sim moves to it — at once, or a share of the events for a while — so the shape drifts.
 
 Kept in the portal database (like 📡 Ingestion): one row per stream with its settings and what
 event-sim reports back (events sent, how many late, the last ones sent). home-api writes the
 settings; event-sim makes / deletes the topics and does the publishing.
 """
+import json
 import os
 import re
 import threading
+
+import labschema
 
 DB_URL = os.environ.get("PORTAL_DB_URL", "postgresql://portal:portal@postgres:5432/portal")
 STREAMING_HOW = ("Manage → ⚙️ Settings → Services → Streaming" if os.environ.get("KUBERNETES_SERVICE_HOST")
@@ -41,6 +47,10 @@ KINDS = {
                   "types": ["stock_received", "stock_sold", "stock_reserved", "stock_adjusted"],
                   "fields": ["event_id", "event_type", "event_time", "publish_time", "sku", "store", "qty_change",
                              "reason"]},
+    "custom": {"name": "Custom schema", "key": "event_id",
+               "what": "Your own event: pick fields from the library — objects, lists too — and change them later "
+                       "(a new revision), to practise schema drift.",
+               "types": [], "fields": []},
 }
 # the Iceberg table a 📡 Ingestion job lands a stream in: its columns, typed — + _kafka (where it came from)
 _ITEM = ("struct", [("product_id", "long"), ("quantity", "int"), ("price", "double")])
@@ -57,8 +67,9 @@ FIRST = [("event_id", "string"), ("event_type", "string"), ("event_time", "times
 KAFKA = ("_kafka", ("struct", [("topic", "string"), ("partition", "int"), ("offset", "long"), ("timestamp", "timestamptz")]))
 
 
-def iceberg_schema(kind):
-    """The stream's table as an Iceberg REST schema (field ids numbered through the nesting)."""
+def iceberg_schema(kind, stream_id=None):
+    """The stream's table as an Iceberg REST schema (field ids numbered through the nesting) — a custom
+    stream's from its current revision."""
     n = [0]
 
     def nid():
@@ -78,7 +89,14 @@ def iceberg_schema(kind):
             fid = nid()
             out.append({"id": fid, "name": name, "required": False, "type": typ(t)})
         return out
-    return {"type": "struct", "schema-id": 0, "fields": fields(FIRST + COLUMNS[kind] + [KAFKA])}
+    first = [c for c in FIRST if c[0] != "event_type"] if kind == "custom" else FIRST
+    return {"type": "struct", "schema-id": 0, "fields": fields(first + _columns(kind, stream_id) + [KAFKA])}
+
+
+def _columns(kind, stream_id=None):
+    if kind != "custom":
+        return COLUMNS[kind]
+    return labschema.columns(schema_of(stream_id)["schema"])
 
 
 # members subscribe from notebooks / Spark on Kafka's members' listener: a login each (SCRAM), allowed
@@ -88,8 +106,11 @@ MEMBERS_BOOTSTRAP = os.environ.get("KAFKA_MEMBERS_BOOTSTRAP", "kafka:9094")
 VAULT_KEY = "kafka"
 CHECK_S = 300                                        # how often a login's vault secret is looked at again
 
-def spark_ddl(kind):
+def spark_ddl(kind, stream_id=None):
     """The event as a Spark DDL schema — from_json(col("value").cast("string"), <this>) in a notebook."""
+    if kind == "custom":
+        cols = [c for c in FIRST if c[0] != "event_type"] + _columns(kind, stream_id)
+        return ", ".join(f"{n} {labschema.spark_type(t)}" for n, t in cols)
     def typ(t):
         if isinstance(t, str):
             return {"string": "STRING", "long": "BIGINT", "int": "INT", "double": "DOUBLE", "timestamptz": "TIMESTAMP"}[t]
@@ -124,7 +145,14 @@ ALTER TABLE pubsub_streams ADD COLUMN IF NOT EXISTS recent_late jsonb NOT NULL D
 CREATE TABLE IF NOT EXISTS pubsub_logins (member text PRIMARY KEY, made_at timestamptz NOT NULL DEFAULT now(),
   checked_at timestamptz NOT NULL DEFAULT now());   -- a member's Kafka login (cdc-runner: kafka_logins)
 CREATE TABLE IF NOT EXISTS pubsub_sim (id int PRIMARY KEY, beat timestamptz NOT NULL);   -- event-sim is alive
+CREATE TABLE IF NOT EXISTS pubsub_schemas (          -- a custom stream's schema, one row per revision
+  stream_id bigint NOT NULL REFERENCES pubsub_streams (id) ON DELETE CASCADE, revision int NOT NULL,
+  schema jsonb NOT NULL, note text, created_at timestamptz NOT NULL DEFAULT now(),
+  rollout_pct int NOT NULL DEFAULT 100, rollout_until timestamptz,   -- until then only rollout_pct % of events use it
+  PRIMARY KEY (stream_id, revision));
 """
+ROLLOUT_PCT = (100, 50, 10)                          # a new revision: all events at once, or a share for a while
+ROLLOUT_MIN = (5, 15, 60)
 _ready, _lock = False, threading.Lock()
 
 
@@ -176,10 +204,25 @@ def sim_alive():
     return bool(r and r["ok"])
 
 
+def schema_of(stream_id, revision=None):
+    """A custom stream's schema: the current revision (or that one) — {revision, schema, note, created_at,
+    rollout_pct, rollout_until}."""
+    r = _q("SELECT * FROM pubsub_schemas WHERE stream_id = %s " + ("AND revision = %s " if revision else "") +
+           "ORDER BY revision DESC LIMIT 1", (stream_id, revision) if revision else (stream_id,), one=True)
+    if not r:
+        raise PubSubError("this stream has no schema")
+    return {"revision": r["revision"], "schema": r["schema"], "note": r["note"], "created_at": _iso(r["created_at"]),
+            "rollout_pct": r["rollout_pct"], "rollout_until": _iso(r["rollout_until"])}
+
+
 def _out(s, recent=False):
     o = {k: s[k] for k in ("id", "name", "kind", "topic", "rate", "late_pct", "late_max", "late_pattern", "state",
                            "paused_why", "ready", "error", "sent", "late")}
     o.update(created_at=_iso(s["created_at"]), resumed_at=_iso(s["resumed_at"]), last_at=_iso(s["last_at"]))
+    if s["kind"] == "custom":
+        cur = schema_of(s["id"])
+        o.update(schema=cur, key=cur["schema"]["key"] or "event_id", ddl=spark_ddl("custom", s["id"]),
+                 columns=[c for c, _ in FIRST if c != "event_type"] + [c for c, _ in _columns("custom", s["id"])] + [KAFKA[0]])
     if recent:
         o["recent"], o["recent_late"] = s["recent"], s["recent_late"]
     return o
@@ -191,6 +234,7 @@ def overview(member, jobs=None):
     jobs = jobs or {}
     return {"streams": [dict(_out(s), jobs=jobs.get(s["id"], [])) for s in rows], "kinds": KINDS,
             "columns": {k: [c for c, _ in FIRST + v] + [KAFKA[0]] for k, v in COLUMNS.items()},
+            "library": labschema.library(), "rollout_pct": ROLLOUT_PCT, "rollout_min": ROLLOUT_MIN,
             "ddl": {k: spark_ddl(k) for k in COLUMNS}, "rates": RATES, "late_pct": LATE_PCT,
             "late_max": LATE_MAX, "patterns": PATTERNS, "late_after_s": LATE_AFTER_S, "auto_pause_h": AUTO_PAUSE_H,
             "retention_h": RETENTION_H, "partitions": PARTITIONS, "limits": _limits(),
@@ -239,9 +283,77 @@ def create(member, body):
     topic = f"{member}.{name}"
     if _q("SELECT 1 FROM pubsub_streams WHERE topic = %s", (topic,), one=True):
         raise PubSubError(f"a stream called {name} exists (or is still being deleted) — pick another name")
-    s = _q("INSERT INTO pubsub_streams (member, name, kind, topic, rate, late_pct, late_max, late_pattern) "
-           "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *", (member, name, kind, topic, rate, pct, mx, pattern), one=True)
+    schema = _schema(body.get("schema")) if kind == "custom" else None
+    c = _conn()                                          # the stream and its first revision together
+    try:
+        with c, c.cursor() as cur:
+            cur.execute("INSERT INTO pubsub_streams (member, name, kind, topic, rate, late_pct, late_max, late_pattern) "
+                        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING *", (member, name, kind, topic, rate, pct, mx, pattern))
+            s = cur.fetchone()
+            if schema:
+                cur.execute("INSERT INTO pubsub_schemas (stream_id, revision, schema, note) VALUES (%s, 1, %s, 'first')",
+                            (s["id"], json.dumps(schema)))
+    finally:
+        c.close()
     return _out(s)
+
+
+def _schema(schema):
+    try:
+        return labschema.validate(schema)
+    except labschema.SchemaError as e:
+        raise PubSubError(str(e)) from None
+
+
+def sample(body):
+    """A few events of a schema not saved yet — the editor's preview."""
+    try:
+        return {"events": labschema.sample(body.get("schema"))}
+    except labschema.SchemaError as e:
+        raise PubSubError(str(e)) from None
+
+
+def revisions(member, sid):
+    """A custom stream's revisions, newest first, each with what changed from the one before."""
+    s = _own(member, sid)
+    if s["kind"] != "custom":
+        raise PubSubError("only a custom stream has revisions")
+    rows = _q("SELECT * FROM pubsub_schemas WHERE stream_id = %s ORDER BY revision", (s["id"],))
+    out, prev = [], None
+    for r in rows:
+        out.append({"revision": r["revision"], "schema": r["schema"], "note": r["note"], "created_at": _iso(r["created_at"]),
+                    "rollout_pct": r["rollout_pct"], "rollout_until": _iso(r["rollout_until"]),
+                    "changes": labschema.diff(prev, r["schema"]) if prev else []})
+        prev = r["schema"]
+    return {"id": s["id"], "revisions": out[::-1]}
+
+
+def new_revision(member, sid, body):
+    """Save a changed schema as the next revision; event-sim moves to it — all at once, or rollout_pct %
+    of the events for rollout_minutes (then all)."""
+    s = _own(member, sid)
+    if s["kind"] != "custom":
+        raise PubSubError("only a custom stream's schema can change")
+    schema, cur = _schema(body.get("schema")), schema_of(s["id"])
+    changes = labschema.diff(cur["schema"], schema)
+    if not changes:
+        raise PubSubError("nothing changed")
+    history = [(r["revision"], r["schema"]) for r in _q("SELECT revision, schema FROM pubsub_schemas WHERE stream_id = %s "
+                                                         "ORDER BY revision", (s["id"],))]
+    problems = labschema.compatible(history, schema)
+    if problems:
+        raise PubSubError("not compatible with the earlier revisions: " + "; ".join(problems))
+    try:
+        pct, mins = int(body.get("rollout_pct") or 100), int(body.get("rollout_minutes") or 0)
+    except (TypeError, ValueError):
+        raise PubSubError("rollout: a share and minutes")
+    if pct not in ROLLOUT_PCT or (pct < 100 and mins not in ROLLOUT_MIN):
+        raise PubSubError("rollout: all at once, or 50 % / 10 % of events for 5, 15 or 60 minutes")
+    note = str(body.get("note") or "").strip()[:200] or None
+    _q("INSERT INTO pubsub_schemas (stream_id, revision, schema, note, rollout_pct, rollout_until) VALUES "
+       "(%s, %s, %s, %s, %s, CASE WHEN %s < 100 THEN now() + make_interval(mins => %s) END)",
+       (s["id"], cur["revision"] + 1, json.dumps(schema), note, pct, pct, mins), rows=False)
+    return {**_out(s), "changes": changes}
 
 
 def update(member, sid, body):

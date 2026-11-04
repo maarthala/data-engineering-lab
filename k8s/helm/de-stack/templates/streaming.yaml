@@ -179,7 +179,7 @@ spec:
             requests: { memory: 64Mi }
             limits: { memory: 256Mi }
           volumeMounts:
-{{- range list "event_sim.py" "labpubsub.py" }}
+{{- range list "event_sim.py" "labpubsub.py" "labschema.py" }}
             - { name: lab-code, mountPath: /app/{{ . }}, subPath: {{ . }} }
 {{- end }}
       volumes:

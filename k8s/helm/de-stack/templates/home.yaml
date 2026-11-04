@@ -252,6 +252,7 @@ spec:
             - { name: lab-code, mountPath: /app/labexams.py, subPath: labexams.py }
             - { name: lab-code, mountPath: /app/labcdc.py, subPath: labcdc.py }
             - { name: lab-code, mountPath: /app/labpubsub.py, subPath: labpubsub.py }
+            - { name: lab-code, mountPath: /app/labschema.py, subPath: labschema.py }
             - { name: lab-code, mountPath: /app/labmaint.py, subPath: labmaint.py }
             - { name: lab-code, mountPath: /app/labgov.py, subPath: labgov.py }
             - { name: lab-code, mountPath: /app/labdb.py, subPath: labdb.py }

@@ -850,7 +850,7 @@ def _ps_info(j):
                       (s["stream_id"],), one=True) if s else None
     if not st:
         raise SetupError("its 📨 Pub/Sub stream was deleted — delete this job (its table stays)")
-    return {"id": j["id"], "member": j["member"], "topic": st["topic"], "kind": st["kind"], "catalog": d["catalog"],
+    return {"id": j["id"], "member": j["member"], "topic": st["topic"], "kind": st["kind"], "stream_id": st["id"], "catalog": d["catalog"],
             "namespace": d["namespace"] or "events", "table": j["tables"][0], "link": f"job-{j['id']}"}
 
 
@@ -882,7 +882,7 @@ def _ps_table(r):
                              + ": choose a destination with another namespace (or delete that table in My catalogs)")
         return
     st, body, _ = _polaris(r["member"], "POST", f"{pre}/namespaces/{r['namespace']}/tables", token=token,
-                           body={"name": r["table"], "schema": labpubsub.iceberg_schema(r["kind"]),
+                           body={"name": r["table"], "schema": labpubsub.iceberg_schema(r["kind"], r["stream_id"]),
                                  "properties": {"format-version": "2", "lab.pubsub": r["topic"], "lab.pubsub.link": r["link"]}})
     if st not in (200, 409):
         raise DbzError(f"couldn't make {where}: HTTP {st} {(body.get('error') or {}).get('message', '')}")
@@ -909,7 +909,9 @@ def ps_sink_config(r):
             "iceberg.tables": f"{r['namespace']}.{r['table']}",
             "iceberg.control.commit.interval-ms": str(COMMIT_MS),
             "transforms": "kafka", "transforms.kafka.type": "io.tabular.iceberg.connect.transforms.KafkaMetadataTransform",
-            "transforms.kafka.field_name": "_kafka", "transforms.kafka.nested": "true"}
+            "transforms.kafka.field_name": "_kafka", "transforms.kafka.nested": "true",
+            # a custom schema drifts (labschema): a field that's new gets its column — the table follows the stream
+            **({"iceberg.tables.evolve-schema-enabled": "true"} if r["kind"] == "custom" else {})}
 
 
 def _ps_connectors():

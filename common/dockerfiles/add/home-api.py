@@ -92,6 +92,9 @@ go (leaving = pause), the review comes after submitting. Changes need the X-Lab-
   GET    /api/pubsub                                     my streams + the choices · /api/pubsub/peek?id=… (last events)
   POST   /api/pubsub {"name", "kind", "rate", "late_pct", "late_max", "late_pattern"}
          …/pubsub/set {"id", "rate"?, "late_*"?, "state"?: running|paused} · …/pubsub/delete {"id"}
+         kind "custom" + "schema" (labschema.py) · …/pubsub/sample {"schema"} (a preview) ·
+         …/pubsub/schema {"id", "schema", "rollout_pct"?, "rollout_minutes"?, "note"?} (a new revision) ·
+         GET /api/pubsub/revisions?id=… (each with what changed)
          each stream is a 📡 Ingestion source too: a job there lands its events in a table
 Managers (/api/admin/exams…, X-Lab-Admin): create an exam; add encrypted banks + their key to it
 (decrypted here, the key isn't kept), a link or a plain file, or a plain exam.json; set
@@ -521,6 +524,8 @@ class Handler(BaseHTTPRequestHandler):
                                                 manager=self._manager(), me=name))
                 if path == "/api/pubsub/peek":
                     return self._json(200, labpubsub.peek(name, q.get("id", "0")))
+                if path == "/api/pubsub/revisions":
+                    return self._json(200, labpubsub.revisions(name, q.get("id", "0")))
                 return self._json(404, {"error": "not found"})
             if method != "POST":
                 return self._json(404, {"error": "not found"})
@@ -529,7 +534,9 @@ class Handler(BaseHTTPRequestHandler):
             b = self._body()
             calls = {"/api/pubsub": lambda: labpubsub.create(name, b),
                      "/api/pubsub/set": lambda: labpubsub.update(name, b.get("id", 0), b),
-                     "/api/pubsub/delete": lambda: labpubsub.delete(name, b.get("id", 0))}
+                     "/api/pubsub/delete": lambda: labpubsub.delete(name, b.get("id", 0)),
+                     "/api/pubsub/sample": lambda: labpubsub.sample(b),
+                     "/api/pubsub/schema": lambda: labpubsub.new_revision(name, b.get("id", 0), b)}
             if path not in calls:
                 return self._json(404, {"error": "not found"})
             return self._json(200, calls[path]())

@@ -56,7 +56,32 @@
               border-radius:8px; padding:8px 10px}
     .tag{display:inline-block; padding:1px 7px; border-radius:6px; font-size:.75rem; background:var(--gold); color:#222; font-weight:600}
     .fields{display:flex; flex-wrap:wrap; gap:4px; margin-top:6px} .fields code{font-size:.74rem}
-    @media (max-width:760px){ .form, .facts{grid-template-columns:1fr} .form > label{padding-top:0} .choices{grid-template-columns:1fr} }
+    /* the custom-schema editor: the library | the event's fields, then a sample */
+    .sch{display:grid; grid-template-columns:minmax(220px, 300px) minmax(0, 1fr); gap:12px; margin-top:10px}
+    .choices{max-width:640px}
+    .lib{border:1px solid var(--line); border-radius:10px; background:var(--panel2); padding:8px; max-height:460px; overflow:auto}
+    .lib input{width:100%; margin-bottom:6px}
+    .lib details{margin:2px 0} .lib summary{cursor:pointer; font-size:.84rem; font-weight:600; padding:3px 2px}
+    .lib button.add{all:unset; display:flex; justify-content:space-between; gap:8px; width:100%; box-sizing:border-box; cursor:pointer;
+                    font-size:.8rem; padding:3px 6px; border-radius:6px}
+    .lib button.add:hover{background:var(--accent-bg); color:var(--accent)} .lib button.add i{font-style:normal; color:var(--muted); font-size:.74rem}
+    .tree{border:1px solid var(--line); border-radius:10px; padding:8px; min-height:120px}
+    .tree .into{font-size:.78rem; color:var(--muted); margin:0 0 6px}
+    .node{display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:4px 6px; border-radius:7px; border:1px solid transparent}
+    .node:hover{background:var(--panel2)} .node.target{border-color:var(--accent); background:var(--accent-bg)}
+    .form.wide{grid-template-columns:170px minmax(0, 1fr)}
+    .form .node select, .form .node input{width:auto}
+    .node input.nm{width:150px; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.8rem; padding:3px 6px}
+    .node .ty{font-size:.74rem; color:var(--muted); min-width:90px}
+    .node select, .node input.vals, .node input.rep{font-size:.76rem; padding:2px 4px}
+    .node input.vals{width:170px} .node input.rep{width:42px}
+    .node button{font-size:.74rem; padding:2px 7px}
+    .node label{font-size:.74rem; color:var(--muted); display:inline-flex; align-items:center; gap:3px}
+    .kids{margin-left:22px; border-left:2px solid var(--line); padding-left:6px}
+    .chg{display:inline-block; font-size:.74rem; padding:1px 7px; border-radius:6px; margin:2px 4px 2px 0; background:var(--panel2); border:1px solid var(--line)}
+    .chg.added{background:var(--ok-bg); color:var(--ok-ink)} .chg.removed{background:var(--bad-bg); color:var(--bad-ink)}
+    .chg.renamed, .chg.type, .chg.list{background:var(--warn-bg)}
+    @media (max-width:760px){ .form, .facts{grid-template-columns:1fr} .form > label{padding-top:0} .choices{grid-template-columns:1fr} .sch{grid-template-columns:1fr} }
   </style>
 </head>
 <body>
@@ -129,6 +154,8 @@
       return pill('ok live', 'publishing');
     }
     function sentText(s) { return num(s.sent) + ' sent' + (s.late ? ' · 🕓 ' + num(s.late) + ' late' : ''); }
+    function carries(s) { return data.kinds[s.kind].name + (s.schema ? ' · revision ' + s.schema.revision : ''); }
+    function keyOf(s) { return s.key || data.kinds[s.kind].key; }
 
     function load() {
       return api('GET', '/api/pubsub').then(function (d) { data = d; });
@@ -184,7 +211,7 @@
         return el('tr', {}, [
           el('td', {}, [on(el('a', {class: 'name', text: s.name}), 'click', function () { location.hash = 'stream/' + s.id; }),
                         el('div', {class: 'sub'}, [el('code', {class: 't', text: s.topic})])]),
-          el('td', {}, [el('div', {text: data.kinds[s.kind].name}), s.jobs.length ? el('div', {class: 'sub muted', text: '🏞 ' + s.jobs.length + ' Ingestion job' + (s.jobs.length > 1 ? 's' : '')}) : null]),
+          el('td', {}, [el('div', {text: carries(s)}), s.jobs.length ? el('div', {class: 'sub muted', text: '🏞 ' + s.jobs.length + ' Ingestion job' + (s.jobs.length > 1 ? 's' : '')}) : null]),
           el('td', {text: s.rate + ' / s'}),
           el('td', {text: lateText(s)}),
           st, sent,
@@ -250,16 +277,20 @@
       function paintTopic() { topic.textContent = data.me + '.' + (name.value || '…'); }
       on(name, 'input', function () { named = true; st.name = name.value.trim(); paintTopic(); });
       var kinds = el('div', {class: 'choices'}), fields = el('div');
+      st.schema = clone(data.library.templates.signups);
       function paintKinds() {
         kinds.replaceChildren.apply(kinds, Object.keys(data.kinds).map(function (k) {
           var d = data.kinds[k];
           return on(el('button', {type: 'button', class: 'choice' + (st.kind === k ? ' on' : '')}, [el('b', {text: d.name}), el('span', {text: d.what})]),
-            'click', function () { st.kind = k; if (!named) { name.value = st.name = k; paintTopic(); } paintKinds(); });
+            'click', function () { st.kind = k; if (!named) { name.value = st.name = k === 'custom' ? 'my_events' : k; paintTopic(); } paintKinds(); });
         }));
         var d = data.kinds[st.kind];
+        form.classList.toggle('wide', st.kind === 'custom');
+        if (st.kind === 'custom') return fields.replaceChildren(schemaEditor(st.schema, true));
         fields.replaceChildren(help('Each event (JSON) has: '), el('div', {class: 'fields'}, d.fields.map(function (f) { return el('code', {class: 't', text: f}); })),
           help('Event types: ' + d.types.join(', ') + '. The message key is ' + d.key + ' — the same key always goes to the same partition, in order.'));
       }
+      var form = el('div', {class: 'form'});
       paintKinds(); paintTopic();
       var create = el('button', {class: 'primary', text: 'Create & start'});
       var err = el('div', {class: 'sub bad', style: 'margin-top:8px'});
@@ -270,10 +301,12 @@
       });
       main.appendChild(el('div', {class: 'crumbs'}, [on(el('a', {text: 'Streams'}), 'click', function () { location.hash = 'streams'; }), '›', el('b', {text: 'New stream'})]));
       main.appendChild(card([el('h3', {text: 'New stream'}),
-        el('div', {class: 'form'}, [
-          el('label', {text: 'Carries'}), el('div', {}, [kinds, fields]),
-          el('label', {text: 'Name'}), el('div', {}, [name, help('Lowercase letters, digits and _. Your topic: '), topic]),
-        ].concat(settingsForm(st))),
+        (function () {
+          [el('label', {text: 'Carries'}), el('div', {}, [kinds, fields]),
+           el('label', {text: 'Name'}), el('div', {}, [name, help('Lowercase letters, digits and _. Your topic: '), topic])]
+            .concat(settingsForm(st)).forEach(function (x) { form.appendChild(x); });
+          return form;
+        })(),
         el('div', {class: 'actions', style: 'margin-top:16px'}, [create,
           on(el('button', {text: 'Cancel'}), 'click', function () { location.hash = 'streams'; })]), err]));
     }
@@ -292,27 +325,29 @@
       return card([el('div', {class: 'head'}, [el('h3', {text: '🏞 Into your lakehouse'}), add]),
         el('div', {class: 'sub muted', style: 'margin-bottom:10px',
           text: 'Kafka keeps events ' + data.retention_h + ' h. To keep them, land them in an Iceberg table with a 📡 Ingestion job: this stream is one of its sources. ' +
-                'Every event becomes a row (Bronze) — typed, with _kafka (topic, partition, offset) — Manual, Cron or Datastream. Build Silver from it with SQL, dbt or Spark.'}),
+                'Every event becomes a row (Bronze) — typed, with _kafka (topic, partition, offset) — Manual, Cron or Datastream. Build Silver from it with SQL, dbt or Spark.' +
+                (s.schema ? ' The table starts with the schema\'s current revision; a field a later revision adds gets its own column (a removed one stays, empty).' : '')}),
         rows.length ? el('table', {class: 'lst'}, [el('thead', {}, [el('tr', {}, [el('th', {text: 'Ingestion job'}), el('th', {text: 'Runs'})])]), el('tbody', {}, rows)])
                     : el('div', {class: 'sub muted', text: 'No job lands it yet.'})]);
     }
 
     // ---- 🧪 the stream in a notebook: Spark Structured Streaming — watermark, a tumbling window, an Iceberg table
     function notebookCard(s) {
-      var bucket = data.me.replace(/_/g, '-') + '-lake', out = s.name + '_per_minute', key = data.kinds[s.kind].key;
+      var bucket = data.me.replace(/_/g, '-') + '-lake', out = s.name + '_per_minute', key = keyOf(s);
+      var by = s.schema && !s.schema.schema.fields.some(function (f) { return f.name === 'event_type' && f.field; }) ? '' : ', "event_type"';
       var code = [
         '# your Kafka login comes from 🔑 My secrets ("kafka") — lab_kafka() puts it in the options',
         'from pyspark.sql.functions import from_json, col, window, count',
         '',
         'spark.conf.set("spark.sql.shuffle.partitions", "3")   # one per Kafka partition (200, the default, = 200 state files a batch)',
-        'schema = "' + data.ddl[s.kind] + '"',
+        'schema = "' + (s.ddl || data.ddl[s.kind]) + '"' + (s.schema ? '   # revision ' + s.schema.revision + ' — a field it doesn\'t list is ignored' : ''),
         '',
         'raw = (spark.readStream.format("kafka").options(**lab_kafka("' + s.name + '"))',
         '       .option("startingOffsets", "earliest").load())        # key, value, partition, offset, timestamp',
         'events = (raw.select(from_json(col("value").cast("string"), schema).alias("e")).select("e.*")',
         '             .withWatermark("event_time", "10 minutes"))     # wait 10 min for late events, then close the window',
         '',
-        'per_minute = (events.groupBy(window("event_time", "1 minute"), "event_type")   # a tumbling window',
+        'per_minute = (events.groupBy(window("event_time", "1 minute")' + by + ')   # a tumbling window',
         '                    .agg(count("*").alias("events")))',
         '',
         'spark.sql("CREATE NAMESPACE IF NOT EXISTS my.silver")',
@@ -339,6 +374,186 @@
       return card([head, body]);
     }
 
+    // ---- 🧬 custom schema: the editor (library | the event's fields | a sample) ----------------
+    function clone(x) { return JSON.parse(JSON.stringify(x)); }
+    var LIB = null;
+    function lib() {
+      if (!LIB) { LIB = {}; data.library.groups.forEach(function (g) { g.fields.forEach(function (f) { LIB[f.field] = f; }); }); }
+      return LIB;
+    }
+    function uid() { return Math.random().toString(36).slice(2, 8); }
+    function schemaEditor(schema, fresh) {
+      var L = lib(), target = null, sampleBox = el('pre', {class: 'mono', style: 'margin:0; max-height:280px; overflow:auto; font-size:.76rem; background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:8px 10px'});
+      var errBox = el('div', {class: 'sub bad'}), tree = el('div', {class: 'tree'}), libBox = el('div', {class: 'lib'});
+      function count(ns) { return ns.reduce(function (n, x) { return n + 1 + (x.object ? count(x.object) : 0); }, 0); }
+      function used(ns, name) { return ns.some(function (x) { return x.name === name; }); }
+      function add(f) {
+        var into = target ? target.object : schema.fields, name = f.name, i = 2;
+        while (used(into, name) || (!target && data.library.fixed.indexOf(name) >= 0)) name = f.name + '_' + i++;
+        into.push({id: uid(), name: name, field: f.field});
+        paint();
+      }
+      // the library
+      var search = el('input', {type: 'text', placeholder: 'Search ' + Object.keys(L).length + ' fields…', autocomplete: 'off'}), groups = el('div');
+      function paintLib() {
+        var q = search.value.trim().toLowerCase();
+        groups.replaceChildren.apply(groups, data.library.groups.map(function (g) {
+          var fs = g.fields.filter(function (f) { return !q || (f.name + ' ' + f.label + ' ' + g.label).toLowerCase().indexOf(q) >= 0; });
+          if (!fs.length) return null;
+          var d = el('details', q ? {open: ''} : {}, [el('summary', {text: g.label + ' (' + fs.length + ')'})].concat(fs.map(function (f) {
+            return on(el('button', {type: 'button', class: 'add', title: f.label}, [el('span', {text: '+ ' + f.name}), el('i', {text: f.type})]), 'click', function () { add(f); });
+          })));
+          return d;
+        }).filter(Boolean));
+      }
+      on(search, 'input', paintLib);
+      var newObj = on(el('button', {type: 'button', class: 'small', text: '+ Object'}), 'click', function () {
+        var into = target ? target.object : schema.fields, name = 'details', i = 2;
+        while (used(into, name)) name = 'details_' + i++;
+        var o = {id: uid(), name: name, object: []};
+        into.push(o); target = o; paint();
+      });
+      libBox.replaceChildren(search, groups, el('div', {style: 'margin-top:8px'}, [newObj]),
+        help('Click a field to add it — into the highlighted object, else at the top. An object groups fields ({…}); “list” makes any field or object an array.'));
+      paintLib();
+      // the event's fields
+      function row(n, list, depth) {
+        var f = n.field && L[n.field];
+        var name = on(el('input', {type: 'text', class: 'nm', value: n.name, autocomplete: 'off', title: 'its name in the event'}), 'input', function () { n.name = name.value.trim(); preview(); });
+        var bits = [name, el('span', {class: 'ty', text: n.object ? '{ object }' : f.type + ' · ' + f.name, title: f ? f.label : 'an object'})];
+        if (f && f.type === 'string') {
+          var vals = on(el('input', {type: 'text', class: 'vals', placeholder: 'your values: a, b, c', value: (n.values || []).join(', '),
+              title: 'pick from these instead of the library\'s'}), 'change', function () {
+            var v = vals.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+            if (v.length) n.values = v; else delete n.values; preview();
+          });
+          bits.push(vals);
+        }
+        if (f) {
+          var kinds = [['', 'as ' + f.type]].concat(Object.keys(data.library.as).filter(function (a) { return a !== f.type && data.library.as[a].indexOf(f.type) >= 0; })
+            .map(function (a) { return [a, 'send as ' + a]; }));
+          if (kinds.length > 1) {
+            var as = on(el('select', {title: 'send it as another type — schema drift'}, kinds.map(function (k) { return el('option', {value: k[0], text: k[1]}); })), 'change', function () {
+              if (as.value) n.as = as.value; else delete n.as; preview();
+            });
+            as.value = n.as || ''; bits.push(as);
+          }
+        }
+        var rep = el('input', {type: 'checkbox'}), lo = el('input', {type: 'number', class: 'rep', min: 0, max: data.library.limits.repeat, value: (n.repeat || [1, 3])[0]}),
+            hi = el('input', {type: 'number', class: 'rep', min: 1, max: data.library.limits.repeat, value: (n.repeat || [1, 3])[1]});
+        rep.checked = !!n.repeat; lo.hidden = hi.hidden = !n.repeat;
+        function setRep() { lo.hidden = hi.hidden = !rep.checked; if (rep.checked) n.repeat = [+lo.value, +hi.value]; else delete n.repeat; preview(); }
+        [rep, lo, hi].forEach(function (x) { on(x, 'change', setRep); });
+        bits.push(el('label', {title: 'an array of it: from … to elements'}, [rep, 'list']), lo, hi);
+        var empty = on(el('select', {title: 'how often it\'s empty (null)'}, [0, 5, 20, 50].map(function (p) { return el('option', {value: p, text: p ? p + '% empty' : 'never empty'}); })), 'change', function () {
+          if (+empty.value) n.null_pct = +empty.value; else delete n.null_pct; preview();
+        });
+        empty.value = String(n.null_pct || 0); bits.push(empty);
+        if (depth === 0 && f) {
+          var key = el('input', {type: 'radio', name: 'schema-key'}); key.checked = schema.key === n.name;
+          on(key, 'change', function () { schema.key = n.name; preview(); });
+          bits.push(el('label', {title: 'the message key: same key → same partition, in order'}, [key, 'key']));
+        }
+        var i = list.indexOf(n);
+        bits.push(on(el('button', {type: 'button', title: 'up', text: '↑', disabled: i === 0 ? '' : null}), 'click', function () { list.splice(i, 1); list.splice(i - 1, 0, n); paint(); }),
+                  on(el('button', {type: 'button', class: 'danger', title: 'remove', text: '✕'}), 'click', function () {
+                    list.splice(i, 1); if (target === n) target = null; if (schema.key === n.name) schema.key = ''; paint(); }));
+        var line = el('div', {class: 'node' + (target === n ? ' target' : '')}, bits);
+        if (!n.object) return [line];
+        on(line, 'click', function (ev) { if (ev.target === line || ev.target.classList.contains('ty')) { target = target === n ? null : n; paint(); } });
+        line.title = 'click to add library fields into this object';
+        var kids = el('div', {class: 'kids'}, n.object.length ? [].concat.apply([], n.object.map(function (x) { return row(x, n.object, depth + 1); }))
+                                                               : [el('div', {class: 'sub muted', style: 'padding:4px', text: 'empty — click the object, then fields in the library'})]);
+        return [line, kids];
+      }
+      function paint() {
+        var top = el('div', {class: 'into'}, [target ? 'Adding into ' + target.name + ' — ' : 'Adding at the top — ',
+          target ? on(el('a', {text: 'back to the top', style: 'cursor:pointer; color:var(--accent)'}), 'click', function () { target = null; paint(); }) : 'click an object to add into it',
+          ' · ' + count(schema.fields) + ' of ' + data.library.limits.fields + ' fields · always there too: ' + data.library.fixed.join(', ')]);
+        var keyNone = el('input', {type: 'radio', name: 'schema-key'}); keyNone.checked = !schema.key;
+        on(keyNone, 'change', function () { schema.key = ''; preview(); });
+        tree.replaceChildren.apply(tree, [top].concat([].concat.apply([], schema.fields.map(function (n) { return row(n, schema.fields, 0); })),
+          [el('label', {class: 'sub muted', style: 'display:inline-flex; gap:4px; margin-top:6px'}, [keyNone, 'key: event_id (every event its own)'])]));
+        preview();
+      }
+      var pt = null;
+      function preview() {
+        clearTimeout(pt);
+        pt = setTimeout(function () {
+          api('POST', '/api/pubsub/sample', {schema: schema}).then(function (r) {
+            errBox.textContent = ''; sampleBox.textContent = JSON.stringify(r.events[0], null, 2);
+          }).catch(function (e) { errBox.textContent = '✗ ' + e.message; });
+        }, 300);
+      }
+      var starts = fresh ? el('div', {class: 'actions', style: 'margin-bottom:4px'}, [el('span', {class: 'sub muted', text: 'Start from:'})].concat(
+        Object.keys(data.library.templates).map(function (t) {
+          return on(el('button', {type: 'button', class: 'small', text: t.replace(/_/g, ' ')}), 'click', function () {
+            var x = clone(data.library.templates[t]); schema.key = x.key; schema.fields.splice.apply(schema.fields, [0, schema.fields.length].concat(x.fields)); target = null; paint();
+          });
+        }), [on(el('button', {type: 'button', class: 'small', text: 'empty'}), 'click', function () { schema.fields.length = 0; schema.key = ''; target = null; paint(); })])) : null;
+      paint();
+      return el('div', {}, [starts, el('div', {class: 'sch'}, [libBox, tree]),
+        el('div', {style: 'margin-top:10px'}, [el('div', {class: 'sub muted', style: 'margin-bottom:4px', text: 'A sample event (publish_time is added when it\'s sent):'}), errBox, sampleBox])]);
+    }
+    function changeChips(changes) {
+      var sym = {added: '+', removed: '−', renamed: '↻', type: '⇄', list: '[ ]', values: '≡', empty: '∅', key: '🔑'};
+      return el('div', {}, changes.map(function (c) {
+        return el('span', {class: 'chg ' + c.change, text: sym[c.change] + ' ' + c.path + (c.detail ? ' — ' + c.detail : '')});
+      }));
+    }
+    var saved = null;                                    // the revision just saved: its changes, shown once
+    function schemaCard(s) {
+      var cur = s.schema, box = el('div'), revs = el('div', {class: 'sub muted', text: 'Loading the revisions…'});
+      function rollText(r) {
+        if (r.rollout_pct >= 100 || !r.rollout_until) return 'all events at once';
+        return r.rollout_pct + '% of events until ' + clock(r.rollout_until) + (new Date(r.rollout_until) > new Date() ? ' (rolling out)' : '') + ', then all';
+      }
+      function loadRevs() {
+        api('GET', '/api/pubsub/revisions?id=' + s.id).then(function (d) {
+          revs.className = '';
+          revs.replaceChildren(el('table', {class: 'lst'}, [el('thead', {}, [el('tr', {}, ['Revision', 'Saved', 'Rollout', 'What changed'].map(function (h) { return el('th', {text: h}); }))]),
+            el('tbody', {}, d.revisions.map(function (r) {
+              return el('tr', {}, [el('td', {}, [el('b', {text: String(r.revision)}), r.note ? el('div', {class: 'sub muted', text: r.note}) : null]),
+                el('td', {class: 'muted', text: when(r.created_at)}), el('td', {class: 'muted', text: r.revision === 1 ? '—' : rollText(r)}),
+                el('td', {}, [r.revision === 1 ? el('span', {class: 'muted', text: 'the first'}) : changeChips(r.changes)])]);
+            }))]));
+        }).catch(function (e) { revs.textContent = e.message; });
+      }
+      function view() {
+        var change = on(el('button', {class: 'primary', text: '✎ Change schema'}), 'click', edit);
+        var just = saved && saved.id === s.id ? el('div', {class: 'sub ok', style: 'margin-bottom:8px'},
+          ['✓ revision ' + cur.revision + ' saved — the simulator moves to it within seconds: ', changeChips(saved.changes)]) : null;
+        saved = null;
+        box.replaceChildren(el('div', {class: 'head'}, [el('h3', {text: '🧬 Schema — revision ' + cur.revision}), change]), just,
+          el('div', {class: 'sub muted', style: 'margin-bottom:8px', text: 'Every event carries schema_revision. Changing the schema saves a new revision; the simulator moves to it — at once, or part of the events for a while, like apps that update one by one. ' +
+            'That is schema drift: see how your Ingestion table, Spark or Beam code copes.'}),
+          el('div', {class: 'fields'}, s.columns.map(function (c) { return el('code', {class: 't', text: c}); })),
+          el('h4', {style: 'margin:14px 0 6px; font-size:.92rem', text: 'Revisions'}), revs);
+        loadRevs();
+      }
+      function edit() {
+        var draft = clone(cur.schema), roll = {pct: 100, min: 15}, note = el('input', {type: 'text', placeholder: 'why (optional) — e.g. app 2.0 sends the device as an object', style: 'width:100%; max-width:520px'});
+        var mins = seg(data.rollout_min.map(function (m) { return [m, m + ' min']; }), roll.min, function (v) { roll.min = v; });
+        mins.hidden = true;
+        var save = el('button', {class: 'primary', text: 'Save as revision ' + (cur.revision + 1)}), msg = el('div', {class: 'sub', style: 'margin-top:6px'});
+        on(save, 'click', function () {
+          save.disabled = true; msg.textContent = '';
+          api('POST', '/api/pubsub/schema', {id: s.id, schema: draft, rollout_pct: roll.pct, rollout_minutes: roll.pct < 100 ? roll.min : 0, note: note.value})
+            .then(function (r) { return load().then(function () { saved = r; route(); }); })
+            .catch(function (e) { msg.className = 'sub bad'; msg.textContent = e.message; save.disabled = false; });
+        });
+        box.replaceChildren(el('div', {class: 'head'}, [el('h3', {text: '🧬 Change the schema — revision ' + cur.revision + ' → ' + (cur.revision + 1)})]),
+          schemaEditor(draft, false),
+          el('div', {class: 'form wide', style: 'margin-top:14px'}, [
+            el('label', {text: 'Roll it out'}), el('div', {}, [seg(data.rollout_pct.map(function (p) { return [p, p >= 100 ? 'All events at once' : p + '% of events first']; }), roll.pct, function (v) { roll.pct = v; mins.hidden = v >= 100; }),
+              mins, help('Part of the events first: for that long, the others still come in revision ' + cur.revision + ' — old and new shapes mixed on one topic.')]),
+            el('label', {text: 'Note'}), el('div', {}, [note])]),
+          el('div', {class: 'actions', style: 'margin-top:12px'}, [save, on(el('button', {text: 'Cancel'}), 'click', view)]), msg);
+      }
+      view();
+      return card([box]);
+    }
+
     // ---- a stream: what it is, its settings, Peek --------------------------------------------
     function streamPage(id) {
       var s = data.streams.filter(function (x) { return x.id === id; })[0];
@@ -353,7 +568,7 @@
       main.appendChild(card([el('div', {class: 'head'}, [el('h3', {}, [s.name + ' ', st]), el('div', {class: 'actions'}, [pause, del])]),
         el('dl', {class: 'facts'}, [
           el('dt', {text: 'Topic'}), el('dd', {}, [el('code', {class: 't', text: s.topic})]),
-          el('dt', {text: 'Carries'}), el('dd', {text: d.name + ' — key ' + d.key}),
+          el('dt', {text: 'Carries'}), el('dd', {text: carries(s) + ' — key ' + keyOf(s)}),
           el('dt', {text: 'Partitions'}), el('dd', {text: data.partitions + ' · events kept ' + data.retention_h + ' h'}),
           el('dt', {text: 'Sent'}), sent,
           el('dt', {text: 'Running since'}), el('dd', {text: when(s.resumed_at) + ' · pauses itself after ' + data.auto_pause_h + ' h (Resume starts it again)'})])]));
@@ -369,6 +584,7 @@
       });
       main.appendChild(card([el('h3', {text: 'Settings'}), el('div', {class: 'form'}, settingsForm(cfg)),
         el('div', {class: 'actions', style: 'margin-top:14px'}, [save, msg])]));
+      if (s.schema) main.appendChild(schemaCard(s));
       main.appendChild(landCard(s));
       main.appendChild(notebookCard(s));
       // peek
@@ -392,7 +608,7 @@
             el('td', {class: 'mono', text: clock(e.publish_time)}),
             el('td', {class: 'mono', text: r.partition + ' · ' + r.offset}),
             el('td', {class: 'mono', text: r.key}),
-            el('td', {text: e.event_type}),
+            el('td', {text: s.schema ? 'rev ' + e.schema_revision + (e.event_type ? ' · ' + e.event_type : '') : e.event_type}),
             el('td', {class: 'mono', text: clock(e.event_time)}),
             el('td', {}, [late ? el('span', {class: 'tag', text: '🕓 +' + dur(r.late_s)}) : el('span', {class: 'muted', text: dur(r.late_s)})])]), 'click', function () {
             if (open[k]) delete open[k]; else open[k] = 1;

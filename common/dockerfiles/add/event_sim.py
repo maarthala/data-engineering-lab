@@ -28,6 +28,7 @@ from confluent_kafka import KafkaException, Producer
 from confluent_kafka.admin import AdminClient, NewTopic
 
 import labpubsub as ps
+import labschema
 
 BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP", "kafka:9092")
 SHOP_DB = os.environ.get("EVENT_SIM_SHOP_DB", "postgresql://reader:reader@lab-db:5432/shop")
@@ -256,14 +257,37 @@ class Stock:
         return random.choice(REF["stores"])                      # a till offline: its store's moves wait
 
 
-GEN = {"click_events": Clicks, "orders": Orders, "payments": Payments, "inventory": Stock}
+class Custom:
+    """A member's own schema (labschema): the current revision — while a new one rolls out, its share of
+    the events (the rest still the one before). Revisions are read again when the stream's row changes."""
+    def __init__(self, rate, stream_id):
+        self.id, self.state, self.revs, self.until = stream_id, {}, [], None
+        self.load()
+
+    def load(self):
+        rows = ps._q("SELECT revision, schema, rollout_pct, rollout_until FROM pubsub_schemas WHERE stream_id = %s "
+                     "ORDER BY revision DESC LIMIT 2", (self.id,))
+        self.revs = [(r["revision"], r["schema"], r["rollout_pct"],
+                      r["rollout_until"].timestamp() if r["rollout_until"] else None) for r in rows]
+
+    def event(self, t, offline=None):
+        rev, schema, pct, until = self.revs[0]
+        if pct < 100 and until and time.time() < until and len(self.revs) > 1 and random.random() * 100 >= pct:
+            rev, schema = self.revs[1][:2]                       # a producer not updated yet
+        return labschema.event(schema, rev, t, self.state, REF)
+
+    def offline(self):
+        return None
+
+
+GEN = {"click_events": Clicks, "orders": Orders, "payments": Payments, "inventory": Stock, "custom": Custom}
 
 
 # ---- a stream: settings from the database + its generator, held events and counters ------------
 class Stream:
     def __init__(self, row):
         self.id, self.topic, self.kind = row["id"], row["topic"], row["kind"]
-        self.gen = GEN[self.kind](row["rate"])
+        self.gen = Custom(row["rate"], row["id"]) if self.kind == "custom" else GEN[self.kind](row["rate"])
         self.held = []                                           # (publish_at, seq, key, event) — random late events
         self.burst = None                                        # {"until", "events": [...], "who"}
         self.credit, self.seq = 0.0, 0
@@ -276,6 +300,8 @@ class Stream:
     def set(self, row):
         self.row = row
         self.gen.rate = row["rate"]
+        if self.kind == "custom":
+            self.gen.load()                                      # a new revision?
 
     def lateness(self):
         return random.uniform(ps.LATE_AFTER_S * 2, self.row["late_max"])
