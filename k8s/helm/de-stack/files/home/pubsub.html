@@ -63,6 +63,9 @@
     .fcard{border:1px solid var(--line); border-radius:9px; padding:3px; margin:0 0 6px; background:var(--panel)}
     .fcard.alt{background:var(--accent-bg)}
     .fcard .node:hover{background:transparent}
+    .grip{cursor:grab; color:var(--muted); padding:0 2px; user-select:none; font-size:.9rem} .grip:active{cursor:grabbing}
+    .drop{outline:2px dashed var(--accent); outline-offset:1px; background:var(--accent-bg) !important}
+    .lib button.add[draggable]{cursor:grab}
     .choices{max-width:640px}
     .lib{border:1px solid var(--line); border-radius:10px; background:var(--panel2); padding:8px; max-height:460px; overflow:auto}
     .lib input{width:100%; margin-bottom:6px}
@@ -399,6 +402,48 @@
         into.push({id: uid(), name: name, field: f.field});
         paint();
       }
+      // drag and drop: a library field (copy) or a field of the event (move) — into an object, before a field, or at the top
+      var dragging = null;
+      function inside(n, list) {                         // is `list` n's own (or a nested) object list?
+        return !!n.object && (n.object === list || n.object.some(function (x) { return inside(x, list); }));
+      }
+      function locate(n, ns) {
+        for (var i = 0; i < ns.length; i++) {
+          if (ns[i] === n) return ns;
+          if (ns[i].object) { var r = locate(n, ns[i].object); if (r) return r; }
+        }
+        return null;
+      }
+      function free(list, name, top) {
+        var b = name, i = 2;
+        while (used(list, name) || (top && data.library.fixed.indexOf(name) >= 0)) name = b + '_' + i++;
+        return name;
+      }
+      function dropAt(list, at) {
+        var d = dragging; dragging = null;
+        if (!d) return;
+        var top = list === schema.fields;
+        if (d.field) list.splice(at, 0, {id: uid(), name: free(list, d.field.name, top), field: d.field.field});
+        else {
+          var n = d.node, from = locate(n, schema.fields);
+          if (!from || n.object === list || inside(n, list)) return;
+          var i = from.indexOf(n);
+          from.splice(i, 1);
+          if (from === list && i < at) at--;
+          if (from !== list) n.name = free(list, n.name, top);
+          if (!top && schema.key === n.name) schema.key = '';
+          list.splice(at, 0, n);
+        }
+        paint();
+      }
+      function target_(e, list, at) {                    // make e a drop target for list[at]
+        on(e, 'dragover', function (ev) { if (!dragging) return; ev.preventDefault(); ev.stopPropagation(); e.classList.add('drop'); });
+        on(e, 'dragleave', function () { e.classList.remove('drop'); });
+        on(e, 'drop', function (ev) { ev.preventDefault(); ev.stopPropagation(); e.classList.remove('drop'); dropAt(list, typeof at === 'function' ? at() : at); });
+        return e;
+      }
+      target_(tree, schema.fields, function () { return schema.fields.length; });   // empty space: at the top, last
+      on(document, 'dragend', function () { dragging = null; [].forEach.call(document.querySelectorAll('.drop'), function (x) { x.classList.remove('drop'); }); });
       // the library
       var search = el('input', {type: 'text', placeholder: 'Search ' + Object.keys(L).length + ' fields…', autocomplete: 'off'}), groups = el('div');
       function paintLib() {
@@ -407,7 +452,9 @@
           var fs = g.fields.filter(function (f) { return !q || (f.name + ' ' + f.label + ' ' + g.label).toLowerCase().indexOf(q) >= 0; });
           if (!fs.length) return null;
           var d = el('details', q ? {open: ''} : {}, [el('summary', {text: g.label + ' (' + fs.length + ')'})].concat(fs.map(function (f) {
-            return on(el('button', {type: 'button', class: 'add', title: f.label}, [el('span', {text: '+ ' + f.name}), el('i', {text: f.type})]), 'click', function () { add(f); });
+            var b = on(el('button', {type: 'button', class: 'add', draggable: 'true', title: f.label + ' — click to add, or drag it into place'},
+              [el('span', {text: '+ ' + f.name}), el('i', {text: f.type})]), 'click', function () { add(f); });
+            return on(b, 'dragstart', function (ev) { dragging = {field: f}; ev.dataTransfer.effectAllowed = 'copy'; ev.dataTransfer.setData('text/plain', f.field); });
           })));
           return d;
         }).filter(Boolean));
@@ -420,13 +467,18 @@
         into.push(o); target = o; paint();
       });
       libBox.replaceChildren(search, groups, el('div', {style: 'margin-top:8px'}, [newObj]),
-        help('Click a field to add it — into the highlighted object, else at the top. An object groups fields ({…}); “list” makes any field or object an array.'));
+        help('Drag a field onto an object to put it inside, onto a field to put it before that one, or onto empty space for the top. Click adds it (at the top, or where “+ add here” points). An object groups fields ({…}); “list” makes any field or object an array.'));
       paintLib();
       // the event's fields
       function row(n, list, depth) {
         var f = n.field && L[n.field];
         var name = on(el('input', {type: 'text', class: 'nm', value: n.name, autocomplete: 'off', title: 'its name in the event'}), 'input', function () { n.name = name.value.trim(); preview(); });
-        var bits = [name, el('span', {class: 'ty', text: n.object ? '{ object }' : f.type + ' · ' + f.name, title: f ? f.label : 'an object'})];
+        var grip = on(el('span', {class: 'grip', draggable: 'true', title: 'drag to move it — before another field, into an object, or to the top', text: '⠿'}), 'dragstart', function (ev) {
+          dragging = {node: n}; ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', n.name); ev.stopPropagation();
+        });
+        var bits = [grip, name, el('span', {class: 'ty', text: n.object ? '{ object }' : f.type + ' · ' + f.name, title: f ? f.label : 'an object'})];
+        if (n.object) bits.push(on(el('button', {type: 'button', class: 'small' + (target === n ? ' on' : ''), title: 'then click fields in the library — or drag them onto this object',
+          text: target === n ? '✓ adding here' : '+ add here'}), 'click', function (ev) { ev.stopPropagation(); target = target === n ? null : n; paint(); }));
         if (f && f.type === 'string') {
           var vals = on(el('input', {type: 'text', class: 'vals', placeholder: 'your values: a, b, c', value: (n.values || []).join(', '),
               title: 'pick from these instead of the library\'s'}), 'change', function () {
@@ -465,16 +517,19 @@
                   on(el('button', {type: 'button', class: 'danger', title: 'remove', text: '✕'}), 'click', function () {
                     list.splice(i, 1); if (target === n) target = null; if (schema.key === n.name) schema.key = ''; paint(); }));
         var line = el('div', {class: 'node' + (target === n ? ' target' : '')}, bits);
+        if (n.object) target_(line, n.object, function () { return n.object.length; });   // onto an object: into it
+        else target_(line, list, function () { return list.indexOf(n); });                // onto a field: before it
         if (!n.object) return [line];
         on(line, 'click', function (ev) { if (ev.target === line || ev.target.classList.contains('ty')) { target = target === n ? null : n; paint(); } });
         line.title = 'click to add library fields into this object';
-        var kids = el('div', {class: 'kids'}, n.object.length ? [].concat.apply([], n.object.map(function (x) { return row(x, n.object, depth + 1); }))
-                                                               : [el('div', {class: 'sub muted', style: 'padding:4px', text: 'empty — click the object, then fields in the library'})]);
+        var kids = target_(el('div', {class: 'kids'}, n.object.length ? [].concat.apply([], n.object.map(function (x) { return row(x, n.object, depth + 1); }))
+                                                               : [el('div', {class: 'sub muted', style: 'padding:4px', text: 'empty — drag fields here, or + add here, then click them in the library'})]),
+                           n.object, function () { return n.object.length; });
         return [line, kids];
       }
       function paint() {
-        var top = el('div', {class: 'into'}, [target ? 'Adding into ' + target.name + ' — ' : 'Adding at the top — ',
-          target ? on(el('a', {text: 'back to the top', style: 'cursor:pointer; color:var(--accent)'}), 'click', function () { target = null; paint(); }) : 'click an object to add into it',
+        var top = el('div', {class: 'into'}, [target ? 'Clicked fields go into ' + target.name + ' — ' : 'Drag fields from the library into place (⠿ moves one), or click them to add at the top — ',
+          target ? on(el('a', {text: 'back to the top', style: 'cursor:pointer; color:var(--accent)'}), 'click', function () { target = null; paint(); }) : '+ add here on an object to click them into it',
           ' · ' + count(schema.fields) + ' of ' + data.library.limits.fields + ' fields · always there too: ' + data.library.fixed.join(', ')]);
         var keyNone = el('input', {type: 'radio', name: 'schema-key'}); keyNone.checked = !schema.key;
         on(keyNone, 'change', function () { schema.key = ''; preview(); });
