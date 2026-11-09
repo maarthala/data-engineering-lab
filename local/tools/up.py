@@ -31,7 +31,10 @@ LOG = os.path.join(HERE, "logs", "make-up.log")
 LOG_SHOWN = "local/logs/make-up.log"
 UNIT_LOG = os.path.join(HERE, "logs", "make-status.log")   # make status: starting / stopping units
 BUILD = "--build" in sys.argv or os.environ.get("BUILD") == "1"
-UP = ["docker", "compose", "--progress", "plain", "up", "-d"] + (["--build"] if BUILD else [])
+UP = ["docker", "compose", "--progress", "plain", "up", "-d"]   # images are built first, see build_batches()
+# make build: how many Dockerfiles build at the same time. `up --build` builds them all at once, which
+# a small machine (e.g. Windows with little memory for Docker) can't take — so 1 at a time by default.
+BUILD_PARALLEL = max(1, int(os.environ.get("LAB_BUILD_PARALLEL", 1)))
 # What Docker must be given (Docker Desktop: Settings → Resources). Memory in GB as Docker Desktop
 # shows it: a "12 GB" setting reports ~11.9 GiB, so compare with a little slack.
 # LAB_MIN_CPUS / LAB_MIN_MEM_GB override the minimum for one run (e.g. to try the check).
@@ -584,15 +587,40 @@ class View:
 
 
 # --- background work -----------------------------------------------------------------------
+def build_batches():
+    """make build (make up: the missing images): the services to build, a few Dockerfiles at a time (LAB_BUILD_PARALLEL, default 1).
+    Services sharing a Dockerfile build in the same call (BuildKit builds the shared steps once)."""
+    cfg = json.loads(subprocess.run(["docker", "compose", "config", "--format", "json"], cwd=HERE,
+                                    capture_output=True, text=True).stdout or "{}")
+    groups, project = {}, cfg.get("name", "local")
+    for svc, conf in cfg.get("services", {}).items():
+        b = conf.get("build")
+        image = conf.get("image") or f"{project}-{svc}"
+        if b and (BUILD or subprocess.run(["docker", "image", "inspect", image],     # make up: only missing ones
+                                          capture_output=True).returncode):
+            groups.setdefault((b.get("context"), b.get("dockerfile")), []).append(svc)
+    g = list(groups.values())
+    return [sum(g[i:i + BUILD_PARALLEL], []) for i in range(0, len(g), BUILD_PARALLEL)]
+
+
+def build_cmds():
+    """The commands make up / make build runs: the builds one batch after another, then up -d."""
+    return [["docker", "compose", "--progress", "plain", "build", *b] for b in build_batches()] + [UP]
+
+
 def run_compose(stack):
     os.makedirs(os.path.dirname(LOG), exist_ok=True)
     with open(LOG, "w") as f:
-        p = subprocess.Popen(UP, cwd=HERE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                             bufsize=1, env={**os.environ, "BUILDKIT_PROGRESS": "plain"})
-        for line in p.stdout:
-            f.write(line)
-            stack.log(line.rstrip("\n"))
-        stack.compose_rc = p.wait()
+        for cmd in build_cmds():
+            p = subprocess.Popen(cmd, cwd=HERE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                 bufsize=1, env={**os.environ, "BUILDKIT_PROGRESS": "plain"})
+            for line in p.stdout:
+                f.write(line)
+                stack.log(line.rstrip("\n"))
+            rc = p.wait()
+            if rc:
+                break
+        stack.compose_rc = rc
 
 
 def run_stop(stack, dry=False):
@@ -1164,7 +1192,10 @@ def main():
             sys.exit(stop_plain() if "--dry-run" not in sys.argv else 0)
         if watch:
             sys.exit(subprocess.call(["docker", "compose", *ALL, "ps"], cwd=HERE))
-        rc = subprocess.call(["docker", "compose", "up", "-d"] + (["--build"] if BUILD else []), cwd=HERE)
+        for cmd in build_cmds():
+            rc = subprocess.call(cmd, cwd=HERE)
+            if rc:
+                break
         if rc == 0:
             line = ensure_shared_lake()
             if line:

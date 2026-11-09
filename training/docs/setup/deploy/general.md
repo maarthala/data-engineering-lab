@@ -81,6 +81,8 @@ make up           # restarts what changed (or switch units on in make status)
 
 If `make up` says an image changed since it was built, run `make build`. Your data stays.
 
+Images build one at a time (one Dockerfile after another), so a laptop with little memory for Docker isn't swamped. Have plenty? `LAB_BUILD_PARALLEL=2 make build` builds two at a time.
+
 To check, home-api asks GitHub for the repo's tags at most once an hour. Offline, nothing is
 shown. To switch the check off, add `LAB_UPDATE_CHECK=0` to `local/.env`.
 

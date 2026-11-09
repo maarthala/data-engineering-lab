@@ -16,6 +16,9 @@
 #   make destroy     # remove everything the stack made: containers, volumes, network, images
 
 COMPOSE = docker compose
+# build the images one service at a time (`up --build` builds them all at once — too much for a small
+# machine); tools/up.py does the same, grouped by Dockerfile (LAB_BUILD_PARALLEL=2 builds two at a time)
+BUILD_ONE_BY_ONE = for s in $$($(COMPOSE) config --services); do $(COMPOSE) build $$s || exit 1; done
 # the release this checkout is on (its latest vX.Y.Z tag) — home-api compares it with GitHub and
 # shows managers a "newer release" banner
 export LAB_VERSION := $(shell git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null)
@@ -33,13 +36,13 @@ init: ## Download required JARs/tarballs (first time only)
 
 up: ## Start the whole stack (builds only missing images) — live view: log left, each service right
 	@if command -v python3 >/dev/null 2>&1; then python3 tools/up.py $(if $(BUILD),--build); \
-	  else $(COMPOSE) up -d $(if $(BUILD),--build); fi
+	  else $(if $(BUILD),$(BUILD_ONE_BY_ONE);) $(COMPOSE) up -d; fi
 
 build: ## Rebuild the images, then start — after changing a Dockerfile (make up warns when one changed)
-	@if command -v python3 >/dev/null 2>&1; then python3 tools/up.py --build; else $(COMPOSE) up -d --build; fi
+	@if command -v python3 >/dev/null 2>&1; then python3 tools/up.py --build; else $(BUILD_ONE_BY_ONE); $(COMPOSE) up -d; fi
 
 up-plain: ## Start the whole stack, plain docker compose output (BUILD=1: rebuild images first)
-	$(COMPOSE) up -d $(if $(BUILD),--build)
+	$(if $(BUILD),$(BUILD_ONE_BY_ONE);) $(COMPOSE) up -d
 
 status: ## Live dashboard of the running stack: all logs left; units with state, CPU, memory, port right — s/x start/stop a unit (core stays on), q quits
 	@python3 tools/up.py --watch
