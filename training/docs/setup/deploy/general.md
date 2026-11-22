@@ -81,6 +81,7 @@ whoever helps you. It holds:
 | `FINDINGS.txt` | the first findings above |
 | `system.txt` | your OS, Docker version, CPUs and memory, the lab version |
 | `status.txt` | every service: running or not, healthy, how often it restarted, killed for lack of memory |
+| `health.txt` | for each unhealthy service, the output of its last health checks |
 | `resources.txt` | CPU and memory per service, how much of Docker's memory the stack uses, free disk space |
 | `problems.log` | every request that failed in any tool (status 4xx / 5xx): when, which app, what |
 | `airflow-failed/` | the log of each failed Airflow task of the last 7 days |
