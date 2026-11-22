@@ -7,9 +7,10 @@ ENDPOINT="${STORAGE_ENDPOINT:-http://storage:9000}"
 ACCESS_KEY="${STORAGE_ROOT_USER:-admin}"
 SECRET_KEY="${STORAGE_ROOT_PASSWORD:-admin123}"
 
-# Wait until the store answers, then register it as the 'local' alias.
+# Wait until the store answers, then register it as the 'local' alias. Each try is capped at
+# 10 s: a connection made while the store is still starting can otherwise hang for good.
 echo "Waiting for object storage at $ENDPOINT ..."
-until mc alias set local "$ENDPOINT" "$ACCESS_KEY" "$SECRET_KEY" >/dev/null 2>&1; do
+until timeout 10 mc alias set local "$ENDPOINT" "$ACCESS_KEY" "$SECRET_KEY" >/dev/null 2>&1; do
   sleep 2
 done
 echo "Object storage is ready."

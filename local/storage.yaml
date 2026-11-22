@@ -50,8 +50,9 @@ services:
   storage-init:
     container_name: storage-init
     image: ghcr.io/maarthala/de-stack/mc:RELEASE.2025-08-13T08-35-41Z   # S3 admin client (mc)
-    depends_on:
-      - storage
+    depends_on:              # healthy, not just started — an early connection can hang forever
+      storage:
+        condition: service_healthy
     entrypoint: ["/bin/sh", "/init_scripts/setup.sh"]
     volumes:
       - ./code:/code

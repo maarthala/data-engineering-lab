@@ -62,6 +62,21 @@ def one_shot(name):
     return name.endswith(("-init", "-bootstrap", "-seed")) or name in ("portal-db", "vault-db")
 
 
+STUCK_MIN = 10
+
+
+def stuck_minutes(read, p):
+    """Minutes between a container's start (last status.txt column, UTC) and the newest log line in the bundle."""
+    started = p[-1] if re.match(r"\d{4}-\d\d-\d\dT\d\d:\d\d", p[-1]) else None
+    newest = max(re.findall(r"^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)", read("containers/gateway.log") +
+                            "\n" + read("containers/postgres.log"), re.M) or [""])
+    if not started or not newest:
+        return 0
+    from datetime import datetime
+    f = "%Y-%m-%dT%H:%M:%S"
+    return int((datetime.strptime(newest, f) - datetime.strptime(started[:19], f)).total_seconds() // 60)
+
+
 def unit_of(name):
     return next((u for pre, u in UNIT_OF if name.startswith(pre)), "Core")
 
@@ -108,6 +123,11 @@ def findings(read, names):
                         f"Give Docker more memory, or run fewer units at once ({unit_of(name)} needs it)."))
         elif state == "exited" and code == "0" and one_shot(name):
             continue                                          # a setup step that finished
+        elif state == "running" and one_shot(name) and stuck_minutes(read, p) >= STUCK_MIN:
+            err = last_error(log)
+            out.append((1, f"Setup step {name} is still running {stuck_minutes(read, p)} min after it started"
+                           + (f" — last line: {err[0].rstrip('. ')}" if err else "") + ". What it sets up is missing until it ends.",
+                        f"docker restart {name}, wait until it exits (make status), then try again."))
         elif state not in ("running",):
             down.append(name)
             err = last_error(log)
