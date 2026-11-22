@@ -65,13 +65,23 @@ Something doesn't work — an *Access denied*, a red task in Airflow, a page tha
 make support
 ```
 
-It asks what went wrong (one or two lines, optional), then writes **`local/support-<date>.zip`**.
-Send that file to whoever helps you. It holds:
+It asks what went wrong (one or two lines, optional), then prints its **first findings**, what
+looks wrong and what to try, for example:
+
+```
+1. Memory is nearly full: the stack uses 7.1 of 7.6 GB (93%).
+   → Turn off units you don't need now (make status → select a unit → x), or give Docker more memory.
+```
+
+Try those first. Still stuck? It also writes **`local/support-<date>.zip`**; send that file to
+whoever helps you. It holds:
 
 | File | What's in it |
 |---|---|
+| `FINDINGS.txt` | the first findings above |
 | `system.txt` | your OS, Docker version, CPUs and memory, the lab version |
-| `status.txt` | every service: running or not, healthy, how often it restarted |
+| `status.txt` | every service: running or not, healthy, how often it restarted, killed for lack of memory |
+| `resources.txt` | CPU and memory per service, how much of Docker's memory the stack uses, free disk space |
 | `problems.log` | every request that failed in any tool (status 4xx / 5xx): when, which app, what |
 | `airflow-failed/` | the log of each failed Airflow task of the last 7 days |
 | `containers/` | the last 2,000 lines of each service's log |
