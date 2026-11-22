@@ -1028,7 +1028,9 @@ def my_exams(member, team, search=None, kind=None, offset=0, limit=20):
 
 def start(exam_id, member, team):
     """Resume the member's open attempt of the exam, or draw a new set of questions (current versions;
-    least seen first — seen counts a question in any version)."""
+    least seen first — seen counts a question in any version). About RETRY_SHARE of a new set are
+    questions the member got wrong the last time they had them (wrong, partly right or not answered),
+    so they come back for another try."""
     e = _exam_for(exam_id, team)
     open_ = _q("SELECT id FROM exam_attempts WHERE exam_id = %s AND member = %s AND finished_at IS NULL",
                (exam_id, member), one=True)
@@ -1043,12 +1045,37 @@ def start(exam_id, member, team):
     for r in _q("SELECT q.bank, q.qid FROM exam_attempts a CROSS JOIN LATERAL unnest(a.vids) AS v(vid) "
                 "JOIN exam_qv q ON q.vid = v.vid WHERE a.exam_id = %s AND a.member = %s", (exam_id, member)):
         seen[(r["bank"], r["qid"])] = seen.get((r["bank"], r["qid"]), 0) + 1
-    random.shuffle(pool)                                  # least seen first, random among equals
-    pick = sorted(pool, key=lambda q: seen.get((q["bank"], q["qid"]), 0))[:min(e["num_questions"], len(pool))]
+    n = min(e["num_questions"], len(pool))
+    wrong = _still_wrong(exam_id, member)
+    retry = [q for q in pool if (q["bank"], q["qid"]) in wrong]
+    random.shuffle(retry)
+    retry = retry[:min(len(retry), round(n * RETRY_SHARE))]
+    taken = {str(q["vid"]) for q in retry}
+    rest = [q for q in pool if str(q["vid"]) not in taken]
+    random.shuffle(rest)                                  # least seen first, random among equals
+    pick = retry + sorted(rest, key=lambda q: seen.get((q["bank"], q["qid"]), 0))[:n - len(retry)]
     random.shuffle(pick)
     row = _q("INSERT INTO exam_attempts (exam_id, member, vids) VALUES (%s, %s, %s::uuid[]) RETURNING id",
              (exam_id, member, [str(q["vid"]) for q in pick]), one=True)
     return attempt(row["id"], member, team)
+
+
+RETRY_SHARE = 0.2                                     # of a new attempt: questions got wrong last time
+
+
+def _still_wrong(exam_id, member):
+    """{(bank, qid)} of the questions the member got wrong in the latest submitted attempt that had them."""
+    atts = _q("SELECT vids, answers FROM exam_attempts WHERE exam_id = %s AND member = %s "
+              "AND finished_at IS NOT NULL AND deleted_at IS NULL ORDER BY finished_at DESC LIMIT 100", (exam_id, member))
+    vids = list({str(v) for a in atts for v in a["vids"]})
+    by = {str(r["vid"]): r for r in _q("SELECT * FROM exam_qv WHERE vid = ANY(%s::uuid[])", (vids,))} if vids else {}
+    last = {}
+    for a in atts:                                    # newest first: the first one seen is the latest
+        for v in map(str, a["vids"]):
+            q = by.get(v)
+            if q and (q["bank"], q["qid"]) not in last:
+                last[(q["bank"], q["qid"])] = _mark(q, a["answers"].get(v))[0] == 1
+    return {k for k, right in last.items() if not right}
 
 
 def _own(attempt_id, member):

@@ -154,6 +154,32 @@
               '&post_logout_redirect_uri=' + encodeURIComponent(location.origin + '/');
   document.getElementById('me-out').href = '/oauth2/sign_out?rd=' + encodeURIComponent(kcOut);
 
+  // Session ended → back to sign-in at once, not on the next click. Keycloak decides (2 h idle, 12 h
+  // at most, or Log out in another tool): /oauth2/auth refreshes with it and gets 401 once it's over.
+  // Asked every minute while you're active here, when the tab is shown again, and once more after
+  // 2 h without activity (+3 min: Keycloak's grace) — so an open tab alone doesn't keep the session alive.
+  var IDLE_MS = (2 * 60 + 3) * 60 * 1000, ACTIVE = 'lab-last-active', gone = false;
+  function lastActive() { try { return +localStorage.getItem(ACTIVE) || Date.now(); } catch (e) { return Date.now(); } }
+  function touch(force) { try { if (force || Date.now() - lastActive() > 15000) localStorage.setItem(ACTIVE, String(Date.now())); } catch (e) {} }
+  function leave() {                                 // the whole window, also from a page in a portal tab (iframe)
+    if (gone) return; gone = true;
+    var to = '/oauth2/sign_out?rd=' + encodeURIComponent('/');
+    try { window.top.location.href = to; } catch (e) { location.href = to; }
+  }
+  function check(back) {                             // back: the tab was just shown again
+    var idle = Date.now() - lastActive();
+    if (gone || !back && idle > 90000 && idle < IDLE_MS) return;
+    if (back || idle >= IDLE_MS) touch(true);        // idle: the next ask is another 2 h later
+    if (!back && document.visibilityState !== 'visible' && idle < IDLE_MS) return;
+    fetch('/oauth2/auth', {credentials: 'same-origin', cache: 'no-store'})
+      .then(function (r) { if (r.status === 401) leave(); })
+      .catch(function () {});
+  }
+  touch(true);
+  ['pointerdown', 'keydown', 'scroll', 'wheel', 'touchstart'].forEach(function (ev) { addEventListener(ev, function () { touch(); }, {passive: true, capture: true}); });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') check(true); });
+  setInterval(function () { check(false); }, 60000);
+
   fetch('/api/me', {credentials: 'same-origin'})
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (me) {

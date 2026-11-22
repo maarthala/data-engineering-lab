@@ -27,13 +27,17 @@ right or not answered). Click one to see it in the review.
 2. Answer one question at a time. *choose 2* under the question number means tick two answers.
    Hotspot and drag-and-drop questions have a dropdown per box; yes / no questions have Yes / No per
    statement.
-3. Move with **← Previous** / **Next →**, or click a number under **Questions**.
+3. Move with **← Previous** / **Next →**, or click a number under **Questions** (above the question).
 4. **⚐ Mark for review** is a reminder for you to come back to a question. It doesn't change the score.
 5. **⏸ Pause** takes you back to the list. Your answers are already saved.
 6. **Submit exam** asks first (inline, **Yes, submit** / **Cancel**) and says how many questions are
    not answered or marked for review.
 
-New attempts prefer the questions you have seen least, so a few attempts cover the whole pool.
+A new attempt mixes two kinds of questions:
+
+- about **20 %** are questions you got wrong the last time you had them (wrong, partly right or not
+  answered), so you get another try at them;
+- the rest are the questions you have seen least, so a few attempts cover the whole pool.
 
 ## How it's scored
 - A question with options is right only with **exactly** the right answers. Picking one of two right

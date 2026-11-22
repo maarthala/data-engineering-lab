@@ -49,7 +49,7 @@
 </head>
 <body>
   <header id="lab-top"></header>
-  <script src="/lab-header.js?v=21"></script>
+  <script src="/lab-header.js?v=22"></script>
   <script src="/exam-render.js?v=5"></script>
   <div class="pagebar"><h1>📝 Mock exams <span class="dot">·</span> practise for a certification</h1></div>
   <main id="main"><div class="placeholder">Loading…</div></main>
@@ -289,13 +289,14 @@
           b.addEventListener('click', function () { i = n; render(); });
           return b;
         }));
+        main.appendChild(el('div', {class: 'card'}, [el('div', {class: 'bar'}, [el('h3', {style: 'margin:0', text: 'Questions — click one to go to it'}),
+          el('span', {class: 'sub', text: answered + ' answered · ' + (a.questions.length - answered) + ' not answered' + (marked.length ? ' · ⚑ ' + marked.length + ' marked for review' : '')})]), pal]));
         main.appendChild(el('div', {class: 'card'}, [
           el('div', {class: 'bar'}, [el('b', {text: a.exam.name}), el('span', {class: 'sub', text: answered + ' / ' + a.questions.length + ' answered · ' + (a.closed ? 'closed — read-only' : 'saved as you go')})]),
           el('div', {class: 'bar'}, [el('div', {}, [el('div', {class: 'sub', text: 'Question ' + (i + 1) + ' of ' + a.questions.length + (q.slots ? ' · ' + SLOT_HINT[q.type] : multi ? ' · choose ' + q.choose : '')}),
             domainOf(a, q) ? el('div', {class: 'sub', style: 'color:var(--accent)', text: domainOf(a, q)}) : null, tagList(q)]), flag]),
           caseBox(a, q), el('div', {class: 'q md', html: md(q.question)}), el('div', {}, opts),
           el('div', {class: 'nav'}, [el('div', {class: 'row'}, [prev, next]), el('div', {class: 'row'}, [pause, submit])])]));
-        main.appendChild(el('div', {class: 'card'}, [el('h3', {text: 'Questions' + (marked.length ? ' · ⚑ ' + marked.length + ' marked for review' : '')}), pal]));
         if (a.closed) {                                    // read-only: look through, then submit
           main.querySelectorAll('.opt input, table.slots input, table.slots select').forEach(function (x) { x.disabled = true; });
           flag.hidden = true;
