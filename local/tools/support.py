@@ -5,6 +5,7 @@ The user runs `make support` (from local/) and sends the zip it writes. Inside:
   FINDINGS.txt        first findings: what looks wrong and what to try (also printed at the end)
   system.txt          OS, Docker (version, CPUs, memory), lab version, git commit
   status.txt          every service: state, health, restarts, exit code, killed for lack of memory
+  health.txt          why Docker calls a service unhealthy (its last health-check results)
   resources.txt       CPU / memory per container, the stack's total vs Docker's memory, disk space
   problems.log        every failed request through the gateway (4xx / 5xx): time, status, app, request
   airflow-failed/     the log of each failed Airflow task (last 7 days)
@@ -139,6 +140,23 @@ def resources(names):
     return "\n".join(out) + "\n"
 
 
+def health(names):
+    """The last health-check results of each container that isn't healthy — why Docker calls it unhealthy."""
+    out = []
+    for name in names:
+        h = run("docker", "inspect", "--format", "{{json .State.Health}}", name).strip()
+        try:
+            h = json.loads(h)
+        except ValueError:
+            continue
+        if not h or h.get("Status") == "healthy":
+            continue
+        out.append(f"===== {name}: {h.get('Status')} (failed {h.get('FailingStreak', 0)}× in a row)")
+        for r in (h.get("Log") or [])[-2:]:
+            out.append(f"  exit {r.get('ExitCode')}: {(r.get('Output') or '').strip()[:600]}")
+    return "\n".join(out) + "\n" if out else "all health checks pass\n"
+
+
 def system(env):
     info = run("docker", "info", "--format", "{{.ServerVersion}}|{{.NCPU}}|{{.MemTotal}}|{{.OperatingSystem}}")
     p = info.strip().split("|")
@@ -237,6 +255,7 @@ def main():
         "system.txt": system(env),
         "status.txt": status([n for n, _ in names]),
         "resources.txt": resources([n for n, _ in names]),
+        "health.txt": health([n for n, _ in names]),
         "problems.log": problems(),
         "env.txt": "".join(f"{k}={'***' if SECRET_KEY.search(k) and v else v}\n" for k, v in env.items()),
     }

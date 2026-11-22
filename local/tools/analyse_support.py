@@ -67,7 +67,8 @@ def unit_of(name):
 
 
 def last_error(text, n=1):
-    lines = [readable(l) for l in text.splitlines() if l.strip()]
+    lines = [readable(l) for l in text.splitlines()]
+    lines = [l for l in lines if len(re.findall(r"[A-Za-z]", l)) >= 8 and not re.search(r"DeprecationWarning|has been moved|has been renamed", l)]
     hits = [l for l in lines if ERR.search(l) and not NOISE.search(l)] or lines
     return [re.sub(r"^\S*\d{4}-\d\d-\d\dT\S+\s+", "", l).strip()[:200] for l in hits[-n:]]
 
@@ -92,7 +93,9 @@ def findings(read, names):
                     "docker system prune (removes unused images and build cache — your data stays), "
                     "or give Docker's disk more space."))
     # services
-    down = []
+    down, hc = [], {}
+    for block in read("health.txt").split("===== ")[1:]:
+        hc[block.split(":", 1)[0]] = block
     for line in read("status.txt").splitlines()[1:]:
         p = line.split()
         if len(p) < 5:
@@ -112,6 +115,11 @@ def findings(read, names):
                         f"{name} is not running ({state}, exit {code})" + (f": {err[0]}" if err else "."),
                         f"make status → {unit_of(name)} → s to start it again" +
                         ("; if it stops again, the line above is why." if err else ".")))
+        elif health == "unhealthy" and "exceeded timeout" in hc.get(name, ""):
+            t = re.search(r"exceeded timeout \((\w+)\)", hc[name])
+            out.append((3, f"{name} is marked unhealthy only because its health check took longer than "
+                           f"{t.group(1) if t else 'allowed'} — the service itself may be fine.",
+                        "Usually a busy machine. Pull the latest lab (longer check), or run fewer units at once."))
         elif health == "unhealthy" or (restarts.isdigit() and int(restarts) >= 3):
             err = last_error(log)
             out.append((2, f"{name} is {'unhealthy' if health == 'unhealthy' else f'restarting ({restarts}×)'}"
