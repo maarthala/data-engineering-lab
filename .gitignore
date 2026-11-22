@@ -108,3 +108,7 @@ local/logs/
 **/dbt/**/logs/
 **/dbt/**/target/
 **/dbt/**/dbt_packages/
+
+# make support bundles (logs from a user's machine)
+local/support-*.zip
+local/support-*/

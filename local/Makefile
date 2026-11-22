@@ -11,6 +11,7 @@
 #   make status      # live dashboard: all containers' logs + state/CPU/memory/port per service (q quits)
 #   make ps          # show running services
 #   make logs        # tail logs for all services
+#   make support     # something wrong? one zip (status, logs, failed requests; secrets masked) to send
 #   make down        # bring the stack down — keeps volumes (all data) and images
 #   make clean       # stack down first: delete all its data (volumes) — fresh install, images kept
 #   make destroy     # remove everything the stack made: containers, volumes, network, images
@@ -25,7 +26,7 @@ export LAB_VERSION := $(shell git describe --tags --abbrev=0 --match 'v[0-9]*' 2
 
 .DEFAULT_GOAL := help
 
-.PHONY: help init up build up-plain status down stop restart ps logs config clean destroy docs docs-serve polaris-seed release
+.PHONY: help init up build up-plain status down stop restart ps logs config clean destroy docs docs-serve polaris-seed release support
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -59,6 +60,9 @@ restart: down up ## make down, then make up — keeps all data
 
 ps: ## Show running services
 	$(COMPOSE) ps
+
+support: ## Something wrong? Writes support-<date>.zip (status, logs, failed requests + Airflow tasks; secrets masked) — send it to whoever helps you
+	@python3 tools/support.py
 
 logs: ## Tail logs for all services (use `make logs S=kafka` for one)
 	$(COMPOSE) logs -f $(S)

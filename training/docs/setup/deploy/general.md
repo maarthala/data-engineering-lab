@@ -42,6 +42,7 @@ Run them from `local/`. The last column is what matters most:
 | `make destroy` | removes **everything the stack made** — containers, volumes, network and images (built and pulled) — a clean plate; the next `make up` rebuilds every image. Asks you to type `yes` | ⚠️ **wiped** |
 | `make ps` | show running services | — |
 | `make logs` (`make logs S=trino`) | tail logs (all, or one service) | — |
+| `make support` | something wrong? writes **one zip** to send to whoever helps you — see [Reporting a problem](#reporting-a-problem) | — |
 | `make docs` | rebuild the course site after editing `training/docs/**` | — |
 
 **Kept** means members, their lakehouses, tables, buckets, notebooks and DAGs, the catalog
@@ -55,6 +56,31 @@ volumes.
     sign-in. After either: `make up` (it recreates the catalog) and the `shopflow_medallion` DAG again.
     They only touch this stack — other projects' containers, volumes and images are left alone —
     and keep the `make init` downloads. To stop for the day, use **`make down`**.
+
+## Reporting a problem
+Something doesn't work — an *Access denied*, a red task in Airflow, a page that won't load? From
+`local/`, run:
+
+```bash
+make support
+```
+
+It asks what went wrong (one or two lines, optional), then writes **`local/support-<date>.zip`**.
+Send that file to whoever helps you. It holds:
+
+| File | What's in it |
+|---|---|
+| `system.txt` | your OS, Docker version, CPUs and memory, the lab version |
+| `status.txt` | every service: running or not, healthy, how often it restarted |
+| `problems.log` | every request that failed in any tool (status 4xx / 5xx): when, which app, what |
+| `airflow-failed/` | the log of each failed Airflow task of the last 7 days |
+| `containers/` | the last 2,000 lines of each service's log |
+| `env.txt` | your `.env` settings |
+
+**Passwords, secrets and tokens are masked** (`***`) in every file before the zip is written. It
+does hold usernames, app names and the stack's logs; open it first if you want to check. It only
+reads Docker, so it works even when you can't sign in. (After updating the lab, restart the gateway
+once, `docker restart gateway`, so `problems.log` names the app.)
 
 ## Updating the lab
 
