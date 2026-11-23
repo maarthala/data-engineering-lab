@@ -49,7 +49,7 @@ services:
   # One-shot: waits for the object store, then creates the shared demo bucket.
   storage-init:
     container_name: storage-init
-    image: ghcr.io/maarthala/de-stack/mc:RELEASE.2025-08-13T08-35-41Z   # S3 admin client (mc)
+    image: ghcr.io/maarthala/de-stack/mc:RELEASE.2025-08-13T08-35-41Z-multiarch   # S3 admin client (mc)
     depends_on:              # healthy, not just started — an early connection can hang forever
       storage:
         condition: service_healthy

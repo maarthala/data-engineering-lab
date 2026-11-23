@@ -9,8 +9,12 @@ SECRET_KEY="${STORAGE_ROOT_PASSWORD:-admin123}"
 
 # Wait until the store answers, then register it as the 'local' alias. Each try is capped at
 # 10 s: a connection made while the store is still starting can otherwise hang for good.
+# Each failed try prints why (otherwise a store that never answers looks like an endless wait).
 echo "Waiting for object storage at $ENDPOINT ..."
-until timeout 10 mc alias set local "$ENDPOINT" "$ACCESS_KEY" "$SECRET_KEY" >/dev/null 2>&1; do
+try=0
+until out=$(timeout 10 mc alias set local "$ENDPOINT" "$ACCESS_KEY" "$SECRET_KEY" 2>&1); do
+  try=$((try + 1))
+  echo "  try $try failed: ${out:-no answer within 10 s}" | tail -n 1
   sleep 2
 done
 echo "Object storage is ready."

@@ -3,7 +3,7 @@
 # stays small and mounts fast.
 FROM apache/airflow:3.3.2-python3.10
 # mc: mints each learner's own storage key for their DAG tasks (lab_spark), like JupyterHub does
-COPY --from=ghcr.io/maarthala/de-stack/mc:RELEASE.2025-08-13T08-35-41Z /usr/bin/mc /usr/local/bin/mc
+COPY --from=ghcr.io/maarthala/de-stack/mc:RELEASE.2025-08-13T08-35-41Z-multiarch /usr/bin/mc /usr/local/bin/mc
 
 # cncf.kubernetes = KubernetesPodOperator; papermill for the notebook DAG.
 # pyspark-client = thin Spark Connect client (no JVM), so an Airflow @task can

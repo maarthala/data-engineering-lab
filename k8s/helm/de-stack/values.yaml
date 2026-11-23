@@ -73,7 +73,7 @@ storage:
   # (S3-compatible, Apache-2.0). Console (Keycloak SSO, each learner sees only their own
   # bucket) at storage.<baseHost>.
   image: rustfs/rustfs:1.0.0
-  mcImage: ghcr.io/maarthala/de-stack/mc:RELEASE.2025-08-13T08-35-41Z   # admin client (works with RustFS)
+  mcImage: ghcr.io/maarthala/de-stack/mc:RELEASE.2025-08-13T08-35-41Z-multiarch   # admin client (works with RustFS)
   storage: 20Gi
   rootUser: admin            # password: secret key storage-root-password
   learnerQuotaMB: 100        # each member's bucket <user>-lake (hard limit; the default — managers change it on ⚙️ Settings)

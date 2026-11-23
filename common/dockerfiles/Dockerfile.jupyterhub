@@ -7,7 +7,7 @@ RUN python3 -m pip install --no-cache-dir \
       "jupyterhub==5.5.2" "oauthenticator==17.4.0" "dockerspawner==14.0.0" \
       "jupyterhub-idle-culler==2.0.0" "jupyterhub-kubespawner==7.0.0"
 # mc: creates each learner's own object-store key (RustFS admin API needs mc's encryption)
-COPY --from=ghcr.io/maarthala/de-stack/mc:RELEASE.2025-08-13T08-35-41Z /usr/bin/mc /usr/local/bin/mc
+COPY --from=ghcr.io/maarthala/de-stack/mc:RELEASE.2025-08-13T08-35-41Z-multiarch /usr/bin/mc /usr/local/bin/mc
 COPY add/lakehouse.py /srv/jupyterhub/lakehouse.py
 COPY add/labvault.py /srv/jupyterhub/labvault.py
 COPY add/lab_culler.py /srv/jupyterhub/lab_culler.py
